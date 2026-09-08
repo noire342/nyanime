@@ -1,0 +1,205 @@
+name: Sync AniYomi bleeding edge
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      integration_branch:
+        description: Branch receiving upstream AniYomi changes
+        required: false
+        default: dev
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-aniyomi-upstream
+  cancel-in-progress: true
+
+env:
+  UPSTREAM_REPOSITORY: aniyomiorg/aniyomi
+  UPSTREAM_BRANCH: main
+  DEFAULT_INTEGRATION_BRANCH: dev
+  SYNC_BRANCH: automation/aniyomi-upstream
+
+jobs:
+  sync:
+    name: Merge AniYomi bleeding edge
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        with:
+          java-version: 17
+          distribution: temurin
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@94baf225fe0a508e581a564467443d0e2379123b # v4.3.0
+
+      - name: Resolve integration branch
+        id: base
+        env:
+          REQUESTED_BRANCH: ${{ inputs.integration_branch }}
+        run: |
+          set -euo pipefail
+          git fetch origin --prune '+refs/heads/*:refs/remotes/origin/*'
+          branch="${REQUESTED_BRANCH:-$DEFAULT_INTEGRATION_BRANCH}"
+          if ! git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+            echo "::error::Integration branch '$branch' does not exist on origin. Create it before running the workflow."
+            exit 1
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "Using fork branch: $branch"
+
+      - name: Fetch latest upstream main
+        id: source
+        run: |
+          set -euo pipefail
+          git remote add upstream "https://github.com/$UPSTREAM_REPOSITORY.git"
+          git fetch --no-tags upstream \
+            "refs/heads/$UPSTREAM_BRANCH:refs/remotes/upstream/$UPSTREAM_BRANCH"
+          main_sha="$(git rev-parse "refs/remotes/upstream/$UPSTREAM_BRANCH")"
+          echo "sha=$main_sha" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${main_sha:0:12}" >> "$GITHUB_OUTPUT"
+          echo "AniYomi $UPSTREAM_BRANCH: $main_sha"
+
+      - name: Merge upstream main into dev
+        id: merge
+        env:
+          BASE_BRANCH: ${{ steps.base.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$SYNC_BRANCH" "origin/$BASE_BRANCH"
+
+          if git merge-base --is-ancestor "refs/remotes/upstream/$UPSTREAM_BRANCH" HEAD; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Fork already contains the latest upstream $UPSTREAM_BRANCH"
+            exit 0
+          fi
+
+          if ! git merge --no-edit --no-ff "refs/remotes/upstream/$UPSTREAM_BRANCH"; then
+            git merge --abort || true
+            echo "::error::Merge conflict while applying upstream $UPSTREAM_BRANCH to $BASE_BRANCH"
+            exit 1
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "Merge commit: $(git rev-parse HEAD)"
+
+      - name: Verify merged fork and build preview APK
+        if: steps.merge.outputs.changed == 'true'
+        run: ./gradlew spotlessCheck assemblePreview testDebugUnitTest -Penable-updater --no-daemon
+
+      - name: Prepare APK artifacts
+        if: steps.merge.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp app/build/outputs/apk/preview/app-*-preview.apk dist/
+          sha256sum dist/*.apk > dist/SHA256SUMS
+
+      - name: Upload APK artifacts
+        if: steps.merge.outputs.changed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: aniyomi-preview-${{ steps.source.outputs.short_sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish synchronization branch
+        if: steps.merge.outputs.changed == 'true'
+        run: git push --force-with-lease origin "HEAD:$SYNC_BRANCH"
+
+      - name: Publish GitHub preview release
+        id: release
+        if: steps.merge.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MAIN_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          tag="preview-${MAIN_SHA:0:12}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          notes="AniYomi bleeding-edge build from $UPSTREAM_REPOSITORY:$UPSTREAM_BRANCH at $MAIN_SHA."
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/*.apk dist/SHA256SUMS \
+              --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
+              --title "AniYomi preview $tag" --notes "$notes"
+          else
+            gh release create "$tag" dist/*.apk dist/SHA256SUMS \
+              --repo "$GITHUB_REPOSITORY" --target "$SYNC_BRANCH" \
+              --title "AniYomi preview $tag" --prerelease --notes "$notes"
+          fi
+
+      - name: Open or update synchronization PR
+        if: steps.merge.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ steps.base.outputs.branch }}
+          MAIN_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          main_short="${MAIN_SHA:0:12}"
+          title="Sync AniYomi $UPSTREAM_BRANCH $main_short"
+          body="This PR merges the latest upstream $UPSTREAM_REPOSITORY:$UPSTREAM_BRANCH (${MAIN_SHA}) into the fork integration branch (${BASE_BRANCH}). The preview APK and checks are attached to the workflow run."
+
+          number="$(gh pr list --base "$BASE_BRANCH" --head "$SYNC_BRANCH" \
+            --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$number" ]]; then
+            gh pr edit "$number" --title "$title" --body "$body"
+            echo "Updated PR #$number"
+          else
+            gh pr create --base "$BASE_BRANCH" --head "$SYNC_BRANCH" \
+              --title "$title" --body "$body"
+          fi
+
+      - name: Merge synchronization PR
+        if: steps.merge.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ steps.base.outputs.branch }}
+        run: |
+          set -euo pipefail
+          number="$(gh pr list --base "$BASE_BRANCH" --head "$SYNC_BRANCH" \
+            --state open --json number --jq '.[0].number // empty')"
+          if [[ -z "$number" ]]; then
+            echo "::warning::The synchronization PR could not be resolved; leaving it open for manual review."
+            exit 0
+          fi
+          if gh pr merge "$number" --merge --delete-branch; then
+            echo "Merged synchronization PR #$number"
+          elif gh pr merge "$number" --auto --merge --delete-branch; then
+            echo "Automatic merge enabled for PR #$number"
+          else
+            echo "::warning::The synchronization PR could not be merged automatically; PR #$number remains open."
+          fi
+
+      - name: Write summary
+        if: always()
+        env:
+          BASE_BRANCH: ${{ steps.base.outputs.branch }}
+          MAIN_SHA: ${{ steps.source.outputs.sha }}
+          PREVIEW_RELEASE: ${{ steps.release.outputs.tag }}
+        run: |
+          {
+            echo "### AniYomi bleeding-edge synchronization"
+            echo "- Source: `$UPSTREAM_REPOSITORY:$UPSTREAM_BRANCH`"
+            echo "- Source commit: `$MAIN_SHA`"
+            echo "- Target branch: `$BASE_BRANCH`"
+            echo "- Preview release: `${PREVIEW_RELEASE:-not created}`"
+            echo "- APK artifacts are uploaded to this workflow run."
+            echo "- Conflicts or failed checks stop the workflow before the PR is updated."
+          } >> "$GITHUB_STEP_SUMMARY"
