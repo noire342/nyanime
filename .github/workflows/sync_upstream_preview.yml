@@ -137,6 +137,25 @@ jobs:
         if: steps.merge.outputs.build == 'true'
         run: ./gradlew spotlessCheck assemblePreview testDebugUnitTest -Penable-updater --no-daemon
 
+      - name: Verify stable preview signature
+        if: steps.merge.outputs.build == 'true'
+        env:
+          EXPECTED_CERT_SHA256: F99AD47F9286CE3D61345F65DD0F888F16AEBF53BFE75EFE5B6AB889041AB259
+        run: |
+          set -euo pipefail
+          actual_cert="$(keytool -list -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            | awk -F': ' '/SHA256:/{print $2; exit}' \
+            | tr -cd '[:xdigit:]' \
+            | tr '[:lower:]' '[:upper:]')"
+          if [[ "$actual_cert" != "$EXPECTED_CERT_SHA256" ]]; then
+            echo "::error::Preview signing certificate mismatch. Expected $EXPECTED_CERT_SHA256, got $actual_cert"
+            exit 1
+          fi
+          echo "Stable preview signing certificate verified: $actual_cert"
+
       - name: Prepare APK artifacts
         if: steps.merge.outputs.build == 'true'
         run: |
@@ -233,10 +252,10 @@ jobs:
         run: |
           {
             echo "### AniYomi bleeding-edge synchronization"
-            echo "- Source: `$UPSTREAM_REPOSITORY:$UPSTREAM_BRANCH`"
-            echo "- Source commit: `$MAIN_SHA`"
-            echo "- Target branch: `$BASE_BRANCH`"
-            echo "- Preview release: `${PREVIEW_RELEASE:-not created}`"
+            echo "- Source: \`$UPSTREAM_REPOSITORY:$UPSTREAM_BRANCH\`"
+            echo "- Source commit: \`$MAIN_SHA\`"
+            echo "- Target branch: \`$BASE_BRANCH\`"
+            echo "- Preview release: \`${PREVIEW_RELEASE:-not created}\`"
             echo "- APK artifacts are uploaded to this workflow run."
             echo "- Conflicts or failed checks stop the workflow before the PR is updated."
           } >> "$GITHUB_STEP_SUMMARY"
