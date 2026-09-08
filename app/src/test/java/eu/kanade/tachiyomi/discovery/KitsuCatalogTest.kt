@@ -64,6 +64,8 @@ class KitsuCatalogTest {
     fun `season filters and page offset use the actual requested date`() = runBlocking {
         val client = OkHttpClient.Builder().addInterceptor { chain ->
             val url = chain.request().url
+            assertNull(url.queryParameter("filter[nsfw]"))
+            assertEquals("G,PG,R", url.queryParameter("filter[ageRating]"))
             assertEquals("winter", url.queryParameter("filter[season]"))
             assertEquals("2027", url.queryParameter("filter[seasonYear]"))
             assertEquals("20", url.queryParameter("page[offset]"))

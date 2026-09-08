@@ -46,11 +46,11 @@ class KitsuCatalogRemote(
         }
         val trending = request.feed == CatalogFeed.TRENDING
         val builder = "$BASE/${if (trending) "trending/anime" else "anime"}".toHttpUrl().newBuilder()
-            .addQueryParameter("filter[nsfw]", "false")
         if (trending) {
             builder.addQueryParameter("limit", "20")
         } else {
-            builder.addQueryParameter("page[limit]", "20")
+            builder.addQueryParameter("filter[ageRating]", "G,PG,R")
+                .addQueryParameter("page[limit]", "20")
                 .addQueryParameter("page[offset]", ((request.page - 1) * 20).toString())
             when (request.feed) {
                 CatalogFeed.SEASON, CatalogFeed.NEXT_SEASON -> {
