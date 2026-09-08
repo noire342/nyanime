@@ -186,7 +186,7 @@ class Anime4KTest {
     }
 
     @Test
-    fun `smart controller starts at primary and promotes after sustained headroom`() {
+    fun `smart controller starts at the highest compatible preset`() {
         val mediaInfo = Anime4KMediaInfo(
             sourceWidth = 1920,
             sourceHeight = 1080,
@@ -196,56 +196,49 @@ class Anime4KTest {
         )
         val controller = Anime4KSmartController(mediaInfo, initialTimestampMillis = 0L)
 
-        assertEquals(Anime4KMode.ModeA, controller.currentMode)
-        for (second in 1L..36L) controller.onSample(healthySample(second))
-
         assertEquals(Anime4KMode.ModeAPlusHq, controller.currentMode)
         assertEquals(false, controller.isSuspended)
     }
 
     @Test
-    fun `smart controller reverts an overloaded probe and blocks it`() {
+    fun `smart controller downgrades from the maximum after overload`() {
         val controller = Anime4KSmartController(upscaledMediaInfo(), initialTimestampMillis = 0L)
 
-        for (second in 1L..12L) controller.onSample(healthySample(second))
+        assertEquals(Anime4KMode.ModeAPlusHq, controller.currentMode)
+        controller.onSample(healthySample(1L))
+        for (second in 2L..7L) {
+            controller.onSample(healthySample(second, filterFps = 15.0))
+        }
+
         assertEquals(Anime4KMode.ModeAPlus, controller.currentMode)
 
-        controller.onSample(healthySample(13L))
-        controller.onSample(healthySample(14L))
-        controller.onSample(
-            healthySample(
-                timestampSeconds = 19L,
-                outputDroppedFrames = 2L,
-                filterFps = 15.0,
-            ),
-        )
-        assertEquals(Anime4KMode.ModeA, controller.currentMode)
-
-        for (second in 20L..45L) controller.onSample(healthySample(second))
-        assertEquals(Anime4KMode.ModeA, controller.currentMode)
+        for (second in 8L..30L) controller.onSample(healthySample(second))
+        assertEquals(Anime4KMode.ModeAPlus, controller.currentMode)
     }
 
     @Test
     fun `smart controller suspends at off after severe overload until resume`() {
         val controller = Anime4KSmartController(nativeMediaInfo(), initialTimestampMillis = 0L)
 
+        assertEquals(Anime4KMode.ModeAHq, controller.currentMode)
         controller.onSample(healthySample(1L))
-        controller.onSample(healthySample(2L))
-        controller.onSample(
-            healthySample(
-                timestampSeconds = 7L,
-                outputDroppedFrames = 10L,
-                filterFps = 10.0,
-            ),
-        )
+        for (second in 2L..7L) {
+            controller.onSample(healthySample(second, filterFps = 10.0))
+        }
+        assertEquals(Anime4KMode.ModeA, controller.currentMode)
+
+        for (second in 8L..14L) {
+            controller.onSample(healthySample(second, filterFps = 10.0))
+        }
+
         assertEquals(Anime4KMode.Off, controller.currentMode)
         assertEquals(true, controller.isSuspended)
 
-        for (second in 8L..20L) controller.onSample(healthySample(second))
+        for (second in 15L..20L) controller.onSample(healthySample(second))
         assertEquals(Anime4KMode.Off, controller.currentMode)
 
         controller.resume(21_000L)
-        assertEquals(Anime4KMode.ModeA, controller.currentMode)
+        assertEquals(Anime4KMode.ModeAHq, controller.currentMode)
         assertEquals(false, controller.isSuspended)
     }
 
@@ -257,11 +250,23 @@ class Anime4KTest {
             controller.onSample(healthySample(second, filterFps = null))
         }
 
-        assertEquals(Anime4KMode.ModeA, controller.currentMode)
+        assertEquals(Anime4KMode.ModeAPlusHq, controller.currentMode)
     }
 
     @Test
-    fun `smart controller respects the stored calibration ceiling`() {
+    fun `smart diagnostics keep the last evaluated health while collecting a new window`() {
+        val controller = Anime4KSmartController(upscaledMediaInfo(), initialTimestampMillis = 0L)
+
+        for (second in 1L..7L) controller.onSample(healthySample(second))
+        assertEquals(Anime4KHealth.Healthy, controller.diagnostics.health)
+
+        controller.onSample(healthySample(8L, filterFps = null))
+
+        assertEquals(Anime4KHealth.Healthy, controller.diagnostics.health)
+    }
+
+    @Test
+    fun `smart controller starts at the maximum despite an older lower calibration`() {
         val controller = Anime4KSmartController(
             initialMediaInfo = upscaledMediaInfo(),
             initialTimestampMillis = 0L,
@@ -272,9 +277,22 @@ class Anime4KTest {
             ),
         )
 
-        for (second in 1L..40L) controller.onSample(healthySample(second))
+        assertEquals(Anime4KMode.ModeAPlusHq, controller.currentMode)
+    }
 
-        assertEquals(Anime4KMode.ModeAPlus, controller.currentMode)
+    @Test
+    fun `smart raises the ceiling when late media metadata enables a secondary pass`() {
+        val incompleteMediaInfo = upscaledMediaInfo().copy(frameRateKnown = false)
+        val controller = Anime4KSmartController(incompleteMediaInfo, initialTimestampMillis = 0L)
+
+        assertEquals(Anime4KMode.ModeAHq, controller.currentMode)
+        val adjustment = controller.updateMediaInfo(
+            upscaledMediaInfo(),
+            nowMillis = 2_000L,
+        )
+
+        assertEquals(Anime4KMode.ModeAPlusHq, adjustment?.mode)
+        assertEquals(Anime4KMode.ModeAPlusHq, controller.currentMode)
     }
 
     @Test
@@ -297,7 +315,7 @@ class Anime4KTest {
         val controller = Anime4KSmartController(upscaledMediaInfo(), initialTimestampMillis = 0L)
 
         for (second in 1L..12L) controller.onSample(healthySample(second))
-        assertEquals(Anime4KMode.ModeAPlus, controller.currentMode)
+        assertEquals(Anime4KMode.ModeAPlusHq, controller.currentMode)
 
         val adjustment = controller.updateMediaInfo(
             upscaledMediaInfo().copy(
@@ -307,8 +325,8 @@ class Anime4KTest {
             nowMillis = 20_000L,
         )
 
-        assertEquals(Anime4KMode.ModeA, adjustment?.mode)
-        assertEquals(Anime4KMode.ModeA, controller.currentMode)
+        assertEquals(Anime4KMode.ModeAHq, adjustment?.mode)
+        assertEquals(Anime4KMode.ModeAHq, controller.currentMode)
     }
 
     @Test
@@ -324,14 +342,14 @@ class Anime4KTest {
         val controller = Anime4KSmartController(upscaledMediaInfo(), initialTimestampMillis = 0L)
 
         for (second in 1L..12L) controller.onSample(healthySample(second))
-        assertEquals(Anime4KMode.ModeAPlus, controller.currentMode)
+        assertEquals(Anime4KMode.ModeAPlusHq, controller.currentMode)
         controller.onShaderError(nowMillis = 12_000L)
-        assertEquals(Anime4KMode.ModeA, controller.currentMode)
+        assertEquals(Anime4KMode.ModeAPlus, controller.currentMode)
         controller.resume(13_000L)
 
         for (second in 14L..45L) controller.onSample(healthySample(second))
 
-        assertEquals(Anime4KMode.ModeA, controller.currentMode)
+        assertEquals(Anime4KMode.ModeAPlus, controller.currentMode)
     }
 
     @Test
@@ -365,7 +383,7 @@ class Anime4KTest {
                 "vulkan",
                 "driver-a",
                 "hwdec",
-                calibrationRevision = "ahg-2",
+                calibrationRevision = "ahg-3",
             ),
         )
     }

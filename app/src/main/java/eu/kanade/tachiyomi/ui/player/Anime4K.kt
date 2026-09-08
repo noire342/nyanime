@@ -261,7 +261,7 @@ object Anime4KSelectionRules {
 object Anime4K {
     const val VERSION = "4.0.1"
     const val SHADER_REVISION = "4.0.1"
-    const val CALIBRATION_REVISION = "ahg-1"
+    const val CALIBRATION_REVISION = "ahg-2"
 
     /** Anime4K documents secondary passes for an upscale ratio of roughly 2x or higher. */
     private const val SECONDARY_PASS_MIN_SCALE = 1.85
