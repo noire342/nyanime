@@ -36,9 +36,17 @@ class UiPreferences(
 
     fun tabletUiMode() = preferenceStore.getEnum("tablet_ui_mode", TabletUiMode.AUTOMATIC)
 
-    fun startScreen() = preferenceStore.getEnum("start_screen", StartScreen.ANIME)
+    fun startScreen() = preferenceStore.getEnum("start_screen", StartScreen.HOME)
 
-    fun navStyle() = preferenceStore.getEnum("bottom_rail_nav_style", NavStyle.MOVE_HISTORY_TO_MORE)
+    fun navStyle() = preferenceStore.getEnum("bottom_rail_nav_style", NavStyle.DISCOVERY)
+
+    fun installDiscoveryNavigationOnce() {
+        val migrated = preferenceStore.getBoolean("fork_discovery_navigation_v1", false)
+        if (migrated.get()) return
+        startScreen().set(StartScreen.HOME)
+        navStyle().set(NavStyle.DISCOVERY)
+        migrated.set(true)
+    }
 
     companion object {
         fun dateFormat(format: String): DateTimeFormatter = when (format) {

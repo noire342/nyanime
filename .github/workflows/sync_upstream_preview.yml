@@ -137,6 +137,30 @@ jobs:
         if: steps.merge.outputs.build == 'true'
         run: ./gradlew spotlessCheck assemblePreview testDebugUnitTest -Penable-updater --no-daemon
 
+      - name: Upload deterministic test reports
+        if: always() && steps.merge.outputs.build == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fork-unit-tests
+          path: app/build/test-results/testDebugUnitTest
+          if-no-files-found: warn
+
+      - name: Probe live public catalogue
+        id: catalogue
+        if: steps.merge.outputs.build == 'true'
+        continue-on-error: true
+        env:
+          ANIYOMI_VERIFY_CATALOG: 'true'
+        run: ./gradlew :app:testDebugUnitTest --tests '*AnilistLiveCatalogTest' --no-daemon
+
+      - name: Upload live catalogue report
+        if: always() && steps.catalogue.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: catalogue-live-probe
+          path: app/build/test-results/testDebugUnitTest/TEST-*AnilistLiveCatalogTest.xml
+          if-no-files-found: warn
+
       - name: Verify stable preview signature
         if: steps.merge.outputs.build == 'true'
         env:

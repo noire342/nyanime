@@ -99,6 +99,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         Injekt.importModule(PreferenceModule(this))
         Injekt.importModule(AppModule(this))
         Injekt.importModule(DomainModule())
+        Injekt.importModule(eu.kanade.tachiyomi.data.discovery.DiscoveryModule(this))
         // SY -->
         Injekt.importModule(SYDomainModule())
         // SY <--

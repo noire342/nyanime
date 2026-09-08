@@ -1,0 +1,87 @@
+# Home anime e selezione automatica delle fonti
+
+La Home aggiunge catalogo pubblico AniList, cronologia locale, nuovi episodi rilevati e feed
+delle estensioni. Il player, Anime4K, package, firma e aggiornamento dell'app restano quelli del fork.
+
+## Uso
+
+La navigazione iniziale è Home / Anime / Manga / Esplora / Altro. Aggiornamenti e Cronologia
+sono accessibili dalla Home e da Altro. La migrazione si applica una sola volta: in Impostazioni
+rimangono selezionabili le schermate iniziali e le disposizioni classiche.
+
+Una copertina AniList apre la scheda; **Apri episodi**, **Riprendi** e **Aggiungi alla libreria**
+risolvono automaticamente una versione nelle estensioni installate e abilitate.
+**Cambia versione / Cerca nelle fonti** è una correzione facoltativa, non un passaggio obbligatorio.
+Non vengono installate estensioni, aggiunti tracker o aggirati blocchi delle fonti.
+
+## Regole del resolver
+
+1. Riutilizza il collegamento locale o una corrispondenza locale univoca AniList/MAL.
+   Rivalida che la fonte sia installata, visibile e in una lingua abilitata.
+2. Cerca su richiesta, avviando prima ultima fonte e preferite; massimo tre ricerche concorrenti.
+   Usa titolo, titoli alternativi e titolo base. Appena una versione supera la verifica,
+   annulla le ricerche ancora in corso. Limite complessivo 60 secondi, verifica singola 15 secondi.
+3. Normalizza accenti, punteggiatura e qualificatori sub/dub; numeri di stagione/parte
+   incompatibili e anni espliciti differenti non sono equivalenti.
+4. Controlla dettagli ed episodi reali. Un contenitore con stagioni apre il figlio corrispondente.
+   Una stagione non viene scelta soltanto perché è l'unica presente.
+5. Una raccolta unica rimane unica. Per accettarla come seconda/ulteriore stagione servono
+   titolo base compatibile, una catena AniList non ambigua di prequel TV/ONA conclusi con
+   conteggi noti e una numerazione continua della fonte che copra il totale necessario.
+   Episodi speciali o duplicati non sono prova sufficiente.
+6. Salva l'associazione opera -> URL/fonte, salvo modalità incognito. Le associazioni a fonti
+   temporaneamente disabilitate non vengono utilizzate né distrutte.
+
+È un'euristica controllata, non una garanzia d'identità universale: titoli non standard,
+raccolte con numerazione che ricomincia e prequel privi di metadati possono richiedere
+la correzione facoltativa. Non vengono inventati offset o riscritti i progressi.
+La versione concreta della fonte mantiene la propria identità e il proprio ordinamento.
+
+## Architettura
+
+- `domain/discovery`: modelli, contratti, scadenze, identità, confronto titoli e prove sulle raccolte.
+- `data/discovery`: repository cache e persistenza SQLDelight.
+- `app/data/discovery`: adattatore GraphQL, estensioni, risoluzione, sezioni locali e ripresa.
+- `app/ui/discovery`: ScreenModel e navigazione; `presentation/discovery`: componenti Compose.
+- `DiscoveryModule`: composition root Injekt.
+- `discovery.db`: database separato dagli archivi anime/manga upstream. Nuovi cambi di schema
+  devono avere migrazioni nella propria directory SQLDelight, senza riutilizzare le migrazioni upstream.
+
+Cache: feed 30 minuti, calendario 15 minuti, dettagli 24 ore; fino a 100 pagine e 300 schede.
+Cache immediata, refresh indipendente, errori per sezione, richieste duplicate accorpate.
+Il calendario rappresenta la messa in onda nel fuso locale, non la disponibilità nell'estensione.
+Il budget AniList è condiviso col tracking, inizialmente circa 28 richieste/minuto,
+ridotto dagli header del servizio e sospeso in caso di 429.
+
+La modalità solo download impedisce richieste al catalogo e alle fonti; la ripresa usa soltanto
+episodi scaricati. La modalità incognito disabilita la cache persistente del catalogo,
+nasconde le sezioni locali sensibili e impedisce di ricordare nuove associazioni.
+Le cache immagini continuano a seguire il comportamento del caricatore immagini dell'app.
+
+## Verifica
+
+Verifica deterministica:
+
+```sh
+./gradlew spotlessCheck testDebugUnitTest
+```
+
+Probe opzionale che usa **lo stesso adattatore di produzione**, senza account:
+
+```sh
+ANIYOMI_VERIFY_CATALOG=true ./gradlew :app:testDebugUnitTest --tests '*AnilistLiveCatalogTest'
+```
+
+Il workflow preview conserva separatamente i risultati deterministici e il probe live.
+Un errore remoto del probe non nasconde l'esito dei test e non impedisce la produzione dell'APK;
+non va interpretato come una verifica positiva del catalogo.
+
+Checklist manuale prima di considerare la funzionalità validata su dispositivo:
+
+- Installare l'APK universale come aggiornamento, verificare package e certificato.
+- Telefono/tablet, chiaro/scuro, font ingranditi, immagini progressive.
+- Rientro dalla scheda al punto di scorrimento; rotazione e ricreazione del processo.
+- Fonti effettivamente installate: titolo univoco, raccolta completa, stagioni separate,
+  fonte disabilitata/rimossa, incognito e solo download.
+- Ripresa incompleta, episodio terminato, fine serie e download.
+- Catalogo reale, ricerca, pagina successiva e calendario; 403/429 e rete assente.

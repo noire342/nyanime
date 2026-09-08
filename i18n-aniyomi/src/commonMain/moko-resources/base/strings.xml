@@ -631,4 +631,6 @@
     <string name="pref_download_fillermarked_items">Allow downloading of fillermarked episodes</string>
     <string name="show_episode_previews">Episode thumbnails</string>
     <string name="show_episode_summaries">Episode summaries</string>
+    <string name="discovery_home">Home</string>
+    <string name="discovery_navigation">Home, Anime, Manga, Esplora, Altro</string>
 </resources>

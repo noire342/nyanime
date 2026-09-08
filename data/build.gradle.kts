@@ -14,6 +14,12 @@ android {
 
     sqldelight {
         databases {
+            create("DiscoveryDatabase") {
+                packageName.set("tachiyomi.data.discovery")
+                dialect(libs.sqldelight.dialects.sql)
+                srcDirs.from(project.file("./src/main/sqldelightdiscovery"))
+                schemaOutputDirectory.set(project.file("./src/main/sqldelightdiscovery"))
+            }
             create("Database") {
                 packageName.set("tachiyomi.data")
                 dialect(libs.sqldelight.dialects.sql)

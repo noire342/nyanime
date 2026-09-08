@@ -38,7 +38,7 @@ fun MoreScreen(
     incognitoMode: Boolean,
     onIncognitoModeChange: (Boolean) -> Unit,
     navStyle: NavStyle,
-    onClickAlt: () -> Unit,
+    onClickAlt: (eu.kanade.presentation.util.Tab) -> Unit,
     onClickDownloadQueue: () -> Unit,
     onClickCategories: () -> Unit,
     onClickStats: () -> Unit,
@@ -78,12 +78,14 @@ fun MoreScreen(
 
             item { HorizontalDivider() }
 
-            item {
-                TextPreferenceWidget(
-                    title = navStyle.moreTab.options.title,
-                    icon = navStyle.moreIcon,
-                    onPreferenceClick = onClickAlt,
-                )
+            navStyle.overflowTabs.forEach { tab ->
+                item {
+                    TextPreferenceWidget(
+                        title = tab.options.title,
+                        icon = navStyle.overflowIcon(tab),
+                        onPreferenceClick = { onClickAlt(tab) },
+                    )
+                }
             }
 
             item {
