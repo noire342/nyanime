@@ -91,6 +91,29 @@ class SmartSourceResolverTest {
     }
 
     @Test
+    fun `combined episodes use the same title number recognition as the library`() = runBlocking {
+        prepare(24)
+        coEvery { engine.getEpisodeList(any()) } returns List(24) { index ->
+            SEpisode.create().apply {
+                name = "Episode ${index + 1}"
+                url = "/ep/$index"
+                episode_number = -1f
+            }
+        }
+        assertEquals(local.id, resolver.resolve(target) {}?.id)
+    }
+
+    @Test
+    fun `first verified result stops unnecessary searches`() = runBlocking {
+        prepare(24)
+        every { sources.search(any(), any()) } returns kotlinx.coroutines.flow.flow {
+            emit(SourceSearchResult(source, listOf(local)))
+            error("A successful match must cancel remaining results")
+        }
+        assertEquals(local.id, resolver.resolve(target) {}?.id)
+    }
+
+    @Test
     fun `first season alone is not claimed as a combined second season`() = runBlocking {
         prepare(13)
         assertNull(resolver.resolve(target) {})

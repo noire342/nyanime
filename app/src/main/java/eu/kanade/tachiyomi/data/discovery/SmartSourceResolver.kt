@@ -18,6 +18,7 @@ import tachiyomi.domain.discovery.CatalogSeriesEvidence
 import tachiyomi.domain.discovery.SmartTitleMatcher
 import tachiyomi.domain.entries.anime.interactor.NetworkToLocalAnime
 import tachiyomi.domain.entries.anime.model.Anime
+import tachiyomi.domain.items.episode.service.EpisodeRecognition
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 
 /**
@@ -139,8 +140,10 @@ class SmartSourceResolver(
         ) {
             val minimum = series.minimumCombinedEpisodes(catalog)
             // Specials/duplicates must not make a short first season look like a collection.
-            val numbers = episodes.map { it.episode_number }.filter { it > 0 && it % 1f == 0f }.toSet()
-            minimum != null && numbers.containsAll((1..minimum).map(Int::toFloat))
+            val numbers = episodes.map {
+                EpisodeRecognition.parseEpisodeNumber(resolvedDetails.title, it.name, it.episode_number.toDouble())
+            }.filter { it > 0 && it % 1.0 == 0.0 }.toSet()
+            minimum != null && numbers.containsAll((1..minimum).map(Int::toDouble))
         } else {
             false
         }
