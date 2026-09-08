@@ -52,14 +52,19 @@ class GetApplicationRelease(
         versionTag: String,
     ): Boolean {
         // Removes prefixes like "r" or "v"
-        val newVersion = versionTag.replace("[^\\d.]".toRegex(), "")
         return if (isPreview) {
-            // Preview builds: based on releases in "tachiyomiorg/tachiyomi-preview" repo
-            // tagged as something like "r1234"
-            newVersion.toInt() > commitCount
+            // Preview builds from the fork are tagged as "r<fork commit count>".
+            // Reject unrelated tag formats instead of accidentally extracting digits from them.
+            val newCommitCount = PREVIEW_TAG_REGEX
+                .matchEntire(versionTag)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.toIntOrNull()
+            newCommitCount != null && newCommitCount > commitCount
         } else {
             // Release builds: based on releases in "tachiyomiorg/tachiyomi" repo
             // tagged as something like "v0.1.2"
+            val newVersion = versionTag.replace("[^\\d.]".toRegex(), "")
             val oldVersion = versionName.replace("[^\\d.]".toRegex(), "")
 
             val newSemVer = newVersion.split(".").map { it.toInt() }
@@ -87,5 +92,9 @@ class GetApplicationRelease(
         data class NewUpdate(val release: Release) : Result
         data object NoNewUpdate : Result
         data object OsTooOld : Result
+    }
+
+    private companion object {
+        val PREVIEW_TAG_REGEX = Regex("^r(\\d+)$", RegexOption.IGNORE_CASE)
     }
 }

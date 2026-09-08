@@ -16,12 +16,26 @@ class ReleaseServiceImpl(
 ) : ReleaseService {
 
     override suspend fun latest(arguments: GetApplicationRelease.Arguments): Release? {
-        val release = with(json) {
-            networkService.client
-                .newCall(GET("https://api.github.com/repos/${arguments.repository}/releases/latest"))
-                .awaitSuccess()
-                .parseAs<GithubRelease>()
-        }
+        val release = if (arguments.isPreview) {
+            // GitHub's /releases/latest endpoint excludes prereleases. The fork publishes
+            // bleeding-edge builds as prereleases, so inspect the newest releases and choose the
+            // first one that contains an APK compatible with this device.
+            with(json) {
+                networkService.client
+                    .newCall(GET("https://api.github.com/repos/${arguments.repository}/releases?per_page=20"))
+                    .awaitSuccess()
+                    .parseAs<List<GithubRelease>>()
+                    .firstOrNull { getDownloadLink(it) != null }
+            }
+        } else {
+            with(json) {
+                networkService.client
+                    .newCall(GET("https://api.github.com/repos/${arguments.repository}/releases/latest"))
+                    .awaitSuccess()
+                    .parseAs<GithubRelease>()
+            }
+        } ?: return null
+
         val downloadLink = getDownloadLink(release = release) ?: return null
 
         return Release(

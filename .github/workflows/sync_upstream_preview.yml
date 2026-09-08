@@ -10,6 +10,11 @@ on:
         required: false
         default: dev
         type: string
+      force_build:
+        description: Build and publish the current fork even when upstream is already synchronized
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -76,33 +81,56 @@ jobs:
         id: merge
         env:
           BASE_BRANCH: ${{ steps.base.outputs.branch }}
+          FORCE_BUILD: ${{ inputs.force_build }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B "$SYNC_BRANCH" "origin/$BASE_BRANCH"
 
+          changed=false
           if git merge-base --is-ancestor "refs/remotes/upstream/$UPSTREAM_BRANCH" HEAD; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "Fork already contains the latest upstream $UPSTREAM_BRANCH"
-            exit 0
+          else
+            if ! git merge --no-edit --no-ff "refs/remotes/upstream/$UPSTREAM_BRANCH"; then
+              git merge --abort || true
+              echo "::error::Merge conflict while applying upstream $UPSTREAM_BRANCH to $BASE_BRANCH"
+              exit 1
+            fi
+            changed=true
+            echo "Merge commit: $(git rev-parse HEAD)"
           fi
 
-          if ! git merge --no-edit --no-ff "refs/remotes/upstream/$UPSTREAM_BRANCH"; then
-            git merge --abort || true
-            echo "::error::Merge conflict while applying upstream $UPSTREAM_BRANCH to $BASE_BRANCH"
+          build=false
+          if [[ "$changed" == "true" || "$FORCE_BUILD" == "true" ]]; then
+            build=true
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          if [[ "$build" == "true" && "$changed" == "false" ]]; then
+            echo "Manual force build requested for the already synchronized fork"
+          fi
+
+      - name: Configure stable preview signing
+        if: steps.merge.outputs.build == 'true'
+        env:
+          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$ANDROID_DEBUG_KEYSTORE_BASE64" ]]; then
+            echo "::error::Missing ANDROID_DEBUG_KEYSTORE_BASE64 repository secret; refusing to publish an APK that cannot update the installed fork."
             exit 1
           fi
-
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-          echo "Merge commit: $(git rev-parse HEAD)"
+          mkdir -p "$HOME/.android"
+          printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
 
       - name: Verify merged fork and build preview APK
-        if: steps.merge.outputs.changed == 'true'
+        if: steps.merge.outputs.build == 'true'
         run: ./gradlew spotlessCheck assemblePreview testDebugUnitTest -Penable-updater --no-daemon
 
       - name: Prepare APK artifacts
-        if: steps.merge.outputs.changed == 'true'
+        if: steps.merge.outputs.build == 'true'
         run: |
           set -euo pipefail
           mkdir -p dist
@@ -110,7 +138,7 @@ jobs:
           sha256sum dist/*.apk > dist/SHA256SUMS
 
       - name: Upload APK artifacts
-        if: steps.merge.outputs.changed == 'true'
+        if: steps.merge.outputs.build == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: aniyomi-preview-${{ steps.source.outputs.short_sha }}
@@ -119,20 +147,21 @@ jobs:
           retention-days: 90
 
       - name: Publish synchronization branch
-        if: steps.merge.outputs.changed == 'true'
+        if: steps.merge.outputs.build == 'true'
         run: git push --force-with-lease origin "HEAD:$SYNC_BRANCH"
 
       - name: Publish GitHub preview release
         id: release
-        if: steps.merge.outputs.changed == 'true'
+        if: steps.merge.outputs.build == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           MAIN_SHA: ${{ steps.source.outputs.sha }}
         run: |
           set -euo pipefail
-          tag="preview-${MAIN_SHA:0:12}"
+          fork_commit_count="$(git rev-list --count HEAD)"
+          tag="r${fork_commit_count}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          notes="AniYomi bleeding-edge build from $UPSTREAM_REPOSITORY:$UPSTREAM_BRANCH at $MAIN_SHA."
+          notes="AniYomi bleeding-edge build from $UPSTREAM_REPOSITORY:$UPSTREAM_BRANCH at $MAIN_SHA (fork commit $fork_commit_count)."
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" dist/*.apk dist/SHA256SUMS \
               --repo "$GITHUB_REPOSITORY" --clobber

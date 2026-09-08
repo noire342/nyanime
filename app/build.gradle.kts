@@ -66,6 +66,7 @@ android {
 
             versionNameSuffix = debug.versionNameSuffix
             signingConfig = debug.signingConfig
+            buildConfigField("boolean", "UPDATER_ENABLED", "true")
 
             matchingFallbacks.addAll(commonMatchingFallbacks)
 

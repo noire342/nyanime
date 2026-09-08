@@ -376,7 +376,9 @@ class MainActivity : BaseActivity() {
         LaunchedEffect(Unit) {
             if (updaterEnabled) {
                 try {
-                    val result = AppUpdateChecker().checkForUpdate(context)
+                    // Preview builds follow the fork's bleeding-edge release cadence. Check once
+                    // for every app launch instead of inheriting the upstream three-day cache.
+                    val result = AppUpdateChecker().checkForUpdate(context, forceCheck = true)
                     if (result is GetApplicationRelease.Result.NewUpdate) {
                         val updateScreen = NewUpdateScreen(
                             versionName = result.release.version,
