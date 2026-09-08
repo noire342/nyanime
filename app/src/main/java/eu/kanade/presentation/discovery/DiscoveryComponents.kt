@@ -40,6 +40,7 @@ import eu.kanade.tachiyomi.data.discovery.LocalHomeItem
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogFeed
 import tachiyomi.domain.discovery.SectionState
+import tachiyomi.domain.entries.anime.model.asAnimeCover
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -250,7 +251,7 @@ fun LocalAnimeRow(state: SectionState<List<LocalHomeItem>>, onOpen: (Long) -> Un
     LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(items, key = { it.anime.id }) { item ->
             Column(Modifier.width(160.dp)) {
-                PosterCard(item.anime.title, item.anime.thumbnailUrl, item.episode.name, { onOpen(item.anime.id) })
+                PosterCard(item.anime.title, item.anime.asAnimeCover(), item.episode.name, { onOpen(item.anime.id) })
                 if (item.progress > 0) {
                     LinearProgressIndicator(
                         progress = { item.progress },

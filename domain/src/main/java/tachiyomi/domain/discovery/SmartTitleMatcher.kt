@@ -51,6 +51,12 @@ object SmartTitleMatcher {
                 expected == actual -> 100
                 baseTitle(title).length < 3 -> 0
                 baseTitle(title) == baseTitle(candidate) &&
+                    anime.relations.none { it.relationship == "PREQUEL" } &&
+                    (expectedSeason ?: 1) == 1 &&
+                    (candidateSeason ?: 1) == 1 &&
+                    (expectedPart ?: "1") == "1" &&
+                    (actualPart ?: "1") == "1" -> 95
+                baseTitle(title) == baseTitle(candidate) &&
                     expectedSeason == candidateSeason &&
                     expectedPart == actualPart -> 95
                 baseTitle(title) == baseTitle(candidate) && collection -> 85

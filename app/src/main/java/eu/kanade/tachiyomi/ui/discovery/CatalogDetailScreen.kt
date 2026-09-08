@@ -43,6 +43,7 @@ import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import tachiyomi.domain.discovery.CatalogId
+import tachiyomi.domain.entries.anime.model.asAnimeCover
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -137,7 +138,7 @@ class CatalogDetailScreen(private val catalogId: Long) : Screen() {
                                 items(result.items, key = { it.id }) { candidate ->
                                     PosterCard(
                                         candidate.title,
-                                        candidate.thumbnailUrl,
+                                        candidate.asAnimeCover(),
                                         result.source.language.uppercase(),
                                         {
                                             manualVersion = false

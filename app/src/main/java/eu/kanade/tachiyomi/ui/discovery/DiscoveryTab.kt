@@ -59,6 +59,7 @@ import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogFeed
 import tachiyomi.domain.discovery.SectionState
+import tachiyomi.domain.entries.anime.model.asAnimeCover
 import tachiyomi.domain.source.anime.interactor.GetRemoteAnime
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -202,7 +203,7 @@ data object DiscoveryTab : Tab {
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 items(section.data.orEmpty(), key = { it.id }) { anime ->
-                                    PosterCard(anime.title, anime.thumbnailUrl, selected.language.uppercase(), {
+                                    PosterCard(anime.title, anime.asAnimeCover(), selected.language.uppercase(), {
                                         navigator.push(AnimeScreen(anime.id, true))
                                     })
                                 }

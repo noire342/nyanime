@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogId
 import tachiyomi.domain.discovery.CatalogIdentityMatcher
+import tachiyomi.domain.discovery.CatalogRelation
 import tachiyomi.domain.discovery.SmartTitleMatcher
 
 class SmartTitleMatcherTest {
@@ -52,6 +53,16 @@ class SmartTitleMatcherTest {
         assertFalse(CatalogIdentityMatcher.matches(target, 3, 1))
         assertNull(CatalogIdentityMatcher.uniqueMatch(listOf(7, 8)))
         assertEquals(7L, CatalogIdentityMatcher.uniqueMatch(listOf(7, 7)))
+    }
+
+    @Test
+    fun `implicit first season matches explicit first season but not a known sequel`() {
+        assertEquals(95, SmartTitleMatcher.score(anime("Example"), "Example Season 1"))
+        assertEquals(95, SmartTitleMatcher.score(anime("Example Season 1"), "Example"))
+        val sequel = anime("Example").copy(
+            relations = listOf(CatalogRelation(CatalogId(value = 2), "Prequel", null, "PREQUEL")),
+        )
+        assertTrue(SmartTitleMatcher.score(sequel, "Example Season 1") < 95)
     }
 
     @Test
