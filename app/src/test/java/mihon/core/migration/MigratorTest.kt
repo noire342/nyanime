@@ -1,8 +1,11 @@
 package mihon.core.migration
 
+import io.mockk.every
+import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.spyk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -10,6 +13,7 @@ import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -20,6 +24,8 @@ import org.junit.jupiter.api.Test
 
 class MigratorTest {
 
+    private lateinit var migrationCompleted: CompletableDeferred<Unit>
+
     lateinit var migrationCompletedListener: MigrationCompletedListener
     lateinit var migrationContext: MigrationContext
     lateinit var migrationJobFactory: MigrationJobFactory
@@ -29,7 +35,12 @@ class MigratorTest {
     fun initilize() {
         migrationContext = MigrationContext(false)
         migrationJobFactory = spyk(MigrationJobFactory(migrationContext, CoroutineScope(Dispatchers.Main + Job())))
-        migrationCompletedListener = spyk<MigrationCompletedListener>(block = {})
+        migrationCompleted = CompletableDeferred()
+        migrationCompletedListener = mockk()
+        every { migrationCompletedListener() } answers {
+            migrationCompleted.complete(Unit)
+            Unit
+        }
         migrationStrategyFactory = spyk(MigrationStrategyFactory(migrationJobFactory, migrationCompletedListener))
     }
 
@@ -45,6 +56,7 @@ class MigratorTest {
 
         verify { migrationJobFactory.create(capture(migrations)) }
         assertEquals(1, migrations.captured.size)
+        withTimeout(5_000) { migrationCompleted.await() }
         verify { migrationCompletedListener() }
     }
 
@@ -86,6 +98,7 @@ class MigratorTest {
 
         verify { migrationJobFactory.create(capture(migrations)) }
         assertEquals(2, migrations.captured.size)
+        withTimeout(5_000) { migrationCompleted.await() }
         verify { migrationCompletedListener() }
     }
 
@@ -114,6 +127,7 @@ class MigratorTest {
 
         verify { migrationJobFactory.create(capture(migrations)) }
         assertEquals(10, migrations.captured.size)
+        withTimeout(5_000) { migrationCompleted.await() }
         verify { migrationCompletedListener() }
     }
 
@@ -135,6 +149,7 @@ class MigratorTest {
 
         verify { migrationJobFactory.create(capture(migrations)) }
         assertEquals(2, migrations.captured.size)
+        withTimeout(5_000) { migrationCompleted.await() }
         verify { migrationCompletedListener() }
     }
 
