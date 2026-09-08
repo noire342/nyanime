@@ -121,8 +121,16 @@ jobs:
             echo "::error::Missing ANDROID_DEBUG_KEYSTORE_BASE64 repository secret; refusing to publish an APK that cannot update the installed fork."
             exit 1
           fi
+          encoded_keystore="$(printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | tr -d '[:space:]')"
+          encoded_keystore="$(printf '%s' "$encoded_keystore" | tr -- '-_' '+/')"
+          case $((${#encoded_keystore} % 4)) in
+            2) encoded_keystore+='==' ;;
+            3) encoded_keystore+='=' ;;
+            0) ;;
+            *) echo "::error::Invalid keystore encoding length"; exit 1 ;;
+          esac
           mkdir -p "$HOME/.android"
-          printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          printf '%s' "$encoded_keystore" | base64 --decode > "$HOME/.android/debug.keystore"
           chmod 600 "$HOME/.android/debug.keystore"
 
       - name: Verify merged fork and build preview APK
