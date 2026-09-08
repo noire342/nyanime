@@ -73,8 +73,9 @@ class KitsuCatalogTest {
                 .body("""{"data":[],"links":{"next":null}}""".toResponseBody()).build()
         }.build()
         try {
-            KitsuCatalogRemote(client, Json, intervalMillis = 0)
+            val page = KitsuCatalogRemote(client, Json, intervalMillis = 0)
                 .fetch(CatalogRequest(CatalogFeed.NEXT_SEASON, page = 2, date = "2026-12-01"))
+            assertEquals("kitsu", page.provider)
         } finally {
             client.dispatcher.executorService.shutdown()
         }
