@@ -45,9 +45,16 @@ fun DiscoveryHomeHeader(
     onBack: (() -> Unit)?,
     onSearch: (() -> Unit)?,
     onRefresh: () -> Unit,
+    cartoonsAvailable: Boolean,
 ) {
     TopAppBar(
-        title = { HomeContentSwitch(cartoons, onSelect) },
+        title = {
+            if (cartoonsAvailable) {
+                HomeContentSwitch(cartoons, onSelect)
+            } else {
+                Text("Home", style = MaterialTheme.typography.headlineMedium)
+            }
+        },
         navigationIcon = {
             if (onBack != null) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
@@ -56,7 +63,7 @@ fun DiscoveryHomeHeader(
         actions = {
             if (onSearch != null) {
                 IconButton(onClick = onSearch) {
-                    Icon(Icons.Outlined.Search, if (cartoons) "Cerca cartoni" else "Cerca anime")
+                    Icon(Icons.Outlined.Search, if (cartoons && cartoonsAvailable) "Cerca cartoni" else "Cerca anime")
                 }
             }
             IconButton(onClick = onRefresh) { Icon(Icons.Outlined.Refresh, "Aggiorna Home") }
@@ -119,7 +126,7 @@ private fun HomeContentSwitch(cartoons: Boolean, onSelect: (Boolean) -> Unit) {
 @Composable
 private fun AnimeHomeHeaderPreview() {
     TachiyomiPreviewTheme {
-        DiscoveryHomeHeader(false, {}, null, {}, {})
+        DiscoveryHomeHeader(false, {}, null, {}, {}, cartoonsAvailable = true)
     }
 }
 
@@ -128,6 +135,14 @@ private fun AnimeHomeHeaderPreview() {
 @Composable
 private fun CartoonsHomeHeaderPreview() {
     TachiyomiPreviewTheme {
-        DiscoveryHomeHeader(true, {}, {}, {}, {})
+        DiscoveryHomeHeader(true, {}, {}, {}, {}, cartoonsAvailable = true)
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun HomeWithoutExtensionsPreview() {
+    TachiyomiPreviewTheme {
+        DiscoveryHomeHeader(false, {}, null, {}, {}, cartoonsAvailable = false)
     }
 }

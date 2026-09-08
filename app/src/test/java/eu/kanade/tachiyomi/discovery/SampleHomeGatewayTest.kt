@@ -11,13 +11,21 @@ import eu.kanade.tachiyomi.data.discovery.SampleHomeFilters
 import eu.kanade.tachiyomi.data.discovery.SampleHomeGateway
 import eu.kanade.tachiyomi.extension.anime.AnimeExtensionManager
 import eu.kanade.tachiyomi.extension.anime.model.AnimeExtension
+import eu.kanade.tachiyomi.ui.discovery.DiscoveryHomeAvailability
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -65,6 +73,45 @@ class SampleHomeGatewayTest {
         assertNull(gateway.currentAccess().source)
         installed.value = emptyList()
         assertNull(gateway.currentAccess().source)
+    }
+
+    @Test
+    fun installationAndRemovalUpdateHomeAvailabilityWithoutFetchingTheCatalogue() = runBlocking {
+        every { manager.sources } returns flowOf(listOf(engine))
+        every { preferences.disabledAnimeSources().changes() } returns flowOf(emptySet())
+        every { preferences.enabledLanguages().changes() } returns flowOf(setOf("it"))
+        every { preferences.showNsfwSource().changes() } returns flowOf(true)
+        every { base.downloadedOnly().changes() } returns flowOf(false)
+        every { base.incognitoMode().changes() } returns flowOf(false)
+        every { preferences.incognitoAnimeExtensions().changes() } returns flowOf(emptySet())
+        installed.value = emptyList()
+        val first = CompletableDeferred<Unit>()
+        val second = CompletableDeferred<Unit>()
+        val observed = mutableListOf<DiscoveryHomeAvailability>()
+        withTimeout(5_000) {
+            val job = launch {
+                gateway.observeAccess().map { DiscoveryHomeAvailability.from(it) }.take(3).collect {
+                    observed += it
+                    if (observed.size == 1) first.complete(Unit)
+                    if (observed.size == 2) second.complete(Unit)
+                }
+            }
+            first.await()
+            installed.value = listOf(extension)
+            second.await()
+            installed.value = emptyList()
+            job.join()
+        }
+        assertEquals(listOf(false, true, false), observed.map { it.cartoonsAvailable })
+        coVerify(exactly = 0) { engine.getSearchAnime(any(), any(), any()) }
+    }
+
+    @Test
+    fun pendingInitializationDoesNotAdvertiseARegisteredButNotReadySource() {
+        every { manager.isInitialized } returns MutableStateFlow(false)
+        val availability = DiscoveryHomeAvailability.from(gateway.currentAccess())
+        assertTrue(availability.loading)
+        assertFalse(availability.cartoonsAvailable)
     }
 
     @Test

@@ -62,19 +62,26 @@ data object DiscoveryTab : Tab {
 
     @Composable
     override fun Content() {
+        val model = rememberScreenModel { DiscoveryHomeScreenModel() }
+        val availability by model.state.collectAsState()
         var cartoons by rememberSaveable { mutableStateOf(false) }
+        val showCartoons = availability.showCartoons(cartoons)
+        LaunchedEffect(availability) { cartoons = availability.reconcileSelection(cartoons) }
         val savedState = rememberSaveableStateHolder()
-        savedState.SaveableStateProvider(if (cartoons) "cartoons" else "anime") {
-            if (cartoons) {
+        savedState.SaveableStateProvider(if (showCartoons) "cartoons" else "anime") {
+            if (showCartoons) {
                 CartoonsHomeContent(onSelect = { cartoons = it })
             } else {
-                AnimeContent(onSelect = { cartoons = it })
+                AnimeContent(
+                    cartoonsAvailable = availability.cartoonsAvailable,
+                    onSelect = { cartoons = it },
+                )
             }
         }
     }
 
     @Composable
-    private fun AnimeContent(onSelect: (Boolean) -> Unit) {
+    private fun AnimeContent(cartoonsAvailable: Boolean, onSelect: (Boolean) -> Unit) {
         val model = rememberScreenModel { DiscoveryScreenModel() }
         val state by model.state.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
@@ -88,6 +95,7 @@ data object DiscoveryTab : Tab {
             topBar = {
                 DiscoveryHomeHeader(
                     cartoons = false,
+                    cartoonsAvailable = cartoonsAvailable,
                     onSelect = onSelect,
                     onBack = if (navigator.lastItem == DiscoveryTab) {
                         { navigator.pop() }

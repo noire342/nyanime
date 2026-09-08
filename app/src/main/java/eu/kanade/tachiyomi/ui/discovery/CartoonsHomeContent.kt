@@ -10,7 +10,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -29,7 +28,6 @@ import eu.kanade.presentation.discovery.PosterCard
 import eu.kanade.presentation.discovery.SectionHeader
 import eu.kanade.tachiyomi.data.discovery.SampleHomeFilters
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
-import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.SectionState
@@ -45,16 +43,19 @@ fun DiscoveryTab.CartoonsHomeContent(onSelect: (Boolean) -> Unit) {
     LaunchedEffect(Unit) { (context as? MainActivity)?.ready = true }
     val access = state.access
     val source = access.source
+    // Parent and child observe availability independently: never render a stale branded frame.
+    if (access.loading || source == null) return
     Scaffold(topBar = {
         DiscoveryHomeHeader(
             cartoons = true,
+            cartoonsAvailable = true,
             onSelect = onSelect,
             onBack = if (navigator.lastItem == DiscoveryTab) {
                 { navigator.pop() }
             } else {
                 null
             },
-            onSearch = if (source != null && !access.offline) {
+            onSearch = if (!access.offline) {
                 { navigator.push(CartoonsListScreen(SampleHomeFilters.SEARCH, "Cerca cartoni")) }
             } else {
                 null
@@ -78,78 +79,62 @@ fun DiscoveryTab.CartoonsHomeContent(onSelect: (Boolean) -> Unit) {
                     Text("Solo download · nessuna richiesta a TestSource", Modifier.padding(horizontal = 16.dp))
                 }
             }
-            if (!access.loading && source == null) {
-                item(key = "missing-source") {
-                    Text(
-                        "Per questa Home serve l’estensione TestSource installata, attendibile e abilitata " +
-                            "con la lingua italiana attiva.",
-                        Modifier.padding(horizontal = 16.dp),
-                    )
-                    TextButton(onClick = {
-                        scope.launch {
-                            HomeScreen.openTab(HomeScreen.Tab.Browse(toExtensions = true, anime = true))
-                        }
-                    }) { Text("Gestisci estensioni") }
-                }
+            item(key = "resume:" + source.id) {
+                SectionHeader("Continua a guardare")
+                LocalAnimeRow(
+                    state.resume,
+                    onOpen = { navigator.push(AnimeScreen(it)) },
+                    emptyMessage = "I cartoni che guardi su TestSource compariranno qui.",
+                ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
             }
-            if (source != null) {
-                item(key = "resume:" + source.id) {
-                    SectionHeader("Continua a guardare")
-                    LocalAnimeRow(
-                        state.resume,
-                        onOpen = { navigator.push(AnimeScreen(it)) },
-                        emptyMessage = "I cartoni che guardi su TestSource compariranno qui.",
-                    ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
-                }
-                item(key = "updates:" + source.id) {
-                    SectionHeader("Nuovi episodi della tua libreria")
-                    LocalAnimeRow(
-                        state.updates,
-                        onOpen = { navigator.push(AnimeScreen(it)) },
-                        emptyMessage = "Aggiungi i cartoni alla libreria per ritrovare qui i loro aggiornamenti.",
-                    ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
-                }
-                if (!access.offline) {
-                    if (source.categories.isNotEmpty()) {
-                        item(key = "categories") {
-                            SectionHeader("Esplora le categorie")
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                items(source.categories, key = { it.id }) { category ->
-                                    AssistChip(
-                                        onClick = { navigator.push(CartoonsListScreen(category.id, category.title)) },
-                                        label = { Text(category.title) },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    items(source.sections, key = { it.id }) { section ->
-                        LaunchedEffect(access, section.id) { model.load(section.id) }
-                        val value = state.sections[section.id] ?: SectionState()
-                        SectionHeader(section.title) {
-                            navigator.push(CartoonsListScreen(section.id, section.title))
-                        }
-                        LoadNotice(value.loading, value.error, value.stale) { model.load(section.id, true) }
-                        if (value.data?.items?.isEmpty() == true && !value.loading && value.error == null) {
-                            Text("Nessun titolo in questa sezione", Modifier.padding(horizontal = 16.dp))
-                        }
+            item(key = "updates:" + source.id) {
+                SectionHeader("Nuovi episodi della tua libreria")
+                LocalAnimeRow(
+                    state.updates,
+                    onOpen = { navigator.push(AnimeScreen(it)) },
+                    emptyMessage = "Aggiungi i cartoni alla libreria per ritrovare qui i loro aggiornamenti.",
+                ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
+            }
+            if (!access.offline) {
+                if (source.categories.isNotEmpty()) {
+                    item(key = "categories") {
+                        SectionHeader("Esplora le categorie")
                         LazyRow(
                             contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            items(value.data?.items.orEmpty(), key = { it.id }) { anime ->
-                                PosterCard(anime.title, anime.asAnimeCover(), "TestSource · IT", {
-                                    navigator.push(AnimeScreen(anime.id, true))
-                                })
+                            items(source.categories, key = { it.id }) { category ->
+                                AssistChip(
+                                    onClick = { navigator.push(CartoonsListScreen(category.id, category.title)) },
+                                    label = { Text(category.title) },
+                                )
                             }
                         }
                     }
-                    if (source.sections.isEmpty()) {
-                        item { Text("Aggiorna TestSource per usare le sezioni della Home", Modifier.padding(16.dp)) }
+                }
+                items(source.sections, key = { it.id }) { section ->
+                    LaunchedEffect(access, section.id) { model.load(section.id) }
+                    val value = state.sections[section.id] ?: SectionState()
+                    SectionHeader(section.title) {
+                        navigator.push(CartoonsListScreen(section.id, section.title))
                     }
+                    LoadNotice(value.loading, value.error, value.stale) { model.load(section.id, true) }
+                    if (value.data?.items?.isEmpty() == true && !value.loading && value.error == null) {
+                        Text("Nessun titolo in questa sezione", Modifier.padding(horizontal = 16.dp))
+                    }
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(value.data?.items.orEmpty(), key = { it.id }) { anime ->
+                            PosterCard(anime.title, anime.asAnimeCover(), "TestSource · IT", {
+                                navigator.push(AnimeScreen(anime.id, true))
+                            })
+                        }
+                    }
+                }
+                if (source.sections.isEmpty()) {
+                    item { Text("Aggiorna TestSource per usare le sezioni della Home", Modifier.padding(16.dp)) }
                 }
             }
         }

@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.discovery
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -44,6 +45,18 @@ class CartoonsListScreen(private val sectionId: String, private val title: Strin
         val state by model.state.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
         var query by rememberSaveable { mutableStateOf("") }
+        val availability = DiscoveryHomeAvailability.from(state.access)
+        val leaveSourcePage = availability.shouldLeaveSourcePage(navigator.lastItem == this)
+        LaunchedEffect(leaveSourcePage) {
+            if (leaveSourcePage && !navigator.pop()) navigator.replace(DiscoveryTab)
+        }
+        if (!availability.cartoonsAvailable) {
+            // A restored route or an extension removal must not expose source-specific labels or cached cards.
+            Scaffold(topBar = { TopAppBar(title = { Text("Home") }) }) { padding ->
+                Box(Modifier.padding(padding)) { LoadNotice(availability.loading, null) }
+            }
+            return
+        }
         LaunchedEffect(query) { if (sectionId == SampleHomeFilters.SEARCH) model.search(query) }
         Scaffold(topBar = {
             TopAppBar(title = { Text(title) }, navigationIcon = {
@@ -69,7 +82,6 @@ class CartoonsListScreen(private val sectionId: String, private val title: Strin
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     val error = when {
                         state.access.offline -> "Modalità solo download: il catalogo TestSource è disattivato"
-                        !state.access.loading && state.access.source == null -> "TestSource non disponibile o disabilitata"
                         else -> state.error ?: state.access.error
                     }
                     LoadNotice(state.loading || state.access.loading, error, state.stale) {
