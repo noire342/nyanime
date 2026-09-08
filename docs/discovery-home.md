@@ -53,6 +53,27 @@ Il calendario rappresenta la messa in onda nel fuso locale, non la disponibilit�
 Il budget AniList è condiviso col tracking, inizialmente circa 28 richieste/minuto,
 ridotto dagli header del servizio e sospeso in caso di 429.
 
+Il catalogo usa un client API senza verifiche WebView: un 403 JSON non è un CAPTCHA.
+Se AniList dichiara l'API temporaneamente disattivata, il trasporto sospende per 60 secondi
+anche le richieste delle altre sezioni in attesa. La Home mostra un solo avviso, conserva
+le righe già in cache e lascia utilizzabili cronologia, libreria e fonti. Il retry manuale
+rispetta la sospensione; nessun proxy o tentativo di aggirare il blocco del servizio.
+
+### Catalogo alternativo automatico
+
+Se il catalogo pubblico AniList non risponde, i nuovi feed usano l'API pubblica Kitsu.
+La provenienza effettiva è indicata in Home e sulle schede; voti Kitsu non sono voti AniList.
+Cache, collegamenti, schede e opere correlate usano identità composte da provider e ID.
+Le pagine successive restano sul provider della prima pagina anche se AniList torna online.
+La ricerca nelle estensioni e il player non cambiano. I mapping MAL provengono esclusivamente
+dai collegamenti espliciti del catalogo; i numeri ID uguali tra cataloghi non sono corrispondenze.
+Il ripiego non sostituisce una scheda AniList con una scheda Kitsu dal medesimo numero ID.
+
+Kitsu offre trend, stagioni, classifica, ricerca, banner e schede; non fornisce in questo
+adattatore il calendario dettagliato equivalente a quello AniList. Il calendario presenta
+un avviso di indisponibilità, senza inventare episodio o orario. Richieste Kitsu serializzate,
+intervallo minimo 1,1 secondi, timeout e rispetto della sospensione in caso di 429.
+
 La modalità solo download impedisce richieste al catalogo e alle fonti; la ripresa usa soltanto
 episodi scaricati. La modalità incognito disabilita la cache persistente del catalogo,
 nasconde le sezioni locali sensibili e impedisce di ricordare nuove associazioni.

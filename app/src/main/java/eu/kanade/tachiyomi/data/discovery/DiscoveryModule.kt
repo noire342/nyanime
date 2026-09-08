@@ -23,7 +23,13 @@ class DiscoveryModule(private val app: Application) : InjektModule {
         addSingletonFactory { SqlDiscoveryStore(get()) }
         addSingletonFactory<AnimeCatalogCache> { PrivateDiscoveryCache(get<SqlDiscoveryStore>(), get()) }
         addSingletonFactory<AnimeSourceLinkRepository> { get<SqlDiscoveryStore>() }
-        addSingletonFactory<AnimeCatalogRemote> { AnilistCatalogRemote(get<NetworkHelper>().client, get()) }
+        addSingletonFactory<AnimeCatalogRemote> {
+            val client = get<NetworkHelper>().apiClient
+            tachiyomi.domain.discovery.FailoverAnimeCatalogRemote(
+                AnilistCatalogRemote(client, get()),
+                KitsuCatalogRemote(client, get()),
+            )
+        }
         addSingletonFactory<AnimeCatalogRepository> { CachedAnimeCatalogRepository(get(), get(), get()) }
         addSingletonFactory {
             DiscoverySourceService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get())

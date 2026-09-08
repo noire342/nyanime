@@ -47,11 +47,11 @@ import tachiyomi.domain.entries.anime.model.asAnimeCover
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
-class CatalogDetailScreen(private val catalogId: Long) : Screen() {
+class CatalogDetailScreen(private val catalogId: Long, private val provider: String = "anilist") : Screen() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
-        val model = rememberScreenModel { CatalogDetailScreenModel(CatalogId(value = catalogId)) }
+        val model = rememberScreenModel { CatalogDetailScreenModel(CatalogId(provider, catalogId)) }
         val state by model.state.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
         val context = LocalContext.current
@@ -197,7 +197,7 @@ class CatalogDetailScreen(private val catalogId: Long) : Screen() {
                                     Text(if (state.linked == null) "Cerca nelle fonti" else "Cambia versione")
                                 }
                             }
-                        }) { navigator.push(CatalogDetailScreen(it)) }
+                        }) { navigator.push(CatalogDetailScreen(it.value, it.provider)) }
                     }
                 }
             }

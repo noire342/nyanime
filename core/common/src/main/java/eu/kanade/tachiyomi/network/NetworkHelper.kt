@@ -57,6 +57,9 @@ class NetworkHelper(
         }
     }
 
+    /** JSON APIs report HTTP errors directly; they must never launch an HTML challenge WebView. */
+    val apiClient = clientBuilder.build()
+
     val client = clientBuilder
         .addInterceptor(
             CloudflareInterceptor(context, cookieJar, ::defaultUserAgentProvider),

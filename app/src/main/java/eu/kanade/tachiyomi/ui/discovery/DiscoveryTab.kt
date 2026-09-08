@@ -77,7 +77,7 @@ data object DiscoveryTab : Tab {
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
         LaunchedEffect(Unit) { (context as? MainActivity)?.ready = true }
-        val openCatalog: (CatalogAnime) -> Unit = { navigator.push(CatalogDetailScreen(it.id.value)) }
+        val openCatalog: (CatalogAnime) -> Unit = { navigator.push(CatalogDetailScreen(it.id.value, it.id.provider)) }
         var sourceMenu by rememberSaveable { mutableStateOf(false) }
         val selected = state.sources.firstOrNull { it.id == state.selectedSource }
         Scaffold(
@@ -116,6 +116,22 @@ data object DiscoveryTab : Tab {
                     val featured = state.catalog[CatalogFeed.TRENDING] ?: SectionState()
                     FeaturedCarousel(featured.data?.items.orEmpty(), openCatalog)
                 }
+                state.catalogueOutage?.let { message ->
+                    item(key = "catalogue-outage") {
+                        LoadNotice(false, message, false) {
+                            DiscoveryScreenModel.feeds.forEach { model.load(it, true) }
+                        }
+                    }
+                }
+                if (state.catalog.values.any { it.data?.provider == "kitsu" }) {
+                    item(key = "catalogue-fallback") {
+                        Text(
+                            "Catalogo alternativo Kitsu attivo · nessuna selezione manuale necessaria",
+                            Modifier.padding(horizontal = 16.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
                 item(key = "resume") {
                     SectionHeader("Continua a guardare") { navigator.push(HistoriesTab) }
                     LocalAnimeRow(state.resume, { navigator.push(AnimeScreen(it)) }) { item ->
@@ -137,7 +153,12 @@ data object DiscoveryTab : Tab {
                         }
                     }
                 }
-                items(DiscoveryScreenModel.feeds, key = { it.name }) { feed ->
+                items(
+                    DiscoveryScreenModel.feeds.filter { feed ->
+                        state.catalogueOutage == null || state.catalog[feed]?.data != null
+                    },
+                    key = { it.name },
+                ) { feed ->
                     val section = state.catalog[feed] ?: SectionState()
                     Column {
                         SectionHeader(feed.displayTitle()) { navigator.push(CatalogListScreen(feed)) }
@@ -150,9 +171,16 @@ data object DiscoveryTab : Tab {
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
-                        LoadNotice(section.loading, section.error, section.stale) { model.load(feed, true) }
+                        val error = section.error.takeUnless {
+                            section.failureReason == tachiyomi.domain.discovery.CatalogFailureReason.SERVICE_UNAVAILABLE
+                        }
+                        LoadNotice(section.loading, error, section.stale) { model.load(feed, true) }
                         CatalogRow(section.data?.items.orEmpty(), openCatalog, feed == CatalogFeed.WEEK)
+                        if (feed == CatalogFeed.WEEK) {
+                            section.data?.notice?.let { Text(it, Modifier.padding(horizontal = 16.dp)) }
+                        }
                         if (section.data?.items?.isEmpty() == true &&
+                            section.data?.notice == null &&
                             !section.loading
                         ) {
                             Text("Nessun anime disponibile", Modifier.padding(horizontal = 16.dp))
@@ -213,7 +241,7 @@ data object DiscoveryTab : Tab {
                 }
                 item {
                     Text(
-                        "Informazioni del catalogo: AniList",
+                        "Informazioni del catalogo: AniList · alternativa automatica Kitsu",
                         Modifier.padding(horizontal = 16.dp),
                         style = MaterialTheme.typography.labelSmall,
                     )

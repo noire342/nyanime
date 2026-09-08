@@ -150,7 +150,7 @@ fun PosterCard(
 @Composable
 fun CatalogRow(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit, calendar: Boolean = false) {
     LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(items, key = { "${it.id.value}:${it.airingAt}" }) { anime ->
+        items(items, key = { "${it.id.provider}:${it.id.value}:${it.airingAt}" }) { anime ->
             PosterCard(
                 anime.title,
                 anime.cover,

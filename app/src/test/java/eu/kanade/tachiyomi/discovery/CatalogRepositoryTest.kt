@@ -69,6 +69,18 @@ class CatalogRepositoryTest {
     }
 
     @Test
+    fun `outage keeps cached data and carries a typed reason to the home`() = runBlocking {
+        val cache = Cache()
+        cache.entries[request.cacheKey] = CatalogCacheEntry(json.encodeToString(CatalogPage.serializer(), page), 0)
+        val outage = tachiyomi.domain.discovery.CatalogServiceUnavailableException("AniList unavailable")
+        val result = CachedAnimeCatalogRepository(remote(AtomicInteger(), outage), cache, json, policy)
+            .observe(request).toList().last()
+        assertEquals(page, result.data)
+        assertTrue(result.stale)
+        assertEquals(tachiyomi.domain.discovery.CatalogFailureReason.SERVICE_UNAVAILABLE, result.failureReason)
+    }
+
+    @Test
     fun `expired cache remains visible on forbidden and rate limited responses`() = runBlocking {
         for (status in listOf(403, 429)) {
             val cache = Cache()

@@ -21,6 +21,7 @@ class CatalogListScreenModel(
 ) : StateScreenModel<CatalogListScreenModel.State>(State()) {
     private var job: Job? = null
     private var page = 1
+    private var provider: String? = null
     private val date = java.time.LocalDate.now().toString()
 
     init {
@@ -39,13 +40,16 @@ class CatalogListScreenModel(
     fun load(reset: Boolean = false) {
         if (!reset && (state.value.loading || !state.value.hasNext)) return
         job?.cancel()
-        if (reset) page = 1
+        if (reset) {
+            page = 1
+            provider = null
+        }
         val requested = page
         val query = state.value.query
         val previous = if (reset) emptyList() else state.value.items
         job = screenModelScope.launch {
             repository.observe(
-                CatalogRequest(feed, requested, query, date),
+                CatalogRequest(feed, requested, query, date, provider),
                 offline = base.downloadedOnly().get(),
             ).collect { result ->
                 val items = previous + result.data?.items.orEmpty()
@@ -56,9 +60,13 @@ class CatalogListScreenModel(
                         stale = result.stale,
                         error = result.error,
                         hasNext = result.data?.hasNextPage ?: false,
+                        notice = result.data?.notice,
                     )
                 }
-                if (!result.loading && result.error == null && result.data != null) page = requested + 1
+                if (!result.loading && result.error == null && result.data != null) {
+                    page = requested + 1
+                    provider = result.data?.provider
+                }
             }
         }
     }
@@ -70,5 +78,6 @@ class CatalogListScreenModel(
         val stale: Boolean = false,
         val error: String? = null,
         val hasNext: Boolean = true,
+        val notice: String? = null,
     )
 }

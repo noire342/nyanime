@@ -67,7 +67,10 @@ class CatalogListScreen(private val feed: CatalogFeed) : Screen() {
                 item(span = {
                     GridItemSpan(maxLineSpan)
                 }) { LoadNotice(state.loading, state.error, state.stale) { model.load(reset = true) } }
-                items(state.items, key = { "${it.id.value}:${it.airingAt}" }) { anime ->
+                state.notice?.let { notice ->
+                    item(span = { GridItemSpan(maxLineSpan) }) { Text(notice, Modifier.padding(12.dp)) }
+                }
+                items(state.items, key = { "${it.id.provider}:${it.id.value}:${it.airingAt}" }) { anime ->
                     PosterCard(
                         anime.title,
                         anime.cover,
@@ -78,7 +81,7 @@ class CatalogListScreen(private val feed: CatalogFeed) : Screen() {
                         } else {
                             anime.score?.let { "★ $it/100" }
                         },
-                        { navigator.push(CatalogDetailScreen(anime.id.value)) },
+                        { navigator.push(CatalogDetailScreen(anime.id.value, anime.id.provider)) },
                         Modifier.padding(6.dp),
                     )
                 }
@@ -88,7 +91,7 @@ class CatalogListScreen(private val feed: CatalogFeed) : Screen() {
                             if (feed == CatalogFeed.SEARCH &&
                                 query.isBlank()
                             ) {
-                                "Cerca nel catalogo AniList"
+                                "Cerca nel catalogo anime"
                             } else {
                                 "Nessun risultato"
                             },

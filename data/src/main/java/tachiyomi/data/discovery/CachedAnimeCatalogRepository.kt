@@ -15,9 +15,11 @@ import tachiyomi.domain.discovery.AnimeCatalogRepository
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogCacheEntry
 import tachiyomi.domain.discovery.CatalogCachePolicy
+import tachiyomi.domain.discovery.CatalogFailureReason
 import tachiyomi.domain.discovery.CatalogId
 import tachiyomi.domain.discovery.CatalogPage
 import tachiyomi.domain.discovery.CatalogRequest
+import tachiyomi.domain.discovery.CatalogServiceUnavailableException
 import tachiyomi.domain.discovery.SectionState
 
 class CachedAnimeCatalogRepository(
@@ -107,6 +109,11 @@ class CachedAnimeCatalogRepository(
                     stale = value != null,
                     error =
                     e.message ?: "Catalogo temporaneamente non disponibile",
+                    failureReason = if (e is CatalogServiceUnavailableException) {
+                        CatalogFailureReason.SERVICE_UNAVAILABLE
+                    } else {
+                        null
+                    },
                 ),
             )
         }

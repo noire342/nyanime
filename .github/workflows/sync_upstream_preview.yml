@@ -22,7 +22,7 @@ permissions:
 
 concurrency:
   group: sync-aniyomi-upstream
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   UPSTREAM_REPOSITORY: aniyomiorg/aniyomi
@@ -159,6 +159,20 @@ jobs:
         with:
           name: catalogue-live-probe
           path: app/build/test-results/testDebugUnitTest/TEST-*AnilistLiveCatalogTest.xml
+          if-no-files-found: warn
+
+      - name: Verify live fallback catalogue
+        if: steps.merge.outputs.build == 'true'
+        env:
+          ANIYOMI_VERIFY_FALLBACK: 'true'
+        run: ./gradlew :app:testDebugUnitTest --tests '*KitsuLiveCatalogTest' --no-daemon
+
+      - name: Upload fallback catalogue report
+        if: always() && steps.merge.outputs.build == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: catalogue-fallback-live
+          path: app/build/test-results/testDebugUnitTest/TEST-*KitsuLiveCatalogTest.xml
           if-no-files-found: warn
 
       - name: Verify stable preview signature

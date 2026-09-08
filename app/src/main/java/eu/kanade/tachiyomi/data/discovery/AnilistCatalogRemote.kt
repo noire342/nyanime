@@ -1,16 +1,11 @@
 package eu.kanade.tachiyomi.data.discovery
 
-import eu.kanade.tachiyomi.data.track.anilist.AnilistRequestLimiter
-import eu.kanade.tachiyomi.network.POST
-import eu.kanade.tachiyomi.network.awaitSuccess
-import eu.kanade.tachiyomi.network.jsonMime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
-import okhttp3.RequestBody.Companion.toRequestBody
 import tachiyomi.domain.discovery.AnimeCatalogRemote
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogFeed
@@ -21,8 +16,8 @@ import java.io.IOException
 import java.time.LocalDate
 import java.time.ZoneId
 
-class AnilistCatalogRemote(client: OkHttpClient, private val json: Json) : AnimeCatalogRemote {
-    private val client = client.newBuilder().addInterceptor(AnilistRequestLimiter).build()
+class AnilistCatalogRemote(client: OkHttpClient, json: Json) : AnimeCatalogRemote {
+    private val transport = AnilistCatalogTransport(client, json)
 
     override suspend fun fetch(request: CatalogRequest): CatalogPage {
         val date = LocalDate.parse(request.date)
@@ -109,22 +104,7 @@ class AnilistCatalogRemote(client: OkHttpClient, private val json: Json) : Anime
     }
 
     private suspend fun execute(query: String, variables: JsonObject): JsonObject {
-        val body = buildJsonObject {
-            put("query", query)
-            put("variables", variables)
-        }
-        return client.newCall(POST("https://graphql.anilist.co", body = body.toString().toRequestBody(jsonMime)))
-            .awaitSuccess().use { response ->
-                val root = json.parseToJsonElement(response.body.string()) as? JsonObject
-                    ?: throw IOException("Risposta AniList non valida")
-                val data = root.obj("data")
-                if (data.isEmpty()) {
-                    throw IOException(
-                        root.objects("errors").firstOrNull()?.text("message") ?: "AniList non disponibile",
-                    )
-                }
-                data
-            }
+        return transport.execute(query, variables)
     }
 
     companion object {

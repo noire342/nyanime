@@ -23,10 +23,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import tachiyomi.domain.discovery.CatalogAnime
+import tachiyomi.domain.discovery.CatalogId
+import tachiyomi.domain.discovery.providerLabel
 
 @Composable
-fun CatalogDetailsContent(anime: CatalogAnime, actions: @Composable () -> Unit = {}, onRelated: (Long) -> Unit) {
-    var expanded by rememberSaveable(anime.id.value) { mutableStateOf(false) }
+fun CatalogDetailsContent(anime: CatalogAnime, actions: @Composable () -> Unit = {}, onRelated: (CatalogId) -> Unit) {
+    var expanded by rememberSaveable(anime.id.provider, anime.id.value) { mutableStateOf(false) }
     AsyncImage(
         anime.banner ?: anime.cover,
         anime.title,
@@ -42,7 +44,7 @@ fun CatalogDetailsContent(anime: CatalogAnime, actions: @Composable () -> Unit =
             )
         }
         val facts = listOfNotNull(
-            anime.score?.let { "Voto AniList: $it/100" },
+            anime.score?.let { "Voto ${anime.id.providerLabel()}: $it/100" },
             metadataLabel(anime.format),
             metadataLabel(anime.status),
             listOfNotNull(metadataLabel(anime.season), anime.year?.toString()).joinToString(" ").takeIf {
@@ -69,7 +71,7 @@ fun CatalogDetailsContent(anime: CatalogAnime, actions: @Composable () -> Unit =
             }) { Text(if (expanded) "Riduci trama" else "Leggi tutta la trama") }
         }
         Text(
-            "Informazioni: AniList · episodi e disponibilità dipendono dalla fonte",
+            "Informazioni: ${anime.id.providerLabel()} · episodi e disponibilità dipendono dalla fonte",
             style = MaterialTheme.typography.labelSmall,
         )
     }
@@ -79,9 +81,9 @@ fun CatalogDetailsContent(anime: CatalogAnime, actions: @Composable () -> Unit =
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(anime.relations, key = { "${it.id.value}:${it.relationship}" }) { relation ->
+            items(anime.relations, key = { "${it.id.provider}:${it.id.value}:${it.relationship}" }) { relation ->
                 PosterCard(relation.title, relation.cover, metadataLabel(relation.relationship), {
-                    onRelated(relation.id.value)
+                    onRelated(relation.id)
                 })
             }
         }

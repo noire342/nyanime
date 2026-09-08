@@ -150,7 +150,12 @@ class DiscoveryScreenModel(
         val popular: SectionState<List<Anime>> = SectionState(loading = false),
         val latest: SectionState<List<Anime>> = SectionState(loading = false),
         val offline: Boolean = false,
-    )
+    ) {
+        val catalogueOutage: String?
+            get() = catalog.values.firstOrNull {
+                it.failureReason == tachiyomi.domain.discovery.CatalogFailureReason.SERVICE_UNAVAILABLE
+            }?.error
+    }
 
     companion object {
         val feeds =

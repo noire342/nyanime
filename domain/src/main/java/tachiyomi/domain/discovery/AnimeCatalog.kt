@@ -43,19 +43,30 @@ data class CatalogRequest(
     val page: Int = 1,
     val query: String = "",
     val date: String = LocalDate.now().toString(),
+    val provider: String? = null,
 ) {
-    val cacheKey: String get() = "${feed.name}:$date:${query.trim()}:$page"
+    val cacheKey: String get() = "${feed.name}:$date:${query.trim()}:$page${provider?.let { ":$it" }.orEmpty()}"
 }
 
 @Serializable
-data class CatalogPage(val items: List<CatalogAnime>, val hasNextPage: Boolean = false)
+data class CatalogPage(
+    val items: List<CatalogAnime>,
+    val hasNextPage: Boolean = false,
+    val provider: String = "anilist",
+    val notice: String? = null,
+)
 
 data class SectionState<T>(
     val data: T? = null,
     val loading: Boolean = true,
     val stale: Boolean = false,
     val error: String? = null,
+    val failureReason: CatalogFailureReason? = null,
 )
+
+enum class CatalogFailureReason { SERVICE_UNAVAILABLE }
+
+class CatalogServiceUnavailableException(message: String) : java.io.IOException(message)
 
 interface AnimeCatalogRepository {
     fun observe(
@@ -114,5 +125,12 @@ object CatalogIdentityMatcher {
 
     fun matches(anime: CatalogAnime, trackerId: Long, remoteId: Long): Boolean =
         (trackerId == 2L && anime.id.provider == "anilist" && remoteId == anime.id.value) ||
+            (trackerId == 3L && anime.id.provider == "kitsu" && remoteId == anime.id.value) ||
             (trackerId == 1L && anime.malId != null && remoteId == anime.malId)
+}
+
+fun CatalogId.providerLabel(): String = when (provider) {
+    "anilist" -> "AniList"
+    "kitsu" -> "Kitsu"
+    else -> provider
 }
