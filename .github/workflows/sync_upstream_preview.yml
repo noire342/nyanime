@@ -183,7 +183,8 @@ jobs:
               --key-pass pass:android \
               "$apk"
             actual_cert="$("$apksigner" verify --verbose --print-certs "$apk" \
-              | awk -F': ' '/certificate SHA-256 digest:/{print $2; exit}' \
+              | sed -n 's/.*certificate SHA-256 digest: //p' \
+              | head -n 1 \
               | tr -cd '[:xdigit:]' \
               | tr '[:lower:]' '[:upper:]')"
             if [[ "$actual_cert" != "$EXPECTED_CERT_SHA256" ]]; then
