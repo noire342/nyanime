@@ -156,6 +156,43 @@ jobs:
           fi
           echo "Stable preview signing certificate verified: $actual_cert"
 
+      - name: Re-sign and verify preview APKs
+        if: steps.merge.outputs.build == 'true'
+        env:
+          EXPECTED_CERT_SHA256: F99AD47F9286CE3D61345F65DD0F888F16AEBF53BFE75EFE5B6AB889041AB259
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          if [[ -z "$apksigner" || ! -x "$apksigner" ]]; then
+            echo "::error::Could not locate the Android apksigner tool."
+            exit 1
+          fi
+
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/preview/app-*-preview.apk)
+          if [[ "${#apks[@]}" -eq 0 ]]; then
+            echo "::error::No preview APKs were produced."
+            exit 1
+          fi
+          for apk in "${apks[@]}"; do
+            "$apksigner" sign \
+              --ks "$HOME/.android/debug.keystore" \
+              --ks-pass pass:android \
+              --ks-key-alias androiddebugkey \
+              --key-pass pass:android \
+              "$apk"
+            actual_cert="$("$apksigner" verify --verbose --print-certs "$apk" \
+              | awk -F': ' '/certificate SHA-256 digest:/{print $2; exit}' \
+              | tr -cd '[:xdigit:]' \
+              | tr '[:lower:]' '[:upper:]')"
+            if [[ "$actual_cert" != "$EXPECTED_CERT_SHA256" ]]; then
+              echo "::error::APK signing certificate mismatch for $apk. Expected $EXPECTED_CERT_SHA256, got $actual_cert"
+              exit 1
+            fi
+            echo "Stable preview APK certificate verified for $(basename "$apk"): $actual_cert"
+          done
+
       - name: Prepare APK artifacts
         if: steps.merge.outputs.build == 'true'
         run: |
