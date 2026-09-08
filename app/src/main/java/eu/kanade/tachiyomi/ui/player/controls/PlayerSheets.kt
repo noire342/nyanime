@@ -22,6 +22,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import dev.vivvvek.seeker.Segment
+import eu.kanade.tachiyomi.ui.player.Anime4KMode
 import eu.kanade.tachiyomi.ui.player.ArtType
 import eu.kanade.tachiyomi.ui.player.Decoder
 import eu.kanade.tachiyomi.ui.player.Panels
@@ -82,6 +83,7 @@ fun PlayerSheets(
     sleepTimerTimeRemaining: Int,
     onStartSleepTimer: (Int) -> Unit,
     buttons: ImmutableList<CustomButton>,
+    onSelectAnime4KCustom: (Anime4KMode) -> Unit,
 
     // Screenshot sheet
     isLocalSource: Boolean,
@@ -169,6 +171,7 @@ fun PlayerSheets(
                 onDismissRequest = onDismissRequest,
                 onEnterFiltersPanel = { onOpenPanel(Panels.VideoFilters) },
                 customButtons = buttons,
+                onSelectAnime4KCustom = onSelectAnime4KCustom,
             )
         }
 

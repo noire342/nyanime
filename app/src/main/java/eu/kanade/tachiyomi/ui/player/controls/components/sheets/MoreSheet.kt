@@ -52,6 +52,7 @@ import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -64,6 +65,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import eu.kanade.presentation.player.components.PlayerSheet
+import eu.kanade.tachiyomi.ui.player.Anime4KMode
+import eu.kanade.tachiyomi.ui.player.Anime4KProfile
 import eu.kanade.tachiyomi.ui.player.Decoder
 import eu.kanade.tachiyomi.ui.player.execute
 import eu.kanade.tachiyomi.ui.player.executeLongPress
@@ -77,9 +80,9 @@ import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
-import tachiyomi.presentation.core.util.collectAsState
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import tachiyomi.presentation.core.util.collectAsState as collectPreferenceAsState
 
 @Composable
 fun MoreSheet(
@@ -90,11 +93,14 @@ fun MoreSheet(
     onDismissRequest: () -> Unit,
     onEnterFiltersPanel: () -> Unit,
     customButtons: ImmutableList<CustomButton>,
+    onSelectAnime4KCustom: (Anime4KMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val advancedPreferences = remember { Injekt.get<AdvancedPlayerPreferences>() }
     val audioPreferences = remember { Injekt.get<AudioPreferences>() }
-    val statisticsPage by advancedPreferences.playerStatisticsPage().collectAsState()
+    val statisticsPage by advancedPreferences.playerStatisticsPage().collectPreferenceAsState()
+    val anime4kSelection by advancedPreferences.anime4kActiveSelection().collectAsState()
+    val anime4kDiagnosticsEnabled by advancedPreferences.anime4kDiagnosticsEnabled().collectPreferenceAsState()
 
     PlayerSheet(
         onDismissRequest = onDismissRequest,
@@ -206,6 +212,31 @@ fun MoreSheet(
                 }
             }
 
+            Text(stringResource(AYMR.strings.pref_anime4k))
+            FlowRow(
+                verticalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
+                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
+            ) {
+                Anime4KMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = if (mode == Anime4KMode.Off) {
+                            anime4kSelection.profile == Anime4KProfile.Off
+                        } else {
+                            anime4kSelection.profile == Anime4KProfile.Custom && anime4kSelection.mode == mode
+                        },
+                        onClick = { onSelectAnime4KCustom(mode) },
+                        label = { Text(text = stringResource(mode.titleRes)) },
+                    )
+                }
+                FilterChip(
+                    selected = anime4kDiagnosticsEnabled,
+                    onClick = {
+                        advancedPreferences.anime4kDiagnosticsEnabled().set(!anime4kDiagnosticsEnabled)
+                    },
+                    label = { Text(text = stringResource(AYMR.strings.pref_anime4k_debug_overlay)) },
+                )
+            }
+
             if (customButtons.isNotEmpty()) {
                 Text(text = stringResource(AYMR.strings.player_sheets_custom_buttons_title))
                 FlowRow(
@@ -239,7 +270,7 @@ fun MoreSheet(
                 }
             }
             Text(text = stringResource(AYMR.strings.pref_audio_channels))
-            val audioChannels by audioPreferences.audioChannels().collectAsState()
+            val audioChannels by audioPreferences.audioChannels().collectPreferenceAsState()
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
             ) {

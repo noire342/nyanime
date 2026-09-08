@@ -30,10 +30,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import eu.kanade.tachiyomi.ui.player.controls.components.AutoPlaySwitch
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
 import tachiyomi.presentation.core.components.material.padding
+import tachiyomi.presentation.core.theme.active
 
 @Composable
 fun TopRightPlayerControls(
@@ -52,6 +54,13 @@ fun TopRightPlayerControls(
     // video
     onQualityClick: () -> Unit,
     isEpisodeOnline: Boolean?,
+
+    // Anime4K quick presets
+    isAnime4KSmartEnabled: Boolean,
+    anime4KSmartLabel: String,
+    onToggleAnime4KSmart: () -> Unit,
+    isAnime4KMaximumEnabled: Boolean,
+    onToggleAnime4KMaximum: () -> Unit,
 
     // more
     onMoreClick: () -> Unit,
@@ -91,6 +100,18 @@ fun TopRightPlayerControls(
                 horizontalSpacing = MaterialTheme.padding.mediumSmall,
             )
         }
+        ControlsButton(
+            text = anime4KSmartLabel,
+            onClick = onToggleAnime4KSmart,
+            color = if (isAnime4KSmartEnabled) MaterialTheme.colorScheme.active else Color.White,
+            horizontalSpacing = MaterialTheme.padding.mediumSmall,
+        )
+        ControlsButton(
+            text = "4K",
+            onClick = onToggleAnime4KMaximum,
+            color = if (isAnime4KMaximumEnabled) MaterialTheme.colorScheme.active else Color.White,
+            horizontalSpacing = MaterialTheme.padding.mediumSmall,
+        )
         ControlsButton(
             icon = Icons.Default.MoreVert,
             onClick = onMoreClick,

@@ -58,6 +58,9 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import eu.kanade.presentation.more.settings.screen.player.custombutton.getButtons
 import eu.kanade.presentation.theme.playerRippleConfiguration
+import eu.kanade.tachiyomi.ui.player.Anime4K
+import eu.kanade.tachiyomi.ui.player.Anime4KMode
+import eu.kanade.tachiyomi.ui.player.Anime4KProfile
 import eu.kanade.tachiyomi.ui.player.Dialogs
 import eu.kanade.tachiyomi.ui.player.Panels
 import eu.kanade.tachiyomi.ui.player.PlayerActivity
@@ -65,6 +68,7 @@ import eu.kanade.tachiyomi.ui.player.PlayerUpdates
 import eu.kanade.tachiyomi.ui.player.PlayerViewModel
 import eu.kanade.tachiyomi.ui.player.Sheets
 import eu.kanade.tachiyomi.ui.player.VideoAspect
+import eu.kanade.tachiyomi.ui.player.controls.components.Anime4KDiagnosticsOverlay
 import eu.kanade.tachiyomi.ui.player.controls.components.BrightnessOverlay
 import eu.kanade.tachiyomi.ui.player.controls.components.BrightnessSlider
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
@@ -73,6 +77,7 @@ import eu.kanade.tachiyomi.ui.player.controls.components.TextPlayerUpdate
 import eu.kanade.tachiyomi.ui.player.controls.components.ThumbnailPreview
 import eu.kanade.tachiyomi.ui.player.controls.components.VolumeSlider
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.toFixed
+import eu.kanade.tachiyomi.ui.player.settings.AdvancedPlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
@@ -95,12 +100,16 @@ val LocalPlayerButtonsClickEvent = staticCompositionLocalOf { {} }
 fun PlayerControls(
     viewModel: PlayerViewModel,
     onBackPress: () -> Unit,
+    onToggleAnime4KSmart: () -> Unit,
+    onToggleAnime4KMaximum: () -> Unit,
+    onSelectAnime4KCustom: (Anime4KMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = MaterialTheme.padding
     val playerPreferences = remember { Injekt.get<PlayerPreferences>() }
     val gesturePreferences = remember { Injekt.get<GesturePreferences>() }
     val audioPreferences = remember { Injekt.get<AudioPreferences>() }
+    val advancedPlayerPreferences = remember { Injekt.get<AdvancedPlayerPreferences>() }
     val subtitlePreferences = remember { Injekt.get<SubtitlePreferences>() }
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -120,6 +129,9 @@ fun PlayerControls(
     val currentChapter by viewModel.currentChapter.collectAsState()
     val indexedChapters by viewModel.chapters.collectAsState()
     val currentBrightness by viewModel.currentBrightness.collectAsState()
+    val anime4kSelection by advancedPlayerPreferences.anime4kActiveSelection().collectAsState()
+    val anime4kDiagnosticsEnabled by advancedPlayerPreferences.anime4kDiagnosticsEnabled().collectAsState()
+    val anime4kDiagnostics by advancedPlayerPreferences.anime4kDiagnostics().collectAsState()
 
     val playerTimeToDisappear by playerPreferences.playerTimeToDisappear().collectAsState()
     var resetControls by remember { mutableStateOf(true) }
@@ -183,6 +195,17 @@ fun PlayerControls(
                 val thumbnail = createRef()
                 val seekbar = createRef()
                 val (playerUpdates) = createRefs()
+                val anime4kDiagnosticsOverlay = createRef()
+
+                if (anime4kDiagnosticsEnabled) {
+                    Anime4KDiagnosticsOverlay(
+                        diagnostics = anime4kDiagnostics,
+                        modifier = Modifier.constrainAs(anime4kDiagnosticsOverlay) {
+                            top.linkTo(parent.top, spacing.medium)
+                            start.linkTo(parent.start, spacing.medium)
+                        },
+                    )
+                }
 
                 val hasPreviousEpisode by viewModel.hasPreviousEpisode.collectAsState()
                 val hasNextEpisode by viewModel.hasNextEpisode.collectAsState()
@@ -471,6 +494,15 @@ fun PlayerControls(
                         onAudioLongClick = { viewModel.showPanel(Panels.AudioDelay) },
                         onQualityClick = { viewModel.showSheet(Sheets.QualityTracks) },
                         isEpisodeOnline = isEpisodeOnline,
+                        isAnime4KSmartEnabled = anime4kSelection.profile == Anime4KProfile.Smart,
+                        anime4KSmartLabel = if (anime4kSelection.profile == Anime4KProfile.Smart) {
+                            Anime4K.smartButtonLabel(anime4kSelection.mode)
+                        } else {
+                            "SM"
+                        },
+                        onToggleAnime4KSmart = onToggleAnime4KSmart,
+                        isAnime4KMaximumEnabled = anime4kSelection.profile == Anime4KProfile.Maximum,
+                        onToggleAnime4KMaximum = onToggleAnime4KMaximum,
                         onMoreClick = { viewModel.showSheet(Sheets.More) },
                         onMoreLongClick = { viewModel.showPanel(Panels.VideoFilters) },
                     )
@@ -621,6 +653,7 @@ fun PlayerControls(
             sleepTimerTimeRemaining = sleepTimerTimeRemaining,
             onStartSleepTimer = viewModel::startTimer,
             buttons = customButtons.getButtons().toImmutableList(),
+            onSelectAnime4KCustom = onSelectAnime4KCustom,
 
             isLocalSource = currentSource?.id == LocalAnimeSource.ID,
             showSubtitles = showSubtitles,

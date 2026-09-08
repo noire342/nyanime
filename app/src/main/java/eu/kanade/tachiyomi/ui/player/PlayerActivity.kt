@@ -39,6 +39,7 @@ import android.media.session.PlaybackState
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Rational
 import android.view.KeyEvent
 import android.view.View
@@ -62,6 +63,7 @@ import aniyomi.core.common.torrent.TorrentServerApi
 import aniyomi.core.common.torrent.TorrentServerUtils
 import com.hippo.unifile.UniFile
 import eu.kanade.presentation.theme.TachiyomiTheme
+import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.animesource.model.ChapterType
 import eu.kanade.tachiyomi.animesource.model.Hoster
 import eu.kanade.tachiyomi.animesource.model.HttpServer
@@ -143,6 +145,15 @@ class PlayerActivity : BaseActivity() {
 
     private var pipReceiver: BroadcastReceiver? = null
     private var httpServer: HttpServer? = null
+    private val anime4kShaderPipeline by lazy { Anime4KShaderPipeline(this) }
+    private var anime4kSmartController: Anime4KSmartController? = null
+    private var anime4kSmartNeedsMediaResolution = true
+    private var anime4kSmartResolutionRetryCount = 0
+    private var anime4kSmartRetryPending = false
+    private var anime4kMediaResolutionGeneration = 0L
+    private var anime4kLastShaderErrorAt = 0L
+    private var anime4kCalibrationKey: String? = null
+    private var anime4kLastSavedCalibration: Anime4KCalibration? = null
 
     private val noisyReceiver = object : BroadcastReceiver() {
         var initialized = false
@@ -241,14 +252,6 @@ class PlayerActivity : BaseActivity() {
         setupMediaSession()
         setupPlayerOrientation()
 
-        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
-            runOnUiThread {
-                toast(throwable.message)
-            }
-            logcat(LogPriority.ERROR, throwable)
-            finish()
-        }
-
         viewModel.eventFlow
             .onEach { event ->
                 when (event) {
@@ -276,6 +279,9 @@ class PlayerActivity : BaseActivity() {
                             finish()
                         }
                     },
+                    onToggleAnime4KSmart = ::toggleAnime4KSmart,
+                    onToggleAnime4KMaximum = ::toggleAnime4KMaximum,
+                    onSelectAnime4KCustom = ::selectAnime4KCustom,
                     modifier = Modifier.onGloballyPositioned {
                         pipRect = run {
                             val boundsInWindow = it.boundsInWindow()
@@ -415,6 +421,470 @@ class PlayerActivity : BaseActivity() {
         }
     }
 
+    private fun currentAnime4KEpisodeIds(): Pair<Long, Long>? {
+        val animeId = viewModel.currentAnime.value?.id ?: return null
+        val episodeId = viewModel.currentEpisode.value?.id ?: return null
+        return animeId to episodeId
+    }
+
+    private fun anime4KRuntimeCalibrationKey(mediaInfo: Anime4KMediaInfo): String {
+        return Anime4K.calibrationKey(
+            mediaInfo = mediaInfo,
+            renderer = getAnime4KPropertyString("gpu-renderer")
+                ?: getAnime4KPropertyString("gpu-context")
+                ?: Build.HARDWARE,
+            api = getAnime4KPropertyString("gpu-api") ?: "unknown",
+            driver = getAnime4KPropertyString("gpu-driver") ?: Build.VERSION.SDK_INT.toString(),
+            hwdec = getAnime4KPropertyString("hwdec-current"),
+            calibrationRevision = "${Anime4K.CALIBRATION_REVISION}:${BuildConfig.VERSION_CODE}",
+        )
+    }
+
+    internal fun onAnime4KShaderError(message: String? = null) {
+        runOnUiThread {
+            if (player.isExiting) return@runOnUiThread
+
+            val now = SystemClock.elapsedRealtime()
+            if (now - anime4kLastShaderErrorAt < 1500L) return@runOnUiThread
+            anime4kLastShaderErrorAt = now
+
+            val currentSelection = currentAnime4KSelection()
+            if (currentSelection.profile == Anime4KProfile.Off || currentSelection.mode == Anime4KMode.Off) {
+                return@runOnUiThread
+            }
+
+            if (currentSelection.profile == Anime4KProfile.Smart) {
+                val controller = anime4kSmartController
+                if (controller == null) {
+                    applyAnime4KSelection(
+                        profile = Anime4KProfile.Smart,
+                        mode = Anime4KMode.Off,
+                        resetSmartController = false,
+                        persistEpisodeProfile = false,
+                        fallbackToOffOnFailure = false,
+                    )
+                } else {
+                    val adjustment = controller.onShaderError(
+                        nowMillis = now,
+                        shaderName = message?.let(Anime4K::shaderNameInError),
+                    )
+                    adjustment?.let { applySmartAdjustment(it, now) }
+                }
+                return@runOnUiThread
+            }
+
+            applyAnime4KSelection(Anime4KProfile.Off, Anime4KMode.Off)
+            toast(AYMR.strings.pref_anime4k_fallback)
+        }
+    }
+
+    internal fun toggleAnime4KSmart() {
+        val mediaInfo = resolveAnime4KMediaInfo()
+        val current = currentAnime4KSelection()
+        if (current.profile == Anime4KProfile.Smart && anime4kSmartController?.isSuspended == true) {
+            val now = SystemClock.elapsedRealtime()
+            val controller = anime4kSmartController ?: return
+            controller.resume(now)
+            advancedPlayerPreferences.setAnime4kActiveSelection(
+                Anime4KSelection(Anime4KProfile.Smart, Anime4KMode.Off),
+            )
+            advancedPlayerPreferences.anime4kProfile().set(Anime4KProfile.Smart)
+            advancedPlayerPreferences.anime4kMode().set(Anime4KMode.Off)
+            currentAnime4KEpisodeIds()?.let { (animeId, episodeId) ->
+                advancedPlayerPreferences.saveAnime4kEpisodeProfile(
+                    animeId,
+                    episodeId,
+                    Anime4KEpisodeProfile(Anime4KProfile.Smart),
+                )
+            }
+            if (applySmartMode(controller, controller.currentMode, now)) {
+                applySmartAnime4KForLoadedMedia()
+            }
+            return
+        }
+
+        val target = Anime4KSelectionRules.toggleSmart(
+            current,
+            mediaInfo?.let(Anime4K::resolveSmartMode) ?: Anime4KMode.ModeA,
+        )
+        if (target.profile == Anime4KProfile.Smart) {
+            if (applyAnime4KSelection(
+                    profile = Anime4KProfile.Smart,
+                    mode = Anime4KMode.Off,
+                    resetSmartController = true,
+                    persistEpisodeProfile = true,
+                    fallbackToOffOnFailure = false,
+                )
+            ) {
+                applySmartAnime4KForLoadedMedia()
+            }
+        } else {
+            applyAnime4KSelection(Anime4KProfile.Off, Anime4KMode.Off)
+        }
+    }
+
+    internal fun toggleAnime4KMaximum() {
+        val target = Anime4KSelectionRules.toggleMaximum(currentAnime4KSelection())
+        applyAnime4KSelection(target.profile, target.mode)
+    }
+
+    internal fun selectAnime4KCustom(mode: Anime4KMode) {
+        val target = Anime4KSelectionRules.selectCustom(currentAnime4KSelection(), mode)
+        applyAnime4KSelection(target.profile, target.mode)
+    }
+
+    private fun currentAnime4KSelection(): Anime4KSelection =
+        advancedPlayerPreferences.anime4kActiveSelection().value
+
+    private fun applyAnime4KSelection(
+        profile: Anime4KProfile,
+        mode: Anime4KMode,
+        resetSmartController: Boolean = true,
+        persistEpisodeProfile: Boolean = true,
+        fallbackToOffOnFailure: Boolean = true,
+    ): Boolean {
+        if (anime4kShaderPipeline.apply(mode)) {
+            val selection = Anime4KSelection(profile, mode)
+            advancedPlayerPreferences.setAnime4kActiveSelection(selection)
+            advancedPlayerPreferences.anime4kProfile().set(profile)
+            advancedPlayerPreferences.anime4kMode().set(mode)
+            if (persistEpisodeProfile) {
+                currentAnime4KEpisodeIds()?.let { (animeId, episodeId) ->
+                    advancedPlayerPreferences.saveAnime4kEpisodeProfile(
+                        animeId,
+                        episodeId,
+                        Anime4KEpisodeProfile(
+                            profile = profile,
+                            customMode = if (profile == Anime4KProfile.Custom) mode else Anime4KMode.Off,
+                        ),
+                    )
+                }
+            }
+            advancedPlayerPreferences.setAnime4kDiagnostics(
+                Anime4KSmartDiagnostics(
+                    profile = profile,
+                    mode = mode,
+                ),
+            )
+            if (profile != Anime4KProfile.Smart) {
+                resetAnime4KRuntime()
+            } else if (resetSmartController) {
+                resetAnime4KRuntime()
+            } else {
+                anime4kSmartNeedsMediaResolution = false
+            }
+            return true
+        }
+
+        if (!fallbackToOffOnFailure) return false
+
+        anime4kShaderPipeline.apply(Anime4KMode.Off)
+        advancedPlayerPreferences.setAnime4kActiveSelection(
+            Anime4KSelection(Anime4KProfile.Off, Anime4KMode.Off),
+        )
+        advancedPlayerPreferences.anime4kProfile().set(Anime4KProfile.Off)
+        advancedPlayerPreferences.anime4kMode().set(Anime4KMode.Off)
+        if (persistEpisodeProfile) {
+            currentAnime4KEpisodeIds()?.let { (animeId, episodeId) ->
+                advancedPlayerPreferences.saveAnime4kEpisodeProfile(
+                    animeId,
+                    episodeId,
+                    Anime4KEpisodeProfile(Anime4KProfile.Off),
+                )
+            }
+        }
+        resetAnime4KRuntime()
+        toast(AYMR.strings.pref_anime4k_fallback)
+        return false
+    }
+
+    private fun applyAnime4K() {
+        // The episode profile is loaded after MPV has identified the current episode. Never
+        // apply a previous episode's profile during MPV initialization.
+        anime4kShaderPipeline.apply(Anime4KMode.Off)
+        advancedPlayerPreferences.setAnime4kActiveSelection(
+            Anime4KSelection(Anime4KProfile.Off, Anime4KMode.Off),
+        )
+        advancedPlayerPreferences.setAnime4kDiagnostics(Anime4KSmartDiagnostics())
+        resetAnime4KRuntime()
+    }
+
+    private fun loadAnime4KForCurrentEpisode() {
+        resetAnime4KRuntime()
+
+        val ids = currentAnime4KEpisodeIds() ?: run {
+            anime4kShaderPipeline.apply(Anime4KMode.Off)
+            advancedPlayerPreferences.setAnime4kActiveSelection(
+                Anime4KSelection(Anime4KProfile.Off, Anime4KMode.Off),
+            )
+            advancedPlayerPreferences.setAnime4kDiagnostics(Anime4KSmartDiagnostics())
+            return
+        }
+        val profile = advancedPlayerPreferences.loadAnime4kEpisodeProfile(ids.first, ids.second)
+        when (profile.profile) {
+            Anime4KProfile.Off -> applyAnime4KSelection(
+                Anime4KProfile.Off,
+                Anime4KMode.Off,
+                persistEpisodeProfile = false,
+            )
+            Anime4KProfile.Smart -> {
+                advancedPlayerPreferences.setAnime4kActiveSelection(
+                    Anime4KSelection(Anime4KProfile.Smart, Anime4KMode.Off),
+                )
+                advancedPlayerPreferences.anime4kProfile().set(Anime4KProfile.Smart)
+                advancedPlayerPreferences.anime4kMode().set(Anime4KMode.Off)
+                applySmartAnime4KForLoadedMedia()
+            }
+            Anime4KProfile.Maximum -> applyAnime4KSelection(
+                Anime4KProfile.Maximum,
+                Anime4KMode.ModeAPlusHq,
+                persistEpisodeProfile = false,
+            )
+            Anime4KProfile.Custom -> applyAnime4KSelection(
+                Anime4KProfile.Custom,
+                profile.customMode,
+                persistEpisodeProfile = false,
+            )
+        }
+    }
+
+    private fun applySmartAnime4KForLoadedMedia() {
+        if (currentAnime4KSelection().profile != Anime4KProfile.Smart) return
+
+        val mediaInfo = resolveAnime4KMediaInfo() ?: run {
+            scheduleAnime4KMediaResolutionRetry()
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        val calibrationKey = anime4KRuntimeCalibrationKey(mediaInfo)
+        val controller = anime4kSmartController
+        if (
+            controller == null ||
+            anime4kSmartNeedsMediaResolution ||
+            anime4kCalibrationKey != calibrationKey
+        ) {
+            val calibration = advancedPlayerPreferences.anime4kCalibration(calibrationKey)
+            val newController = Anime4KSmartController(mediaInfo, now, calibration)
+            anime4kSmartController = newController
+            anime4kSmartNeedsMediaResolution = false
+            anime4kSmartResolutionRetryCount = 0
+            anime4kCalibrationKey = calibrationKey
+            anime4kLastSavedCalibration = calibration
+            if (applySmartMode(newController, newController.currentMode, now)) {
+                logcat(LogPriority.INFO) {
+                    "Anime4K Smart started at ${newController.currentMode.name} for " +
+                        "${mediaInfo.sourceWidth}x${mediaInfo.sourceHeight} -> " +
+                        "${mediaInfo.targetWidth}x${mediaInfo.targetHeight} @ " +
+                        "${mediaInfo.framesPerSecond}fps"
+                }
+            }
+            publishAnime4KSmartState(newController)
+            return
+        }
+
+        if (controller.isSuspended) {
+            publishAnime4KSmartState(controller)
+            return
+        }
+
+        controller.updateMediaInfo(mediaInfo, now)?.let { adjustment ->
+            applySmartAdjustment(adjustment, now)
+        }
+        publishAnime4KSmartState(controller)
+        saveAnime4KCalibrationIfChanged(controller)
+    }
+
+    private fun applySmartMode(
+        controller: Anime4KSmartController,
+        mode: Anime4KMode,
+        nowMillis: Long,
+    ): Boolean {
+        if (
+            applyAnime4KSelection(
+                profile = Anime4KProfile.Smart,
+                mode = mode,
+                resetSmartController = false,
+                persistEpisodeProfile = false,
+                fallbackToOffOnFailure = false,
+            )
+        ) {
+            publishAnime4KSmartState(controller)
+            saveAnime4KCalibrationIfChanged(controller)
+            return true
+        }
+
+        val fallback = controller.onModeApplyFailure(nowMillis)
+        if (fallback != null && fallback.mode != Anime4KMode.Off) {
+            if (
+                applyAnime4KSelection(
+                    profile = Anime4KProfile.Smart,
+                    mode = fallback.mode,
+                    resetSmartController = false,
+                    persistEpisodeProfile = false,
+                    fallbackToOffOnFailure = false,
+                )
+            ) {
+                publishAnime4KSmartState(controller)
+                saveAnime4KCalibrationIfChanged(controller)
+                return false
+            }
+        }
+        forceSmartOff(controller)
+        return false
+    }
+
+    private fun applySmartAdjustment(
+        adjustment: Anime4KSmartAdjustment,
+        nowMillis: Long,
+    ) {
+        val controller = anime4kSmartController ?: return
+        val previousMode = currentAnime4KSelection().mode
+        if (
+            adjustment.mode != previousMode &&
+            !applyAnime4KSelection(
+                profile = Anime4KProfile.Smart,
+                mode = adjustment.mode,
+                resetSmartController = false,
+                persistEpisodeProfile = false,
+                fallbackToOffOnFailure = false,
+            )
+        ) {
+            applySmartMode(controller, adjustment.mode, nowMillis)
+        }
+        publishAnime4KSmartState(controller)
+        saveAnime4KCalibrationIfChanged(controller)
+        if (previousMode != adjustment.mode) {
+            logcat(LogPriority.INFO) {
+                "Anime4K Smart changed $previousMode to ${adjustment.mode.name}: ${adjustment.reason}"
+            }
+        }
+    }
+
+    private fun forceSmartOff(controller: Anime4KSmartController) {
+        anime4kShaderPipeline.apply(Anime4KMode.Off)
+        advancedPlayerPreferences.setAnime4kActiveSelection(
+            Anime4KSelection(Anime4KProfile.Smart, Anime4KMode.Off),
+        )
+        advancedPlayerPreferences.anime4kProfile().set(Anime4KProfile.Smart)
+        advancedPlayerPreferences.anime4kMode().set(Anime4KMode.Off)
+        publishAnime4KSmartState(controller)
+        saveAnime4KCalibrationIfChanged(controller)
+    }
+
+    private fun resetAnime4KRuntime() {
+        anime4kSmartController = null
+        anime4kSmartNeedsMediaResolution = true
+        anime4kSmartResolutionRetryCount = 0
+        anime4kSmartRetryPending = false
+        anime4kMediaResolutionGeneration++
+        anime4kCalibrationKey = null
+        anime4kLastSavedCalibration = null
+    }
+
+    private fun publishAnime4KSmartState(controller: Anime4KSmartController) {
+        advancedPlayerPreferences.setAnime4kDiagnostics(controller.diagnostics)
+    }
+
+    private fun saveAnime4KCalibrationIfChanged(controller: Anime4KSmartController) {
+        val key = anime4kCalibrationKey ?: return
+        val calibration = controller.calibration
+        if (calibration != anime4kLastSavedCalibration) {
+            advancedPlayerPreferences.saveAnime4kCalibration(key, calibration)
+            anime4kLastSavedCalibration = calibration
+        }
+    }
+
+    /** MPV can publish FILE_LOADED before video-params is available. Retry only briefly. */
+    private fun scheduleAnime4KMediaResolutionRetry() {
+        if (
+            anime4kSmartRetryPending ||
+            currentAnime4KSelection().profile != Anime4KProfile.Smart ||
+            !anime4kSmartNeedsMediaResolution ||
+            anime4kSmartResolutionRetryCount >= 4
+        ) {
+            return
+        }
+
+        val generation = anime4kMediaResolutionGeneration
+        anime4kSmartResolutionRetryCount++
+        anime4kSmartRetryPending = true
+        binding.root.postDelayed({
+            anime4kSmartRetryPending = false
+            if (isFinishing || isDestroyed) return@postDelayed
+            if (generation != anime4kMediaResolutionGeneration) return@postDelayed
+            if (currentAnime4KSelection().profile == Anime4KProfile.Smart) {
+                applySmartAnime4KForLoadedMedia()
+            }
+        }, anime4kSmartResolutionRetryCount * 250L)
+    }
+
+    private fun resolveAnime4KMediaInfo(): Anime4KMediaInfo? {
+        val sourceWidth = getAnime4KPropertyInt("video-params/w")?.takeIf { it > 0 } ?: return null
+        val sourceHeight = getAnime4KPropertyInt("video-params/h")?.takeIf { it > 0 } ?: return null
+        val targetWidth = sequenceOf(
+            "video-target-params/dw",
+            "video-target-params/w",
+            "video-out-params/dw",
+            "video-out-params/w",
+        ).mapNotNull { property -> getAnime4KPropertyInt(property) }.firstOrNull { it > 0 }
+            ?: player.width.takeIf { it > 0 }
+            ?: binding.root.width.takeIf { it > 0 }
+            ?: resources.displayMetrics.widthPixels
+        val targetHeight = sequenceOf(
+            "video-target-params/dh",
+            "video-target-params/h",
+            "video-out-params/dh",
+            "video-out-params/h",
+        ).mapNotNull { property -> getAnime4KPropertyInt(property) }.firstOrNull { it > 0 }
+            ?: player.height.takeIf { it > 0 }
+            ?: binding.root.height.takeIf { it > 0 }
+            ?: resources.displayMetrics.heightPixels
+        val containerFps = getAnime4KPropertyDouble("container-fps")
+        val displayRefreshRate = getAnime4KPropertyDouble("display-fps")
+            ?.takeIf { it.isFinite() && it > 0.0 }
+            ?: getAnime4KPropertyDouble("estimated-display-fps")?.takeIf { it.isFinite() && it > 0.0 }
+
+        return Anime4KMediaInfo(
+            sourceWidth = sourceWidth,
+            sourceHeight = sourceHeight,
+            targetWidth = targetWidth,
+            targetHeight = targetHeight,
+            framesPerSecond = Anime4K.resolveFramesPerSecond(null, containerFps),
+            displayRefreshRate = displayRefreshRate,
+            frameRateKnown = containerFps?.let { it.isFinite() && it > 0.0 } == true,
+            playbackSpeed = getAnime4KPropertyDouble("speed")
+                ?.takeIf { it.isFinite() && it > 0.0 }
+                ?: 1.0,
+        )
+    }
+
+    private fun sampleAnime4KSmart() {
+        if (currentAnime4KSelection().profile != Anime4KProfile.Smart) return
+        val controller = anime4kSmartController ?: return
+        val sample = Anime4KPerformanceSample(
+            timestampMillis = SystemClock.elapsedRealtime(),
+            outputDroppedFrames = getAnime4KPropertyInt("frame-drop-count")?.toLong(),
+            decoderDroppedFrames = getAnime4KPropertyInt("decoder-frame-drop-count")?.toLong(),
+            delayedFrames = getAnime4KPropertyInt("vo-delayed-frame-count")?.toLong(),
+            estimatedFilterFramesPerSecond = getAnime4KPropertyDouble("estimated-vf-fps"),
+            mistimedFrames = getAnime4KPropertyInt("mistimed-frame-count")?.toLong(),
+        )
+        controller.onSample(sample)?.let { adjustment ->
+            applySmartAdjustment(adjustment, sample.timestampMillis)
+        }
+        publishAnime4KSmartState(controller)
+        saveAnime4KCalibrationIfChanged(controller)
+    }
+
+    private fun getAnime4KPropertyInt(property: String): Int? =
+        runCatching { MPVLib.getPropertyInt(property) }.getOrNull()
+
+    private fun getAnime4KPropertyDouble(property: String): Double? =
+        runCatching { MPVLib.getPropertyDouble(property) }.getOrNull()
+
+    private fun getAnime4KPropertyString(property: String): String? =
+        runCatching { MPVLib.getPropertyString(property) }.getOrNull()
+
     private fun UniFile.writeText(text: String) {
         this.openOutputStream().use {
             it.write(text.toByteArray())
@@ -432,6 +902,7 @@ class PlayerActivity : BaseActivity() {
         advancedPlayerPreferences.mpvInput().get().let { mpvInputFile.writeText(it) }
 
         copyUserFiles(mpvDir)
+        anime4kShaderPipeline.copyAssets(mpvDir)
         copyAssets(mpvDir)
         copyFontsDirectory(mpvDir)
 
@@ -445,6 +916,7 @@ class PlayerActivity : BaseActivity() {
         )
         MPVLib.addLogObserver(playerObserver)
         MPVLib.addObserver(playerObserver)
+        applyAnime4K()
     }
 
     private fun copyUserFiles(mpvDir: UniFile) {
@@ -668,10 +1140,16 @@ class PlayerActivity : BaseActivity() {
             "time-pos" -> {
                 viewModel.updatePlayBackPos(value.toFloat())
                 viewModel.setChapter(value.toFloat())
+                sampleAnime4KSmart()
             }
             "demuxer-cache-time" -> viewModel.updateReadAhead(value = value)
             "volume" -> viewModel.setMPVVolume(value.toInt())
             "volume-max" -> viewModel.volumeBoostCap = value.toInt() - 100
+            "frame-drop-count",
+            "decoder-frame-drop-count",
+            "vo-delayed-frame-count",
+            "mistimed-frame-count",
+            -> sampleAnime4KSmart()
             // "chapter" -> viewModel.updateChapter(value)
             "duration" -> viewModel.duration.update { value.toFloat() }
             "user-data/current-anime/intro-length" -> viewModel.setAnimeSkipIntroLength(value)
@@ -745,8 +1223,16 @@ class PlayerActivity : BaseActivity() {
     internal fun onObserverEvent(property: String, value: Double) {
         if (player.isExiting) return
         when (property) {
-            "speed" -> viewModel.playbackSpeed.update { value.toFloat() }
+            "speed" -> {
+                viewModel.playbackSpeed.update { value.toFloat() }
+                applySmartAnime4KForLoadedMedia()
+            }
             "video-params/aspect" -> if (isPipSupportedAndEnabled) createPipParams()
+            "container-fps",
+            "estimated-vf-fps",
+            "display-fps",
+            "estimated-display-fps",
+            -> sampleAnime4KSmart()
         }
     }
 
@@ -754,9 +1240,14 @@ class PlayerActivity : BaseActivity() {
         if (player.isExiting) return
         when (eventId) {
             MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED -> {
+                loadAnime4KForCurrentEpisode()
                 viewModel.viewModelScope.launchIO { fileLoaded() }
             }
-            MPVLib.mpvEventId.MPV_EVENT_SEEK -> viewModel.isLoading.update { true }
+            MPVLib.mpvEventId.MPV_EVENT_VIDEO_RECONFIG -> applySmartAnime4KForLoadedMedia()
+            MPVLib.mpvEventId.MPV_EVENT_SEEK -> {
+                anime4kSmartController?.resetTelemetry()
+                viewModel.isLoading.update { true }
+            }
             MPVLib.mpvEventId.MPV_EVENT_PLAYBACK_RESTART -> player.isExiting = false
         }
     }

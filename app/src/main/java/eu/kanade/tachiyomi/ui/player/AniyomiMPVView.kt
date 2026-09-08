@@ -217,12 +217,20 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet) : BaseMPVView(c
         "duration" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
         "volume" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
         "volume-max" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
+        "frame-drop-count" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
+        "decoder-frame-drop-count" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
+        "vo-delayed-frame-count" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
+        "mistimed-frame-count" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
 
         "sid" to MPVLib.mpvFormat.MPV_FORMAT_STRING,
         "secondary-sid" to MPVLib.mpvFormat.MPV_FORMAT_STRING,
         "aid" to MPVLib.mpvFormat.MPV_FORMAT_STRING,
 
         "speed" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE,
+        "container-fps" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE,
+        "estimated-vf-fps" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE,
+        "display-fps" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE,
+        "estimated-display-fps" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE,
         "video-params/aspect" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE,
 
         "hwdec-current" to MPVLib.mpvFormat.MPV_FORMAT_STRING,

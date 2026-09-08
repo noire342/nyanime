@@ -239,6 +239,25 @@
     <string name="pref_mpv_conf">Edit MPV configuration file for further player settings</string>
     <string name="pref_reset_mpv_conf">Reset MPV configuration file</string>
     <string name="pref_mpv_input">Edit MPV input file for keyboard mapping configuration</string>
+    <string name="pref_anime4k">Anime4K</string>
+    <string name="pref_anime4k_summary">Anime4K Fast and HQ presets for the internal player (HQ uses more GPU)</string>
+    <string name="pref_anime4k_max">Maximum (A+A HQ)</string>
+    <string name="pref_anime4k_off">Off</string>
+    <string name="pref_anime4k_mode_a">Mode A (Fast)</string>
+    <string name="pref_anime4k_mode_a_plus">Mode A+A (Fast)</string>
+    <string name="pref_anime4k_mode_a_hq">Mode A (HQ)</string>
+    <string name="pref_anime4k_mode_a_plus_hq">Mode A+A (HQ)</string>
+    <string name="pref_anime4k_mode_b">Mode B (Fast)</string>
+    <string name="pref_anime4k_mode_c">Mode C (Fast)</string>
+    <string name="pref_anime4k_mode_b_plus">Mode B+B (Fast)</string>
+    <string name="pref_anime4k_mode_c_plus_a">Mode C+A (Fast)</string>
+    <string name="pref_anime4k_mode_b_hq">Mode B (HQ)</string>
+    <string name="pref_anime4k_mode_c_hq">Mode C (HQ)</string>
+    <string name="pref_anime4k_mode_b_plus_hq">Mode B+B (HQ)</string>
+    <string name="pref_anime4k_mode_c_plus_a_hq">Mode C+A (HQ)</string>
+    <string name="pref_anime4k_fallback">Anime4K disabled after a shader error</string>
+    <string name="pref_anime4k_reduced">Anime4K preset reduced after a shader error</string>
+    <string name="pref_anime4k_debug_overlay">Anime4K diagnostic overlay</string>
     <!-- Player -->
 
     <!-- Player - skip intro button -->

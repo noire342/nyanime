@@ -1,13 +1,154 @@
 package eu.kanade.tachiyomi.ui.player.settings
 
+import eu.kanade.tachiyomi.ui.player.Anime4KCalibration
+import eu.kanade.tachiyomi.ui.player.Anime4KEpisodeProfile
+import eu.kanade.tachiyomi.ui.player.Anime4KMode
+import eu.kanade.tachiyomi.ui.player.Anime4KProfile
+import eu.kanade.tachiyomi.ui.player.Anime4KSelection
+import eu.kanade.tachiyomi.ui.player.Anime4KSmartDiagnostics
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
+import tachiyomi.core.common.preference.getEnum
+import java.security.MessageDigest
 
 class AdvancedPlayerPreferences(
     private val preferenceStore: PreferenceStore,
 ) {
+    private val anime4kEffectiveModeFlow = MutableStateFlow(Anime4KMode.Off)
+    private val anime4kEffectiveModeState = anime4kEffectiveModeFlow.asStateFlow()
+    private val anime4kActiveSelectionFlow = MutableStateFlow(
+        Anime4KSelection(Anime4KProfile.Off, Anime4KMode.Off),
+    )
+    private val anime4kActiveSelectionState = anime4kActiveSelectionFlow.asStateFlow()
+    private val anime4kDiagnosticsFlow = MutableStateFlow(Anime4KSmartDiagnostics())
+    private val anime4kDiagnosticsState = anime4kDiagnosticsFlow.asStateFlow()
+    private var activeEpisodeKey: String? = null
+
     fun mpvUserFiles() = preferenceStore.getBoolean("mpv_scripts", false)
     fun mpvConf() = preferenceStore.getString("pref_mpv_conf", "")
     fun mpvInput() = preferenceStore.getString("pref_mpv_input", "")
+    fun anime4kMode() = preferenceStore.getEnum("pref_anime4k_mode", Anime4KMode.Off)
+    fun anime4kProfile() = preferenceStore.getEnum(
+        "pref_anime4k_profile",
+        if (anime4kMode().get() == Anime4KMode.Off) Anime4KProfile.Off else Anime4KProfile.Custom,
+    )
+
+    /** Effective player mode; unlike the preference, Smart's learned mode is session-local. */
+    fun anime4kEffectiveMode(): StateFlow<Anime4KMode> = anime4kEffectiveModeState
+
+    fun setAnime4kEffectiveMode(mode: Anime4KMode) {
+        anime4kEffectiveModeFlow.value = mode
+        anime4kActiveSelectionFlow.value = anime4kActiveSelectionFlow.value.copy(mode = mode)
+    }
+
+    fun anime4kActiveSelection(): StateFlow<Anime4KSelection> = anime4kActiveSelectionState
+
+    fun setAnime4kActiveSelection(selection: Anime4KSelection) {
+        anime4kActiveSelectionFlow.value = selection
+        anime4kEffectiveModeFlow.value = selection.mode
+    }
+
+    fun anime4kDiagnosticsEnabled() = preferenceStore.getBoolean("pref_anime4k_diagnostics", false)
+
+    fun anime4kDiagnostics(): StateFlow<Anime4KSmartDiagnostics> = anime4kDiagnosticsState
+
+    fun setAnime4kDiagnostics(diagnostics: Anime4KSmartDiagnostics) {
+        anime4kDiagnosticsFlow.value = diagnostics
+    }
+
+    fun loadAnime4kEpisodeProfile(animeId: Long?, episodeId: Long?): Anime4KEpisodeProfile {
+        activeEpisodeKey = episodeKey(animeId, episodeId)
+        val stored = activeEpisodeKey
+            ?.let { preferenceStore.getString(it, "").get() }
+            ?.let(::decodeEpisodeProfile)
+        val profile = stored ?: Anime4KEpisodeProfile(Anime4KProfile.Smart)
+        if (stored == null) {
+            saveAnime4kEpisodeProfile(animeId, episodeId, profile)
+        }
+        setAnime4kActiveSelection(profile.toSelection())
+        setAnime4kDiagnostics(
+            Anime4KSmartDiagnostics(
+                profile = profile.profile,
+                mode = profile.toSelection().mode,
+            ),
+        )
+        return profile
+    }
+
+    fun anime4kEpisodeProfile(animeId: Long?, episodeId: Long?): Anime4KEpisodeProfile? {
+        return episodeKey(animeId, episodeId)
+            ?.let { preferenceStore.getString(it, "").get() }
+            ?.let(::decodeEpisodeProfile)
+    }
+
+    fun saveAnime4kEpisodeProfile(
+        animeId: Long?,
+        episodeId: Long?,
+        profile: Anime4KEpisodeProfile,
+    ) {
+        val key = episodeKey(animeId, episodeId) ?: return
+        preferenceStore.getString(key, "").set(encodeEpisodeProfile(profile))
+        if (key == activeEpisodeKey) {
+            setAnime4kActiveSelection(profile.toSelection())
+        }
+    }
+
+    fun anime4kCalibration(key: String): Anime4KCalibration? {
+        val encoded = preferenceStore.getString(calibrationPreferenceKey(key), "").get()
+        val fields = encoded.split('|')
+        if (fields.size != 3) return null
+        val mode = fields[0].let { value ->
+            runCatching { Anime4KMode.valueOf(value) }.getOrNull()
+        } ?: return null
+        val probes = fields[1].toIntOrNull()?.coerceAtLeast(0) ?: return null
+        val timestamp = fields[2].toLongOrNull()?.takeIf { it > 0L } ?: return null
+        return Anime4KCalibration(mode, probes, timestamp)
+    }
+
+    fun saveAnime4kCalibration(key: String, calibration: Anime4KCalibration) {
+        preferenceStore.getString(calibrationPreferenceKey(key), "").set(
+            listOf(
+                calibration.maxStableMode.name,
+                calibration.successfulProbes,
+                calibration.updatedAtMillis,
+            ).joinToString("|"),
+        )
+    }
+
+    private fun Anime4KEpisodeProfile.toSelection(): Anime4KSelection = when (profile) {
+        Anime4KProfile.Off -> Anime4KSelection(profile, Anime4KMode.Off)
+        Anime4KProfile.Smart -> Anime4KSelection(profile, Anime4KMode.Off)
+        Anime4KProfile.Maximum -> Anime4KSelection(profile, Anime4KMode.ModeAPlusHq)
+        Anime4KProfile.Custom -> Anime4KSelection(profile, customMode)
+    }
+
+    private fun encodeEpisodeProfile(profile: Anime4KEpisodeProfile): String = listOf(
+        profile.profile.name,
+        profile.customMode.name,
+    ).joinToString("|")
+
+    private fun decodeEpisodeProfile(encoded: String): Anime4KEpisodeProfile? {
+        val fields = encoded.split('|')
+        if (fields.size != 2) return null
+        val profile = runCatching { Anime4KProfile.valueOf(fields[0]) }.getOrNull() ?: return null
+        val customMode = runCatching { Anime4KMode.valueOf(fields[1]) }.getOrNull() ?: return null
+        if (profile == Anime4KProfile.Custom && customMode == Anime4KMode.Off) return null
+        return Anime4KEpisodeProfile(profile, customMode)
+    }
+
+    private fun episodeKey(animeId: Long?, episodeId: Long?): String? {
+        if (animeId == null || episodeId == null || animeId <= 0L || episodeId <= 0L) return null
+        return Preference.privateKey("anime4k_episode_profile_${animeId}_$episodeId")
+    }
+
+    private fun calibrationPreferenceKey(key: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(key.toByteArray(Charsets.UTF_8))
+        val hash = digest.joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+        return Preference.privateKey("anime4k_calibration_$hash")
+    }
 
     // Non-preference
 
