@@ -10,20 +10,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -31,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -41,6 +35,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import eu.kanade.presentation.discovery.CatalogRow
+import eu.kanade.presentation.discovery.DiscoveryHomeHeader
 import eu.kanade.presentation.discovery.FeaturedCarousel
 import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.LocalAnimeRow
@@ -53,7 +48,6 @@ import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.history.HistoriesTab
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
-import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.CatalogAnime
@@ -61,16 +55,26 @@ import tachiyomi.domain.discovery.CatalogFeed
 import tachiyomi.domain.discovery.SectionState
 import tachiyomi.domain.entries.anime.model.asAnimeCover
 import tachiyomi.domain.source.anime.interactor.GetRemoteAnime
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 
 data object DiscoveryTab : Tab {
     override val options: TabOptions
         @Composable get() = TabOptions(5u, "Home", rememberVectorPainter(Icons.Outlined.Home))
 
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
+        var cartoons by rememberSaveable { mutableStateOf(false) }
+        val savedState = rememberSaveableStateHolder()
+        savedState.SaveableStateProvider(if (cartoons) "cartoons" else "anime") {
+            if (cartoons) {
+                CartoonsHomeContent(onSelect = { cartoons = it })
+            } else {
+                AnimeContent(onSelect = { cartoons = it })
+            }
+        }
+    }
+
+    @Composable
+    private fun AnimeContent(onSelect: (Boolean) -> Unit) {
         val model = rememberScreenModel { DiscoveryScreenModel() }
         val state by model.state.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
@@ -82,21 +86,16 @@ data object DiscoveryTab : Tab {
         val selected = state.sources.firstOrNull { it.id == state.selectedSource }
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = { Text("Home", style = MaterialTheme.typography.headlineMedium) },
-                    navigationIcon = {
-                        if (navigator.lastItem == DiscoveryTab) {
-                            IconButton(onClick = {
-                                navigator.pop()
-                            }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
-                        }
+                DiscoveryHomeHeader(
+                    cartoons = false,
+                    onSelect = onSelect,
+                    onBack = if (navigator.lastItem == DiscoveryTab) {
+                        { navigator.pop() }
+                    } else {
+                        null
                     },
-                    actions = {
-                        IconButton(onClick = {
-                            navigator.push(CatalogListScreen(CatalogFeed.SEARCH))
-                        }) { Icon(Icons.Outlined.Search, "Cerca anime") }
-                        IconButton(onClick = model::refresh) { Icon(Icons.Outlined.Refresh, "Aggiorna Home") }
-                    },
+                    onSearch = { navigator.push(CatalogListScreen(CatalogFeed.SEARCH)) },
+                    onRefresh = model::refresh,
                 )
             },
         ) { padding ->

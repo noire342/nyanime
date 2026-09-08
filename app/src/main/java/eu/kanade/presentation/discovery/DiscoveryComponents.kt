@@ -235,12 +235,17 @@ fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit)
 }
 
 @Composable
-fun LocalAnimeRow(state: SectionState<List<LocalHomeItem>>, onOpen: (Long) -> Unit, onPlay: (LocalHomeItem) -> Unit) {
+fun LocalAnimeRow(
+    state: SectionState<List<LocalHomeItem>>,
+    onOpen: (Long) -> Unit,
+    emptyMessage: String = "Gli anime che segui compariranno qui.",
+    onPlay: (LocalHomeItem) -> Unit,
+) {
     LoadNotice(state.loading, state.error)
     val items = state.data.orEmpty()
     if (!state.loading && items.isEmpty() && state.error == null) {
         Text(
-            "Gli anime che segui compariranno qui.",
+            emptyMessage,
             Modifier.padding(
                 horizontal = 16.dp,
                 vertical = 8.dp,

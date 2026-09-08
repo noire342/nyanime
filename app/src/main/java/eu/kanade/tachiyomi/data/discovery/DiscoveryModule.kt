@@ -31,6 +31,12 @@ class DiscoveryModule(private val app: Application) : InjektModule {
             )
         }
         addSingletonFactory<AnimeCatalogRepository> { CachedAnimeCatalogRepository(get(), get(), get()) }
+        addSingletonFactory<tachiyomi.domain.discovery.SourceHomeGateway> {
+            SampleHomeGateway(get(), get(), get(), get(), get(), get(), get())
+        }
+        addSingletonFactory<tachiyomi.domain.discovery.SourceHomeRepository> {
+            tachiyomi.data.discovery.CachedSourceHomeRepository(get())
+        }
         addSingletonFactory {
             DiscoverySourceService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get())
         }
@@ -38,10 +44,11 @@ class DiscoveryModule(private val app: Application) : InjektModule {
         addSingletonFactory { tachiyomi.domain.discovery.CatalogSeriesEvidence(get()) }
         addSingletonFactory { SmartSourceResolver(get(), get(), get(), get(), get(), get(), get()) }
         addSingletonFactory {
-            fun provider(resume: Boolean) = LocalHomeSectionProvider(
-                get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), resume,
-            )
-            LocalHomeSections(provider(true), provider(false))
+            LocalHomeSections { resume, sourceId ->
+                LocalHomeSectionProvider(
+                    get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), resume, sourceId,
+                )
+            }
         }
     }
 }

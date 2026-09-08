@@ -43,18 +43,19 @@ class LocalHomeSectionProvider(
     private val downloads: AnimeDownloadManager,
     private val sourceService: DiscoverySourceService,
     private val resume: Boolean,
+    private val sourceId: Long? = null,
 ) : HomeSectionProvider<LocalHomeItem> {
     override fun observe() = combine(
         if (resume) {
             history.subscribe("").map { list ->
-                list.distinctBy { it.animeId }.take(30).map {
+                list.distinctBy { it.animeId }.map {
                     it.animeId to
                         it.episodeId
                 }
             }
         } else {
             updates.subscribe(Instant.now().minusSeconds(30 * 86_400)).map { list ->
-                list.filterNot { it.seen }.distinctBy { it.animeId }.take(30).map { it.animeId to it.episodeId }
+                list.filterNot { it.seen }.distinctBy { it.animeId }.map { it.animeId to it.episodeId }
             }
         },
         base.incognitoMode().changes(),
@@ -67,8 +68,11 @@ class LocalHomeSectionProvider(
         ) { _, _, _, _ -> Unit },
         sources.sources,
     ) { entries, _, _, _, _ ->
+        var accepted = 0
         val items = entries.mapNotNull { (animeId, episodeId) ->
+            if (accepted >= 30) return@mapNotNull null
             val anime = getAnime.await(animeId) ?: return@mapNotNull null
+            if (sourceId != null && anime.source != sourceId) return@mapNotNull null
             if (anime.source.toString() in preferences.disabledAnimeSources().get()) return@mapNotNull null
             if (!anime.isLocal() &&
                 sources.get(anime.source)?.let(sourceService::isEnabled) != true
@@ -85,7 +89,10 @@ class LocalHomeSectionProvider(
             }
             episode?.takeIf {
                 !base.downloadedOnly().get() || isDownloaded(anime, it)
-            }?.let { LocalHomeItem(anime, it) }
+            }?.let {
+                accepted++
+                LocalHomeItem(anime, it)
+            }
         }
         SectionState(data = items, loading = false)
     }.catch { emit(SectionState(loading = false, error = "Impossibile caricare la libreria")) }.flowOn(Dispatchers.IO)

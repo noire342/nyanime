@@ -79,6 +79,23 @@ episodi scaricati. La modalità incognito disabilita la cache persistente del ca
 nasconde le sezioni locali sensibili e impedisce di ricordare nuove associazioni.
 Le cache immagini continuano a seguire il comportamento del caricatore immagini dell'app.
 
+## Home delle estensioni
+
+Le Home opzionali provengono dalle estensioni installate, attendibili e abilitate.
+Nomi, sezioni, categorie e filtri appartengono all'estensione; l'app non contiene
+un elenco di siti o configurazioni per fonti specifiche.
+
+Le pagine mantengono ricerca, paginazione, selezione e scorrimento indipendenti.
+Le copertine aprono le identità locali esistenti, conservando stagioni, episodi,
+libreria e progressi. La ripresa usa la cronologia delle fonti disponibili.
+Una fonte assente o disabilitata non espone pagine o inviti all'installazione.
+Incognito e solo download continuano a limitare richieste e cronologia.
+
+I contratti SourceHomeGateway e SourceHomeRepository separano l'accesso alle fonti
+da cache e presentazione. Le richieste usano i metodi pubblici delle estensioni,
+filtri indipendenti, caricamento delle righe su richiesta e risultati precedenti
+visibili durante il refresh. Gli errori e il retry restano separati per sezione.
+
 ## Verifica
 
 Verifica deterministica:
