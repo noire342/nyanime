@@ -22,7 +22,7 @@ permissions:
 
 concurrency:
   group: sync-aniyomi-upstream
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   UPSTREAM_REPOSITORY: aniyomiorg/aniyomi
