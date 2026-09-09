@@ -16,6 +16,9 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import tachiyomi.data.discovery.CachedSourceHomeRepository
 import tachiyomi.domain.discovery.SourceHomeAccess
+import tachiyomi.domain.discovery.SourceHomeCache
+import tachiyomi.domain.discovery.SourceHomeCacheEntry
+import tachiyomi.domain.discovery.SourceHomeCacheKey
 import tachiyomi.domain.discovery.SourceHomeGateway
 import tachiyomi.domain.discovery.SourceHomePage
 import tachiyomi.domain.discovery.SourceHomeRequest
@@ -51,6 +54,130 @@ class SourceHomeRepositoryTest {
     }
 
     private val request = SourceHomeRequest("popular")
+
+    private class Disk : SourceHomeCache {
+        val entries = mutableMapOf<SourceHomeCacheKey, SourceHomeCacheEntry>()
+        var reads = 0
+        var writes = 0
+        var failure: Exception? = null
+        override suspend fun read(key: SourceHomeCacheKey): SourceHomeCacheEntry? {
+            reads++
+            failure?.let { throw it }
+            return entries[key]
+        }
+        override suspend fun write(key: SourceHomeCacheKey, entry: SourceHomeCacheEntry) {
+            writes++
+            failure?.let { throw it }
+            entries[key] = entry
+        }
+    }
+
+    @Test
+    fun freshPublicFeedSurvivesRepositoryRecreationWithoutNetwork() = runBlocking {
+        val gateway = Gateway()
+        val disk = Disk()
+        val clock = TestClock()
+        CachedSourceHomeRepository(gateway, clock, persistent = disk).observe(gateway.currentAccess(), request).toList()
+        val states = CachedSourceHomeRepository(gateway, clock, persistent = disk)
+            .observe(gateway.currentAccess(), request).toList()
+        assertEquals(1, gateway.calls.get())
+        assertEquals(1, disk.writes)
+        assertEquals(1, states.size)
+        assertFalse(states.single().loading)
+        assertTrue(states.single().data!!.hasNextPage)
+    }
+
+    @Test
+    fun restoredFeedRefreshesOnDemandAndSurvivesNetworkFailureAfterExpiration() = runBlocking {
+        val gateway = Gateway()
+        val disk = Disk()
+        val clock = TestClock()
+        CachedSourceHomeRepository(gateway, clock, persistent = disk).observe(gateway.currentAccess(), request).toList()
+        CachedSourceHomeRepository(gateway, clock, persistent = disk)
+            .observe(gateway.currentAccess(), request, refresh = true).toList()
+        assertEquals(2, gateway.calls.get())
+        clock.now += CachedSourceHomeRepository.TTL
+        gateway.error = IOException("HTTP 429")
+        val states = CachedSourceHomeRepository(gateway, clock, persistent = disk)
+            .observe(gateway.currentAccess(), request).toList()
+        assertTrue(states.first().stale)
+        assertTrue(states.first().data != null)
+        assertEquals(states.first().data, states.last().data)
+        assertEquals("HTTP 429", states.last().error)
+    }
+
+    @Test
+    fun privateSearchOfflineAndUnavailableModesNeverTouchPersistentStorage() = runBlocking {
+        val gateway = Gateway()
+        val disk = Disk()
+        val repository = CachedSourceHomeRepository(gateway, persistent = disk)
+        repository.observe(gateway.currentAccess(), request.copy(query = "secret")).toList()
+        repository.observe(gateway.currentAccess(), request.copy(sectionId = SourceHomeRequest.SEARCH)).toList()
+        gateway.access.value = gateway.currentAccess().copy(isPrivate = true)
+        repository.observe(gateway.currentAccess(), request).toList()
+        gateway.access.value = gateway.currentAccess().copy(isPrivate = false, offline = true)
+        repository.observe(gateway.currentAccess(), request).toList()
+        gateway.access.value = SourceHomeAccess()
+        repository.observe(gateway.currentAccess(), request).toList()
+        assertEquals(0, disk.reads)
+        assertEquals(0, disk.writes)
+        assertEquals(3, gateway.calls.get())
+    }
+
+    @Test
+    fun diskFailureCannotHideSuccessfulNetworkResultsButCancellationPropagates(): Unit = runBlocking {
+        val gateway = Gateway()
+        val disk = Disk().apply { failure = IOException("storage unavailable") }
+        val states = CachedSourceHomeRepository(gateway, persistent = disk)
+            .observe(gateway.currentAccess(), request).toList()
+        assertNull(states.last().error)
+        assertTrue(states.last().data != null)
+        disk.failure = CancellationException("obsolete")
+        assertThrows(CancellationException::class.java) {
+            runBlocking {
+                CachedSourceHomeRepository(gateway, persistent = disk)
+                    .observe(gateway.currentAccess(), request).toList()
+            }
+        }
+    }
+
+    @Test
+    fun restoredFeedRejectsOldRevisionExpiredDayAndBackwardClock() = runBlocking {
+        for (change in 0..2) {
+            val gateway = Gateway()
+            val disk = Disk()
+            val clock = TestClock()
+            CachedSourceHomeRepository(
+                gateway,
+                clock,
+                persistent = disk,
+            ).observe(gateway.currentAccess(), request).toList()
+            when (change) {
+                0 -> gateway.access.value = gateway.currentAccess().copy(
+                    source = gateway.currentAccess().source!!.copy(revision = "new"),
+                )
+                1 -> clock.now += 24 * 60 * 60_000L
+                2 -> clock.now = 0
+            }
+            val states = CachedSourceHomeRepository(gateway, clock, persistent = disk)
+                .observe(gateway.currentAccess(), request).toList()
+            assertNull(states.first().data)
+            assertEquals(2, gateway.calls.get())
+        }
+    }
+
+    @Test
+    fun inMemoryPagesAlsoExpireAfterOneDay() = runBlocking {
+        val gateway = Gateway()
+        val clock = TestClock()
+        val repository = CachedSourceHomeRepository(gateway, clock)
+        repository.observe(gateway.currentAccess(), request).toList()
+        clock.now += 24 * 60 * 60_000L
+        gateway.error = IOException("offline")
+        val states = repository.observe(gateway.currentAccess(), request).toList()
+        assertNull(states.first().data)
+        assertNull(states.last().data)
+    }
 
     @Test
     fun freshPageIsImmediateAndDuplicateCollectorsShareASingleRequest() = runBlocking {

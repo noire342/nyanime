@@ -1,0 +1,62 @@
+package tachiyomi.data.discovery
+
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import tachiyomi.domain.discovery.SourceHomeCache
+import tachiyomi.domain.discovery.SourceHomeCacheEntry
+import tachiyomi.domain.discovery.SourceHomeCacheKey
+import tachiyomi.domain.discovery.SourceHomePage
+import tachiyomi.domain.entries.anime.repository.AnimeRepository
+
+/** Persist references, not copies of library flags/progress; metadata always comes from the local entries. */
+class SqlSourceHomeCache(
+    private val database: DiscoveryDatabase,
+    private val anime: AnimeRepository,
+) : SourceHomeCache {
+    @Serializable
+    private data class Payload(val ids: List<Long>, val hasNextPage: Boolean)
+    private val json = Json { ignoreUnknownKeys = true }
+
+    override suspend fun read(key: SourceHomeCacheKey): SourceHomeCacheEntry? = withContext(Dispatchers.IO) {
+        try {
+            val row = database.sourceHomeCacheQueries.find(
+                key.home,
+                key.source,
+                key.revision,
+                key.section,
+                key.page.toLong(),
+            ).executeAsOneOrNull() ?: return@withContext null
+            val payload = json.decodeFromString<Payload>(row.payload)
+            if (payload.ids.size > 200) return@withContext null
+            val items = payload.ids.map { anime.getAnimeById(it) }
+            if (items.any { it.source != key.source }) return@withContext null
+            SourceHomeCacheEntry(SourceHomePage(items, payload.hasNextPage), row.fetched_at)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // A cache migration, missing local row or corrupt payload may require refetching, never an empty Home.
+            null
+        }
+    }
+
+    override suspend fun write(key: SourceHomeCacheKey, entry: SourceHomeCacheEntry) = withContext(Dispatchers.IO) {
+        if (entry.page.items.size > 200 || entry.page.items.any { it.source != key.source }) return@withContext
+        val payload = json.encodeToString(Payload(entry.page.items.map { it.id }, entry.page.hasNextPage))
+        database.transaction {
+            database.sourceHomeCacheQueries.put(
+                key.home,
+                key.source,
+                key.revision,
+                key.section,
+                key.page.toLong(),
+                payload,
+                entry.fetchedAt,
+            )
+            database.sourceHomeCacheQueries.discardExpired(entry.fetchedAt - 24 * 60 * 60_000L)
+            database.sourceHomeCacheQueries.trim()
+        }
+    }
+}

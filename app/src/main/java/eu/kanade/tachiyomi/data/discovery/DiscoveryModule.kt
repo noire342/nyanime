@@ -33,7 +33,10 @@ class DiscoveryModule(private val app: Application) : InjektModule {
         addSingletonFactory<AnimeCatalogRepository> { CachedAnimeCatalogRepository(get(), get(), get()) }
         addSingletonFactory<ExtensionHomeManifestReader> { ApkExtensionHomeManifestReader(app) }
         addSingletonFactory { ExtensionHomeRegistry(get(), get(), get(), get(), get(), get(), get()) }
-        addSingletonFactory { ExtensionHomeServices(get(), get(), get()) }
+        addSingletonFactory<tachiyomi.domain.discovery.SourceHomeCache> {
+            tachiyomi.data.discovery.SqlSourceHomeCache(get(), get())
+        }
+        addSingletonFactory { ExtensionHomeServices(get(), get(), get(), get()) }
         addSingletonFactory {
             DiscoverySourceService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get())
         }

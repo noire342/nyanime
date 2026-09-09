@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.data.discovery
 import kotlinx.coroutines.sync.Semaphore
 import tachiyomi.data.discovery.CachedSourceHomeRepository
 import tachiyomi.data.discovery.MergedSourceHomeRepository
+import tachiyomi.domain.discovery.SourceHomeCache
 import tachiyomi.domain.discovery.SourceHomeGateway
 import tachiyomi.domain.discovery.SourceHomeRepository
 import tachiyomi.domain.entries.anime.interactor.NetworkToLocalAnime
@@ -13,6 +14,7 @@ class ExtensionHomeServices(
     private val registry: ExtensionHomeRegistry,
     private val manager: AnimeSourceManager,
     private val toLocal: NetworkToLocalAnime,
+    private val cache: SourceHomeCache,
 ) {
     data class Bound(val gateway: SourceHomeGateway, val repository: SourceHomeRepository)
     private val requests = Semaphore(3)
@@ -27,7 +29,7 @@ class ExtensionHomeServices(
             return existing
         }
         val gateway = ExtensionHomeGateway(key, registry, manager, toLocal, requests)
-        val bound = Bound(gateway, CachedSourceHomeRepository(gateway, capacity = 16))
+        val bound = Bound(gateway, CachedSourceHomeRepository(gateway, capacity = 16, persistent = cache))
         services[key] = bound
         while (services.size > 8) services.remove(services.keys.first())
         return bound

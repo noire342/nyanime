@@ -44,7 +44,9 @@ Il nome visualizzato in caso di titoli discordanti viene scelto deterministicame
 
 Solo lettura locale dell'APK scelto dal loader esistente, anche per installazioni private; nessuna richiesta remota durante il rilevamento delle capacità. Il documento ha un limite di 64 KiB decompressi, 8 Home, 16 sezioni per Home e 100 caratteri per etichetta. ID duplicati nella stessa estensione sono ambigui e ignorati. Versioni sconosciute o documenti malformati non bloccano il catalogo generale. Gli attributi aggiuntivi non eseguono codice e non avviano richieste.
 
-Concorrenza condivisa: massimo 3 richieste alle fonti. Cache solo in memoria, 16 pagine per produttore, fino a 8 servizi conservati, scadenza 30 minuti. Query e risultati incognito non vengono salvati nella cache. Solo download impedisce le richieste alle fonti. Continua a guardare e aggiornamenti usano gli interactor locali filtrando l'insieme delle fonti del gruppo.
+Concorrenza condivisa: massimo 3 richieste alle fonti. Cache in memoria, 16 pagine per produttore, fino a 8 servizi conservati, scadenza 30 minuti. I feed pubblici persistono anche nel database Discovery separato: massimo 128 pagine consultate, conservazione massima 24 ore. Un riavvio entro la scadenza non riscarica i feed già salvati; dopo 30 minuti vengono mostrati subito e aggiornati in background. Il refresh manuale resta disponibile. La revisione dell'estensione invalida le vecchie pagine.
+
+Il database salva solo ID locali e paginazione: flag della libreria e metadati vengono riletti, non ripristinati da vecchie copie. La migrazione 1 → 2 aggiunge una tabella senza alterare catalogo e collegamenti esistenti. Errori della cache non impediscono l'accesso alla rete. Le ricerche non vengono persistite; in incognito nessuna lettura o scrittura della cache, nemmeno in memoria. Solo download impedisce letture di queste pagine e richieste alle fonti. Continua a guardare e aggiornamenti usano gli interactor locali filtrando l'insieme delle fonti del gruppo.
 
 ## Compatibilità degli aggiornamenti
 
