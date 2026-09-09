@@ -26,37 +26,38 @@ import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.LocalAnimeRow
 import eu.kanade.presentation.discovery.PosterCard
 import eu.kanade.presentation.discovery.SectionHeader
-import eu.kanade.tachiyomi.data.discovery.SampleHomeFilters
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.SectionState
+import tachiyomi.domain.discovery.SourceHomeGroup
+import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.entries.anime.model.asAnimeCover
 
 @Composable
-fun DiscoveryTab.CartoonsHomeContent(onSelect: (Boolean) -> Unit) {
-    val model = rememberScreenModel { CartoonsHomeScreenModel() }
+fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
+    val model = rememberScreenModel(tag = homeKey) { SourceHomeScreenModel(homeKey) }
     val state by model.state.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { (context as? MainActivity)?.ready = true }
     val access = state.access
-    val source = access.source
+    val source = access.group
     // Parent and child observe availability independently: never render a stale branded frame.
     if (access.loading || source == null) return
     Scaffold(topBar = {
         DiscoveryHomeHeader(
-            cartoons = true,
-            cartoonsAvailable = true,
+            selectedHome = homeKey,
+            homes = homes,
             onSelect = onSelect,
             onBack = if (navigator.lastItem == DiscoveryTab) {
                 { navigator.pop() }
             } else {
                 null
             },
-            onSearch = if (!access.offline) {
-                { navigator.push(CartoonsListScreen(SampleHomeFilters.SEARCH, "Cerca cartoni")) }
+            onSearch = if (!access.offline && source.searchable) {
+                { navigator.push(SourceHomeListScreen(homeKey, SourceHomeRequest.SEARCH, "Cerca ${source.title}")) }
             } else {
                 null
             },
@@ -70,13 +71,13 @@ fun DiscoveryTab.CartoonsHomeContent(onSelect: (Boolean) -> Unit) {
         ) {
             item(key = "intro") {
                 Text(
-                    "Cartoni · TestSource",
+                    source.title,
                     Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.headlineSmall,
                 )
-                LoadNotice(access.loading, access.error)
+                LoadNotice(access.loading, null)
                 if (access.offline) {
-                    Text("Solo download · nessuna richiesta a TestSource", Modifier.padding(horizontal = 16.dp))
+                    Text("Solo download · nessuna richiesta alle fonti", Modifier.padding(horizontal = 16.dp))
                 }
             }
             item(key = "resume:" + source.id) {
@@ -84,7 +85,7 @@ fun DiscoveryTab.CartoonsHomeContent(onSelect: (Boolean) -> Unit) {
                 LocalAnimeRow(
                     state.resume,
                     onOpen = { navigator.push(AnimeScreen(it)) },
-                    emptyMessage = "I cartoni che guardi su TestSource compariranno qui.",
+                    emptyMessage = "I titoli che guardi in questa Home compariranno qui.",
                 ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
             }
             item(key = "updates:" + source.id) {
@@ -92,7 +93,7 @@ fun DiscoveryTab.CartoonsHomeContent(onSelect: (Boolean) -> Unit) {
                 LocalAnimeRow(
                     state.updates,
                     onOpen = { navigator.push(AnimeScreen(it)) },
-                    emptyMessage = "Aggiungi i cartoni alla libreria per ritrovare qui i loro aggiornamenti.",
+                    emptyMessage = "Aggiungi i titoli alla libreria per ritrovare qui i loro aggiornamenti.",
                 ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
             }
             if (!access.offline) {
@@ -105,7 +106,9 @@ fun DiscoveryTab.CartoonsHomeContent(onSelect: (Boolean) -> Unit) {
                         ) {
                             items(source.categories, key = { it.id }) { category ->
                                 AssistChip(
-                                    onClick = { navigator.push(CartoonsListScreen(category.id, category.title)) },
+                                    onClick = {
+                                        navigator.push(SourceHomeListScreen(homeKey, category.id, category.title))
+                                    },
                                     label = { Text(category.title) },
                                 )
                             }
@@ -116,7 +119,7 @@ fun DiscoveryTab.CartoonsHomeContent(onSelect: (Boolean) -> Unit) {
                     LaunchedEffect(access, section.id) { model.load(section.id) }
                     val value = state.sections[section.id] ?: SectionState()
                     SectionHeader(section.title) {
-                        navigator.push(CartoonsListScreen(section.id, section.title))
+                        navigator.push(SourceHomeListScreen(homeKey, section.id, section.title))
                     }
                     LoadNotice(value.loading, value.error, value.stale) { model.load(section.id, true) }
                     if (value.data?.items?.isEmpty() == true && !value.loading && value.error == null) {
@@ -127,14 +130,14 @@ fun DiscoveryTab.CartoonsHomeContent(onSelect: (Boolean) -> Unit) {
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         items(value.data?.items.orEmpty(), key = { it.id }) { anime ->
-                            PosterCard(anime.title, anime.asAnimeCover(), "TestSource · IT", {
+                            PosterCard(anime.title, anime.asAnimeCover(), source.sourceLabel(anime.source), {
                                 navigator.push(AnimeScreen(anime.id, true))
                             })
                         }
                     }
                 }
                 if (source.sections.isEmpty()) {
-                    item { Text("Aggiorna TestSource per usare le sezioni della Home", Modifier.padding(16.dp)) }
+                    item { Text("Aggiorna l’estensione per usare le sezioni della Home", Modifier.padding(16.dp)) }
                 }
             }
         }

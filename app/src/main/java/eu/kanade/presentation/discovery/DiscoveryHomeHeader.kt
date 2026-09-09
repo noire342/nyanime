@@ -3,11 +3,13 @@ package eu.kanade.presentation.discovery
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,21 +39,22 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
+import tachiyomi.domain.discovery.SourceHomeGroup
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoveryHomeHeader(
-    cartoons: Boolean,
-    onSelect: (Boolean) -> Unit,
+    selectedHome: String?,
+    onSelect: (String?) -> Unit,
     onBack: (() -> Unit)?,
     onSearch: (() -> Unit)?,
     onRefresh: () -> Unit,
-    cartoonsAvailable: Boolean,
+    homes: List<SourceHomeGroup>,
 ) {
     TopAppBar(
         title = {
-            if (cartoonsAvailable) {
-                HomeContentSwitch(cartoons, onSelect)
+            if (homes.isNotEmpty()) {
+                HomeContentSwitch(selectedHome, homes, onSelect)
             } else {
                 Text("Home", style = MaterialTheme.typography.headlineMedium)
             }
@@ -63,7 +67,10 @@ fun DiscoveryHomeHeader(
         actions = {
             if (onSearch != null) {
                 IconButton(onClick = onSearch) {
-                    Icon(Icons.Outlined.Search, if (cartoons && cartoonsAvailable) "Cerca cartoni" else "Cerca anime")
+                    Icon(
+                        Icons.Outlined.Search,
+                        homes.firstOrNull { it.id == selectedHome }?.let { "Cerca ${it.title}" } ?: "Cerca anime",
+                    )
                 }
             }
             IconButton(onClick = onRefresh) { Icon(Icons.Outlined.Refresh, "Aggiorna Home") }
@@ -73,19 +80,28 @@ fun DiscoveryHomeHeader(
 
 /** Compact, single-tap navigation. State remains owned by the Home, not this visual control. */
 @Composable
-private fun HomeContentSwitch(cartoons: Boolean, onSelect: (Boolean) -> Unit) {
+private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
     val shape = RoundedCornerShape(50)
-    Row(
+    val choices = listOf(null to "Anime") +
+        homes.map { home ->
+            home.id to home.title
+        }
+    val scroll = rememberLazyListState()
+    LaunchedEffect(selectedHome, choices) {
+        scroll.animateScrollToItem(choices.indexOfFirst { it.first == selectedHome }.coerceAtLeast(0))
+    }
+    LazyRow(
         Modifier
-            .widthIn(max = 240.dp)
+            .widthIn(max = 280.dp)
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(4.dp)
             .selectableGroup(),
+        state = scroll,
     ) {
-        listOf(false to "Anime", true to "Cartoni").forEach { (value, label) ->
-            val selected = cartoons == value
+        items(choices, key = { it.first ?: "anime" }) { (value, label) ->
+            val selected = selectedHome == value
             val background by animateColorAsState(
                 if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                 label = "Home selection background",
@@ -100,7 +116,7 @@ private fun HomeContentSwitch(cartoons: Boolean, onSelect: (Boolean) -> Unit) {
             )
             Box(
                 Modifier
-                    .weight(1f)
+                    .widthIn(min = 80.dp, max = 200.dp)
                     .heightIn(min = 48.dp)
                     .clip(shape)
                     .background(background)
@@ -126,7 +142,7 @@ private fun HomeContentSwitch(cartoons: Boolean, onSelect: (Boolean) -> Unit) {
 @Composable
 private fun AnimeHomeHeaderPreview() {
     TachiyomiPreviewTheme {
-        DiscoveryHomeHeader(false, {}, null, {}, {}, cartoonsAvailable = true)
+        DiscoveryHomeHeader(null, {}, null, {}, {}, homes = previewHomes())
     }
 }
 
@@ -135,7 +151,7 @@ private fun AnimeHomeHeaderPreview() {
 @Composable
 private fun CartoonsHomeHeaderPreview() {
     TachiyomiPreviewTheme {
-        DiscoveryHomeHeader(true, {}, {}, {}, {}, cartoonsAvailable = true)
+        DiscoveryHomeHeader("1", {}, {}, {}, {}, homes = previewHomes())
     }
 }
 
@@ -143,6 +159,10 @@ private fun CartoonsHomeHeaderPreview() {
 @Composable
 private fun HomeWithoutExtensionsPreview() {
     TachiyomiPreviewTheme {
-        DiscoveryHomeHeader(false, {}, null, {}, {}, cartoonsAvailable = false)
+        DiscoveryHomeHeader(null, {}, null, {}, {}, homes = emptyList())
     }
+}
+
+private fun previewHomes() = listOf("Cartoni", "Film").mapIndexed { index, title ->
+    SourceHomeGroup((index + 1).toString(), title, emptyList())
 }

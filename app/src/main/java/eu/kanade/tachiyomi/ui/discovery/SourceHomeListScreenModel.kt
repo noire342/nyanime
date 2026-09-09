@@ -2,30 +2,32 @@ package eu.kanade.tachiyomi.ui.discovery
 
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
-import eu.kanade.tachiyomi.data.discovery.SampleHomeFilters
+import eu.kanade.tachiyomi.data.discovery.ExtensionHomeServices
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import tachiyomi.domain.discovery.SourceHomeAccess
 import tachiyomi.domain.discovery.SourceHomeGateway
+import tachiyomi.domain.discovery.SourceHomeGroupAccess
 import tachiyomi.domain.discovery.SourceHomeRepository
 import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.entries.anime.model.Anime
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
-class CartoonsListScreenModel(
+class SourceHomeListScreenModel(
+    homeKey: String,
     private val sectionId: String,
-    private val gateway: SourceHomeGateway = Injekt.get(),
-    private val repository: SourceHomeRepository = Injekt.get(),
-) : StateScreenModel<CartoonsListScreenModel.State>(State()) {
+    services: ExtensionHomeServices = Injekt.get(),
+) : StateScreenModel<SourceHomeListScreenModel.State>(State()) {
+    private val repository = services.merged
+    private val accessFlow = services.observeGroup(homeKey)
     private var job: Job? = null
     private var nextPage = 1
 
     init {
         screenModelScope.launch {
-            gateway.observeAccess().collect { access ->
+            accessFlow.collect { access ->
                 job?.cancel()
                 mutableState.value = State(access = access, query = state.value.query)
                 nextPage = 1
@@ -44,8 +46,8 @@ class CartoonsListScreenModel(
 
     fun load(reset: Boolean = false, debounce: Boolean = false) {
         val current = state.value
-        if (current.access.loading || current.access.source == null || current.access.offline) return
-        if (sectionId == SampleHomeFilters.SEARCH && current.query.isBlank()) return
+        if (current.access.loading || current.access.group == null || current.access.offline) return
+        if (sectionId == SourceHomeRequest.SEARCH && current.query.isBlank()) return
         if (!reset && (job?.isActive == true || !current.hasNext)) return
         job?.cancel()
         val page = if (reset) 1 else nextPage
@@ -74,7 +76,7 @@ class CartoonsListScreenModel(
     }
 
     data class State(
-        val access: SourceHomeAccess = SourceHomeAccess(loading = true),
+        val access: SourceHomeGroupAccess = SourceHomeGroupAccess(loading = true),
         val query: String = "",
         val items: List<Anime> = emptyList(),
         val loading: Boolean = false,

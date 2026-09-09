@@ -23,6 +23,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -53,6 +54,7 @@ import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogFeed
 import tachiyomi.domain.discovery.SectionState
+import tachiyomi.domain.discovery.SourceHomeGroup
 import tachiyomi.domain.entries.anime.model.asAnimeCover
 import tachiyomi.domain.source.anime.interactor.GetRemoteAnime
 
@@ -64,24 +66,29 @@ data object DiscoveryTab : Tab {
     override fun Content() {
         val model = rememberScreenModel { DiscoveryHomeScreenModel() }
         val availability by model.state.collectAsState()
-        var cartoons by rememberSaveable { mutableStateOf(false) }
-        val showCartoons = availability.showCartoons(cartoons)
-        LaunchedEffect(availability) { cartoons = availability.reconcileSelection(cartoons) }
+        var selected by rememberSaveable(
+            stateSaver = Saver<String?, Any>(
+                save = { it.orEmpty() },
+                restore = DiscoveryHomeAvailability::restoreSelection,
+            ),
+        ) { mutableStateOf<String?>(null) }
+        val homeKey = availability.selectedHome(selected)
+        LaunchedEffect(availability) { selected = availability.reconcileSelection(selected) }
         val savedState = rememberSaveableStateHolder()
-        savedState.SaveableStateProvider(if (showCartoons) "cartoons" else "anime") {
-            if (showCartoons) {
-                CartoonsHomeContent(onSelect = { cartoons = it })
+        savedState.SaveableStateProvider(homeKey ?: "anime") {
+            if (homeKey != null) {
+                SourceHomeContent(homeKey, availability.homes, onSelect = { selected = it })
             } else {
                 AnimeContent(
-                    cartoonsAvailable = availability.cartoonsAvailable,
-                    onSelect = { cartoons = it },
+                    homes = availability.homes,
+                    onSelect = { selected = it },
                 )
             }
         }
     }
 
     @Composable
-    private fun AnimeContent(cartoonsAvailable: Boolean, onSelect: (Boolean) -> Unit) {
+    private fun AnimeContent(homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
         val model = rememberScreenModel { DiscoveryScreenModel() }
         val state by model.state.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
@@ -94,8 +101,8 @@ data object DiscoveryTab : Tab {
         Scaffold(
             topBar = {
                 DiscoveryHomeHeader(
-                    cartoons = false,
-                    cartoonsAvailable = cartoonsAvailable,
+                    selectedHome = null,
+                    homes = homes,
                     onSelect = onSelect,
                     onBack = if (navigator.lastItem == DiscoveryTab) {
                         { navigator.pop() }

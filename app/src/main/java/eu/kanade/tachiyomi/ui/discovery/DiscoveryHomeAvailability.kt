@@ -1,25 +1,37 @@
 package eu.kanade.tachiyomi.ui.discovery
 
 import tachiyomi.domain.discovery.SourceHomeAccess
+import tachiyomi.domain.discovery.SourceHomeGroup
+import tachiyomi.domain.discovery.SourceHomeGroupAccess
+import tachiyomi.domain.discovery.SourceHomeListing
 
 /** An optional extension may add a Home, but must never advertise itself before it is available. */
 data class DiscoveryHomeAvailability(
     val loading: Boolean = true,
-    val cartoonsAvailable: Boolean = false,
+    val homes: List<SourceHomeGroup> = emptyList(),
 ) {
-    fun showCartoons(requested: Boolean): Boolean = requested && cartoonsAvailable && !loading
+    fun selectedHome(
+        requested: String?,
+    ): String? = requested?.takeIf { !loading && homes.any { home -> home.id == it } }
 
     // Keep a restored selection pending until extension initialization has actually finished.
-    fun reconcileSelection(requested: Boolean): Boolean = requested && (loading || cartoonsAvailable)
+    fun reconcileSelection(requested: String?): String? = if (loading) requested else selectedHome(requested)
 
-    val unavailable: Boolean get() = !loading && !cartoonsAvailable
+    val unavailable: Boolean get() = !loading && homes.isEmpty()
 
     fun shouldLeaveSourcePage(current: Boolean): Boolean = unavailable && current
 
     companion object {
+        // Earlier versions saved a Boolean here. Never cast that state to a String after an update.
+        fun restoreSelection(value: Any?): String? = (value as? String)?.takeIf { it.isNotBlank() }
+        fun from(access: SourceHomeGroupAccess) = DiscoveryHomeAvailability(access.loading, listOfNotNull(access.group))
         fun from(access: SourceHomeAccess) = DiscoveryHomeAvailability(
             loading = access.loading,
-            cartoonsAvailable = !access.loading && access.source != null,
+            homes = SourceHomeListing(access.loading, listOfNotNull(access.source)).groups.takeUnless {
+                access.loading
+            }.orEmpty(),
         )
+
+        fun from(listing: SourceHomeListing) = DiscoveryHomeAvailability(listing.loading, listing.groups)
     }
 }

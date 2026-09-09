@@ -43,7 +43,7 @@ class LocalHomeSectionProvider(
     private val downloads: AnimeDownloadManager,
     private val sourceService: DiscoverySourceService,
     private val resume: Boolean,
-    private val sourceId: Long? = null,
+    private val sourceIds: Set<Long>? = null,
 ) : HomeSectionProvider<LocalHomeItem> {
     override fun observe() = combine(
         if (resume) {
@@ -72,7 +72,7 @@ class LocalHomeSectionProvider(
         val items = entries.mapNotNull { (animeId, episodeId) ->
             if (accepted >= 30) return@mapNotNull null
             val anime = getAnime.await(animeId) ?: return@mapNotNull null
-            if (sourceId != null && anime.source != sourceId) return@mapNotNull null
+            if (sourceIds != null && anime.source !in sourceIds) return@mapNotNull null
             if (anime.source.toString() in preferences.disabledAnimeSources().get()) return@mapNotNull null
             if (!anime.isLocal() &&
                 sources.get(anime.source)?.let(sourceService::isEnabled) != true

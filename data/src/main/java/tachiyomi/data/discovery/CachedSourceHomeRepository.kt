@@ -24,7 +24,7 @@ class CachedSourceHomeRepository(
         require(capacity > 0)
     }
 
-    private data class Key(val source: Long, val revision: String, val request: SourceHomeRequest)
+    private data class Key(val home: String, val revision: String, val request: SourceHomeRequest)
     private data class Entry(val page: SourceHomePage, val at: Long)
     private val entries = LinkedHashMap<Key, Entry>()
     private val cacheLock = Mutex()
@@ -37,7 +37,7 @@ class CachedSourceHomeRepository(
             emit(SectionState<SourceHomePage>(loading = false, error = "Fonte non disponibile in questa modalità"))
             return@flow
         }
-        val key = Key(source.id, source.revision, request.copy(query = request.query.trim()))
+        val key = Key(source.key, source.revision, request.copy(query = request.query.trim()))
         val cached = cacheLock.withLock { entries[key].takeUnless { access.isPrivate } }
         val fresh = cached != null && clock.millis() - cached.at in 0 until TTL
         emit(SectionState(cached?.page, loading = refresh || !fresh, stale = cached != null && !fresh))
@@ -72,7 +72,7 @@ class CachedSourceHomeRepository(
                     cached?.page.takeIf { stillAllowed },
                     loading = false,
                     stale = cached != null && stillAllowed,
-                    error = e.message ?: "Impossibile caricare TestSource",
+                    error = e.message ?: "Impossibile caricare la fonte",
                 ),
             )
         }

@@ -7,8 +7,9 @@ import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.model.AnimesPage
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.data.discovery.DiscoverySourceService
-import eu.kanade.tachiyomi.data.discovery.SampleHomeFilters
-import eu.kanade.tachiyomi.data.discovery.SampleHomeGateway
+import eu.kanade.tachiyomi.data.discovery.ExtensionHomeGateway
+import eu.kanade.tachiyomi.data.discovery.ExtensionHomeManifestReader
+import eu.kanade.tachiyomi.data.discovery.ExtensionHomeRegistry
 import eu.kanade.tachiyomi.extension.anime.AnimeExtensionManager
 import eu.kanade.tachiyomi.extension.anime.model.AnimeExtension
 import eu.kanade.tachiyomi.ui.discovery.DiscoveryHomeAvailability
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -36,7 +38,7 @@ import tachiyomi.domain.entries.anime.interactor.NetworkToLocalAnime
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 
-class SampleHomeGatewayTest {
+class ExtensionHomeGatewayTest {
     private val manager = mockk<AnimeSourceManager>()
     private val extensions = mockk<AnimeExtensionManager>()
     private val visibility = mockk<DiscoverySourceService>()
@@ -47,19 +49,24 @@ class SampleHomeGatewayTest {
     private val engine = mockk<AnimeSource>()
     private val extension = mockk<AnimeExtension.Installed>()
     private val installed = MutableStateFlow(listOf(extension))
-    private val gateway = SampleHomeGateway(manager, extensions, visibility, preferences, base, incognito, toLocal)
+    private val reader = mockk<ExtensionHomeManifestReader>()
+    private val registry = ExtensionHomeRegistry(manager, extensions, visibility, preferences, base, incognito, reader)
+    private val homeKey = "test.extension:cartoons:42"
+    private val gateway = ExtensionHomeGateway(homeKey, registry, manager, toLocal, Semaphore(3))
 
     @BeforeEach
     fun prepare() {
         every { manager.isInitialized } returns MutableStateFlow(true)
         every { extensions.installedExtensionsFlow } returns installed
-        every { extension.pkgName } returns SampleHomeFilters.PACKAGE
+        every { extension.pkgName } returns "test.extension"
         every { extension.versionCode } returns 1L
         every { extension.versionName } returns "16.1"
         every { extension.sources } returns listOf(engine)
         every { engine.id } returns 42L
         every { engine.lang } returns "it"
-        every { engine.getFilterList() } answers { SampleHomeFiltersTest.filters() }
+        every { engine.name } returns "TestSource"
+        every { reader.read(extension) } returns listOf(ExtensionHomeFiltersTest.manifest())
+        every { engine.getFilterList() } answers { ExtensionHomeFiltersTest.filters() }
         every { manager.get(42) } returns engine
         every { visibility.isEnabled(engine) } returns true
         every { base.downloadedOnly().get() } returns false
@@ -102,7 +109,7 @@ class SampleHomeGatewayTest {
             installed.value = emptyList()
             job.join()
         }
-        assertEquals(listOf(false, true, false), observed.map { it.cartoonsAvailable })
+        assertEquals(listOf(false, true, false), observed.map { it.homes.isNotEmpty() })
         coVerify(exactly = 0) { engine.getSearchAnime(any(), any(), any()) }
     }
 
@@ -111,7 +118,7 @@ class SampleHomeGatewayTest {
         every { manager.isInitialized } returns MutableStateFlow(false)
         val availability = DiscoveryHomeAvailability.from(gateway.currentAccess())
         assertTrue(availability.loading)
-        assertFalse(availability.cartoonsAvailable)
+        assertTrue(availability.homes.isEmpty())
     }
 
     @Test
@@ -147,7 +154,7 @@ class SampleHomeGatewayTest {
         val local = Anime.create().copy(id = 123, source = 42, url = sourceAnime.url, title = sourceAnime.title)
         coEvery { toLocal.await(any()) } returns local
         coEvery { engine.getSearchAnime(2, "test", any()) } answers {
-            assertEquals("Categoria A", SampleHomeFiltersTest.values(thirdArg())["Categoria"])
+            assertEquals("Categoria A", ExtensionHomeFiltersTest.values(thirdArg())["Categoria"])
             AnimesPage(listOf(sourceAnime), false)
         }
         val page = gateway.fetch(gateway.currentAccess(), SourceHomeRequest("category:Categoria A", 2, " test "))
