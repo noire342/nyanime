@@ -145,6 +145,31 @@ jobs:
           path: app/build/test-results/testDebugUnitTest
           if-no-files-found: warn
 
+      - name: Verify JNI symbols in optimized APKs
+        if: steps.merge.outputs.build == 'true'
+        run: python3 scripts/verify_apk_jni.py app/build/outputs/apk/preview/app-*-preview.apk
+
+      - name: Build independent device JNI probe
+        if: steps.merge.outputs.build == 'true'
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          android_jar="$sdk_root/platforms/android-36/android.jar"
+          d8="$(find "$sdk_root/build-tools" -type f -name d8 | sort -V | tail -n 1)"
+          mkdir -p build/jni-probe/classes build/jni-probe/dex
+          javac -source 8 -target 8 -cp "$android_jar" -d build/jni-probe/classes scripts/ZstdApkProbe.java
+          "$d8" --lib "$android_jar" --output build/jni-probe/dex build/jni-probe/classes/ZstdApkProbe.class
+
+      - name: Preserve release diagnostics and device probe
+        if: always() && steps.merge.outputs.build == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-diagnostics
+          path: |
+            app/build/outputs/mapping/preview/mapping.txt
+            build/jni-probe/dex/classes.dex
+          if-no-files-found: error
+
       - name: Probe live public catalogue
         id: catalogue
         if: steps.merge.outputs.build == 'true'

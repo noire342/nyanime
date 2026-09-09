@@ -311,6 +311,11 @@ class PlayerActivity : BaseActivity() {
         }
         audioFocusRequest = null
 
+        pipReceiver?.let {
+            unregisterReceiver(it)
+            pipReceiver = null
+        }
+
         mediaSession?.let {
             it.isActive = false
             it.release()
@@ -384,7 +389,7 @@ class PlayerActivity : BaseActivity() {
 
     override fun onStart() {
         super.onStart()
-        setPictureInPictureParams(createPipParams())
+        if (isPipSupportedAndEnabled) setPictureInPictureParams(createPipParams())
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setFlags(
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
@@ -1227,7 +1232,7 @@ class PlayerActivity : BaseActivity() {
                 viewModel.playbackSpeed.update { value.toFloat() }
                 applySmartAnime4KForLoadedMedia()
             }
-            "video-params/aspect" -> if (isPipSupportedAndEnabled) createPipParams()
+            "video-params/aspect" -> if (isPipSupportedAndEnabled) setPictureInPictureParams(createPipParams())
             "container-fps",
             "estimated-vf-fps",
             "display-fps",
@@ -1254,6 +1259,7 @@ class PlayerActivity : BaseActivity() {
 
     fun createPipParams(): PictureInPictureParams {
         val builder = PictureInPictureParams.Builder()
+        val paused = if (player.isExiting) true else player.paused ?: true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val anime = viewModel.currentAnime.value
             val episode = viewModel.currentEpisode.value
@@ -1264,24 +1270,24 @@ class PlayerActivity : BaseActivity() {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val autoEnter = playerPreferences.pipOnExit().get()
-            builder.setAutoEnterEnabled(player.paused == false && autoEnter)
-            builder.setSeamlessResizeEnabled(player.paused == false && autoEnter)
+            builder.setAutoEnterEnabled(!paused && autoEnter)
+            builder.setSeamlessResizeEnabled(!paused && autoEnter)
         }
         builder.setActions(
             createPipActions(
                 context = this,
-                isPaused = player.paused ?: true,
+                isPaused = paused,
                 replaceWithPrevious = playerPreferences.pipReplaceWithPrevious().get(),
                 playlistCount = viewModel.currentPlaylist.value.size,
                 playlistPosition = viewModel.getCurrentEpisodeIndex(),
             ),
         )
-        builder.setSourceRectHint(pipRect)
-        player.videoH?.let {
-            val height = it
-            val width = it * player.getVideoOutAspect()!!
-            val rational = Rational(height, width.toInt()).toFloat()
-            if (rational in 0.42..2.38) builder.setAspectRatio(Rational(width.toInt(), height))
+        if (!pipRect.isEmpty) builder.setSourceRectHint(pipRect)
+        // MPV can expose height before aspect, or clear aspect during a transition.
+        // Missing geometry is valid: omit it and let Android use its default.
+        val aspect = if (player.isExiting) null else player.getVideoOutAspect()
+        PipVideoGeometry.fromAspect(aspect)?.let {
+            builder.setAspectRatio(Rational(it.width, it.height))
         }
         return builder.build()
     }
@@ -1300,6 +1306,10 @@ class PlayerActivity : BaseActivity() {
             viewModel.isBrightnessSliderShown.update { false }
             viewModel.isVolumeSliderShown.update { false }
             viewModel.sheetShown.update { Sheets.None }
+            if (pipReceiver != null) {
+                super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+                return
+            }
             pipReceiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
                     if (intent == null || intent.action != PIP_INTENTS_FILTER) return

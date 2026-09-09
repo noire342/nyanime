@@ -14,6 +14,10 @@
 -keep,allowoptimization class kotlinx.serialization.** { public protected *; }
 -keep,allowoptimization class okhttp3.** { public protected *; }
 -keep,allowoptimization class okio.** { public protected *; }
+# Zstd's native initializer looks up these classes and byte counters by name,
+# including the compressor even when OkHttp only uses decompression. R8 cannot
+# see those JNI references; removing/renaming them aborts the entire process.
+-keep class com.squareup.zstd.** { *; }
 -keep,allowoptimization class org.jsoup.** { public protected *; }
 -keep,allowoptimization class rx.** { public protected *; }
 -keep,allowoptimization class app.cash.quickjs.** { public protected *; }
