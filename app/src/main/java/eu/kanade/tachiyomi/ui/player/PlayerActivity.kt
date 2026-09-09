@@ -1282,7 +1282,7 @@ class PlayerActivity : BaseActivity() {
                 playlistPosition = viewModel.getCurrentEpisodeIndex(),
             ),
         )
-        if (!pipRect.isEmpty) builder.setSourceRectHint(pipRect)
+        pipRect?.takeUnless { it.isEmpty }?.let(builder::setSourceRectHint)
         // MPV can expose height before aspect, or clear aspect during a transition.
         // Missing geometry is valid: omit it and let Android use its default.
         val aspect = if (player.isExiting) null else player.getVideoOutAspect()

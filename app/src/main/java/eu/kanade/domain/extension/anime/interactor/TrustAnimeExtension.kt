@@ -2,6 +2,7 @@ package eu.kanade.domain.extension.anime.interactor
 
 import android.content.pm.PackageInfo
 import androidx.core.content.pm.PackageInfoCompat
+import eu.kanade.domain.extension.ExtensionTrustPolicy
 import eu.kanade.domain.source.service.SourcePreferences
 import mihon.domain.extension.anime.repository.AnimeExtensionStoreRepository
 import tachiyomi.core.common.preference.getAndSet
@@ -11,10 +12,13 @@ class TrustAnimeExtension(
     private val preferences: SourcePreferences,
 ) {
 
-    suspend fun isTrusted(pkgInfo: PackageInfo, fingerprints: List<String>): Boolean {
+    suspend fun isTrusted(pkgInfo: PackageInfo, fingerprints: List<String>): Boolean = ExtensionTrustPolicy.isTrusted(
+        automaticallyTrust = preferences.automaticallyTrustExtensions().get(),
+        fingerprints = fingerprints,
+    ) {
         val trustedFingerprints = repository.getAll().map { it.signingKey }.toHashSet()
         val key = "${pkgInfo.packageName}:${PackageInfoCompat.getLongVersionCode(pkgInfo)}:${fingerprints.last()}"
-        return trustedFingerprints.any { fingerprints.contains(it) } || key in preferences.trustedExtensions().get()
+        trustedFingerprints.any { fingerprints.contains(it) } || key in preferences.trustedExtensions().get()
     }
 
     fun trust(pkgName: String, versionCode: Long, signatureHash: String) {

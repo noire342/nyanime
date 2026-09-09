@@ -995,4 +995,6 @@
     <string name="exception_http">HTTP %d, check website in WebView</string>
     <string name="exception_offline">No Internet connection</string>
     <string name="exception_unknown_host">Couldn\'t reach %s</string>
+    <string name="ext_automatically_trust">Automatically trust extensions</string>
+    <string name="ext_automatically_trust_summary">Load installed anime and manga extensions without confirmation. Extensions execute code in the app: install only those you trust. Changing this setting requires an app restart.</string>
 </resources>

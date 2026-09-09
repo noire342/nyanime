@@ -41,6 +41,9 @@ class SourcePreferences(
 
     fun mangaExtensionRepos() = preferenceStore.getStringSet("extension_repos", emptySet())
 
+    // Fork default: consent is automatic, without changing the explicit trust records.
+    fun automaticallyTrustExtensions() = preferenceStore.getBoolean("automatically_trust_extensions", true)
+
     fun trustedExtensions() = preferenceStore.getStringSet(
         Preference.appStateKey("trusted_extensions"),
         emptySet(),

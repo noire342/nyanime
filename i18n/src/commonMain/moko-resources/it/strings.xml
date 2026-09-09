@@ -840,4 +840,6 @@
     <string name="export">Esporta</string>
     <string name="author">Autore</string>
     <string name="artist">Artista</string>
+    <string name="ext_automatically_trust">Fiducia automatica nelle estensioni</string>
+    <string name="ext_automatically_trust_summary">Carica le estensioni anime e manga installate senza conferma. Le estensioni eseguono codice nell’app: installa solo quelle di cui ti fidi. La modifica richiede il riavvio dell’app.</string>
 </resources>

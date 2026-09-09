@@ -408,6 +408,8 @@ object SettingsAdvancedScreen : SearchableSettings {
         var shizukuMissing by rememberSaveable { mutableStateOf(false) }
         val trustAnimeExtension = remember { Injekt.get<TrustAnimeExtension>() }
         val trustMangaExtension = remember { Injekt.get<TrustMangaExtension>() }
+        val sourcePreferences = remember { Injekt.get<SourcePreferences>() }
+        val automaticallyTrust by sourcePreferences.automaticallyTrustExtensions().collectAsState()
 
         if (shizukuMissing) {
             val dismiss = { shizukuMissing = false }
@@ -466,10 +468,20 @@ object SettingsAdvancedScreen : SearchableSettings {
                 ),
                 Preference.PreferenceItem.TextPreference(
                     title = stringResource(MR.strings.ext_revoke_trust),
+                    enabled = !automaticallyTrust,
                     onClick = {
                         trustMangaExtension.revokeAll()
                         trustAnimeExtension.revokeAll()
                         context.toast(MR.strings.requires_app_restart)
+                    },
+                ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = sourcePreferences.automaticallyTrustExtensions(),
+                    title = stringResource(MR.strings.ext_automatically_trust),
+                    subtitle = stringResource(MR.strings.ext_automatically_trust_summary),
+                    onValueChanged = {
+                        context.toast(MR.strings.requires_app_restart)
+                        true
                     },
                 ),
             ),
