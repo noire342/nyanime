@@ -32,6 +32,10 @@ dependencyResolutionManagement {
     }
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // Mirror only the existing immutable artifact; upstream version upgrades remain unrestricted.
+        maven(url = uri("vendor/maven")) {
+            content { includeVersion("com.github.arkon.FlexibleAdapter", "flexible-adapter", "c8013533") }
+        }
         mavenCentral()
         google()
         maven(url = "https://www.jitpack.io")
