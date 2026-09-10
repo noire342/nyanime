@@ -18,6 +18,8 @@ shared last_ext_check. Every successful check could post the identical notificat
 - Manual catalogue refresh continues to use findExtensions and remains immediate.
 - MainActivity checks run independently; one failing catalogue cannot suppress the other.
 - Existing app startup updater, extension trust, source Home and Anime4K are unchanged.
+- Release asset selection accepts only known signed app filenames, picks a supported ABI
+  or the universal APK, and ignores extension APKs, checksums and source archives.
 
 ## Verification
 
@@ -25,4 +27,6 @@ spotlessApply testDebugUnitTest passed locally with all eight new policy tests d
 recreation, daily boundary, kind independence, overlapping API instances, failure retry,
 cancellation, clock rollback, persistent version deduplication and bounded storage.
 The signed universal APK is produced and tested separately by the GitHub preview workflow.
+Four additional asset-selection tests cover mixed attachments, architecture order,
+official stable filenames and rejected look-alike/unsigned packages.
 No phone UI, playback or ADB diagnostics were used for this change.

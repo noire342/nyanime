@@ -48,17 +48,10 @@ class ReleaseServiceImpl(
         )
     }
 
-    private fun getDownloadLink(release: GithubRelease): String? {
-        val map = release.assets.associate { asset ->
-            BUILD_TYPES.find { "-$it" in asset.name } to asset.downloadLink
-        }
-
-        return map[Build.SUPPORTED_ABIS[0]] ?: map[null]
-    }
+    private fun getDownloadLink(release: GithubRelease): String? =
+        ApplicationReleaseAssets.select(release.assets, Build.SUPPORTED_ABIS.toList())
 
     companion object {
-        private val BUILD_TYPES = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
-
         /**
          * Regular expression that matches a mention to a valid GitHub username, like it's
          * done in GitHub Flavored Markdown. It follows these constraints:
