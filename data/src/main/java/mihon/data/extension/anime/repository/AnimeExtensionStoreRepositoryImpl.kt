@@ -1,6 +1,7 @@
 package mihon.data.extension.anime.repository
 
 import eu.kanade.tachiyomi.extension.anime.model.AnimeExtension
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
@@ -46,6 +47,8 @@ class AnimeExtensionStoreRepositoryImpl(
                         }
                     }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
         }
@@ -81,6 +84,8 @@ class AnimeExtensionStoreRepositoryImpl(
                     .awaitAll()
                     .flatMap { it.getOrDefault(emptyList()) }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
             emptyList()

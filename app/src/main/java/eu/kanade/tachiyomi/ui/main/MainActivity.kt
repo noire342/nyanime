@@ -398,7 +398,17 @@ class MainActivity : BaseActivity() {
         LaunchedEffect(Unit) {
             try {
                 AnimeExtensionApi().checkForUpdates(context)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logcat(LogPriority.ERROR, e)
+            }
+        }
+        LaunchedEffect(Unit) {
+            try {
                 MangaExtensionApi().checkForUpdates(context)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR, e)
             }
