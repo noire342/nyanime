@@ -42,7 +42,13 @@ Ogni sezione può dichiarare `"layout": "featured"` per mostrare un carosello co
 `thumbnail_url`, titolo e descrizione dei normali `SAnime` restituiti dall'estensione. Il valore
 predefinito e gli stili sconosciuti usano le normali copertine. L'ordine delle sezioni e dei titoli
 rimane quello dei produttori; banner e suggerimenti non vengono sostituiti con quelli del catalogo.
-Il clic apre direttamente la serie della fonte. Le sezioni locali seguono i contenuti dell'estensione.
+Il clic apre direttamente la serie della fonte. «Continua a guardare» è sempre la prima
+sezione sotto la toolbar, prima della vetrina e delle altre righe dell'estensione.
+Resta visibile anche durante caricamenti/errori remoti, in Solo download e senza
+elementi da riprendere (con un messaggio esplicativo). Il titolo offre l'accesso alla
+cronologia. I dati sono locali e filtrati per le fonti della Home; le estensioni non
+controllano né possono nascondere questa sezione. Gli aggiornamenti della libreria
+seguono i contenuti dell'estensione.
 
 Le proprietà sono facoltative e compatibili con le dichiarazioni v1 precedenti. Il selettore in
 toolbar occupa la larghezza del contenuto, fino allo spazio disponibile; scorre solo quando serve.

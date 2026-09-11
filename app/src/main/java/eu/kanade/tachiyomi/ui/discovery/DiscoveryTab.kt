@@ -124,6 +124,19 @@ data object DiscoveryTab : Tab {
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                item(key = "resume") {
+                    SectionHeader("Continua a guardare") { navigator.push(HistoriesTab) }
+                    LocalAnimeRow(state.resume, { navigator.push(AnimeScreen(it)) }) { item ->
+                        scope.launch {
+                            context.playDiscoveryEpisode(item.episode)
+                        }
+                    }
+                    if (state.resume.data?.isEmpty() == true) {
+                        TextButton(onClick = {
+                            navigator.push(CatalogListScreen(CatalogFeed.TRENDING))
+                        }) { Text("Scopri cosa guardare") }
+                    }
+                }
                 item(key = "shortcuts") {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         TextButton(onClick = { navigator.push(UpdatesTab) }) { Text("Aggiornamenti") }
@@ -149,19 +162,6 @@ data object DiscoveryTab : Tab {
                             Modifier.padding(horizontal = 16.dp),
                             style = MaterialTheme.typography.bodySmall,
                         )
-                    }
-                }
-                item(key = "resume") {
-                    SectionHeader("Continua a guardare") { navigator.push(HistoriesTab) }
-                    LocalAnimeRow(state.resume, { navigator.push(AnimeScreen(it)) }) { item ->
-                        scope.launch {
-                            context.playDiscoveryEpisode(item.episode)
-                        }
-                    }
-                    if (state.resume.data?.isEmpty() == true) {
-                        TextButton(onClick = {
-                            navigator.push(CatalogListScreen(CatalogFeed.TRENDING))
-                        }) { Text("Scopri cosa guardare") }
                     }
                 }
                 item(key = "updates") {

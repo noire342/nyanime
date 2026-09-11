@@ -33,6 +33,7 @@ import eu.kanade.presentation.discovery.SectionHeader
 import eu.kanade.presentation.discovery.SourceFeaturedCarousel
 import eu.kanade.presentation.discovery.SourceHomePosterCard
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
+import eu.kanade.tachiyomi.ui.history.HistoriesTab
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.SectionState
@@ -75,6 +76,15 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
             contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Local playback is the first row, regardless of the number/state of remote sections.
+            item(key = "resume:" + source.id) {
+                SectionHeader("Continua a guardare") { navigator.push(HistoriesTab) }
+                LocalAnimeRow(
+                    state.resume,
+                    onOpen = { navigator.push(AnimeScreen(it)) },
+                    emptyMessage = "I titoli che guardi in questa Home compariranno qui.",
+                ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
+            }
             if (access.offline) {
                 item(key = "offline") {
                     Text("Solo download · nessuna richiesta alle fonti", Modifier.padding(horizontal = 16.dp))
@@ -157,14 +167,6 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                 if (source.sections.isEmpty()) {
                     item { Text("Aggiorna l’estensione per usare le sezioni della Home", Modifier.padding(16.dp)) }
                 }
-            }
-            item(key = "resume:" + source.id) {
-                SectionHeader("Continua a guardare")
-                LocalAnimeRow(
-                    state.resume,
-                    onOpen = { navigator.push(AnimeScreen(it)) },
-                    emptyMessage = "I titoli che guardi in questa Home compariranno qui.",
-                ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
             }
             item(key = "updates:" + source.id) {
                 SectionHeader("Nuovi episodi della tua libreria")
