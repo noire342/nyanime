@@ -5,7 +5,6 @@ import androidx.benchmark.Outputs
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
 import org.junit.Test
 
 class AccessibilitySmokeTest {
@@ -71,11 +70,9 @@ class AccessibilitySmokeTest {
 
     private fun openReaderSettings(device: UiDevice) {
         if (!device.hasObject(By.res("reader_settings_button"))) {
-            device.findObject(By.res(TARGET_PACKAGE, "reader_pager")).click()
+            clickFresh(device, By.res(TARGET_PACKAGE, "reader_pager"))
         }
-        val button = device.wait(Until.findObject(By.res("reader_settings_button")), 10_000)
-            ?: failJourney(device, "Reader settings button did not appear")
-        button.click()
+        clickFresh(device, By.res("reader_settings_button"))
         if (!device.waitForFresh(By.res("reader_settings_page_0"), 10_000)) {
             failJourney(device, "Reading mode settings did not open")
         }
@@ -83,9 +80,7 @@ class AccessibilitySmokeTest {
     }
 
     private fun selectReaderSettingsPage(device: UiDevice, title: String, page: Int) {
-        val tab = device.wait(Until.findObject(By.text(title)), 10_000)
-            ?: failJourney(device, "Reader settings tab not reachable: $title")
-        tab.click()
+        clickFresh(device, By.text(title))
         if (!device.waitForFresh(By.res("reader_settings_page_$page"), 10_000)) {
             failJourney(device, "Reader settings page did not open: $title")
         }

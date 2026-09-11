@@ -51,10 +51,23 @@ fun prepareFixtures(device: UiDevice) {
 fun MacrobenchmarkScope.openTab(tag: String) = openTab(device, tag)
 
 fun openTab(device: UiDevice, tag: String) {
-    val tab = device.wait(Until.findObject(By.res(tag)), 10_000)
-        ?: failJourney(device, "Missing navigation target: $tag")
-    tab.click()
+    clickFresh(device, By.res(tag))
     awaitTabContent(device, tag)
+}
+
+fun clickFresh(device: UiDevice, selector: BySelector) {
+    val deadline = SystemClock.uptimeMillis() + 10_000
+    do {
+        refreshAccessibilityCache()
+        try {
+            val bounds = device.findObject(selector)?.visibleBounds
+            if (bounds != null && !bounds.isEmpty && device.click(bounds.centerX(), bounds.centerY())) return
+        } catch (_: StaleObjectException) {
+            // Rotation or a Compose update can replace the node between lookup and reading its bounds.
+        }
+        SystemClock.sleep(100)
+    } while (SystemClock.uptimeMillis() < deadline)
+    failJourney(device, "Could not click current navigation bounds: $selector")
 }
 
 fun awaitTabContent(device: UiDevice, tag: String) {

@@ -2,6 +2,12 @@ name: App performance and interface checks
 
 on:
   workflow_dispatch:
+    inputs:
+      suite:
+        description: Run all measurements or only the interface smoke test
+        type: choice
+        options: [all, interface]
+        default: all
   push:
     branches: [dev]
     paths:
@@ -19,10 +25,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [journeys, profile]
+        mode: ${{ fromJSON(inputs.suite == 'interface' && '["interface"]' || '["journeys", "profile"]') }}
     env:
       PROFILE_ARGUMENT: ${{ matrix.mode == 'profile' && '-PprofileGeneration=true' || '' }}
-      TEST_ARGUMENT: ${{ matrix.mode == 'profile' && '-Pandroid.testInstrumentationRunnerArguments.class=tachiyomi.macrobenchmark.BaselineProfileGenerator' || '-Pandroid.testInstrumentationRunnerArguments.notClass=tachiyomi.macrobenchmark.BaselineProfileGenerator' }}
+      TEST_ARGUMENT: ${{ matrix.mode == 'interface' && '-Pandroid.testInstrumentationRunnerArguments.class=tachiyomi.macrobenchmark.AccessibilitySmokeTest' || matrix.mode == 'profile' && '-Pandroid.testInstrumentationRunnerArguments.class=tachiyomi.macrobenchmark.BaselineProfileGenerator' || '-Pandroid.testInstrumentationRunnerArguments.notClass=tachiyomi.macrobenchmark.BaselineProfileGenerator' }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12
