@@ -8,6 +8,35 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ExtensionHomeManifestTest {
+    private val grouped = """{"id":"films","title":"Film","source":{"name":"Ciao","lang":"it"},
+        "sections":[
+          {"id":"day","title":"Giorno","group":{"id":"ranking","title":"Classifica","tab":"Giorno"}},
+          {"id":"week","title":"Settimana","group":{"id":"ranking","title":"Classifica","tab":"Settimana"}}
+        ]}"""
+
+    @Test fun sectionGroupsAreOptionalAndKeepTheirSourceOwnedLabels() {
+        val manifest = ExtensionHomeManifest.parse(wrap(grouped)).single()
+        val sections = ExtensionHomeFilters.sections(manifest, AnimeFilterList())
+        assertEquals(listOf("day", "week"), sections.map { it.id })
+        assertEquals(listOf("Giorno", "Settimana"), sections.map { it.group?.tab })
+        assertEquals(setOf("ranking"), sections.map { it.group?.id }.toSet())
+        assertEquals(setOf("Classifica"), sections.map { it.group?.title }.toSet())
+        assertEquals(null, ExtensionHomeManifest.parse(wrap(film)).single().sections.single().group)
+    }
+
+    @Test fun ambiguousOrMalformedGroupsCannotSuppressAValidSibling() {
+        for (invalid in listOf(
+            grouped.replace("\"ranking\"", "\"../ranking\""),
+            grouped.replace("\"Classifica\"", "\"\""),
+            grouped.replace("\"Classifica\"", "\"${"x".repeat(101)}\""),
+            grouped.replace("\"tab\":\"Settimana\"", "\"tab\":\"Giorno\""),
+            grouped.replace("\"tab\":\"Settimana\"", "\"tab\":\"\""),
+            grouped.replaceFirst("\"Classifica\"", "\"Titolo diverso\""),
+        )) {
+            assertEquals(listOf("films"), ExtensionHomeManifest.parse(wrap("$invalid,$film")).map { it.id })
+        }
+    }
+
     @Test fun optionalPresentationWorksForAnySourceAndUnknownLayoutsFallBack() {
         val manifest = ExtensionHomeManifest.parse(
             wrap(

@@ -9,7 +9,11 @@ data class SourceHomeSection(
     val title: String,
     val selections: Map<String, String>,
     val layout: String = "posters",
+    val group: SourceHomeSectionGroup? = null,
 )
+
+/** Optional presentation only; requests and caches still use the concrete section ID. */
+data class SourceHomeSectionGroup(val id: String, val title: String, val tab: String)
 
 data class SourceHomeSource(
     val id: Long,
@@ -34,11 +38,28 @@ data class SourceHomeListing(val loading: Boolean = true, val homes: List<Source
 
 /** A content kind can be provided by several extensions; concrete source identities never get merged. */
 data class SourceHomeGroup(val id: String, val title: String, val providers: List<SourceHomeSource>) {
-    data class Section(val id: String, val title: String, val layout: String = "posters")
+    data class Section(
+        val id: String,
+        val title: String,
+        val layout: String = "posters",
+        val group: SourceHomeSectionGroup? = null,
+    )
+
+    data class Row(val id: String, val title: String, val sections: List<Section>) {
+        fun selected(id: String?) = sections.firstOrNull { it.id == id } ?: sections.first()
+    }
+
     val primary get() = providers.any { it.primary }
     val sections get() = providers.flatMap {
         it.sections
-    }.distinctBy { it.id }.map { Section(it.id, it.title, it.layout) }
+    }.distinctBy { it.id }.map { Section(it.id, it.title, it.layout, it.group) }
+
+    // Insertion order preserves the first occurrence of each row, even across providers.
+    val rows get() = sections.groupBy { it.group?.let { group -> "group:${group.id}" } ?: "section:${it.id}" }
+        .map { (id, variants) ->
+            val first = variants.first()
+            Row(id, first.group?.title?.takeIf { variants.size > 1 } ?: first.title, variants)
+        }
     val categories get() = providers.flatMap { it.categories }.distinctBy { it.id }.map { Section(it.id, it.title) }
     val searchable get() = providers.any { it.search != null }
     val sourceIds get() = providers.map { it.id }.toSet()

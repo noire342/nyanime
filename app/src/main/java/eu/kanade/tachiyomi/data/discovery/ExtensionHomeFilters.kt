@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.data.discovery
 import eu.kanade.tachiyomi.animesource.model.AnimeFilter
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import tachiyomi.domain.discovery.SourceHomeSection
+import tachiyomi.domain.discovery.SourceHomeSectionGroup
 
 /** Each request owns fresh filter instances; capabilities depend on labels, never their positions. */
 object ExtensionHomeFilters {
@@ -12,6 +13,7 @@ object ExtensionHomeFilters {
             it.title,
             manifest.defaults + it.filters,
             it.layout.takeIf { it == "featured" } ?: "posters",
+            it.group?.let { group -> SourceHomeSectionGroup(group.id, group.title, group.tab) },
         )
     }.filter { supports(filters, it) }
 

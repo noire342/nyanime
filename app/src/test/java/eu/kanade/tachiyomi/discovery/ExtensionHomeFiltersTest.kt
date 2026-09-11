@@ -9,8 +9,34 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import tachiyomi.domain.discovery.SourceHomeGroup
+import tachiyomi.domain.discovery.SourceHomeSource
 
 class ExtensionHomeFiltersTest {
+    @Test
+    fun unsupportedVariantsDisappearBeforeRowsAreGrouped() {
+        val grouped = manifest().copy(
+            sections = listOf(
+                ExtensionHomeManifest.Section(
+                    "available",
+                    "Disponibili",
+                    mapOf("Ordina" to "Più visti"),
+                    group = ExtensionHomeManifest.Group("order", "Ordine", "Popolari"),
+                ),
+                ExtensionHomeManifest.Section(
+                    "removed",
+                    "Rimossi",
+                    mapOf("Ordina" to "Valore rimosso"),
+                    group = ExtensionHomeManifest.Group("order", "Ordine", "Altro"),
+                ),
+            ),
+        )
+        val sections = ExtensionHomeFilters.sections(grouped, filters())
+        val group = SourceHomeGroup("films", "Film", listOf(SourceHomeSource(1, "v1", sections, emptyList())))
+        assertEquals(listOf("available"), group.rows.single().sections.map { it.id })
+        assertEquals("available", group.rows.single().selected("removed").id)
+    }
+
     @Test
     fun allSixShelvesReflectTheExtensionFilters() {
         val filters = filters()

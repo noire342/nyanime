@@ -47,6 +47,34 @@ Il clic apre direttamente la serie della fonte. Le sezioni locali seguono i cont
 Le proprietà sono facoltative e compatibili con le dichiarazioni v1 precedenti. Il selettore in
 toolbar occupa la larghezza del contenuto, fino allo spazio disponibile; scorre solo quando serve.
 
+### Varianti di una sezione
+
+Le sezioni possono condividere una riga con schede selezionabili, dichiarando `group`:
+
+```json
+[
+  { "id": "day", "title": "Classifica giornaliera", "filters": { "Periodo": "Giorno" },
+    "group": { "id": "ranking", "title": "Classifica", "tab": "Giorno" } },
+  { "id": "week", "title": "Classifica settimanale", "filters": { "Periodo": "Settimana" },
+    "group": { "id": "ranking", "title": "Classifica", "tab": "Settimana" } }
+]
+```
+
+La riga occupa la posizione della prima sezione del gruppo. Le schede seguono l'ordine dichiarato;
+la prima è la scelta iniziale. Titolo del gruppo e nomi delle schede arrivano dall'estensione:
+nessun elenco di periodi, lingue o categorie è codificato nell'app. Dentro una dichiarazione,
+lo stesso ID gruppo deve avere lo stesso titolo ed etichette delle schede distinte e non vuote.
+Valgono i limiti ordinari di ID ed etichette. Le Home condivise possono aggiungere varianti usando
+gli stessi ID semantici di gruppo e sezione; la presentazione del primo produttore ha precedenza.
+
+Si carica soltanto la variante selezionata di ogni riga composta. Filtri, cache, retry e
+"Mostra tutto" usano ancora l'ID della sezione concreta. Il ritorno alla Home e la ricreazione
+della schermata conservano selezione e scorrimento delle varianti già visitate. Se una variante
+non è più supportata, viene scelta la prima disponibile; con una sola variante non si mostra
+un selettore e si usa il titolo completo della sezione. Il refresh manuale aggiorna le sezioni
+già visitate, incluse le altre varianti consultate. Senza `group` la sezione resta indipendente. I precedenti host v1 ignorano
+questa proprietà e mostrano tutte le sezioni separate.
+
 L'identificatore semantico `homes[].id` è condiviso tra estensioni: per contribuire alla stessa Home devono dichiarare lo stesso ID, per esempio `cartoons` o `films`. Non si raggruppa tramite il testo tradotto del titolo. Non esiste una whitelist di ID nell'app.
 
 - Una sola voce di navigazione per ID, con contributi di tutte le estensioni disponibili.

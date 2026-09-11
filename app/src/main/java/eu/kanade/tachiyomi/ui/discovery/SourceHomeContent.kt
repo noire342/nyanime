@@ -1,19 +1,25 @@
 package eu.kanade.tachiyomi.ui.discovery
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -75,29 +81,58 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                 }
             }
             if (!access.offline) {
-                items(source.sections, key = { it.id }) { section ->
+                items(source.rows, key = { it.id }) { row ->
+                    var selection by rememberSaveable(homeKey, row.id) { mutableStateOf<String?>(null) }
+                    val variantStates = rememberSaveableStateHolder()
+                    val section = row.selected(selection)
                     LaunchedEffect(access, section.id) { model.load(section.id) }
                     val value = state.sections[section.id] ?: SectionState()
-                    SectionHeader(section.title) {
-                        navigator.push(SourceHomeListScreen(homeKey, section.id, section.title))
-                    }
-                    LoadNotice(value.loading, value.error, value.stale) { model.load(section.id, true) }
-                    if (value.data?.items?.isEmpty() == true && !value.loading && value.error == null) {
-                        Text("Nessun titolo in questa sezione", Modifier.padding(horizontal = 16.dp))
-                    }
-                    if (section.layout == "featured") {
-                        SourceFeaturedCarousel(value.data?.items.orEmpty()) { anime ->
-                            navigator.push(AnimeScreen(anime.id, true))
+                    Column {
+                        SectionHeader(row.title) {
+                            navigator.push(SourceHomeListScreen(homeKey, section.id, section.title))
                         }
-                    } else {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            items(value.data?.items.orEmpty(), key = { it.id }) { anime ->
-                                PosterCard(anime.title, anime.asAnimeCover(), source.sourceLabel(anime.source), {
+                        if (row.sections.size > 1) {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                items(row.sections, key = { it.id }) { variant ->
+                                    FilterChip(
+                                        selected = variant.id == section.id,
+                                        onClick = { selection = variant.id },
+                                        label = { Text(variant.group?.tab ?: variant.title) },
+                                    )
+                                }
+                            }
+                        }
+                        LoadNotice(value.loading, value.error, value.stale) { model.load(section.id, true) }
+                        if (value.data?.items?.isEmpty() == true && !value.loading && value.error == null) {
+                            Text("Nessun titolo in questa sezione", Modifier.padding(horizontal = 16.dp))
+                        }
+                        // Each variant owns its scroll state; switching never reuses another tab's offset.
+                        variantStates.SaveableStateProvider(section.id) {
+                            if (section.layout == "featured") {
+                                SourceFeaturedCarousel(value.data?.items.orEmpty()) { anime ->
                                     navigator.push(AnimeScreen(anime.id, true))
-                                })
+                                }
+                            } else {
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    items(value.data?.items.orEmpty(), key = { it.id }) { anime ->
+                                        PosterCard(
+                                            anime.title,
+                                            anime.asAnimeCover(),
+                                            source.sourceLabel(
+                                                anime.source,
+                                            ),
+                                            {
+                                                navigator.push(AnimeScreen(anime.id, true))
+                                            },
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
