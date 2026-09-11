@@ -1,13 +1,13 @@
 package tachiyomi.macrobenchmark
 
+import android.annotation.SuppressLint
 import android.content.Intent
+import androidx.benchmark.Outputs
 import androidx.benchmark.macro.MacrobenchmarkScope
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
-import java.io.File
 
 const val TARGET_PACKAGE = "xyz.jmir.tachiyomi.mi.anime4k.benchmark"
 const val FIXTURE_ACTIVITY = "eu.kanade.tachiyomi.benchmark.BenchmarkSetupActivity"
@@ -15,6 +15,8 @@ const val FIXTURE_ACTIVITY = "eu.kanade.tachiyomi.benchmark.BenchmarkSetupActivi
 fun MacrobenchmarkScope.prepareFixtures() = prepareFixtures(device)
 
 fun prepareFixtures(device: UiDevice) {
+    device.wakeUp()
+    device.executeShellCommand("wm dismiss-keyguard")
     device.executeShellCommand("am start -W -n $TARGET_PACKAGE/$FIXTURE_ACTIVITY")
     if (!device.wait(Until.hasObject(By.text("BENCHMARK_READY")), 180_000)) {
         val failure = device.findObject(By.textStartsWith("BENCHMARK_FAILED"))?.text
@@ -89,17 +91,13 @@ fun MacrobenchmarkScope.coreJourneys() {
     openReader()
 }
 
+@SuppressLint("RestrictedApi")
 fun failJourney(device: UiDevice, message: String): Nothing {
     // Preserve the actual screen when a journey fails, including R8-only failures.
     runCatching {
-        val directory = File(
-            InstrumentationRegistry.getInstrumentation().context.getExternalFilesDir(null)!!,
-            "interface-evidence",
-        )
-        directory.mkdirs()
         val name = "journey-failure-${System.currentTimeMillis()}"
-        device.takeScreenshot(File(directory, "$name.png"))
-        device.dumpWindowHierarchy(File(directory, "$name.xml"))
+        Outputs.writeFile("$name.png") { check(device.takeScreenshot(it)) }
+        Outputs.writeFile("$name.xml") { device.dumpWindowHierarchy(it) }
     }
     error(message)
 }

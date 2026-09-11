@@ -53,8 +53,10 @@ class BenchmarkSetupActivity : ComponentActivity() {
                     startActivity(ReaderActivity.newIntent(this@BenchmarkSetupActivity, manga.id, chapter.id))
                     finish()
                 } else {
+                    android.util.Log.i("BenchmarkSetup", "Preparing fixtures")
                     withContext(Dispatchers.IO) { prepare() }
                     label.text = "BENCHMARK_READY"
+                    android.util.Log.i("BenchmarkSetup", "BENCHMARK_READY")
                 }
             } catch (e: Exception) {
                 android.util.Log.e("BenchmarkSetup", "Fixture preparation failed", e)
@@ -64,7 +66,9 @@ class BenchmarkSetupActivity : ComponentActivity() {
     }
 
     private suspend fun prepare() {
+        android.util.Log.i("BenchmarkSetup", "Waiting for migrations")
         Migrator.await()
+        android.util.Log.i("BenchmarkSetup", "Preparing storage and preferences")
         val base = Injekt.get<BasePreferences>()
         base.shownOnboardingFlow().set(true)
         base.incognitoMode().set(false)
@@ -95,10 +99,12 @@ class BenchmarkSetupActivity : ComponentActivity() {
             }
         }
         image.recycle()
+        android.util.Log.i("BenchmarkSetup", "Preparing library entries")
         val cover = File(pageDirectory, "1.png").toUri().toString()
         val animeRepo = Injekt.get<AnimeRepository>()
         val mangaRepo = Injekt.get<MangaRepository>()
         repeat(500) { index ->
+            if (index % 100 == 0) android.util.Log.i("BenchmarkSetup", "Library entries: $index/500")
             val title = "Benchmark ${index.toString().padStart(4, '0')} · Un titolo lungo per verificare la libreria"
             if (animeRepo.getAnimeByUrlAndSourceId("benchmark/$index", 0) == null) {
                 animeRepo.insertAnime(
@@ -150,6 +156,7 @@ class BenchmarkSetupActivity : ComponentActivity() {
             )
         }
         val cache = Injekt.get<AnimeCatalogCache>()
+        android.util.Log.i("BenchmarkSetup", "Preparing catalog cache")
         val json = Injekt.get<Json>()
         val items = List(30) {
             CatalogAnime(

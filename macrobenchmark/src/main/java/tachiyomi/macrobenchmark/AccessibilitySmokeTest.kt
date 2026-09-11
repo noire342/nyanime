@@ -1,11 +1,12 @@
 package tachiyomi.macrobenchmark
 
+import android.annotation.SuppressLint
+import androidx.benchmark.Outputs
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import org.junit.Test
-import java.io.File
 
 class AccessibilitySmokeTest {
     @Test fun largeTextLandscapeAndTablet() {
@@ -62,10 +63,8 @@ class AccessibilitySmokeTest {
         device.waitForIdle()
     }
 
+    @SuppressLint("RestrictedApi")
     private fun capture(device: UiDevice, name: String) {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val directory = File(instrumentation.context.getExternalFilesDir(null)!!, "interface-evidence")
-        directory.mkdirs()
-        check(device.takeScreenshot(File(directory, "$name.png")))
+        Outputs.writeFile("$name.png") { check(device.takeScreenshot(it)) }
     }
 }
