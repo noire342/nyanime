@@ -7,7 +7,13 @@ import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.anime.model.asAnimeCover
 
 @Composable
-fun SourceHomePosterCard(anime: Anime, sourceLabel: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun SourceHomePosterCard(
+    anime: Anime,
+    sourceLabel: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    refreshKey: Int = 0,
+) {
     val presentation = anime.homePresentation
     PosterCard(
         title = anime.title,
@@ -17,5 +23,6 @@ fun SourceHomePosterCard(anime: Anime, sourceLabel: String, onClick: () -> Unit,
         modifier = modifier,
         badges = presentation?.badges.orEmpty(),
         subtitleMaxLines = 12,
+        artworkRefreshKey = refreshKey,
     )
 }

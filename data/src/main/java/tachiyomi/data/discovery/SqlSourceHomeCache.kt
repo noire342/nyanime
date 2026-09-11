@@ -13,7 +13,7 @@ import tachiyomi.domain.discovery.SourceHomePresentation
 import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.repository.AnimeRepository
 
-/** Persist references, not copies of library flags/progress; metadata always comes from the local entries. */
+/** Persist Home artwork and references; personal metadata and progress come from the current local entries. */
 class SqlSourceHomeCache(
     private val database: DiscoveryDatabase,
     private val anime: AnimeRepository,
@@ -26,6 +26,8 @@ class SqlSourceHomeCache(
         val descriptions: Map<Long, String> = emptyMap(),
         val presentations: List<SourceHomePresentation?> = emptyList(),
         val title: String? = null,
+        // Null identifies legacy snapshots that discarded the extension's poster URLs.
+        val covers: Map<Long, String>? = null,
     )
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -39,6 +41,7 @@ class SqlSourceHomeCache(
                 key.page.toLong(),
             ).executeAsOneOrNull() ?: return@withContext null
             val payload = json.decodeFromString<Payload>(row.payload)
+            val covers = payload.covers ?: return@withContext null
             if (payload.ids.size > 200) return@withContext null
             if (payload.presentations.isNotEmpty() &&
                 payload.presentations.size != payload.ids.size
@@ -48,6 +51,7 @@ class SqlSourceHomeCache(
             val items = payload.ids.mapIndexed { index, id ->
                 val local = anime.getAnimeById(id)
                 local.copy(
+                    thumbnailUrl = covers[id] ?: local.thumbnailUrl,
                     backgroundUrl = payload.backgrounds[id] ?: local.backgroundUrl,
                     description = payload.descriptions[id] ?: local.description,
                     memo = payload.presentations.getOrNull(index)?.bounded()?.attachTo(local.memo)
@@ -74,6 +78,9 @@ class SqlSourceHomeCache(
                 entry.page.items.mapNotNull { item -> item.description?.take(8000)?.let { item.id to it } }.toMap(),
                 entry.page.items.map { it.homePresentation?.bounded() },
                 entry.page.title?.take(100),
+                entry.page.items.mapNotNull { item ->
+                    item.thumbnailUrl?.takeIf(String::isNotBlank)?.take(2048)?.let { item.id to it }
+                }.toMap(),
             ),
         )
         database.transaction {

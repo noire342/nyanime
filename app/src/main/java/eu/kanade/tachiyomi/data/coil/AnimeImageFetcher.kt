@@ -34,7 +34,6 @@ import tachiyomi.domain.entries.anime.model.AnimeCover
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import uy.kohesive.injekt.injectLazy
 import java.io.File
-import java.io.IOException
 
 /**
  * A [Fetcher] that fetches cover image for [Anime] object.
@@ -139,12 +138,14 @@ class AnimeImageFetcher(
                 // Read from cover cache after library manga cover updated
                 val responseCoverCache = writeResponseToCoverCache(response, libraryCoverCacheFile)
                 if (responseCoverCache != null) {
+                    responseBody.close()
                     return fileLoader(responseCoverCache)
                 }
 
                 // Read from disk cache
                 snapshot = writeToDiskCache(response)
                 if (snapshot != null) {
+                    responseBody.close()
                     return SourceFetchResult(
                         source = snapshot.toImageSource(),
                         mimeType = "image/*",
@@ -170,10 +171,10 @@ class AnimeImageFetcher(
 
     private suspend fun executeNetworkRequest(): Response {
         val client = sourceLazy.value?.client ?: callFactoryLazy.value
-        val response = client.newCall(newRequest()).await()
+        val response = ArtworkRequestPolicy.limit(client.newCall(newRequest()), options.artworkTimeoutMillis).await()
         if (!response.isSuccessful && response.code != HTTP_NOT_MODIFIED) {
             response.close()
-            throw IOException(response.message)
+            throw ArtworkHttpException(response.code)
         }
         return response
     }

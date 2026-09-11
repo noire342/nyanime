@@ -48,6 +48,7 @@ import eu.kanade.tachiyomi.data.discovery.LocalHomeItem
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogFeed
 import tachiyomi.domain.discovery.SectionState
+import tachiyomi.domain.entries.anime.model.AnimeCover
 import tachiyomi.domain.entries.anime.model.asAnimeCover
 import java.time.Instant
 import java.time.ZoneId
@@ -131,6 +132,7 @@ fun PosterCard(
     modifier: Modifier = Modifier,
     badges: List<String> = emptyList(),
     subtitleMaxLines: Int = 3,
+    artworkRefreshKey: Int = 0,
 ) {
     Column(
         modifier.width((144 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)
@@ -141,12 +143,16 @@ fun PosterCard(
                 144f / 208f,
             ).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
-            AsyncImage(
-                model = cover,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
+            if (cover is AnimeCover) {
+                SourceHomeArtwork(cover, Modifier.fillMaxSize(), refreshKey = artworkRefreshKey)
+            } else {
+                AsyncImage(
+                    model = cover,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
             if (badges.isNotEmpty()) {
                 Text(
                     badges.joinToString(" · "),

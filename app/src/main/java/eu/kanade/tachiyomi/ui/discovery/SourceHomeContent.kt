@@ -135,7 +135,10 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                             // Each variant owns its scroll state; switching never reuses another tab's offset.
                             variantStates.SaveableStateProvider(section.id) {
                                 if (section.layout == "featured") {
-                                    SourceFeaturedCarousel(value.data?.items.orEmpty()) { anime ->
+                                    SourceFeaturedCarousel(
+                                        value.data?.items.orEmpty(),
+                                        state.artworkRefreshKey,
+                                    ) { anime ->
                                         navigator.push(AnimeScreen(anime.id, true))
                                     }
                                 } else {
@@ -152,6 +155,7 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                                                 {
                                                     navigator.push(AnimeScreen(anime.id, true))
                                                 },
+                                                refreshKey = state.artworkRefreshKey,
                                             )
                                         }
                                     }

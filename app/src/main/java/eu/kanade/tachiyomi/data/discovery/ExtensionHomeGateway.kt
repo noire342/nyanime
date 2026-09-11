@@ -52,7 +52,10 @@ class ExtensionHomeGateway(
                             )
                             // Home artwork is presentation data: never rewrite library flags or progress.
                             local.copy(
-                                backgroundUrl = remote.background_url ?: local.backgroundUrl,
+                                thumbnailUrl = remote.thumbnail_url?.takeIf(String::isNotBlank) ?: local.thumbnailUrl,
+                                backgroundUrl = remote.background_url?.takeIf(
+                                    String::isNotBlank,
+                                ) ?: local.backgroundUrl,
                                 description = remote.description ?: local.description,
                                 memo = presentation?.attachTo(local.memo) ?: SourceHomePresentation.without(local.memo),
                             )

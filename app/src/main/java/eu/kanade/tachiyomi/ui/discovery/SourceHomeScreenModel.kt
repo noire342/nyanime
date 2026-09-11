@@ -49,10 +49,18 @@ class SourceHomeScreenModel(
         }
     }
 
-    fun load(sectionId: String, refresh: Boolean = false, date: String? = null) =
+    fun load(sectionId: String, refresh: Boolean = false, date: String? = null) {
+        if (refresh && !state.value.access.offline) restartArtwork()
         feeds.load(SourceHomeRequest(sectionId, date = date), refresh)
+    }
 
-    fun refresh() = feeds.refresh(force = true)
+    fun refresh() {
+        if (state.value.access.offline) return
+        restartArtwork()
+        feeds.refresh(force = true)
+    }
+
+    private fun restartArtwork() = mutableState.update { it.copy(artworkRefreshKey = it.artworkRefreshKey + 1) }
 
     fun onResume() = feeds.refresh(force = false)
 
@@ -61,5 +69,6 @@ class SourceHomeScreenModel(
         val sections: Map<String, SectionState<SourceHomePage>> = emptyMap(),
         val resume: SectionState<List<LocalHomeItem>> = SectionState(),
         val updates: SectionState<List<LocalHomeItem>> = SectionState(),
+        val artworkRefreshKey: Int = 0,
     )
 }

@@ -52,14 +52,47 @@ class SqlSourceHomeCacheTest {
         JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).use { driver ->
             DiscoveryDatabase.Schema.create(driver)
             val cache = SqlSourceHomeCache(DiscoveryDatabase(driver), entries)
-            val featured = anime.copy(backgroundUrl = "https://example.org/banner.jpg", description = "Source synopsis")
+            val featured = anime.copy(
+                thumbnailUrl = "https://example.org/current-cover.jpg",
+                backgroundUrl = "https://example.org/banner.jpg",
+                description = "Source synopsis",
+            )
             cache.write(key, page.copy(page = SourceHomePage(listOf(featured), false)))
-            coEvery { entries.getAnimeById(10) } returns anime.copy(favorite = true, title = "Local title")
+            coEvery { entries.getAnimeById(10) } returns anime.copy(
+                favorite = true,
+                title = "Local title",
+                thumbnailUrl = "https://old.example.org/stale-cover.jpg",
+                coverLastModified = 123,
+            )
             val restored = cache.read(key)!!.page.items.single()
+            assertEquals(featured.thumbnailUrl, restored.thumbnailUrl)
+            assertEquals(123L, restored.coverLastModified)
             assertEquals(featured.backgroundUrl, restored.backgroundUrl)
             assertEquals(featured.description, restored.description)
             assertEquals("Local title", restored.title)
             assertEquals(true, restored.favorite)
+        }
+    }
+
+    @Test fun oldHomeSnapshotsAreRefetchedInsteadOfRestoringDiscardedPosters() = runBlocking {
+        JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).use { driver ->
+            DiscoveryDatabase.Schema.create(driver)
+            val database = DiscoveryDatabase(driver)
+            val cache = SqlSourceHomeCache(database, entries)
+            database.sourceHomeCacheQueries.put(
+                "producer",
+                42,
+                "1",
+                "popular",
+                1,
+                """{"ids":[10],"hasNextPage":false,"backgrounds":{"10":"https://example.org/banner.jpg"}}""",
+                1000,
+            )
+            coEvery { entries.getAnimeById(10) } returns anime
+            assertNull(cache.read(key))
+            // A newly cached section with genuinely missing posters is still a valid snapshot.
+            cache.write(key, page)
+            assertEquals(page, cache.read(key))
         }
     }
 

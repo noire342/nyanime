@@ -19,18 +19,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import tachiyomi.domain.discovery.homeItemKey
 import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
 
 /** The extension supplies every title, image and synopsis; there is no catalogue resolution here. */
 @Composable
-fun SourceFeaturedCarousel(items: List<Anime>, onClick: (Anime) -> Unit) {
+fun SourceFeaturedCarousel(items: List<Anime>, refreshKey: Int = 0, onClick: (Anime) -> Unit) {
     if (items.isEmpty()) return
     val pager = rememberPagerState { items.size }
     HorizontalPager(
@@ -42,11 +40,12 @@ fun SourceFeaturedCarousel(items: List<Anime>, onClick: (Anime) -> Unit) {
         val anime = items[index]
         Card(onClick = { onClick(anime) }, modifier = Modifier.fillMaxWidth()) {
             Box(Modifier.fillMaxWidth().heightIn(min = 340.dp), contentAlignment = Alignment.BottomStart) {
-                AsyncImage(
-                    model = anime.backgroundUrl ?: anime.thumbnailUrl,
+                SourceHomeArtwork(
+                    data = anime,
+                    background = !anime.backgroundUrl.isNullOrBlank(),
+                    refreshKey = refreshKey,
                     contentDescription = anime.title,
                     modifier = Modifier.matchParentSize(),
-                    contentScale = ContentScale.Crop,
                 )
                 Column(
                     Modifier.fillMaxWidth().background(

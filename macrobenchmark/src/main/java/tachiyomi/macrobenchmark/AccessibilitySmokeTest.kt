@@ -8,6 +8,42 @@ import androidx.test.uiautomator.UiDevice
 import org.junit.Test
 
 class AccessibilitySmokeTest {
+    @Test fun sourceArtworkRecoversAutomaticallyManuallyAndAfterHomeRefresh() {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        device.wakeUp()
+        device.executeShellCommand("wm dismiss-keyguard")
+        device.executeShellCommand("am start -W -n $TARGET_PACKAGE/$FIXTURE_ACTIVITY --ez artwork true")
+        try {
+            check(device.waitForFresh(By.text("ARTWORK_RESPONSE=ready"), 15_000))
+            check(device.waitForFresh(By.text("ARTWORK_REQUESTS=2"), 5_000))
+            device.waitForIdle()
+            capture(device, "artwork-automatic-recovery")
+
+            clickFresh(device, By.text("Caso manuale"))
+            check(device.waitForFresh(By.text("ARTWORK_SCENARIO=manuale"), 5_000))
+            check(device.waitForFresh(By.text("ARTWORK_REQUESTS=2"), 15_000))
+            check(device.waitForFresh(By.desc("Ricarica immagine"), 5_000))
+            device.waitForIdle()
+            capture(device, "artwork-retry-visible")
+            clickFresh(device, By.desc("Ricarica immagine"))
+            check(device.waitForFresh(By.text("ARTWORK_RESPONSE=ready"), 5_000))
+            check(device.waitForFresh(By.text("ARTWORK_REQUESTS=3"), 5_000))
+            capture(device, "artwork-manual-recovery")
+
+            clickFresh(device, By.text("Caso refresh"))
+            check(device.waitForFresh(By.text("ARTWORK_SCENARIO=refresh"), 5_000))
+            check(device.waitForFresh(By.text("ARTWORK_RESPONSE=failed"), 5_000))
+            check(device.waitForFresh(By.text("ARTWORK_REQUESTS=2"), 15_000))
+            check(device.waitForFresh(By.desc("Ricarica immagine"), 5_000))
+            clickFresh(device, By.text("Aggiorna Home"))
+            check(device.waitForFresh(By.text("ARTWORK_RESPONSE=ready"), 5_000))
+            check(device.waitForFresh(By.text("ARTWORK_REQUESTS=3"), 5_000))
+            capture(device, "artwork-refresh-recovery")
+        } finally {
+            device.pressBack()
+        }
+    }
+
     @Test fun largeTextLandscapeAndTablet() {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         prepareFixtures(device)

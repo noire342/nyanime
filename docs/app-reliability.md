@@ -87,3 +87,22 @@ blocco seguito da corruzione audio/video, che richiede log raccolti durante l'ev
 
 Riferimenti: [HTTP range](https://www.rfc-editor.org/rfc/rfc9110.html#name-range-requests),
 [profili Android](https://developer.android.com/topic/performance/baselineprofiles/create-baselineprofile).
+# Copertine delle Home delle estensioni
+
+Le Home usano subito le copertine non vuote fornite dall'estensione, anche quando
+un titolo esiste gia nella libreria con un indirizzo vecchio o senza immagine.
+La cache conserva questi indirizzi separatamente da preferiti, titoli personali,
+copertine personalizzate e avanzamento. I vecchi snapshot che omettevano le
+copertine vengono ricaricati; non viene cancellato il database della libreria.
+
+Le immagini delle Home hanno un limite di rete di 15 secondi per chiamata,
+rispettando eventuali limiti piu brevi della fonte. Un errore temporaneo consente
+un solo nuovo tentativo automatico, dopo 1,2 secondi. Gli errori permanenti non
+generano un ciclo di richieste. Rimane disponibile il comando sulla singola
+immagine e il refresh della Home riavvia anche le immagini con URL invariato.
+Cookie, client e header provengono dalla fonte anche per gli sfondi in evidenza.
+
+La prova Android `sourceArtworkRecoversAutomaticallyManuallyAndAfterHomeRefresh`
+usa lo stesso componente delle Home con trasferimenti sintetici interrotti.
+Controlla recupero automatico, arresto dei tentativi, comando manuale e refresh,
+con immagini e gerarchie UI. Le fixture appartengono solo alla variante benchmark.

@@ -41,6 +41,54 @@ import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 
 class ExtensionHomeGatewayTest {
+    @Test
+    fun freshHomeCoverReplacesMissingOrStaleLocalArtworkWithoutChangingLibraryData() = runBlocking {
+        val remote = SAnime.create().apply {
+            title = "Source title"
+            url = "/series"
+            thumbnail_url = "https://images.test/current.jpg"
+        }
+        for (oldCover in listOf(null, "", "https://old-images.test/old.jpg")) {
+            val local = Anime.create().copy(
+                id = 123,
+                source = 42,
+                url = remote.url,
+                title = "Custom title",
+                favorite = true,
+                thumbnailUrl = oldCover,
+                coverLastModified = 456,
+                episodeFlags = 81,
+            )
+            coEvery { toLocal.await(any()) } returns local
+            coEvery { engine.getSearchAnime(1, "", any()) } returns AnimesPage(listOf(remote), false)
+            val actual = gateway.fetch(gateway.currentAccess(), SourceHomeRequest("popular")).items.single()
+            assertEquals(local.copy(thumbnailUrl = remote.thumbnail_url), actual)
+        }
+    }
+
+    @Test
+    fun homeRowsWithoutArtworkKeepTheExistingCoverAndBackground() = runBlocking {
+        val local = Anime.create().copy(
+            id = 123,
+            source = 42,
+            url = "/series",
+            title = "Local title",
+            thumbnailUrl = "https://images.test/saved.jpg",
+            backgroundUrl = "https://images.test/background.jpg",
+        )
+        for (missing in listOf(null, "", "  ")) {
+            val remote = SAnime.create().apply {
+                title = "Source title"
+                url = local.url
+                thumbnail_url = missing
+                background_url = missing
+            }
+            coEvery { toLocal.await(any()) } returns local
+            coEvery { engine.getSearchAnime(1, "", any()) } returns AnimesPage(listOf(remote), false)
+            assertEquals(local, gateway.fetch(gateway.currentAccess(), SourceHomeRequest("popular")).items.single())
+        }
+    }
+
     @Test fun calendarRequestPassesTheDeclaredPublicDateWithoutChangingTheQuery() = runBlocking {
         val manifest = ExtensionHomeFiltersTest.manifest()
         every { reader.read(extension) } returns

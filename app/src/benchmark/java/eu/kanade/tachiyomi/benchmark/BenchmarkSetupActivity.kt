@@ -7,6 +7,8 @@ import android.graphics.Paint
 import android.os.Bundle
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.material3.MaterialTheme
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import eu.kanade.domain.base.BasePreferences
@@ -44,6 +46,10 @@ class BenchmarkSetupActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         check(packageName.endsWith(".benchmark"))
+        if (intent.getBooleanExtra("artwork", false)) {
+            setContent { MaterialTheme { ArtworkProbe() } }
+            return
+        }
         val label = TextView(this).apply { text = "Preparing benchmark fixtures" }
         setContentView(label)
         lifecycleScope.launch {
