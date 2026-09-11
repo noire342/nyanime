@@ -10,6 +10,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -75,6 +76,7 @@ import eu.kanade.tachiyomi.animesource.model.Hoster
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.core.common.Constants
 import eu.kanade.tachiyomi.data.cache.ChapterCache
+import eu.kanade.tachiyomi.data.cast.CastController
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadCache
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
@@ -88,6 +90,7 @@ import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.GlobalAnimeSearchScreen
 import eu.kanade.tachiyomi.ui.browse.manga.source.browse.BrowseMangaSourceScreen
 import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.GlobalMangaSearchScreen
+import eu.kanade.tachiyomi.ui.cast.CastMiniController
 import eu.kanade.tachiyomi.ui.deeplink.DeepLinkScreenType
 import eu.kanade.tachiyomi.ui.deeplink.anime.DeepLinkAnimeScreen
 import eu.kanade.tachiyomi.ui.deeplink.manga.DeepLinkMangaScreen
@@ -135,6 +138,16 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class MainActivity : BaseActivity() {
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        val controller = CastController.get(this)
+        if (controller.state.value.active &&
+            (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)
+        ) {
+            controller.adjustVolume(if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) 0.05f else -0.05f)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 
     private val libraryPreferences: LibraryPreferences by injectLazy()
     private val preferences: BasePreferences by injectLazy()
@@ -238,6 +251,7 @@ class MainActivity : BaseActivity() {
                             modifier = Modifier.windowInsetsPadding(scaffoldInsets),
                         )
                     },
+                    bottomBar = { if (navigator.lastItem != HomeScreen) CastMiniController() },
                     contentWindowInsets = scaffoldInsets,
                 ) { contentPadding ->
                     // Consume insets already used by app state banners

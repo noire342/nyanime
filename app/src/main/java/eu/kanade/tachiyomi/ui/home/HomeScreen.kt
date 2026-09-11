@@ -7,6 +7,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -42,6 +43,7 @@ import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.isTabletUi
 import eu.kanade.tachiyomi.ui.browse.BrowseTab
+import eu.kanade.tachiyomi.ui.cast.CastMiniController
 import eu.kanade.tachiyomi.ui.download.DownloadsTab
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
@@ -103,12 +105,16 @@ object HomeScreen : Screen() {
                         }
                     },
                     bottomBar = {
-                        if (!isTabletUi()) {
-                            val bottomNavVisible by produceState(initialValue = true) {
-                                showBottomNavEvent.receiveAsFlow().collectLatest { value = it }
-                            }
+                        val bottomNavVisible by produceState(initialValue = true) {
+                            showBottomNavEvent.receiveAsFlow().collectLatest { value = it }
+                        }
+                        val showNavigation = !isTabletUi() &&
+                            bottomNavVisible &&
+                            tabNavigator.current !in navStyle.overflowTabs
+                        Column {
+                            CastMiniController(includeNavigationInsets = !showNavigation)
                             AnimatedVisibility(
-                                visible = bottomNavVisible && tabNavigator.current !in navStyle.overflowTabs,
+                                visible = showNavigation,
                                 enter = expandVertically(),
                                 exit = shrinkVertically(),
                             ) {

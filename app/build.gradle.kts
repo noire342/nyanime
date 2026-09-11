@@ -317,6 +317,9 @@ dependencies {
     implementation(aniyomilibs.arthenica.smartexceptions)
     // TorrServer
     implementation(aniyomilibs.torrserver)
+    implementation(aniyomilibs.nanohttpd)
+    implementation(libs.cast.framework)
+    implementation(libs.media.router)
     // seeker seek bar
     implementation(aniyomilibs.seeker)
     // true type parser

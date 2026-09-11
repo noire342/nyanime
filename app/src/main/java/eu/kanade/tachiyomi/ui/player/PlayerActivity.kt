@@ -70,6 +70,9 @@ import eu.kanade.tachiyomi.animesource.model.HttpServer
 import eu.kanade.tachiyomi.animesource.model.SerializableHoster.Companion.serialize
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
+import eu.kanade.tachiyomi.data.cast.CastController
+import eu.kanade.tachiyomi.data.cast.CastHandoffPolicy
+import eu.kanade.tachiyomi.data.cast.CastRequest
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
@@ -89,6 +92,7 @@ import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPVLib
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -116,6 +120,38 @@ import kotlin.math.floor
 import kotlin.time.Duration.Companion.seconds
 
 class PlayerActivity : BaseActivity() {
+    val castController by lazy { CastController.get(applicationContext) }
+
+    fun castRequest(video: Video? = viewModel.currentVideo.value): CastRequest? {
+        val anime = viewModel.currentAnime.value ?: return null
+        val episode = viewModel.currentEpisode.value ?: return null
+        val episodeId = episode.id ?: return null
+        val media = castController.state.value.media?.takeIf { it.episodeId == episodeId }
+        return CastRequest(
+            anime.id, episodeId, anime.source, anime.title, episode.name, video ?: return null,
+            CastHandoffPolicy.startPosition(
+                remotePositionMs = media?.let { castController.state.value.playback.positionMs },
+                loadingEpisode = viewModel.isLoadingEpisode.value,
+                savedPositionMs = episode.last_second_seen,
+                seen = episode.seen,
+                preserveSeenPosition = playerPreferences.preserveWatchingPosition().get(),
+                localPositionMs = (viewModel.pos.value * 1000).toLong(),
+            ),
+            when {
+                media != null -> castController.state.value.playback.durationMs
+                viewModel.isLoadingEpisode.value -> episode.total_seconds
+                else -> (viewModel.duration.value * 1000).toLong()
+            },
+            viewModel.currentPlaylist.value.mapNotNull { it.id },
+            playerPreferences.autoplayEnabled().get(),
+        )
+    }
+
+    fun resumeAfterCast() {
+        val anime = viewModel.currentAnime.value ?: return
+        val episode = viewModel.currentEpisode.value ?: return
+        onNewIntent(newIntent(this, anime.id, episode.id))
+    }
     private val viewModel by viewModels<PlayerViewModel>(factoryProducer = { PlayerViewModelProviderFactory(this) })
     private val binding by lazy { PlayerLayoutBinding.inflate(layoutInflater) }
     private val playerObserver by lazy { PlayerObserver(this) }
@@ -261,6 +297,15 @@ class PlayerActivity : BaseActivity() {
         setupPlayerAudio()
         setupMediaSession()
         setupPlayerOrientation()
+
+        castController.state.distinctUntilChangedBy { it.active || it.connecting }.onEach { cast ->
+            if (cast.active || cast.connecting) {
+                viewModel.remoteProgressOwned = true
+                mediaSession?.isActive = false
+                player.paused = true
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }.launchIn(lifecycleScope)
 
         viewModel.eventFlow
             .onEach { event ->
@@ -1427,6 +1472,12 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (castController.state.value.active &&
+            (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)
+        ) {
+            castController.adjustVolume(if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) 0.05f else -0.05f)
+            return true
+        }
         when (keyCode) {
             KeyEvent.KEYCODE_VOLUME_UP -> {
                 viewModel.changeVolumeBy(1)
@@ -1639,6 +1690,13 @@ class PlayerActivity : BaseActivity() {
     fun setVideo(video: Video?, position: Long? = null) {
         if (player.isExiting) return
         if (video == null) return
+        if (castController.state.value.active || castController.state.value.connecting) {
+            lifecycleScope.launch {
+                castRequest(video)?.let { castController.play(it) }
+                viewModel.updateIsLoadingEpisode(false)
+            }
+            return
+        }
         httpServer?.stop()
         httpServer = null
 
@@ -1647,7 +1705,7 @@ class PlayerActivity : BaseActivity() {
         if (viewModel.isLoadingEpisode.value) {
             viewModel.currentEpisode.value?.let { episode ->
                 val preservePos = playerPreferences.preserveWatchingPosition().get()
-                val resumePosition = position
+                val resumePosition = castController.takePhoneResume(episode.id ?: -1) ?: position
                     ?: if (episode.seen && !preservePos) {
                         0L
                     } else {
@@ -1854,6 +1912,12 @@ class PlayerActivity : BaseActivity() {
     // at void is.xyz.mpv.MPVLib.event(int) (MPVLib.java:86)
     private fun fileLoaded() {
         if (player.isExiting) return
+        if (castController.state.value.active || castController.state.value.connecting) {
+            player.paused = true
+            return
+        }
+        viewModel.remoteProgressOwned = false
+        mediaSession?.isActive = true
         setMpvOptions()
         setMpvMediaTitle()
         setupPlayerOrientation()

@@ -60,6 +60,7 @@ import eu.kanade.tachiyomi.animesource.model.TileInfo
 import eu.kanade.tachiyomi.animesource.model.TimeStamp
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
+import eu.kanade.tachiyomi.data.cast.CastController
 import eu.kanade.tachiyomi.data.database.models.anime.Episode
 import eu.kanade.tachiyomi.data.database.models.anime.isRecognizedNumber
 import eu.kanade.tachiyomi.data.database.models.anime.toDomainEpisode
@@ -187,6 +188,9 @@ class PlayerViewModel @JvmOverloads constructor(
     val hasNextEpisode = _hasNextEpisode.asStateFlow()
 
     private val _currentEpisode = MutableStateFlow<Episode?>(null)
+
+    // Survives a remote disconnect until a fresh local file is loaded. onCleared must not save stale MPV progress.
+    @Volatile var remoteProgressOwned = false
     val currentEpisode = _currentEpisode.asStateFlow()
 
     private val _currentAnime = MutableStateFlow<Anime?>(null)
@@ -658,6 +662,12 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun unpause() {
+        val cast = CastController.get(activity.applicationContext).state.value
+        if (cast.active || cast.connecting) return
+        if (remoteProgressOwned) {
+            activity.resumeAfterCast()
+            return
+        }
         activity.player.paused = false
         _paused.update { false }
     }
@@ -1233,7 +1243,7 @@ class PlayerViewModel @JvmOverloads constructor(
      * Whether this viewModel is initialized with the correct episode.
      */
     private fun needsInit(animeId: Long, episodeId: Long): Boolean {
-        return currentAnime.value?.id != animeId || currentEpisode.value?.id != episodeId
+        return remoteProgressOwned || currentAnime.value?.id != animeId || currentEpisode.value?.id != episodeId
     }
 
     data class InitResult(
@@ -1656,6 +1666,8 @@ class PlayerViewModel @JvmOverloads constructor(
      * seen, update tracking services, enqueue downloaded episode deletion and download next episode.
      */
     private fun onSecondReached(position: Int, duration: Int) {
+        val cast = CastController.get(activity.applicationContext).state.value
+        if (remoteProgressOwned || cast.active || cast.connecting) return
         if (isLoadingEpisode.value) return
         val currentEp = currentEpisode.value ?: return
         if (episodeId == -1L) return
@@ -1761,6 +1773,8 @@ class PlayerViewModel @JvmOverloads constructor(
      * Called when episode is changed in player or when activity is paused.
      */
     private fun saveWatchingProgress(episode: Episode) {
+        val cast = CastController.get(activity.applicationContext).state.value
+        if (remoteProgressOwned || cast.active || cast.connecting) return
         viewModelScope.launchNonCancellable {
             saveEpisodeProgress(episode)
             saveEpisodeHistory(episode)
@@ -1772,6 +1786,7 @@ class PlayerViewModel @JvmOverloads constructor(
      * If incognito mode isn't on or has at least 1 tracker
      */
     private suspend fun saveEpisodeProgress(episode: Episode) {
+        if (remoteProgressOwned) return
         if (!incognitoMode || hasTrackers) {
             updateEpisode.await(
                 EpisodeUpdate(
@@ -1790,6 +1805,7 @@ class PlayerViewModel @JvmOverloads constructor(
      * Saves this [episode] last seen history if incognito mode isn't on.
      */
     private suspend fun saveEpisodeHistory(episode: Episode) {
+        if (remoteProgressOwned) return
         if (!incognitoMode) {
             val episodeId = episode.id!!
             val seenAt = Date()
@@ -1973,6 +1989,8 @@ class PlayerViewModel @JvmOverloads constructor(
      * are ignored.
      */
     fun deletePendingEpisodes() {
+        val cast = CastController.get(activity.applicationContext).state.value
+        if (cast.active || cast.connecting) return
         viewModelScope.launchNonCancellable {
             downloadManager.deletePendingEpisodes()
         }

@@ -85,3 +85,6 @@
 
 # XmlUtil
 -keep public enum nl.adaptivity.xmlutil.EventType { *; }
+
+# Loaded by the Google Cast framework from manifest metadata.
+-keep class eu.kanade.tachiyomi.data.cast.GoogleCastOptions { *; }

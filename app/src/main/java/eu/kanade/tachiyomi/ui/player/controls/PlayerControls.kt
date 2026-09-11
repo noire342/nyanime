@@ -58,6 +58,8 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import eu.kanade.presentation.more.settings.screen.player.custombutton.getButtons
 import eu.kanade.presentation.theme.playerRippleConfiguration
+import eu.kanade.tachiyomi.ui.cast.CastDevicesDialog
+import eu.kanade.tachiyomi.ui.cast.CastRemoteScreen
 import eu.kanade.tachiyomi.ui.player.Anime4K
 import eu.kanade.tachiyomi.ui.player.Anime4KMode
 import eu.kanade.tachiyomi.ui.player.Anime4KProfile
@@ -76,6 +78,7 @@ import eu.kanade.tachiyomi.ui.player.controls.components.SeekbarWithTimers
 import eu.kanade.tachiyomi.ui.player.controls.components.TextPlayerUpdate
 import eu.kanade.tachiyomi.ui.player.controls.components.ThumbnailPreview
 import eu.kanade.tachiyomi.ui.player.controls.components.VolumeSlider
+import eu.kanade.tachiyomi.ui.player.controls.components.sheets.QualitySheet
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.toFixed
 import eu.kanade.tachiyomi.ui.player.settings.AdvancedPlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
@@ -106,6 +109,43 @@ fun PlayerControls(
     modifier: Modifier = Modifier,
 ) {
     val spacing = MaterialTheme.padding
+    val castActivity = LocalContext.current as PlayerActivity
+    val castState by castActivity.castController.state.collectAsState()
+    var showCastDevices by remember { mutableStateOf(false) }
+    if (showCastDevices) {
+        CastDevicesDialog(request = { castActivity.castRequest() }, onDismiss = { showCastDevices = false })
+    }
+    if (castState.active || castState.connecting) {
+        val episode by viewModel.currentEpisode.collectAsState()
+        var qualityShown by remember { mutableStateOf(false) }
+        val sameEpisode = episode?.id == castState.media?.episodeId && castState.active
+        CastRemoteScreen(
+            onBack = onBackPress,
+            modifier = modifier,
+            onQuality = if (sameEpisode) ({ qualityShown = true }) else null,
+        )
+        if (qualityShown && sameEpisode) {
+            val hosters by viewModel.hosterState.collectAsState()
+            val expanded by viewModel.hosterExpandedList.collectAsState()
+            val selected by viewModel.selectedHosterVideoIndex.collectAsState()
+            val loading by viewModel.isLoadingHosters.collectAsState()
+            QualitySheet(
+                isLoadingHosters = loading,
+                hosterState = hosters,
+                expandedState = expanded,
+                selectedVideoIndex = selected,
+                onClickHoster = viewModel::onHosterClicked,
+                onClickVideo = { host, video ->
+                    qualityShown = false
+                    viewModel.onVideoClicked(host, video)
+                },
+                displayHosters = true to true,
+                onDismissRequest = { qualityShown = false },
+                dismissSheet = false,
+            )
+        }
+        return
+    }
     val playerPreferences = remember { Injekt.get<PlayerPreferences>() }
     val gesturePreferences = remember { Injekt.get<GesturePreferences>() }
     val audioPreferences = remember { Injekt.get<AudioPreferences>() }
@@ -486,6 +526,13 @@ fun PlayerControls(
                     },
                 ) {
                     TopRightPlayerControls(
+                        onCastClick = {
+                            if (castActivity.castRequest() != null) {
+                                showCastDevices = true
+                            } else {
+                                castActivity.showToast("Attendi il caricamento del video")
+                            }
+                        },
                         autoPlayEnabled = autoPlayEnabled,
                         onToggleAutoPlay = { viewModel.setAutoPlay(it) },
                         onSubtitlesClick = { viewModel.showSheet(Sheets.SubtitleTracks) },

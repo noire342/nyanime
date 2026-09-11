@@ -57,6 +57,8 @@ richtext-commonmark = { module = "com.halilibo.compose-richtext:richtext-commonm
 richtext-m3 = { module = "com.halilibo.compose-richtext:richtext-ui-material3", version.ref = "richtext" }
 
 material = "com.google.android.material:material:1.12.0"
+cast-framework = "com.google.android.gms:play-services-cast-framework:22.3.1"
+media-router = "androidx.mediarouter:mediarouter:1.8.1"
 flexible-adapter-core = "com.github.arkon.FlexibleAdapter:flexible-adapter:c8013533"
 photoview = "com.github.chrisbanes:PhotoView:2.3.0"
 directionalviewpager = "com.github.tachiyomiorg:DirectionalViewPager:1.0.0"

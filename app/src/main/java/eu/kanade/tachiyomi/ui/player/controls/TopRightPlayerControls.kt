@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Subtitles
@@ -39,6 +40,7 @@ import tachiyomi.presentation.core.theme.active
 
 @Composable
 fun TopRightPlayerControls(
+    onCastClick: () -> Unit,
     // auto-play
     autoPlayEnabled: Boolean,
     onToggleAutoPlay: (Boolean) -> Unit,
@@ -79,6 +81,12 @@ fun TopRightPlayerControls(
             modifier = Modifier
                 .padding(vertical = MaterialTheme.padding.medium, horizontal = MaterialTheme.padding.mediumSmall)
                 .size(width = 48.dp, height = 24.dp),
+        )
+        ControlsButton(
+            icon = Icons.Default.Cast,
+            title = "Trasmetti alla TV",
+            onClick = onCastClick,
+            horizontalSpacing = MaterialTheme.padding.mediumSmall,
         )
         ControlsButton(
             icon = Icons.Default.Subtitles,
