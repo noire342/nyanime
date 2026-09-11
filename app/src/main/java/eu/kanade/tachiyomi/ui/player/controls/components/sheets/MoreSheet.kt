@@ -68,6 +68,7 @@ import eu.kanade.presentation.player.components.PlayerSheet
 import eu.kanade.tachiyomi.ui.player.Anime4KMode
 import eu.kanade.tachiyomi.ui.player.Anime4KProfile
 import eu.kanade.tachiyomi.ui.player.Decoder
+import eu.kanade.tachiyomi.ui.player.applyAudioChannels
 import eu.kanade.tachiyomi.ui.player.execute
 import eu.kanade.tachiyomi.ui.player.executeLongPress
 import eu.kanade.tachiyomi.ui.player.settings.AdvancedPlayerPreferences
@@ -278,13 +279,8 @@ fun MoreSheet(
                     FilterChip(
                         selected = audioChannels == it,
                         onClick = {
+                            applyAudioChannels(it, previous = audioChannels)
                             audioPreferences.audioChannels().set(it)
-                            if (it == AudioChannels.ReverseStereo) {
-                                MPVLib.setPropertyString(AudioChannels.AutoSafe.property, AudioChannels.AutoSafe.value)
-                            } else {
-                                MPVLib.setPropertyString(AudioChannels.ReverseStereo.property, "")
-                            }
-                            MPVLib.setPropertyString(it.property, it.value)
                         },
                         label = { Text(text = stringResource(it.titleRes)) },
                     )

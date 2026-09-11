@@ -2,10 +2,12 @@ package tachiyomi.macrobenchmark
 
 import android.content.Intent
 import androidx.benchmark.macro.MacrobenchmarkScope
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
+import java.io.File
 
 const val TARGET_PACKAGE = "xyz.jmir.tachiyomi.mi.anime4k.benchmark"
 const val FIXTURE_ACTIVITY = "eu.kanade.tachiyomi.benchmark.BenchmarkSetupActivity"
@@ -14,14 +16,16 @@ fun MacrobenchmarkScope.prepareFixtures() = prepareFixtures(device)
 
 fun prepareFixtures(device: UiDevice) {
     device.executeShellCommand("am start -W -n $TARGET_PACKAGE/$FIXTURE_ACTIVITY")
-    check(device.wait(Until.hasObject(By.text("BENCHMARK_READY")), 120_000)) {
-        "Synthetic fixture preparation failed; refusing to measure an empty library."
+    if (!device.wait(Until.hasObject(By.text("BENCHMARK_READY")), 180_000)) {
+        val failure = device.findObject(By.textStartsWith("BENCHMARK_FAILED"))?.text
+        failJourney(device, "Synthetic fixture preparation failed: $failure")
     }
     device.pressHome()
 }
 
 fun MacrobenchmarkScope.openTab(tag: String) {
-    val tab = device.wait(Until.findObject(By.res(tag)), 10_000) ?: error("Missing navigation target: $tag")
+    val tab = device.wait(Until.findObject(By.res(tag)), 10_000)
+        ?: failJourney(device, "Missing navigation target: $tag")
     tab.click()
     device.waitForIdle()
 }
@@ -83,4 +87,19 @@ fun MacrobenchmarkScope.coreJourneys() {
     openTab("library_manga")
     scrollContent()
     openReader()
+}
+
+fun failJourney(device: UiDevice, message: String): Nothing {
+    // Preserve the actual screen when a journey fails, including R8-only failures.
+    runCatching {
+        val directory = File(
+            InstrumentationRegistry.getInstrumentation().context.getExternalFilesDir(null)!!,
+            "interface-evidence",
+        )
+        directory.mkdirs()
+        val name = "journey-failure-${System.currentTimeMillis()}"
+        device.takeScreenshot(File(directory, "$name.png"))
+        device.dumpWindowHierarchy(File(directory, "$name.xml"))
+    }
+    error(message)
 }

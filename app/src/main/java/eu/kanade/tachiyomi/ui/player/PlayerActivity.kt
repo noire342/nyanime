@@ -897,7 +897,11 @@ class PlayerActivity : BaseActivity() {
                 decoderDroppedFrames = getAnime4KPropertyString("decoder-frame-drop-count")?.toLongOrNull(),
                 delayedFrames = getAnime4KPropertyString("vo-delayed-frame-count")?.toLongOrNull(),
                 renderTimeMillis = null,
-                mistimedFrames = getAnime4KPropertyString("mistimed-frame-count")?.toLongOrNull(),
+                mistimedFrames = if (getAnime4KPropertyString("display-sync-active") == "yes") {
+                    getAnime4KPropertyString("mistimed-frame-count")?.toLongOrNull()
+                } else {
+                    null
+                },
                 playing = player.paused == false &&
                     getAnime4KPropertyString("paused-for-cache") == "no" &&
                     getAnime4KPropertyString("seeking") == "no",
@@ -1122,7 +1126,7 @@ class PlayerActivity : BaseActivity() {
 
     private fun setupPlayerAudio() {
         with(audioPreferences) {
-            audioChannels().get().let { MPVLib.setPropertyString(it.property, it.value) }
+            applyAudioChannels(audioChannels().get())
 
             val request = AudioFocusRequestCompat.Builder(AudioManagerCompat.AUDIOFOCUS_GAIN).also {
                 it.setAudioAttributes(

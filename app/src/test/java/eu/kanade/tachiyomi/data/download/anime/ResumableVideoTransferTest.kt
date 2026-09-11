@@ -178,6 +178,35 @@ class ResumableVideoTransferTest {
         assertEquals("fresh", store.bytes.toString(Charsets.UTF_8))
     }
 
+    @Test fun disguisedManifestOrErrorPageLeavesTheFfmpegRouteAvailable() {
+        for (body in listOf(
+            "#EXTM3U\n#EXT-X-VERSION:3",
+            "<MPD>test</MPD>",
+            "  <html>expired</html>",
+            "{\"error\":true}",
+        )) {
+            val store = Store()
+            val transfer = ResumableVideoTransfer(client({ response(it, body) }), store)
+            assertThrows(UnsupportedDirectVideo::class.java) {
+                runBlocking { transfer.download(url, headers) { _, _ -> } }
+            }
+            assertTrue(store.bytes.isEmpty())
+        }
+    }
+
+    @Test fun restartingAccountsForSpaceReclaimedFromTheOldPartial() = runBlocking {
+        val store = Store()
+        var free = Long.MAX_VALUE
+        val transfer = ResumableVideoTransfer(
+            client({ response(it, "abc", 6) }, { response(it, "whole!") }),
+            store,
+        ) { free }
+        runCatching { transfer.download(url, headers) { _, _ -> } }
+        free = 32L * 1024 * 1024 + 4
+        transfer.download(url, headers) { _, _ -> }
+        assertEquals("whole!", store.bytes.toString(Charsets.UTF_8))
+    }
+
     @Test fun rejectsInsufficientStorageBeforeOpeningTheTarget() {
         val store = Store()
         val transfer = ResumableVideoTransfer(client({ response(it, "abc") }), store) { 16L }

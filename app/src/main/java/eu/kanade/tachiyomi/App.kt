@@ -158,8 +158,13 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
             init(ProcessLifecycleOwner.get().lifecycleScope)
         }
 
-        if (!LogcatLogger.isInstalled && networkPreferences.verboseLogging().get()) {
-            LogcatLogger.install(AndroidLogcatLogger(LogPriority.VERBOSE))
+        if (!LogcatLogger.isInstalled) {
+            val minimumPriority = if (networkPreferences.verboseLogging().get()) {
+                LogPriority.VERBOSE
+            } else {
+                LogPriority.WARN
+            }
+            LogcatLogger.install(AndroidLogcatLogger(minimumPriority))
         }
 
         initializeMigrator()

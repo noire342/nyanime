@@ -11,11 +11,14 @@ import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.ui.UiPreferences
+import eu.kanade.domain.ui.model.NavStyle
+import eu.kanade.domain.ui.model.StartScreen
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import mihon.core.migration.Migrator
 import tachiyomi.domain.discovery.AnimeCatalogCache
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogCacheEntry
@@ -54,17 +57,23 @@ class BenchmarkSetupActivity : ComponentActivity() {
                     label.text = "BENCHMARK_READY"
                 }
             } catch (e: Exception) {
+                android.util.Log.e("BenchmarkSetup", "Fixture preparation failed", e)
                 label.text = "BENCHMARK_FAILED: ${e.javaClass.simpleName}: ${e.message}"
             }
         }
     }
 
     private suspend fun prepare() {
+        Migrator.await()
         val base = Injekt.get<BasePreferences>()
         base.shownOnboardingFlow().set(true)
         base.incognitoMode().set(false)
         base.downloadedOnly().set(false)
-        Injekt.get<UiPreferences>().installDiscoveryNavigationOnce()
+        Injekt.get<UiPreferences>().apply {
+            installDiscoveryNavigationOnce()
+            startScreen().set(StartScreen.HOME)
+            navStyle().set(NavStyle.DISCOVERY)
+        }
         val storage = File(filesDir, "benchmark-storage").apply { mkdirs() }
         Injekt.get<StoragePreferences>().baseStorageDirectory().set(storage.toUri().toString())
         val pageDirectory = File(storage, "local/Benchmark reader/Chapter 1").apply { mkdirs() }

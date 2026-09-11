@@ -59,5 +59,19 @@ di sostituire app/src/main/baseline-prof.txt. Non si inventano regole o migliora
 percentuali. Le misure di un emulatore non rappresentano autonomia, temperatura
 o fluidita del dispositivo dell'utente.
 
+Il profilo misurato dal run 34617849306 (commit ab5134f1208c97accac59e2079c8549205957bb0)
+copre Home, librerie, ricerca e lettore. Le regole precedenti sono conservate e
+deduplicate: 52.848 regole finali, con le otto regole delle fixture escluse.
+
+## Diagnosi del player
+Avvisi ed errori sono registrati anche senza Registrazione dettagliata. Il livello
+verboso resta facoltativo e richiede il riavvio dell'app; permette di raccogliere
+piu contesto in ADB durante un'anomalia sporadica.
+
+Le opzioni Auto e Auto sicuro ora corrispondono ai rispettivi valori mpv. Il cambio
+dei canali conserva i filtri audio personalizzati e gestisce soltanto il filtro
+etichettato dell'inversione stereo. Queste correzioni non dimostrano la causa di un
+blocco seguito da corruzione audio/video, che richiede log raccolti durante l'evento.
+
 Riferimenti: [HTTP range](https://www.rfc-editor.org/rfc/rfc9110.html#name-range-requests),
 [profili Android](https://developer.android.com/topic/performance/baselineprofiles/create-baselineprofile).

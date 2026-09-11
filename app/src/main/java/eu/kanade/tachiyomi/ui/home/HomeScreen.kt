@@ -208,7 +208,7 @@ object HomeScreen : Screen() {
         val scope = rememberCoroutineScope()
         val selected = tabNavigator.current::class == tab::class
         NavigationBarItem(
-            modifier = Modifier.testTag(navigationTag(tab)),
+            modifier = Modifier.semantics { testTagsAsResourceId = true }.testTag(navigationTag(tab)),
             selected = selected,
             onClick = {
                 if (!selected) {
@@ -237,7 +237,7 @@ object HomeScreen : Screen() {
         val scope = rememberCoroutineScope()
         val selected = tabNavigator.current::class == tab::class
         NavigationRailItem(
-            modifier = Modifier.testTag(navigationTag(tab)),
+            modifier = Modifier.semantics { testTagsAsResourceId = true }.testTag(navigationTag(tab)),
             selected = selected,
             onClick = {
                 if (!selected) {

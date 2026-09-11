@@ -104,8 +104,28 @@ class ResumableVideoTransfer(
                     start = 0
                     total = response.body.contentLength()
                 }
+                if (start == 0L) {
+                    val prefix = response.body.source().peek().use { probe ->
+                        probe.request(64)
+                        probe.readUtf8(minOf(64, probe.buffer.size)).trimStart().removePrefix("\uFEFF").lowercase()
+                    }
+                    if (listOf("#extm3u", "<mpd", "<?xml", "<!doctype", "<html", "{")
+                            .any(prefix::startsWith)
+                    ) {
+                        // Some servers disguise manifests or error pages with a video URL/MIME type.
+                        throw UnsupportedDirectVideo()
+                    }
+                }
                 val free = availableBytes()
-                if (free >= 0 && total > 0 && total - start > free - STORAGE_RESERVE) {
+                val reclaimed = if (start == 0L) size.coerceAtLeast(0) else 0L
+                val writable = if (free < 0) {
+                    -1L
+                } else if (reclaimed > Long.MAX_VALUE - free) {
+                    Long.MAX_VALUE
+                } else {
+                    free + reclaimed
+                }
+                if (writable >= 0 && total > 0 && total - start > writable - STORAGE_RESERVE) {
                     throw VideoStorageException(
                         "Spazio insufficiente per completare il video. Libera spazio e riprova.",
                     )

@@ -48,12 +48,15 @@ class AccessibilitySmokeTest {
     private fun launchHome(device: UiDevice) {
         device.executeShellCommand("am force-stop $TARGET_PACKAGE")
         device.executeShellCommand("am start -W -n $TARGET_PACKAGE/eu.kanade.tachiyomi.ui.main.MainActivity")
-        check(device.wait(Until.hasObject(By.res("library_anime")), 15_000))
+        if (!device.wait(Until.hasObject(By.res("library_anime")), 15_000)) {
+            failJourney(device, "Home navigation did not appear")
+        }
         device.waitForIdle()
     }
 
     private fun clickTab(device: UiDevice, tag: String) {
-        val target = device.wait(Until.findObject(By.res(tag)), 10_000) ?: error("Missing tab: $tag")
+        val target = device.wait(Until.findObject(By.res(tag)), 10_000)
+            ?: failJourney(device, "Missing tab: $tag")
         check(target.visibleBounds.width() > 0 && target.visibleBounds.height() > 0)
         target.click()
         device.waitForIdle()
@@ -61,8 +64,7 @@ class AccessibilitySmokeTest {
 
     private fun capture(device: UiDevice, name: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val directory = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
-            ?.let(::File) ?: instrumentation.context.getExternalFilesDir(null)!!
+        val directory = File(instrumentation.context.getExternalFilesDir(null)!!, "interface-evidence")
         directory.mkdirs()
         check(device.takeScreenshot(File(directory, "$name.png")))
     }
