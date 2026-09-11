@@ -156,6 +156,14 @@ class PlayerActivity : BaseActivity() {
     private var anime4kCalibrationKey: String? = null
     private var anime4kCalibrationMediaInfo: Anime4KMediaInfo? = null
     private var anime4kLastSavedCalibration: Anime4KCalibration? = null
+    private val anime4kMediaRefresh by lazy {
+        Anime4KMediaRefresh(
+            schedule = { delay, refresh ->
+                binding.root.postDelayed({ if (!isFinishing && !isDestroyed && !player.isExiting) refresh() }, delay)
+            },
+            refresh = ::applySmartAnime4KForLoadedMedia,
+        )
+    }
 
     private val noisyReceiver = object : BroadcastReceiver() {
         var initialized = false
@@ -661,6 +669,10 @@ class PlayerActivity : BaseActivity() {
         }
     }
 
+    private fun requestAnime4KMediaRefresh() {
+        if (currentAnime4KSelection().profile == Anime4KProfile.Smart) anime4kMediaRefresh.request()
+    }
+
     private fun applySmartAnime4KForLoadedMedia() {
         if (currentAnime4KSelection().profile != Anime4KProfile.Smart) return
 
@@ -773,6 +785,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun resetAnime4KRuntime() {
+        anime4kMediaRefresh.reset()
         stopAnime4KTelemetry()
         anime4kSmartController = null
         anime4kSmartNeedsMediaResolution = true
@@ -1213,7 +1226,7 @@ class PlayerActivity : BaseActivity() {
                 viewModel.updateChapter(0)
             }
             "track-list" -> viewModel.loadTracks()
-            "osd-dimensions" -> applySmartAnime4KForLoadedMedia()
+            "osd-dimensions" -> requestAnime4KMediaRefresh()
         }
     }
 
@@ -1287,13 +1300,14 @@ class PlayerActivity : BaseActivity() {
         when (property) {
             "speed" -> {
                 viewModel.playbackSpeed.update { value.toFloat() }
-                applySmartAnime4KForLoadedMedia()
+                anime4kSmartController?.resetTelemetry(SystemClock.elapsedRealtime())
+                requestAnime4KMediaRefresh()
             }
             "video-params/aspect" -> if (isPipSupportedAndEnabled) setPictureInPictureParams(createPipParams())
             "container-fps",
             "display-fps",
             "estimated-display-fps",
-            -> applySmartAnime4KForLoadedMedia()
+            -> requestAnime4KMediaRefresh()
         }
     }
 
@@ -1304,7 +1318,7 @@ class PlayerActivity : BaseActivity() {
                 loadAnime4KForCurrentEpisode()
                 viewModel.viewModelScope.launchIO { fileLoaded() }
             }
-            MPVLib.mpvEventId.MPV_EVENT_VIDEO_RECONFIG -> applySmartAnime4KForLoadedMedia()
+            MPVLib.mpvEventId.MPV_EVENT_VIDEO_RECONFIG -> requestAnime4KMediaRefresh()
             MPVLib.mpvEventId.MPV_EVENT_SEEK -> {
                 anime4kSmartController?.resetTelemetry(SystemClock.elapsedRealtime())
                 viewModel.isLoading.update { true }

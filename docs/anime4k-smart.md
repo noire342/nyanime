@@ -16,6 +16,8 @@ unchanged.
 - `aniyomi_anime4k.lua`: native MPV property collection on the script thread.
 - `Anime4KTelemetry` / `Anime4KTelemetrySession`: bounded, versioned parsing,
   session/sequence validation and JNI fallback throttling.
+- `Anime4KMediaRefresh`: coalesces high-frequency metadata/resize notifications
+  into one native refresh per second, invalidating callbacks from old episodes.
 - `Anime4KShaderPipeline`: verified asset installation and ownership-aware
   shader-list replacement.
 - `PlayerActivity`: episode lifecycle, property observers, applying decisions,
