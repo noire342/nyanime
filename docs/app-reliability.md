@@ -46,6 +46,12 @@ hanno semantica accessibile e i controlli di ricerca lasciano spazio ai nomi lun
 Le schede dei pannelli adattivi, incluso il lettore manga, possono scorrere senza
 comprimere tutte le etichette in una sola riga.
 
+Le griglie delle librerie anime e manga, con colonne su Automatico, aumentano la
+larghezza delle copertine insieme al carattere di sistema, fino a 1,5 volte la
+larghezza minima abituale. Le colonne manuali e la modalita con sole copertine
+conservano le proprie dimensioni. I titoli ammettono tre righe con caratteri grandi;
+lo sfondo scuro sulle copertine segue l'altezza del testo per mantenerne il contrasto.
+
 ## Prestazioni e prove ripetibili
 Il package per misurare e xyz.jmir.tachiyomi.mi.anime4k.benchmark, separato dalle
 app installate. La variante contiene un'attivita esclusiva per preparare 500 anime,
@@ -58,6 +64,12 @@ tracce e profili. Un profilo prodotto dall'esecuzione deve essere esaminato prim
 di sostituire app/src/main/baseline-prof.txt. Non si inventano regole o miglioramenti
 percentuali. Le misure di un emulatore non rappresentano autonomia, temperatura
 o fluidita del dispositivo dell'utente.
+
+Le prove di navigazione attendono la selezione, il contenuto della destinazione
+e la scomparsa della schermata precedente. Le catture conservano anche la gerarchia
+accessibile. La configurazione tablet usa una larghezza effettiva di 800 dp e
+verifica la presenza della barra laterale; il lettore viene controllato anche nei
+tre pannelli delle impostazioni, senza tutorial iniziali nelle fixture isolate.
 
 Il profilo misurato dal run 34617849306 (commit ab5134f1208c97accac59e2079c8549205957bb0)
 copre Home, librerie, ricerca e lettore. Le regole precedenti sono conservate e

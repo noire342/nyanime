@@ -14,6 +14,7 @@ import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.domain.ui.model.NavStyle
 import eu.kanade.domain.ui.model.StartScreen
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
+import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,6 +74,10 @@ class BenchmarkSetupActivity : ComponentActivity() {
         base.shownOnboardingFlow().set(true)
         base.incognitoMode().set(false)
         base.downloadedOnly().set(false)
+        Injekt.get<ReaderPreferences>().apply {
+            showNavigationOverlayNewUser().set(false)
+            showNavigationOverlayOnStart().set(false)
+        }
         Injekt.get<UiPreferences>().apply {
             installDiscoveryNavigationOnce()
             startScreen().set(StartScreen.HOME)

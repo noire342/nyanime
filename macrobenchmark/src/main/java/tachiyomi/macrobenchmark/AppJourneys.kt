@@ -17,6 +17,8 @@ fun MacrobenchmarkScope.prepareFixtures() = prepareFixtures(device)
 fun prepareFixtures(device: UiDevice) {
     device.wakeUp()
     device.executeShellCommand("wm dismiss-keyguard")
+    // The isolated benchmark exercises returning users, not the system's first-use tutorial.
+    device.executeShellCommand("settings put secure immersive_mode_confirmations confirmed")
     device.executeShellCommand("am start -W -n $TARGET_PACKAGE/$FIXTURE_ACTIVITY")
     if (!device.wait(Until.hasObject(By.text("BENCHMARK_READY")), 180_000)) {
         val failure = device.findObject(By.textStartsWith("BENCHMARK_FAILED"))?.text
@@ -25,10 +27,33 @@ fun prepareFixtures(device: UiDevice) {
     device.pressHome()
 }
 
-fun MacrobenchmarkScope.openTab(tag: String) {
+fun MacrobenchmarkScope.openTab(tag: String) = openTab(device, tag)
+
+fun openTab(device: UiDevice, tag: String) {
     val tab = device.wait(Until.findObject(By.res(tag)), 10_000)
         ?: failJourney(device, "Missing navigation target: $tag")
     tab.click()
+    awaitTabContent(device, tag)
+}
+
+fun awaitTabContent(device: UiDevice, tag: String) {
+    if (!device.wait(Until.hasObject(By.res(tag).selected(true)), 15_000)) {
+        failJourney(device, "Navigation target was not selected: $tag")
+    }
+    if (!device.wait(Until.hasObject(By.res("content_$tag").hasDescendant(By.scrollable(true))), 15_000)) {
+        failJourney(device, "Scrollable content did not load for: $tag")
+    }
+    // AnimatedContent briefly retains both screens; accessibility idle alone does not await Compose.
+    for (previous in listOf("discovery", "library_anime", "library_manga") - tag) {
+        if (!device.wait(Until.gone(By.res("content_$previous")), 10_000)) {
+            failJourney(device, "Previous screen remained visible: $previous")
+        }
+    }
+    if (tag.startsWith("library_") &&
+        !device.wait(Until.hasObject(By.res("content_$tag").hasDescendant(By.textStartsWith("Benchmark"))), 15_000)
+    ) {
+        failJourney(device, "Library fixtures did not appear for: $tag")
+    }
     device.waitForIdle()
 }
 

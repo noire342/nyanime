@@ -139,7 +139,9 @@ object HomeScreen : Screen() {
                             label = "tabContent",
                         ) {
                             tabNavigator.saveableState(key = "currentTab", it) {
-                                it.Content()
+                                Box(Modifier.testTag("content_${navigationTag(it)}")) {
+                                    it.Content()
+                                }
                             }
                         }
                     }
@@ -326,7 +328,7 @@ object HomeScreen : Screen() {
         }
     }
 
-    private fun navigationTag(tab: eu.kanade.presentation.util.Tab) = when (tab) {
+    private fun navigationTag(tab: cafe.adriel.voyager.navigator.tab.Tab) = when (tab) {
         AnimeLibraryTab -> "library_anime"
         MangaLibraryTab -> "library_manga"
         BrowseTab -> "browse"

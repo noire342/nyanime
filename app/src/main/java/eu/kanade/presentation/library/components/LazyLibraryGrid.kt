@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import tachiyomi.presentation.core.components.FastScrollLazyVerticalGrid
 import tachiyomi.presentation.core.util.plus
@@ -16,10 +17,13 @@ internal fun LazyLibraryGrid(
     modifier: Modifier = Modifier,
     columns: Int,
     contentPadding: PaddingValues,
+    showTitle: Boolean = true,
     content: LazyGridScope.() -> Unit,
 ) {
+    val titleScale = if (showTitle) LocalDensity.current.fontScale.coerceIn(1f, 1.5f) else 1f
+    val automaticCellSize = 128.dp * titleScale
     FastScrollLazyVerticalGrid(
-        columns = if (columns == 0) GridCells.Adaptive(128.dp) else GridCells.Fixed(columns),
+        columns = if (columns == 0) GridCells.Adaptive(automaticCellSize) else GridCells.Fixed(columns),
         modifier = modifier,
         contentPadding = contentPadding + PaddingValues(8.dp),
         verticalArrangement = Arrangement.spacedBy(CommonEntryItemDefaults.GridVerticalSpacer),

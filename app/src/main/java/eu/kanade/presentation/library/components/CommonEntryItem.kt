@@ -126,21 +126,19 @@ private fun BoxScope.CoverTextOverlay(
     title: String,
     onClickContinueViewing: (() -> Unit)? = null,
 ) {
-    Box(
+    Row(
         modifier = Modifier
             .clip(RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp))
             .background(
                 Brush.verticalGradient(
                     0f to Color.Transparent,
+                    0.3f to Color(0xAA000000),
                     1f to Color(0xAA000000),
                 ),
             )
-            .fillMaxHeight(0.33f)
             .fillMaxWidth()
-            .align(Alignment.BottomCenter),
-    )
-    Row(
-        modifier = Modifier.align(Alignment.BottomStart),
+            .align(Alignment.BottomCenter)
+            .padding(top = 24.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
         GridItemTitle(
@@ -156,6 +154,7 @@ private fun BoxScope.CoverTextOverlay(
                 ),
             ),
             minLines = 1,
+            maxLines = gridTitleMaxLines(),
         )
         if (onClickContinueViewing != null) {
             ContinueViewingButton(
@@ -180,7 +179,7 @@ fun EntryComfortableGridItem(
     title: String,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    titleMaxLines: Int = 2,
+    titleMaxLines: Int = gridTitleMaxLines(),
     coverData: EntryCoverModel,
     coverAlpha: Float = 1f,
     coverBadgeStart: (@Composable RowScope.() -> Unit)? = null,
@@ -265,6 +264,9 @@ private fun EntryGridCover(
         }
     }
 }
+
+@Composable
+private fun gridTitleMaxLines() = if (LocalDensity.current.fontScale >= 1.3f) 3 else 2
 
 @Composable
 private fun GridItemTitle(

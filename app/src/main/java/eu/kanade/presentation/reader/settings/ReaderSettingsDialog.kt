@@ -11,6 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.window.DialogWindowProvider
 import eu.kanade.presentation.components.TabbedDialog
 import eu.kanade.presentation.components.TabbedDialogPaddings
@@ -35,7 +38,10 @@ fun ReaderSettingsDialog(
 
     BoxWithConstraints {
         TabbedDialog(
-            modifier = Modifier.heightIn(max = maxHeight * 0.75f),
+            modifier = Modifier
+                .semantics { testTagsAsResourceId = true }
+                .testTag("reader_settings")
+                .heightIn(max = maxHeight * 0.75f),
             onDismissRequest = {
                 onDismissRequest()
                 onShowMenus()
@@ -57,6 +63,7 @@ fun ReaderSettingsDialog(
 
             Column(
                 modifier = Modifier
+                    .testTag("reader_settings_page_$page")
                     .padding(vertical = TabbedDialogPaddings.Vertical)
                     .verticalScroll(rememberScrollState()),
             ) {
