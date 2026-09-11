@@ -5,16 +5,13 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.tachiyomi.data.discovery.ExtensionHomeServices
 import eu.kanade.tachiyomi.data.discovery.LocalHomeItem
 import eu.kanade.tachiyomi.data.discovery.LocalHomeSections
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.SectionState
-import tachiyomi.domain.discovery.SourceHomeGateway
 import tachiyomi.domain.discovery.SourceHomeGroupAccess
 import tachiyomi.domain.discovery.SourceHomePage
-import tachiyomi.domain.discovery.SourceHomeRepository
 import tachiyomi.domain.discovery.SourceHomeRequest
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -24,15 +21,16 @@ class SourceHomeScreenModel(
     private val services: ExtensionHomeServices = Injekt.get(),
     private val locals: LocalHomeSections = Injekt.get(),
 ) : StateScreenModel<SourceHomeScreenModel.State>(State()) {
-    private val repository = services.merged
     private val accessFlow = services.observeGroup(homeKey)
-    private val jobs = mutableMapOf<String, Job>()
+    private val feeds = SourceHomeFeedLoader(screenModelScope, services.merged) { state.value.access }
 
     init {
         screenModelScope.launch {
+            feeds.sections.collect { sections -> mutableState.update { it.copy(sections = sections) } }
+        }
+        screenModelScope.launch {
             accessFlow.collectLatest { access ->
-                jobs.values.forEach(Job::cancel)
-                jobs.clear()
+                feeds.reset()
                 mutableState.value = State(access = access)
                 val source = access.group ?: return@collectLatest
                 coroutineScope {
@@ -51,21 +49,12 @@ class SourceHomeScreenModel(
         }
     }
 
-    fun load(sectionId: String, refresh: Boolean = false) {
-        val access = state.value.access
-        if (access.group == null || access.offline || access.loading) return
-        if (!refresh && sectionId in state.value.sections) return
-        jobs.remove(sectionId)?.cancel()
-        jobs[sectionId] = screenModelScope.launch {
-            repository.observe(access, SourceHomeRequest(sectionId), refresh).collect { value ->
-                mutableState.update { it.copy(sections = it.sections + (sectionId to value)) }
-            }
-        }
-    }
+    fun load(sectionId: String, refresh: Boolean = false, date: String? = null) =
+        feeds.load(SourceHomeRequest(sectionId, date = date), refresh)
 
-    fun refresh() {
-        state.value.sections.keys.toList().forEach { load(it, true) }
-    }
+    fun refresh() = feeds.refresh(force = true)
+
+    fun onResume() = feeds.refresh(force = false)
 
     data class State(
         val access: SourceHomeGroupAccess = SourceHomeGroupAccess(loading = true),

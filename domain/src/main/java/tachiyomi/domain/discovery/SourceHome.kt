@@ -10,6 +10,7 @@ data class SourceHomeSection(
     val selections: Map<String, String>,
     val layout: String = "posters",
     val group: SourceHomeSectionGroup? = null,
+    val dateFilter: String? = null,
 )
 
 /** Optional presentation only; requests and caches still use the concrete section ID. */
@@ -43,6 +44,7 @@ data class SourceHomeGroup(val id: String, val title: String, val providers: Lis
         val title: String,
         val layout: String = "posters",
         val group: SourceHomeSectionGroup? = null,
+        val supportsDate: Boolean = false,
     )
 
     data class Row(val id: String, val title: String, val sections: List<Section>) {
@@ -52,7 +54,17 @@ data class SourceHomeGroup(val id: String, val title: String, val providers: Lis
     val primary get() = providers.any { it.primary }
     val sections get() = providers.flatMap {
         it.sections
-    }.distinctBy { it.id }.map { Section(it.id, it.title, it.layout, it.group) }
+    }.distinctBy { it.id }.map { first ->
+        Section(
+            first.id,
+            first.title,
+            first.layout,
+            first.group,
+            providers.any { source ->
+                source.sections.any { it.id == first.id && it.dateFilter != null }
+            },
+        )
+    }
 
     // Insertion order preserves the first occurrence of each row, even across providers.
     val rows get() = sections.groupBy { it.group?.let { group -> "group:${group.id}" } ?: "section:${it.id}" }
@@ -91,10 +103,24 @@ data class SourceHomeAccess(
     val error: String? = null,
 )
 
-data class SourceHomeRequest(val sectionId: String, val page: Int = 1, val query: String = "") {
+data class SourceHomeRequest(
+    val sectionId: String,
+    val page: Int = 1,
+    val query: String = "",
+    val date: String? = null,
+) {
     init {
         require(page > 0)
+        require(
+            date == null ||
+                (
+                    date.matches(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}")) &&
+                        runCatching { java.time.LocalDate.parse(date) }.isSuccess
+                    ),
+        )
     }
+
+    val cacheSection: String get() = date?.let { "$sectionId:date:$it" } ?: sectionId
 
     companion object {
         const val SEARCH = "search"

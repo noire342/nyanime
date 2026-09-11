@@ -41,11 +41,13 @@ class SourceHomeListScreen(
     private val homeKey: String,
     private val sectionId: String,
     private val title: String,
+    private val date: String? = null,
 ) : Screen() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
-        val model = rememberScreenModel { SourceHomeListScreenModel(homeKey, sectionId) }
+        var selectedDate by rememberSaveable { mutableStateOf(date) }
+        val model = rememberScreenModel { SourceHomeListScreenModel(homeKey, sectionId, date = date) }
         val state by model.state.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
         var query by rememberSaveable { mutableStateOf("") }
@@ -63,6 +65,7 @@ class SourceHomeListScreen(
             return
         }
         LaunchedEffect(query) { if (sectionId == SourceHomeRequest.SEARCH) model.search(query) }
+        LaunchedEffect(selectedDate) { model.selectDate(selectedDate) }
         Scaffold(topBar = {
             TopAppBar(title = { Text(state.title ?: title) }, navigationIcon = {
                 IconButton(onClick = { navigator.pop() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
@@ -73,6 +76,11 @@ class SourceHomeListScreen(
                 Modifier.padding(padding),
                 contentPadding = PaddingValues(12.dp),
             ) {
+                if (source.sections.firstOrNull { it.id == sectionId }?.supportsDate == true) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        eu.kanade.presentation.discovery.SourceHomeDateSelector(selectedDate) { selectedDate = it }
+                    }
+                }
                 if (sectionId == SourceHomeRequest.SEARCH) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         OutlinedTextField(

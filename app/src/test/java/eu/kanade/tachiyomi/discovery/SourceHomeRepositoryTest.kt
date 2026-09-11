@@ -31,6 +31,27 @@ import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
 
 class SourceHomeRepositoryTest {
+    @Test fun datesRemainSeparateInMemoryAndAcrossProcessRestarts() = runBlocking {
+        val gateway = Gateway()
+        val disk = Disk()
+        val clock = TestClock()
+        val repository = CachedSourceHomeRepository(gateway, clock, persistent = disk)
+        val today = SourceHomeRequest("schedule")
+        val first = today.copy(date = "2026-09-12")
+        val second = today.copy(date = "2026-09-13")
+        for (query in listOf(today, first, second, first)) repository.observe(gateway.currentAccess(), query).toList()
+        assertEquals(3, gateway.calls.get())
+        assertEquals(
+            setOf("schedule", "schedule:date:2026-09-12", "schedule:date:2026-09-13"),
+            disk.entries.keys.map {
+                it.section
+            }.toSet(),
+        )
+        val restored = CachedSourceHomeRepository(gateway, clock, persistent = disk)
+        restored.observe(gateway.currentAccess(), second).toList()
+        assertEquals(3, gateway.calls.get())
+    }
+
     private class Gateway : SourceHomeGateway {
         val access = MutableStateFlow(SourceHomeAccess(SourceHomeSource(42, "16.1", emptyList(), emptyList())))
         val calls = AtomicInteger()

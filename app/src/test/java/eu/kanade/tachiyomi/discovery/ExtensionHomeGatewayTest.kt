@@ -41,6 +41,29 @@ import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 
 class ExtensionHomeGatewayTest {
+    @Test fun calendarRequestPassesTheDeclaredPublicDateWithoutChangingTheQuery() = runBlocking {
+        val manifest = ExtensionHomeFiltersTest.manifest()
+        every { reader.read(extension) } returns
+            listOf(manifest.copy(sections = manifest.sections.map { it.copy(dateFilter = "Date") }))
+        every { engine.getFilterList() } answers {
+            eu.kanade.tachiyomi.animesource.model.AnimeFilterList(
+                ExtensionHomeFiltersTest.filters() +
+                    object : eu.kanade.tachiyomi.animesource.model.AnimeFilter.Text("Date") {},
+            )
+        }
+        coEvery { engine.getSearchAnime(1, "", any()) } answers {
+            val filters = thirdArg<eu.kanade.tachiyomi.animesource.model.AnimeFilterList>()
+            assertEquals(
+                "2026-09-12",
+                filters.filterIsInstance<eu.kanade.tachiyomi.animesource.model.AnimeFilter.Text>().single().state,
+            )
+            AnimesPage(emptyList(), false)
+        }
+        val result = gateway.fetch(gateway.currentAccess(), SourceHomeRequest("popular", date = "2026-09-12"))
+        assertTrue(result.items.isEmpty())
+        coVerify(exactly = 1) { engine.getSearchAnime(1, "", any()) }
+    }
+
     @Test
     fun episodeCardsKeepOneLibraryIdentityAndNeverPersistPresentationInTheLibrary() = runBlocking {
         val local = Anime.create().copy(

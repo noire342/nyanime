@@ -28,6 +28,27 @@ import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
 
 class MergedSourceHomeRepositoryTest {
+    @Test fun selectedDateOnlyQueriesCapableProvidersAndKeepsItsOwnPagination() = runBlocking {
+        val dated = second.copy(sections = listOf(shelf.copy(dateFilter = "Date")))
+        val current = access.copy(
+            group = access.group!!.copy(providers = listOf(first, dated)),
+            providers = listOf(SourceHomeAccess(first), SourceHomeAccess(dated)),
+        )
+        val calls = mutableListOf<Pair<Long, SourceHomeRequest>>()
+        val merged = MergedSourceHomeRepository({ source ->
+            provider { request ->
+                calls += source.id to request
+                flowOf(page())
+            }
+        }, { current })
+        assertTrue(current.group!!.sections.single().supportsDate)
+        val tomorrow = SourceHomeRequest("popular", date = "2026-09-12")
+        merged.observe(current, tomorrow).last()
+        merged.observe(current, tomorrow.copy(page = 2)).last()
+        merged.observe(current, tomorrow.copy(page = 2, date = "2026-09-13")).last()
+        assertEquals(listOf(2L to tomorrow, 2L to tomorrow.copy(page = 2, date = "2026-09-13")), calls)
+    }
+
     @Test fun mergedFeedsPreserveDifferentEpisodesOfOneSeries() = runBlocking {
         val a = item(11, 1)
         val cards = listOf("ep9", "ep8", "ep9").map { id ->

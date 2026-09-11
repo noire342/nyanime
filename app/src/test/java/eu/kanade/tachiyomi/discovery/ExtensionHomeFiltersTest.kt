@@ -13,6 +13,41 @@ import tachiyomi.domain.discovery.SourceHomeGroup
 import tachiyomi.domain.discovery.SourceHomeSource
 
 class ExtensionHomeFiltersTest {
+    @Test fun datesUseOnlyDeclaredTextFiltersAndNeverLeakBetweenRequests() {
+        fun dateFilters() = AnimeFilterList(object : AnimeFilter.Text("Data") {})
+        val section = tachiyomi.domain.discovery.SourceHomeSection(
+            "schedule",
+            "Calendario",
+            emptyMap(),
+            dateFilter = "Data",
+        )
+        val first = dateFilters()
+        val untouched = dateFilters()
+        ExtensionHomeFilters.apply(first, section, "2026-09-12")
+        assertEquals("2026-09-12", first.filterIsInstance<AnimeFilter.Text>().single().state)
+        assertEquals("", untouched.filterIsInstance<AnimeFilter.Text>().single().state)
+        ExtensionHomeFilters.apply(first, section)
+        assertEquals("", first.filterIsInstance<AnimeFilter.Text>().single().state)
+        assertThrows(IllegalArgumentException::class.java) {
+            ExtensionHomeFilters.apply(first, section.copy(dateFilter = null), "2026-09-12")
+        }
+        assertThrows(IllegalArgumentException::class.java) { ExtensionHomeFilters.apply(first, section, "2026-02-30") }
+    }
+
+    @Test fun optionalDateSupportFallsBackForOlderExtensions() {
+        val definition = manifest().copy(
+            defaults = emptyMap(),
+            sections = listOf(ExtensionHomeManifest.Section("schedule", "Calendario", dateFilter = "Data")),
+        )
+        val supported = ExtensionHomeFilters.sections(
+            definition,
+            AnimeFilterList(object : AnimeFilter.Text("Data") {}),
+        ).single()
+        val older = ExtensionHomeFilters.sections(definition, AnimeFilterList()).single()
+        assertEquals("Data", supported.dateFilter)
+        assertEquals(null, older.dateFilter)
+    }
+
     @Test
     fun unsupportedVariantsDisappearBeforeRowsAreGrouped() {
         val grouped = manifest().copy(

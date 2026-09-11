@@ -14,6 +14,7 @@ object ExtensionHomeFilters {
             manifest.defaults + it.filters,
             it.layout.takeIf { it == "featured" } ?: "posters",
             it.group?.let { group -> SourceHomeSectionGroup(group.id, group.title, group.tab) },
+            it.dateFilter?.takeIf { label -> textFilter(filters, label) != null },
         )
     }.filter { supports(filters, it) }
 
@@ -29,11 +30,20 @@ object ExtensionHomeFilters {
         SourceHomeSection(it.id, it.title, manifest.defaults + it.filters)
     }?.takeIf { supports(filters, it) }
 
-    fun apply(filters: AnimeFilterList, section: SourceHomeSection): AnimeFilterList {
+    fun apply(filters: AnimeFilterList, section: SourceHomeSection, date: String? = null): AnimeFilterList {
         require(supports(filters, section)) { "Aggiorna l’estensione: filtri non compatibili" }
         section.selections.forEach { (label, value) ->
             val filter = requireNotNull(select(filters, label))
             filter.state = filter.values.indexOfFirst { it == value }
+        }
+        if (date != null) {
+            // Validate even callers that do not construct a SourceHomeRequest themselves.
+            tachiyomi.domain.discovery.SourceHomeRequest(section.id, date = date)
+            requireNotNull(section.dateFilter?.let { textFilter(filters, it) }) {
+                "La fonte non supporta la scelta della data"
+            }.state = date
+        } else {
+            section.dateFilter?.let { textFilter(filters, it)?.state = "" }
         }
         return filters
     }
@@ -44,4 +54,7 @@ object ExtensionHomeFilters {
 
     private fun select(filters: AnimeFilterList, name: String) =
         filters.filterIsInstance<AnimeFilter.Select<*>>().singleOrNull { it.name == name }
+
+    private fun textFilter(filters: AnimeFilterList, name: String) =
+        filters.filterIsInstance<AnimeFilter.Text>().singleOrNull { it.name == name }
 }

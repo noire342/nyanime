@@ -42,7 +42,7 @@ class CachedSourceHomeRepository(
             return@flow
         }
         val key = Key(source.key, source.revision, request.copy(query = request.query.trim()))
-        val diskKey = SourceHomeCacheKey(source.key, source.id, source.revision, request.sectionId, request.page)
+        val diskKey = SourceHomeCacheKey(source.key, source.id, source.revision, request.cacheSection, request.page)
             .takeIf { !access.isPrivate && request.query.isBlank() && request.sectionId != SourceHomeRequest.SEARCH }
         var cached = readMemory(key).takeUnless { access.isPrivate }
         if (cached == null && diskKey != null) {

@@ -1,8 +1,10 @@
 package eu.kanade.presentation.discovery
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -23,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import tachiyomi.domain.discovery.homeItemKey
+import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
 
 /** The extension supplies every title, image and synopsis; there is no catalogue resolution here. */
@@ -72,6 +75,31 @@ fun SourceFeaturedCarousel(items: List<Anime>, onClick: (Anime) -> Unit) {
                             overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.bodyMedium,
                         )
+                    }
+                    anime.homePresentation?.let { presentation ->
+                        FlowRow(
+                            modifier = Modifier.padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            presentation.badges.forEach { badge ->
+                                Text(
+                                    badge,
+                                    Modifier.background(Color.Black.copy(alpha = 0.65f), MaterialTheme.shapes.small)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            }
+                        }
+                        presentation.details.forEach { detail ->
+                            Text(
+                                detail,
+                                Modifier.padding(top = 4.dp),
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                     }
                     Text(
                         "Apri episodi →",

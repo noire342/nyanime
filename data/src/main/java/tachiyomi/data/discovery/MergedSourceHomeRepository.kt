@@ -41,7 +41,9 @@ class MergedSourceHomeRepository(
                 if (request.sectionId == SourceHomeRequest.SEARCH) {
                     it.search != null
                 } else {
-                    (it.sections + it.categories).any { section -> section.id == request.sectionId }
+                    (it.sections + it.categories).any { section ->
+                        section.id == request.sectionId && (request.date == null || section.dateFilter != null)
+                    }
                 }
             } == true
         }
@@ -52,7 +54,7 @@ class MergedSourceHomeRepository(
         }
         val feeds = providers.map { provider ->
             val source = requireNotNull(provider.source)
-            val cursor = Cursor(source.key, source.revision, request.sectionId, request.query.trim())
+            val cursor = Cursor(source.key, source.revision, request.cacheSection, request.query.trim())
             val finished = synchronized(finishedAt) {
                 if (provider.isPrivate) finishedAt.clear()
                 if (refresh || request.page == 1) finishedAt.remove(cursor)

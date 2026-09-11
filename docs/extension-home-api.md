@@ -46,14 +46,31 @@ Il clic apre direttamente la serie della fonte. «Continua a guardare» è sempr
 sezione sotto la toolbar, prima della vetrina e delle altre righe dell'estensione.
 Resta visibile anche durante caricamenti/errori remoti, in Solo download e senza
 elementi da riprendere (con un messaggio esplicativo). Il titolo offre l'accesso alla
-cronologia. I dati sono locali e filtrati per le fonti della Home; le estensioni non
+cronologia filtrata per tutte le fonti disponibili della Home, con ricerca e azioni
+sui singoli titoli; «Tutta la cronologia» apre la schermata generale. Non si offre
+la cancellazione globale dentro la vista filtrata. I dati sono locali; le estensioni non
 controllano né possono nascondere questa sezione. Gli aggiornamenti della libreria
 seguono i contenuti dell'estensione.
 
 Le proprietà sono facoltative e compatibili con le dichiarazioni v1 precedenti. Il selettore in
 toolbar occupa la larghezza del contenuto, fino allo spazio disponibile; scorre solo quando serve.
 
-### Varianti di una sezione
+### Sezioni con scelta della data
+
+Una sezione può dichiarare `"dateFilter": "Data"`, dove l'etichetta identifica un solo
+`AnimeFilter.Text` pubblico della fonte. L'host mostra giorno precedente/successivo,
+selettore della data e ritorno a «Oggi». La data esplicita è una data civile ISO
+`AAAA-MM-GG`; il valore vuoto lascia all'estensione il giorno predefinito del sito.
+Fuso orario, URL e formato delle richieste remote appartengono alla fonte.
+
+Data selezionata e richiesta restano associate anche in «Mostra tutto», nella cache
+persistente e nella paginazione. Cambiando data si svuotano subito i risultati precedenti;
+errori e giorni senza uscite non riutilizzano gli eventi di un altro giorno. Nelle Home
+condivise le richieste datate coinvolgono solo i produttori che dichiarano il filtro.
+Se il filtro opzionale non è disponibile, la sezione conserva il comportamento precedente.
+I vecchi host ignorano la nuova proprietà e continuano a caricare il giorno predefinito.
+
+### Raggruppamento delle varianti
 
 Le sezioni possono condividere una riga con schede selezionabili, dichiarando `group`:
 
@@ -110,6 +127,8 @@ L'API pubblica `SAnime.memo` può contenere la chiave facoltativa `aniyomi.home.
 
 `id` distingue una scheda/evento all'interno della serie, senza cambiare `SAnime.url`.
 La stessa serie può comparire per episodi diversi mantenendo un solo ID in libreria.
+Il carosello `featured` mostra anche tutti i badge e dettagli di presentazione, con
+testo a capo e altezza adattabile, oltre a immagine, titolo e sinossi.
 Badge ed etichette sono testo semplice fornito dall'estensione: l'app non interpreta
 episodi, orari, voti o lingue di un sito. Il titolo dinamico viene usato quando i produttori
 concordano; le righe con varianti mantengono il proprio titolo di gruppo.
@@ -134,6 +153,12 @@ Il rilevamento riguarda solo questo metodo pubblico, mai classi private della fo
 Solo lettura locale dell'APK scelto dal loader esistente, anche per installazioni private; nessuna richiesta remota durante il rilevamento delle capacità. Il documento ha un limite di 64 KiB decompressi, 8 Home, 16 sezioni per Home e 100 caratteri per etichetta. ID duplicati nella stessa estensione sono ambigui e ignorati. Versioni sconosciute o documenti malformati non bloccano il catalogo generale. Gli attributi aggiuntivi non eseguono codice e non avviano richieste.
 
 Concorrenza condivisa: massimo 3 richieste alle fonti. Cache in memoria, 16 pagine per produttore, fino a 8 servizi conservati, scadenza 30 minuti. I feed pubblici persistono anche nel database Discovery separato: massimo 128 pagine consultate, conservazione massima 24 ore. Un riavvio entro la scadenza non riscarica i feed già salvati; dopo 30 minuti vengono mostrati subito e aggiornati in background. Il refresh manuale resta disponibile. La revisione dell'estensione invalida le vecchie pagine.
+
+Al rientro nella Home e al ritorno dell'app in primo piano si rivalutano le sezioni già
+visitate: le pagine ancora fresche non richiedono rete. Il gesto di trascinamento verso
+il basso e il pulsante della toolbar forzano l'aggiornamento. Le schede della stessa
+richiesta rimangono visibili durante il caricamento; date diverse e cambi delle fonti
+non ereditano quei dati. Solo download continua a impedire richieste remote.
 
 Il database salva ID locali, paginazione e dati di presentazione pubblici (banner e descrizioni,
 limitati rispettivamente a 2048 e 8000 caratteri per scheda). Flag, progressi, titolo e copertina della

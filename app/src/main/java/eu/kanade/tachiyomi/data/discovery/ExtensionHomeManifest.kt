@@ -30,6 +30,7 @@ data class ExtensionHomeManifest(
         val filters: Map<String, String> = emptyMap(),
         val layout: String = "posters",
         val group: Group? = null,
+        val dateFilter: String? = null,
     )
 
     @Serializable
@@ -46,6 +47,7 @@ data class ExtensionHomeManifest(
         sections.size in 1..16 &&
         sections.map { it.id }.distinct().size == sections.size &&
         sections.all { it.id.matches(ID) && it.id != "search" && text(it.title) && selections(it.filters) } &&
+        sections.all { it.dateFilter == null || (text(it.dateFilter) && it.dateFilter !in (defaults + it.filters)) } &&
         sections.mapNotNull { it.group }.all { it.id.matches(ID) && text(it.title) && text(it.tab) } &&
         sections.mapNotNull { it.group }.groupBy { it.id }.values.all { variants ->
             variants.map { it.title }.distinct().size == 1 && variants.map { it.tab }.distinct().size == variants.size

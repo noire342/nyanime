@@ -38,7 +38,7 @@ class ExtensionHomeGateway(
                 (definition.sections + definition.categories).firstOrNull { it.id == request.sectionId }
                     ?: error("La sezione non è più supportata: aggiorna la Home")
             }
-            val filters = ExtensionHomeFilters.apply(source.getFilterList(), section)
+            val filters = ExtensionHomeFilters.apply(source.getFilterList(), section, request.date)
             try {
                 withTimeout(30_000) {
                     val page = source.getSearchAnime(request.page, request.query.trim(), filters)

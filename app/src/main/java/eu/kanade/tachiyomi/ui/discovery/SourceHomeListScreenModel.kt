@@ -20,6 +20,7 @@ class SourceHomeListScreenModel(
     homeKey: String,
     private val sectionId: String,
     services: ExtensionHomeServices = Injekt.get(),
+    private var date: String? = null,
 ) : StateScreenModel<SourceHomeListScreenModel.State>(State()) {
     private val repository = services.merged
     private val accessFlow = services.observeGroup(homeKey)
@@ -45,6 +46,15 @@ class SourceHomeListScreenModel(
         load(reset = true, debounce = true)
     }
 
+    fun selectDate(value: String?) {
+        if (date == value) return
+        date = value
+        job?.cancel()
+        mutableState.value = State(access = state.value.access, query = state.value.query)
+        nextPage = 1
+        load(reset = true)
+    }
+
     fun load(reset: Boolean = false, debounce: Boolean = false) {
         val current = state.value
         if (current.access.loading || current.access.group == null || current.access.offline) return
@@ -58,7 +68,7 @@ class SourceHomeListScreenModel(
             if (debounce) delay(400)
             repository.observe(
                 current.access,
-                SourceHomeRequest(sectionId, page, current.query),
+                SourceHomeRequest(sectionId, page, current.query, date),
                 refresh = reset && current.items.isNotEmpty(),
             ).collect { value ->
                 val result = value.data
