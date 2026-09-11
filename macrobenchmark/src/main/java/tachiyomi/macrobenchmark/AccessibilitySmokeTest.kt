@@ -41,7 +41,7 @@ class AccessibilitySmokeTest {
                 "Tablet configuration did not activate the navigation rail"
             }
             device.executeShellCommand("am start -W -n $TARGET_PACKAGE/$FIXTURE_ACTIVITY --ez reader true")
-            check(device.wait(Until.hasObject(By.res(TARGET_PACKAGE, "reader_pager")), 15_000))
+            check(device.waitForFresh(By.res(TARGET_PACKAGE, "reader_pager"), 15_000))
             device.waitForIdle()
             capture(device, "reader-tablet-large-text")
             openReaderSettings(device)
@@ -76,7 +76,7 @@ class AccessibilitySmokeTest {
         val button = device.wait(Until.findObject(By.res("reader_settings_button")), 10_000)
             ?: failJourney(device, "Reader settings button did not appear")
         button.click()
-        if (!device.wait(Until.hasObject(By.res("reader_settings_page_0")), 10_000)) {
+        if (!device.waitForFresh(By.res("reader_settings_page_0"), 10_000)) {
             failJourney(device, "Reading mode settings did not open")
         }
         device.waitForIdle()
@@ -86,11 +86,11 @@ class AccessibilitySmokeTest {
         val tab = device.wait(Until.findObject(By.text(title)), 10_000)
             ?: failJourney(device, "Reader settings tab not reachable: $title")
         tab.click()
-        if (!device.wait(Until.hasObject(By.res("reader_settings_page_$page")), 10_000)) {
+        if (!device.waitForFresh(By.res("reader_settings_page_$page"), 10_000)) {
             failJourney(device, "Reader settings page did not open: $title")
         }
         for (previous in (0..2).filter { it != page }) {
-            if (!device.wait(Until.gone(By.res("reader_settings_page_$previous")), 10_000)) {
+            if (!device.waitForFresh(By.res("reader_settings_page_$previous"), 10_000, exists = false)) {
                 failJourney(device, "Previous reader settings page remained visible: $previous")
             }
         }
@@ -99,6 +99,7 @@ class AccessibilitySmokeTest {
 
     @SuppressLint("RestrictedApi")
     private fun capture(device: UiDevice, name: String) {
+        refreshAccessibilityCache()
         Outputs.writeFile("$name.png") { check(device.takeScreenshot(it)) }
         Outputs.writeFile("$name.xml") { device.dumpWindowHierarchy(it) }
     }

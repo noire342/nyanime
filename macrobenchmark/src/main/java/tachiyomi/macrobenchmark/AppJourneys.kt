@@ -2,15 +2,36 @@ package tachiyomi.macrobenchmark
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.os.Build
+import android.os.SystemClock
 import androidx.benchmark.Outputs
 import androidx.benchmark.macro.MacrobenchmarkScope
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 
 const val TARGET_PACKAGE = "xyz.jmir.tachiyomi.mi.anime4k.benchmark"
 const val FIXTURE_ACTIVITY = "eu.kanade.tachiyomi.benchmark.BenchmarkSetupActivity"
+
+fun refreshAccessibilityCache() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        InstrumentationRegistry.getInstrumentation().uiAutomation.clearCache()
+    }
+}
+
+fun UiDevice.waitForFresh(selector: BySelector, timeoutMillis: Long, exists: Boolean = true): Boolean {
+    val deadline = SystemClock.uptimeMillis() + timeoutMillis
+    do {
+        // Accessibility can retain a navigation item's pre-click selection after Compose renders.
+        refreshAccessibilityCache()
+        if (hasObject(selector) == exists) return true
+        SystemClock.sleep(100)
+    } while (SystemClock.uptimeMillis() < deadline)
+    return false
+}
 
 fun MacrobenchmarkScope.prepareFixtures() = prepareFixtures(device)
 
@@ -37,20 +58,23 @@ fun openTab(device: UiDevice, tag: String) {
 }
 
 fun awaitTabContent(device: UiDevice, tag: String) {
-    if (!device.wait(Until.hasObject(By.res(tag).selected(true)), 15_000)) {
+    if (!device.waitForFresh(By.res(tag).selected(true), 15_000)) {
         failJourney(device, "Navigation target was not selected: $tag")
     }
-    if (!device.wait(Until.hasObject(By.res("content_$tag").hasDescendant(By.scrollable(true))), 15_000)) {
+    if (!device.waitForFresh(By.res("content_$tag").hasDescendant(By.scrollable(true)), 15_000)) {
         failJourney(device, "Scrollable content did not load for: $tag")
     }
     // AnimatedContent briefly retains both screens; accessibility idle alone does not await Compose.
     for (previous in listOf("discovery", "library_anime", "library_manga") - tag) {
-        if (!device.wait(Until.gone(By.res("content_$previous")), 10_000)) {
+        if (!device.waitForFresh(By.res("content_$previous"), 10_000, exists = false)) {
             failJourney(device, "Previous screen remained visible: $previous")
         }
     }
     if (tag.startsWith("library_") &&
-        !device.wait(Until.hasObject(By.res("content_$tag").hasDescendant(By.textStartsWith("Benchmark"))), 15_000)
+        !device.waitForFresh(
+            By.res("content_$tag").hasDescendant(By.textStartsWith("Benchmark")),
+            15_000,
+        )
     ) {
         failJourney(device, "Library fixtures did not appear for: $tag")
     }
@@ -120,6 +144,7 @@ fun MacrobenchmarkScope.coreJourneys() {
 fun failJourney(device: UiDevice, message: String): Nothing {
     // Preserve the actual screen when a journey fails, including R8-only failures.
     runCatching {
+        refreshAccessibilityCache()
         val name = "journey-failure-${System.currentTimeMillis()}"
         Outputs.writeFile("$name.png") { check(device.takeScreenshot(it)) }
         Outputs.writeFile("$name.xml") { device.dumpWindowHierarchy(it) }
