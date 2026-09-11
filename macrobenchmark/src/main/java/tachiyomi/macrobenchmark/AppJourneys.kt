@@ -3,7 +3,7 @@ package tachiyomi.macrobenchmark
 import android.content.Intent
 import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.test.uiautomator.By
-import androidx.test.uiautomator.Direction
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 
@@ -27,11 +27,29 @@ fun MacrobenchmarkScope.openTab(tag: String) {
 }
 
 fun MacrobenchmarkScope.scrollContent() {
-    val list = device.wait(Until.findObject(By.scrollable(true)), 10_000)
-        ?: error("No scrollable content in benchmark journey")
-    list.setGestureMargin(device.displayWidth / 5)
     repeat(3) {
-        list.swipe(Direction.UP, 0.65f)
+        device.waitForIdle()
+        // Compose can replace an accessibility node after any state or image update.
+        // Resolve fresh bounds for each gesture, without retaining a UiObject2 across frames.
+        var bounds: android.graphics.Rect? = null
+        for (attempt in 0..2) {
+            try {
+                bounds = device.wait(Until.findObject(By.scrollable(true)), 10_000)?.visibleBounds
+                if (bounds != null) break
+            } catch (e: StaleObjectException) {
+                if (attempt == 2) throw e
+            }
+        }
+        val area = checkNotNull(bounds) { "No scrollable content in benchmark journey" }
+        check(
+            device.swipe(
+                area.centerX(),
+                area.top + area.height() * 4 / 5,
+                area.centerX(),
+                area.top + area.height() / 5,
+                20,
+            ),
+        )
         device.waitForIdle()
     }
 }
