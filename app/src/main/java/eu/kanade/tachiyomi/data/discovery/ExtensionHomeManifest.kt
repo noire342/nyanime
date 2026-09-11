@@ -18,12 +18,18 @@ data class ExtensionHomeManifest(
     val sections: List<Section>,
     val search: Section? = null,
     val categories: Categories? = null,
+    val primary: Boolean = false,
 ) {
     @Serializable
     data class Source(val name: String, val lang: String)
 
     @Serializable
-    data class Section(val id: String, val title: String, val filters: Map<String, String> = emptyMap())
+    data class Section(
+        val id: String,
+        val title: String,
+        val filters: Map<String, String> = emptyMap(),
+        val layout: String = "posters",
+    )
 
     @Serializable
     data class Categories(val filter: String, val exclude: List<String> = emptyList())

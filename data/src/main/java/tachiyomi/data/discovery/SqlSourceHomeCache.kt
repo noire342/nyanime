@@ -17,7 +17,12 @@ class SqlSourceHomeCache(
     private val anime: AnimeRepository,
 ) : SourceHomeCache {
     @Serializable
-    private data class Payload(val ids: List<Long>, val hasNextPage: Boolean)
+    private data class Payload(
+        val ids: List<Long>,
+        val hasNextPage: Boolean,
+        val backgrounds: Map<Long, String> = emptyMap(),
+        val descriptions: Map<Long, String> = emptyMap(),
+    )
     private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun read(key: SourceHomeCacheKey): SourceHomeCacheEntry? = withContext(Dispatchers.IO) {
@@ -31,7 +36,13 @@ class SqlSourceHomeCache(
             ).executeAsOneOrNull() ?: return@withContext null
             val payload = json.decodeFromString<Payload>(row.payload)
             if (payload.ids.size > 200) return@withContext null
-            val items = payload.ids.map { anime.getAnimeById(it) }
+            val items = payload.ids.map { id ->
+                val local = anime.getAnimeById(id)
+                local.copy(
+                    backgroundUrl = payload.backgrounds[id] ?: local.backgroundUrl,
+                    description = payload.descriptions[id] ?: local.description,
+                )
+            }
             if (items.any { it.source != key.source }) return@withContext null
             SourceHomeCacheEntry(SourceHomePage(items, payload.hasNextPage), row.fetched_at)
         } catch (e: CancellationException) {
@@ -44,7 +55,14 @@ class SqlSourceHomeCache(
 
     override suspend fun write(key: SourceHomeCacheKey, entry: SourceHomeCacheEntry) = withContext(Dispatchers.IO) {
         if (entry.page.items.size > 200 || entry.page.items.any { it.source != key.source }) return@withContext
-        val payload = json.encodeToString(Payload(entry.page.items.map { it.id }, entry.page.hasNextPage))
+        val payload = json.encodeToString(
+            Payload(
+                entry.page.items.map { it.id },
+                entry.page.hasNextPage,
+                entry.page.items.mapNotNull { item -> item.backgroundUrl?.take(2048)?.let { item.id to it } }.toMap(),
+                entry.page.items.mapNotNull { item -> item.description?.take(8000)?.let { item.id to it } }.toMap(),
+            ),
+        )
         database.transaction {
             database.sourceHomeCacheQueries.put(
                 key.home,

@@ -28,6 +28,25 @@ Le chiavi e i valori di `defaults`/`filters` corrispondono alle etichette pubbli
 
 ## Home condivise
 
+### Presentazione e Home principale
+
+La dichiarazione può aggiungere `"primary": true`: quando la fonte è inizializzata e disponibile,
+la sua Home diventa la destinazione iniziale al posto del catalogo pubblico. Non serve un ID
+speciale e l'app non controlla il nome del sito. Le altre Home selezionate dall'utente restano
+selezionate. Tra più gruppi principali si sceglie deterministicamente l'ID alfabeticamente primo.
+Rimuovendo o disabilitando l'ultima fonte principale ricompare il catalogo pubblico.
+Durante il caricamento delle estensioni si mostra lo stato di caricamento, senza avviare richieste
+al catalogo che potrebbe essere sostituito.
+
+Ogni sezione può dichiarare `"layout": "featured"` per mostrare un carosello con `background_url`,
+`thumbnail_url`, titolo e descrizione dei normali `SAnime` restituiti dall'estensione. Il valore
+predefinito e gli stili sconosciuti usano le normali copertine. L'ordine delle sezioni e dei titoli
+rimane quello dei produttori; banner e suggerimenti non vengono sostituiti con quelli del catalogo.
+Il clic apre direttamente la serie della fonte. Le sezioni locali seguono i contenuti dell'estensione.
+
+Le proprietà sono facoltative e compatibili con le dichiarazioni v1 precedenti. Il selettore in
+toolbar occupa la larghezza del contenuto, fino allo spazio disponibile; scorre solo quando serve.
+
 L'identificatore semantico `homes[].id` è condiviso tra estensioni: per contribuire alla stessa Home devono dichiarare lo stesso ID, per esempio `cartoons` o `films`. Non si raggruppa tramite il testo tradotto del titolo. Non esiste una whitelist di ID nell'app.
 
 - Una sola voce di navigazione per ID, con contributi di tutte le estensioni disponibili.
@@ -46,7 +65,14 @@ Solo lettura locale dell'APK scelto dal loader esistente, anche per installazion
 
 Concorrenza condivisa: massimo 3 richieste alle fonti. Cache in memoria, 16 pagine per produttore, fino a 8 servizi conservati, scadenza 30 minuti. I feed pubblici persistono anche nel database Discovery separato: massimo 128 pagine consultate, conservazione massima 24 ore. Un riavvio entro la scadenza non riscarica i feed già salvati; dopo 30 minuti vengono mostrati subito e aggiornati in background. Il refresh manuale resta disponibile. La revisione dell'estensione invalida le vecchie pagine.
 
-Il database salva solo ID locali e paginazione: flag della libreria e metadati vengono riletti, non ripristinati da vecchie copie. La migrazione 1 → 2 aggiunge una tabella senza alterare catalogo e collegamenti esistenti. Errori della cache non impediscono l'accesso alla rete. Le ricerche non vengono persistite; in incognito nessuna lettura o scrittura della cache, nemmeno in memoria. Solo download impedisce letture di queste pagine e richieste alle fonti. Continua a guardare e aggiornamenti usano gli interactor locali filtrando l'insieme delle fonti del gruppo.
+Il database salva ID locali, paginazione e dati di presentazione pubblici (banner e descrizioni,
+limitati rispettivamente a 2048 e 8000 caratteri per scheda). Flag, progressi, titolo e copertina della
+libreria vengono riletti, non ripristinati da vecchie copie. Le pagine precedenti restano leggibili.
+La migrazione 1 → 2 aggiunge una tabella senza alterare catalogo e collegamenti esistenti. Errori
+della cache non impediscono l'accesso alla rete. Le ricerche non vengono persistite; in incognito
+nessuna lettura o scrittura della cache, nemmeno in memoria. Solo download impedisce letture di
+queste pagine e richieste alle fonti. Continua a guardare e aggiornamenti usano gli interactor
+locali filtrando l'insieme delle fonti del gruppo.
 
 ## Compatibilità degli aggiornamenti
 

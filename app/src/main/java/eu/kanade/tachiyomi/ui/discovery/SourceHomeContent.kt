@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +25,7 @@ import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.LocalAnimeRow
 import eu.kanade.presentation.discovery.PosterCard
 import eu.kanade.presentation.discovery.SectionHeader
+import eu.kanade.presentation.discovery.SourceFeaturedCarousel
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import kotlinx.coroutines.launch
@@ -69,34 +69,39 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
             contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item(key = "intro") {
-                Text(
-                    source.title,
-                    Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    style = MaterialTheme.typography.headlineSmall,
-                )
-                LoadNotice(access.loading, null)
-                if (access.offline) {
+            if (access.offline) {
+                item(key = "offline") {
                     Text("Solo download · nessuna richiesta alle fonti", Modifier.padding(horizontal = 16.dp))
                 }
             }
-            item(key = "resume:" + source.id) {
-                SectionHeader("Continua a guardare")
-                LocalAnimeRow(
-                    state.resume,
-                    onOpen = { navigator.push(AnimeScreen(it)) },
-                    emptyMessage = "I titoli che guardi in questa Home compariranno qui.",
-                ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
-            }
-            item(key = "updates:" + source.id) {
-                SectionHeader("Nuovi episodi della tua libreria")
-                LocalAnimeRow(
-                    state.updates,
-                    onOpen = { navigator.push(AnimeScreen(it)) },
-                    emptyMessage = "Aggiungi i titoli alla libreria per ritrovare qui i loro aggiornamenti.",
-                ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
-            }
             if (!access.offline) {
+                items(source.sections, key = { it.id }) { section ->
+                    LaunchedEffect(access, section.id) { model.load(section.id) }
+                    val value = state.sections[section.id] ?: SectionState()
+                    SectionHeader(section.title) {
+                        navigator.push(SourceHomeListScreen(homeKey, section.id, section.title))
+                    }
+                    LoadNotice(value.loading, value.error, value.stale) { model.load(section.id, true) }
+                    if (value.data?.items?.isEmpty() == true && !value.loading && value.error == null) {
+                        Text("Nessun titolo in questa sezione", Modifier.padding(horizontal = 16.dp))
+                    }
+                    if (section.layout == "featured") {
+                        SourceFeaturedCarousel(value.data?.items.orEmpty()) { anime ->
+                            navigator.push(AnimeScreen(anime.id, true))
+                        }
+                    } else {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(value.data?.items.orEmpty(), key = { it.id }) { anime ->
+                                PosterCard(anime.title, anime.asAnimeCover(), source.sourceLabel(anime.source), {
+                                    navigator.push(AnimeScreen(anime.id, true))
+                                })
+                            }
+                        }
+                    }
+                }
                 if (source.categories.isNotEmpty()) {
                     item(key = "categories") {
                         SectionHeader("Esplora le categorie")
@@ -115,30 +120,25 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                         }
                     }
                 }
-                items(source.sections, key = { it.id }) { section ->
-                    LaunchedEffect(access, section.id) { model.load(section.id) }
-                    val value = state.sections[section.id] ?: SectionState()
-                    SectionHeader(section.title) {
-                        navigator.push(SourceHomeListScreen(homeKey, section.id, section.title))
-                    }
-                    LoadNotice(value.loading, value.error, value.stale) { model.load(section.id, true) }
-                    if (value.data?.items?.isEmpty() == true && !value.loading && value.error == null) {
-                        Text("Nessun titolo in questa sezione", Modifier.padding(horizontal = 16.dp))
-                    }
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(value.data?.items.orEmpty(), key = { it.id }) { anime ->
-                            PosterCard(anime.title, anime.asAnimeCover(), source.sourceLabel(anime.source), {
-                                navigator.push(AnimeScreen(anime.id, true))
-                            })
-                        }
-                    }
-                }
                 if (source.sections.isEmpty()) {
                     item { Text("Aggiorna l’estensione per usare le sezioni della Home", Modifier.padding(16.dp)) }
                 }
+            }
+            item(key = "resume:" + source.id) {
+                SectionHeader("Continua a guardare")
+                LocalAnimeRow(
+                    state.resume,
+                    onOpen = { navigator.push(AnimeScreen(it)) },
+                    emptyMessage = "I titoli che guardi in questa Home compariranno qui.",
+                ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
+            }
+            item(key = "updates:" + source.id) {
+                SectionHeader("Nuovi episodi della tua libreria")
+                LocalAnimeRow(
+                    state.updates,
+                    onOpen = { navigator.push(AnimeScreen(it)) },
+                    emptyMessage = "Aggiungi i titoli alla libreria per ritrovare qui i loro aggiornamenti.",
+                ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
             }
         }
     }

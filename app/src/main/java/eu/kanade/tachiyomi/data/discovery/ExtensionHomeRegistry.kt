@@ -79,6 +79,7 @@ class ExtensionHomeRegistry(
                         language = source.lang,
                         search = ExtensionHomeFilters.search(manifest, filters),
                         homeId = manifest.id,
+                        primary = manifest.primary,
                     )
                 }
             } catch (e: CancellationException) {

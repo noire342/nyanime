@@ -4,7 +4,12 @@ import kotlinx.coroutines.flow.Flow
 import tachiyomi.domain.entries.anime.model.Anime
 
 /** Source identities stay separate from public catalogue identities. */
-data class SourceHomeSection(val id: String, val title: String, val selections: Map<String, String>)
+data class SourceHomeSection(
+    val id: String,
+    val title: String,
+    val selections: Map<String, String>,
+    val layout: String = "posters",
+)
 
 data class SourceHomeSource(
     val id: Long,
@@ -17,6 +22,7 @@ data class SourceHomeSource(
     val language: String = "",
     val search: SourceHomeSection? = null,
     val homeId: String = key,
+    val primary: Boolean = false,
 )
 
 data class SourceHomeListing(val loading: Boolean = true, val homes: List<SourceHomeSource> = emptyList()) {
@@ -28,8 +34,11 @@ data class SourceHomeListing(val loading: Boolean = true, val homes: List<Source
 
 /** A content kind can be provided by several extensions; concrete source identities never get merged. */
 data class SourceHomeGroup(val id: String, val title: String, val providers: List<SourceHomeSource>) {
-    data class Section(val id: String, val title: String)
-    val sections get() = providers.flatMap { it.sections }.distinctBy { it.id }.map { Section(it.id, it.title) }
+    data class Section(val id: String, val title: String, val layout: String = "posters")
+    val primary get() = providers.any { it.primary }
+    val sections get() = providers.flatMap {
+        it.sections
+    }.distinctBy { it.id }.map { Section(it.id, it.title, it.layout) }
     val categories get() = providers.flatMap { it.categories }.distinctBy { it.id }.map { Section(it.id, it.title) }
     val searchable get() = providers.any { it.search != null }
     val sourceIds get() = providers.map { it.id }.toSet()

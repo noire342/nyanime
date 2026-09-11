@@ -12,10 +12,19 @@ data class DiscoveryHomeAvailability(
 ) {
     fun selectedHome(
         requested: String?,
-    ): String? = requested?.takeIf { !loading && homes.any { home -> home.id == it } }
+    ): String? = if (loading) {
+        null
+    } else {
+        requested?.takeIf { id -> homes.any { it.id == id } }
+            ?: homes.filter { it.primary }.minByOrNull { it.id }?.id
+    }
 
     // Keep a restored selection pending until extension initialization has actually finished.
-    fun reconcileSelection(requested: String?): String? = if (loading) requested else selectedHome(requested)
+    fun reconcileSelection(requested: String?): String? = if (loading) {
+        requested
+    } else {
+        requested?.takeIf { id -> homes.any { it.id == id } }
+    }
 
     val unavailable: Boolean get() = !loading && homes.isEmpty()
 

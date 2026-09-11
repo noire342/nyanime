@@ -21,6 +21,21 @@ class SqlSourceHomeCacheTest {
     private val entries = mockk<AnimeRepository>()
     private val page = SourceHomeCacheEntry(SourceHomePage(listOf(anime), true), 1000)
 
+    @Test fun homeArtworkSurvivesRestartWithoutRestoringOldLibraryFlags() = runBlocking {
+        JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).use { driver ->
+            DiscoveryDatabase.Schema.create(driver)
+            val cache = SqlSourceHomeCache(DiscoveryDatabase(driver), entries)
+            val featured = anime.copy(backgroundUrl = "https://example.org/banner.jpg", description = "Source synopsis")
+            cache.write(key, page.copy(page = SourceHomePage(listOf(featured), false)))
+            coEvery { entries.getAnimeById(10) } returns anime.copy(favorite = true, title = "Local title")
+            val restored = cache.read(key)!!.page.items.single()
+            assertEquals(featured.backgroundUrl, restored.backgroundUrl)
+            assertEquals(featured.description, restored.description)
+            assertEquals("Local title", restored.title)
+            assertEquals(true, restored.favorite)
+        }
+    }
+
     @Test
     fun migrationPreservesExistingCatalogAndSourceLinks() {
         JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).use { driver ->

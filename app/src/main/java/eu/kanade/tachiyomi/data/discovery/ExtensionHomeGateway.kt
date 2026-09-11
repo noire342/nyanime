@@ -42,7 +42,14 @@ class ExtensionHomeGateway(
                     val page = source.getSearchAnime(request.page, request.query.trim(), filters)
                     check(access == currentAccess()) { "La fonte è stata disabilitata" }
                     SourceHomePage(
-                        page.animes.map { toLocal.await(it.toDomainAnime(source.id)) }.distinctBy { it.id },
+                        page.animes.map { remote ->
+                            val local = toLocal.await(remote.toDomainAnime(source.id))
+                            // Home artwork is presentation data: never rewrite library flags or progress.
+                            local.copy(
+                                backgroundUrl = remote.background_url ?: local.backgroundUrl,
+                                description = remote.description ?: local.description,
+                            )
+                        }.distinctBy { it.id },
                         page.hasNextPage,
                     )
                 }

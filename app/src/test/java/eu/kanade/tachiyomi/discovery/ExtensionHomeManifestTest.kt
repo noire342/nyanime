@@ -1,11 +1,28 @@
 package eu.kanade.tachiyomi.discovery
 
+import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
+import eu.kanade.tachiyomi.data.discovery.ExtensionHomeFilters
 import eu.kanade.tachiyomi.data.discovery.ExtensionHomeManifest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ExtensionHomeManifestTest {
+    @Test fun optionalPresentationWorksForAnySourceAndUnknownLayoutsFallBack() {
+        val manifest = ExtensionHomeManifest.parse(
+            wrap(
+                film.replace(
+                    "\"sections\":",
+                    "\"primary\":true,\"sections\":",
+                ).replace("\"title\":\"Più visti\"", "\"title\":\"Più visti\",\"layout\":\"featured\""),
+            ),
+        ).single()
+        assertTrue(manifest.primary)
+        assertEquals("featured", ExtensionHomeFilters.sections(manifest, AnimeFilterList()).single().layout)
+        val unknown = manifest.copy(sections = manifest.sections.map { it.copy(layout = "future-layout") })
+        assertEquals("posters", ExtensionHomeFilters.sections(unknown, AnimeFilterList()).single().layout)
+        assertEquals(false, ExtensionHomeManifest.parse(wrap(film)).single().primary)
+    }
     private val film = """{"id":"films","title":"Film","source":{"name":"Ciao","lang":"it"},
         "sections":[{"id":"popular","title":"Più visti"}]}"""
     private fun wrap(homes: String) = """{"version":1,"homes":[$homes]}"""

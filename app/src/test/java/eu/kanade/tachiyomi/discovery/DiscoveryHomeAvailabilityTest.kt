@@ -20,6 +20,28 @@ class DiscoveryHomeAvailabilityTest {
     }
     private val source = SourceHomeSource(42, "v1", emptyList(), emptyList(), homeId = "cartoons", title = "Cartoni")
 
+    @Test fun primaryIsSelectedOnlyAfterInitializationAndDisappearsOnRemoval() {
+        val primary = source.copy(key = "primary", homeId = "featured-home", primary = true)
+        assertNull(DiscoveryHomeAvailability.from(SourceHomeAccess(primary, loading = true)).selectedHome(null))
+        val available = DiscoveryHomeAvailability.from(SourceHomeListing(false, listOf(source, primary)))
+        assertEquals("featured-home", available.selectedHome(null))
+        assertEquals("cartoons", available.selectedHome("cartoons"))
+        assertNull(available.reconcileSelection(null))
+        val removed = DiscoveryHomeAvailability.from(SourceHomeListing(false, listOf(source)))
+        assertNull(removed.selectedHome("featured-home"))
+        assertNull(removed.reconcileSelection("featured-home"))
+    }
+
+    @Test fun primaryChoiceIsDeterministicAndDoesNotDependOnSiteName() {
+        val a = source.copy(key = "a", homeId = "a-home", primary = true)
+        val z = source.copy(key = "z", homeId = "z-home", primary = true)
+        for (providers in listOf(listOf(a, z), listOf(z, a))) {
+            val available = DiscoveryHomeAvailability.from(SourceHomeListing(false, providers))
+            assertEquals("a-home", available.selectedHome(null))
+            assertEquals("z-home", available.selectedHome("z-home"))
+        }
+    }
+
     @Test fun absentExtensionNeverRestoresOptionalHome() {
         val state = DiscoveryHomeAvailability.from(SourceHomeAccess())
         assertTrue(state.homes.isEmpty())

@@ -2,14 +2,15 @@ package eu.kanade.presentation.discovery
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,57 +85,59 @@ fun DiscoveryHomeHeader(
 @Composable
 private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
     val shape = RoundedCornerShape(50)
-    val choices = listOf(null to "Anime") +
-        homes.map { home ->
+    val choices = (if (homes.any { it.primary }) emptyList() else listOf(null to "Anime")) +
+        homes.sortedWith(compareByDescending<SourceHomeGroup> { it.primary }.thenBy { it.title }).map { home ->
             home.id to home.title
         }
-    val scroll = rememberLazyListState()
-    LaunchedEffect(selectedHome, choices) {
-        scroll.animateScrollToItem(choices.indexOfFirst { it.first == selectedHome }.coerceAtLeast(0))
-    }
-    LazyRow(
+    Row(
         Modifier
             .widthIn(max = 280.dp)
-            .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(4.dp)
-            .selectableGroup(),
-        state = scroll,
+            .selectableGroup()
+            .horizontalScroll(rememberScrollState()),
     ) {
-        items(choices, key = { it.first ?: "anime" }) { (value, label) ->
-            val selected = selectedHome == value
-            val background by animateColorAsState(
-                if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                label = "Home selection background",
-            )
-            val foreground by animateColorAsState(
-                if (selected) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                label = "Home selection text",
-            )
-            Box(
-                Modifier
-                    .widthIn(min = 80.dp, max = 200.dp)
-                    .heightIn(min = 48.dp)
-                    .clip(shape)
-                    .background(background)
-                    .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(value) })
-                    .semantics { contentDescription = "Home $label" }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    label,
-                    color = foreground,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+        choices.forEach { (value, label) ->
+            key(value) {
+                val bringIntoView = remember { BringIntoViewRequester() }
+                val selected = selectedHome == value
+                LaunchedEffect(selected) {
+                    if (selected) bringIntoView.bringIntoView()
+                }
+                val background by animateColorAsState(
+                    if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    label = "Home selection background",
                 )
+                val foreground by animateColorAsState(
+                    if (selected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    label = "Home selection text",
+                )
+                Box(
+                    Modifier
+                        .widthIn(min = 80.dp, max = 200.dp)
+                        .heightIn(min = 48.dp)
+                        .bringIntoViewRequester(bringIntoView)
+                        .clip(shape)
+                        .background(background)
+                        .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(value) })
+                        .semantics { contentDescription = "Home $label" }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        label,
+                        color = foreground,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }

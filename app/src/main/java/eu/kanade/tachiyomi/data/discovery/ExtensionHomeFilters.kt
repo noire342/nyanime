@@ -7,7 +7,12 @@ import tachiyomi.domain.discovery.SourceHomeSection
 /** Each request owns fresh filter instances; capabilities depend on labels, never their positions. */
 object ExtensionHomeFilters {
     fun sections(manifest: ExtensionHomeManifest, filters: AnimeFilterList) = manifest.sections.map {
-        SourceHomeSection(it.id, it.title, manifest.defaults + it.filters)
+        SourceHomeSection(
+            it.id,
+            it.title,
+            manifest.defaults + it.filters,
+            it.layout.takeIf { it == "featured" } ?: "posters",
+        )
     }.filter { supports(filters, it) }
 
     fun categories(manifest: ExtensionHomeManifest, filters: AnimeFilterList): List<SourceHomeSection> {

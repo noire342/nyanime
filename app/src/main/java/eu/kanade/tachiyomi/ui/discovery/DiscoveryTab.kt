@@ -57,6 +57,7 @@ import tachiyomi.domain.discovery.SectionState
 import tachiyomi.domain.discovery.SourceHomeGroup
 import tachiyomi.domain.entries.anime.model.asAnimeCover
 import tachiyomi.domain.source.anime.interactor.GetRemoteAnime
+import tachiyomi.presentation.core.screens.LoadingScreen
 
 data object DiscoveryTab : Tab {
     override val options: TabOptions
@@ -75,7 +76,11 @@ data object DiscoveryTab : Tab {
         val homeKey = availability.selectedHome(selected)
         LaunchedEffect(availability) { selected = availability.reconcileSelection(selected) }
         val savedState = rememberSaveableStateHolder()
-        savedState.SaveableStateProvider(homeKey ?: "anime") {
+        if (availability.loading) {
+            LoadingScreen()
+            return
+        }
+        savedState.SaveableStateProvider(homeKey?.let { "source:$it" } ?: "catalog") {
             if (homeKey != null) {
                 SourceHomeContent(homeKey, availability.homes, onSelect = { selected = it })
             } else {
