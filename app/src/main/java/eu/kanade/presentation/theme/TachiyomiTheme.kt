@@ -48,7 +48,7 @@ internal val LocalMangaSurfaces = staticCompositionLocalOf<SnapshotStateMap<Any,
 @Composable
 fun LegacyMangaTheme(content: @Composable () -> Unit) {
     val preferences = Injekt.get<UiPreferences>()
-    BaseTachiyomiTheme(preferences.legacyMangaTheme().get(), preferences.themeDarkAmoled().get()) {
+    BaseTachiyomiTheme(preferences.legacyMangaTheme().get(), preferences.themeDarkAmoled().get(), modernUi = false) {
         val surfaces = LocalMangaSurfaces.current
         val surface = MaterialTheme.colorScheme.surface
         DisposableEffect(surfaces, surface) {
@@ -73,8 +73,9 @@ fun TachiyomiTheme(
 ) {
     val uiPreferences = Injekt.get<UiPreferences>()
     BaseTachiyomiTheme(
-        appTheme = appTheme ?: uiPreferences.appTheme().get(),
+        appTheme = appTheme ?: uiPreferences.activeAppTheme(),
         isAmoled = amoled ?: uiPreferences.themeDarkAmoled().get(),
+        modernUi = appTheme?.let { it == AppTheme.NYANIME } ?: uiPreferences.modernUi().get(),
         content = content,
     )
 }
@@ -83,24 +84,26 @@ fun TachiyomiTheme(
 fun TachiyomiPreviewTheme(
     appTheme: AppTheme = AppTheme.NYANIME,
     isAmoled: Boolean = false,
+    modernUi: Boolean = appTheme == AppTheme.NYANIME,
     content: @Composable () -> Unit,
-) = BaseTachiyomiTheme(appTheme, isAmoled, content)
+) = BaseTachiyomiTheme(appTheme, isAmoled, modernUi, content)
 
 @Composable
 private fun BaseTachiyomiTheme(
     appTheme: AppTheme,
     isAmoled: Boolean,
+    modernUi: Boolean,
     content: @Composable () -> Unit,
 ) {
     val mangaSurfaces = LocalMangaSurfaces.current ?: remember { mutableStateMapOf() }
     CompositionLocalProvider(
-        LocalNyanimeStyle provides (appTheme == AppTheme.NYANIME),
+        LocalNyanimeStyle provides modernUi,
         LocalMangaSurfaces provides mangaSurfaces,
     ) {
         MaterialTheme(
             colorScheme = getThemeColorScheme(appTheme, isAmoled),
-            shapes = if (appTheme == AppTheme.NYANIME) NyanimeShapes else androidx.compose.material3.Shapes(),
-            typography = if (appTheme == AppTheme.NYANIME) {
+            shapes = if (modernUi) NyanimeShapes else androidx.compose.material3.Shapes(),
+            typography = if (modernUi) {
                 NyanimeTypography
             } else {
                 androidx.compose.material3.Typography()

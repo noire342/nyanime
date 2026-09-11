@@ -13,7 +13,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -23,19 +22,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LifecycleStartEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.discovery.ContinueWatchingRow
 import eu.kanade.presentation.discovery.DiscoveryHomeHeader
+import eu.kanade.presentation.discovery.HomeContentReveal
 import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.LocalAnimeRow
 import eu.kanade.presentation.discovery.SectionHeader
 import eu.kanade.presentation.discovery.SourceFeaturedCarousel
+import eu.kanade.presentation.discovery.SourceFeaturedSection
 import eu.kanade.presentation.discovery.SourceHomeDateSelector
 import eu.kanade.presentation.discovery.SourceHomePosterCard
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import kotlinx.coroutines.launch
@@ -48,7 +50,7 @@ import tachiyomi.presentation.core.components.material.PullRefresh
 @Composable
 fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
     val model = rememberScreenModel(tag = homeKey) { SourceHomeScreenModel(homeKey) }
-    val state by model.state.collectAsState()
+    val state by model.state.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.currentOrThrow
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -57,13 +59,16 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
     val source = access.group
     // Parent and child observe availability independently: never render a stale branded frame.
     if (access.loading || source == null) return
+    val modern = LocalNyanimeStyle.current
     val featuredRow = source.rows.firstOrNull { row ->
         row.sections.size == 1 && row.sections.first().layout == "featured" && !row.sections.first().supportsDate
-    }
+    }.takeIf { modern }
     val heroSection = featuredRow?.sections?.firstOrNull()
-        ?: source.rows.firstOrNull()?.sections?.firstOrNull()
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.onResume() }
-    LaunchedEffect(access) { model.onResume() }
+        ?: source.rows.firstOrNull()?.sections?.firstOrNull()?.takeIf { modern }
+    LifecycleStartEffect(access) {
+        model.onResume()
+        onStopOrDispose { model.onPause() }
+    }
     Scaffold(topBar = {
         DiscoveryHomeHeader(
             selectedHome = homeKey,
@@ -82,147 +87,149 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
             onRefresh = model::refresh,
         )
     }) { padding ->
-        PullRefresh(
-            refreshing = state.sections.values.any { it.loading },
-            enabled = !access.offline,
-            onRefresh = model::refresh,
-            modifier = Modifier.padding(padding),
-        ) {
-            LazyColumn(
-                contentPadding = PaddingValues(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+        HomeContentReveal(homeKey) {
+            PullRefresh(
+                refreshing = state.sections.values.any { it.loading },
+                enabled = !access.offline,
+                onRefresh = model::refresh,
+                modifier = Modifier.padding(padding),
             ) {
-                if (!access.offline && heroSection != null) {
-                    item(key = "hero:" + source.id) {
-                        LaunchedEffect(access, heroSection.id) { model.load(heroSection.id) }
-                        val featured = state.sections[heroSection.id] ?: SectionState()
-                        SourceFeaturedCarousel(
-                            if (featuredRow !=
-                                null
-                            ) {
-                                featured.data?.items.orEmpty()
-                            } else {
-                                featured.data?.items.orEmpty().take(8)
-                            },
-                            state.artworkRefreshKey,
-                        ) { navigator.push(AnimeScreen(it.id, true)) }
-                        if (featuredRow != null) {
-                            SectionHeader(featured.data?.title ?: heroSection.title) {
-                                navigator.push(SourceHomeListScreen(homeKey, heroSection.id, heroSection.title))
-                            }
-                            LoadNotice(featured.loading, featured.error, featured.stale) {
-                                model.load(heroSection.id, true)
-                            }
+                LazyColumn(
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (!access.offline && heroSection != null) {
+                        item(key = "hero:" + source.id) {
+                            LaunchedEffect(access, heroSection.id) { model.load(heroSection.id) }
+                            val featured = state.sections[heroSection.id] ?: SectionState()
+                            SourceFeaturedSection(
+                                state = featured,
+                                title = heroSection.title,
+                                refreshKey = state.artworkRefreshKey,
+                                limit = if (featuredRow == null) 8 else null,
+                                onBrowse = {
+                                    navigator.push(SourceHomeListScreen(homeKey, heroSection.id, heroSection.title))
+                                },
+                                onRetry = { model.load(heroSection.id, true) },
+                                onOpen = { navigator.push(AnimeScreen(it.id, true)) },
+                            )
                         }
                     }
-                }
-                // Local playback never depends on a successful remote feed or a featured row.
-                item(key = "resume:" + source.id) {
-                    SectionHeader("Continua a guardare") { navigator.push(SourceHomeHistoryScreen(homeKey)) }
-                    ContinueWatchingRow(
-                        state.resume,
-                        onOpen = { navigator.push(AnimeScreen(it)) },
-                        emptyMessage = "I titoli che guardi in questa Home compariranno qui.",
-                    ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
-                }
-                if (access.offline) {
-                    item(key = "offline") {
-                        Text("Solo download · nessuna richiesta alle fonti", Modifier.padding(horizontal = 16.dp))
+                    // Local playback never depends on a successful remote feed or a featured row.
+                    item(key = "resume:" + source.id) {
+                        SectionHeader("Continua a guardare") { navigator.push(SourceHomeHistoryScreen(homeKey)) }
+                        ContinueWatchingRow(
+                            state.resume,
+                            onOpen = { navigator.push(AnimeScreen(it)) },
+                            emptyMessage = "I titoli che guardi in questa Home compariranno qui.",
+                        ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
                     }
-                }
-                if (!access.offline) {
-                    items(source.rows.filter { it.id != featuredRow?.id }, key = { it.id }) { row ->
-                        var selection by rememberSaveable(homeKey, row.id) { mutableStateOf<String?>(null) }
-                        val variantStates = rememberSaveableStateHolder()
-                        val section = row.selected(selection)
-                        var date by rememberSaveable(homeKey, section.id) { mutableStateOf<String?>(null) }
-                        LaunchedEffect(access, section.id, date) { model.load(section.id, date = date) }
-                        val value = state.sections[section.id] ?: SectionState()
-                        Column {
-                            SectionHeader(value.data?.title?.takeIf { row.sections.size == 1 } ?: row.title) {
-                                navigator.push(SourceHomeListScreen(homeKey, section.id, section.title, date))
-                            }
-                            if (row.sections.size > 1) {
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    items(row.sections, key = { it.id }) { variant ->
-                                        FilterChip(
-                                            selected = variant.id == section.id,
-                                            onClick = { selection = variant.id },
-                                            label = { Text(variant.group?.tab ?: variant.title) },
-                                        )
-                                    }
+                    if (access.offline) {
+                        item(key = "offline") {
+                            Text("Solo download · nessuna richiesta alle fonti", Modifier.padding(horizontal = 16.dp))
+                        }
+                    }
+                    if (!access.offline) {
+                        items(source.rows.filter { it.id != featuredRow?.id }, key = { it.id }) { row ->
+                            var selection by rememberSaveable(homeKey, row.id) { mutableStateOf<String?>(null) }
+                            val variantStates = rememberSaveableStateHolder()
+                            val section = row.selected(selection)
+                            var date by rememberSaveable(homeKey, section.id) { mutableStateOf<String?>(null) }
+                            LaunchedEffect(access, section.id, date) { model.load(section.id, date = date) }
+                            val value = state.sections[section.id] ?: SectionState()
+                            Column {
+                                SectionHeader(value.data?.title?.takeIf { row.sections.size == 1 } ?: row.title) {
+                                    navigator.push(SourceHomeListScreen(homeKey, section.id, section.title, date))
                                 }
-                            }
-                            if (section.supportsDate) SourceHomeDateSelector(date) { date = it }
-                            LoadNotice(value.loading, value.error, value.stale) { model.load(section.id, true, date) }
-                            if (value.data?.items?.isEmpty() == true && !value.loading && value.error == null) {
-                                Text("Nessun titolo in questa sezione", Modifier.padding(horizontal = 16.dp))
-                            }
-                            // Each variant owns its scroll state; switching never reuses another tab's offset.
-                            variantStates.SaveableStateProvider(section.id) {
-                                if (section.layout == "featured") {
-                                    SourceFeaturedCarousel(
-                                        value.data?.items.orEmpty(),
-                                        state.artworkRefreshKey,
-                                    ) { anime ->
-                                        navigator.push(AnimeScreen(anime.id, true))
-                                    }
-                                } else {
+                                if (row.sections.size > 1) {
                                     LazyRow(
                                         contentPadding = PaddingValues(horizontal = 16.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
-                                        items(value.data?.items.orEmpty(), key = { it.homeItemKey }) { anime ->
-                                            SourceHomePosterCard(
-                                                anime,
-                                                source.sourceLabel(
-                                                    anime.source,
-                                                ),
-                                                {
-                                                    navigator.push(AnimeScreen(anime.id, true))
-                                                },
-                                                refreshKey = state.artworkRefreshKey,
+                                        items(row.sections, key = { it.id }) { variant ->
+                                            FilterChip(
+                                                selected = variant.id == section.id,
+                                                onClick = { selection = variant.id },
+                                                label = { Text(variant.group?.tab ?: variant.title) },
                                             )
+                                        }
+                                    }
+                                }
+                                if (section.supportsDate) SourceHomeDateSelector(date) { date = it }
+                                LoadNotice(value.loading, value.error, value.stale) {
+                                    model.load(section.id, true, date)
+                                }
+                                if (value.data?.items?.isEmpty() == true && !value.loading && value.error == null) {
+                                    Text("Nessun titolo in questa sezione", Modifier.padding(horizontal = 16.dp))
+                                }
+                                // Each variant owns its scroll state; switching never reuses another tab's offset.
+                                variantStates.SaveableStateProvider(section.id) {
+                                    if (section.layout == "featured") {
+                                        SourceFeaturedCarousel(
+                                            value.data?.items.orEmpty(),
+                                            state.artworkRefreshKey,
+                                        ) { anime ->
+                                            navigator.push(AnimeScreen(anime.id, true))
+                                        }
+                                    } else {
+                                        LazyRow(
+                                            contentPadding = PaddingValues(horizontal = 16.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        ) {
+                                            items(value.data?.items.orEmpty(), key = { it.homeItemKey }) { anime ->
+                                                SourceHomePosterCard(
+                                                    anime,
+                                                    source.sourceLabel(
+                                                        anime.source,
+                                                    ),
+                                                    {
+                                                        navigator.push(AnimeScreen(anime.id, true))
+                                                    },
+                                                    refreshKey = state.artworkRefreshKey,
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                    if (source.categories.isNotEmpty()) {
-                        item(key = "categories") {
-                            SectionHeader("Esplora le categorie")
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                items(source.categories, key = { it.id }) { category ->
-                                    AssistChip(
-                                        onClick = {
-                                            navigator.push(SourceHomeListScreen(homeKey, category.id, category.title))
-                                        },
-                                        label = { Text(category.title) },
-                                    )
+                        if (source.categories.isNotEmpty()) {
+                            item(key = "categories") {
+                                SectionHeader("Esplora le categorie")
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    items(source.categories, key = { it.id }) { category ->
+                                        AssistChip(
+                                            onClick = {
+                                                navigator.push(
+                                                    SourceHomeListScreen(homeKey, category.id, category.title),
+                                                )
+                                            },
+                                            label = { Text(category.title) },
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                    if (source.sections.isEmpty()) {
-                        item {
-                            Text("Aggiorna l’estensione per usare le sezioni della Home", Modifier.padding(16.dp))
+                        if (source.sections.isEmpty()) {
+                            item {
+                                Text(
+                                    "Aggiorna l’estensione per usare le sezioni della Home",
+                                    Modifier.padding(16.dp),
+                                )
+                            }
                         }
                     }
-                }
-                item(key = "updates:" + source.id) {
-                    SectionHeader("Nuovi episodi della tua libreria")
-                    LocalAnimeRow(
-                        state.updates,
-                        onOpen = { navigator.push(AnimeScreen(it)) },
-                        emptyMessage = "Aggiungi i titoli alla libreria per ritrovare qui i loro aggiornamenti.",
-                    ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
+                    item(key = "updates:" + source.id) {
+                        SectionHeader("Nuovi episodi della tua libreria")
+                        LocalAnimeRow(
+                            state.updates,
+                            onOpen = { navigator.push(AnimeScreen(it)) },
+                            emptyMessage = "Aggiungi i titoli alla libreria per ritrovare qui i loro aggiornamenti.",
+                        ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
+                    }
                 }
             }
         }

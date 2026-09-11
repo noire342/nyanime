@@ -60,7 +60,8 @@ object SettingsAppearanceScreen : SearchableSettings {
         val themeModePref = uiPreferences.themeMode()
         val themeMode by themeModePref.collectAsState()
 
-        val appThemePref = uiPreferences.appTheme()
+        val modernUi by uiPreferences.modernUi().collectAsState()
+        val appThemePref = if (modernUi) uiPreferences.appTheme() else uiPreferences.legacyAppTheme()
         val appTheme by appThemePref.collectAsState()
 
         val amoledPref = uiPreferences.themeDarkAmoled()
@@ -69,6 +70,16 @@ object SettingsAppearanceScreen : SearchableSettings {
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_theme),
             preferenceItems = persistentListOf(
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = uiPreferences.modernUi(),
+                    title = "ModernUI",
+                    subtitle = "Disattiva per tornare alla UI legacy. Manga resta sempre legacy.",
+                    onValueChanged = {
+                        uiPreferences.modernUi().set(it)
+                        (context as? Activity)?.let { ActivityCompat.recreate(it) }
+                        true
+                    },
+                ),
                 Preference.PreferenceItem.CustomPreference(
                     title = stringResource(MR.strings.pref_app_theme),
                 ) {

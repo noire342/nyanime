@@ -4,6 +4,7 @@ import eu.kanade.tachiyomi.ui.discovery.SourceHomeFeedLoader
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -18,6 +19,39 @@ import tachiyomi.domain.discovery.SourceHomePage
 import tachiyomi.domain.discovery.SourceHomeRequest
 
 class SourceHomeFeedLoaderTest {
+    @Test fun hiddenHomeCancelsRemoteWorkAndResumesWithoutLosingCardsOrDates() = runBlocking {
+        val access = SourceHomeGroupAccess(group = SourceHomeGroup("test", "Home", emptyList()))
+        var calls = 0
+        var cancelled = 0
+        val page = SourceHomePage(emptyList(), false, "Saved calendar")
+        val repository = object : SourceHomeGroupRepository {
+            override fun observe(access: SourceHomeGroupAccess, request: SourceHomeRequest, refresh: Boolean) = flow {
+                calls++
+                emit(SectionState(page, loading = true))
+                try {
+                    awaitCancellation()
+                } finally {
+                    cancelled++
+                }
+            }
+        }
+        val loader =
+            SourceHomeFeedLoader(CoroutineScope(coroutineContext + Dispatchers.Unconfined), repository) { access }
+        val request = SourceHomeRequest("schedule", date = "2026-09-12")
+        loader.load(request)
+        loader.pause()
+        assertEquals(1, cancelled)
+        assertEquals(page, loader.sections.value["schedule"]?.data)
+        assertEquals(false, loader.sections.value["schedule"]?.loading)
+        loader.refresh(true)
+        loader.load(SourceHomeRequest("other"))
+        assertEquals(1, calls)
+        loader.resume()
+        assertEquals(2, calls)
+        loader.reset()
+        assertEquals(2, cancelled)
+    }
+
     @Test fun returnRevalidatesVisitedRequestsWhileManualRefreshForcesNetwork() = runBlocking {
         val calls = mutableListOf<Pair<SourceHomeRequest, Boolean>>()
         val access = SourceHomeGroupAccess(group = SourceHomeGroup("test", "Home", emptyList()))

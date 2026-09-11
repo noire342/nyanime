@@ -26,6 +26,12 @@ class UiPreferences(
 
     fun themeDarkAmoled() = preferenceStore.getBoolean("pref_theme_dark_amoled_key", false)
 
+    fun modernUi() = preferenceStore.getBoolean("nyanime_modern_ui", true)
+
+    fun legacyAppTheme() = preferenceStore.getEnum("nyanime_legacy_app_theme", legacyMangaTheme().get())
+
+    fun activeAppTheme() = if (modernUi().get()) appTheme().get() else legacyAppTheme().get()
+
     private val legacyDefaultTheme get() = if (DeviceUtil.isDynamicColorAvailable) AppTheme.MONET else AppTheme.DEFAULT
 
     fun legacyMangaTheme() = preferenceStore.getEnum("nyanime_legacy_manga_theme", legacyDefaultTheme)
@@ -34,6 +40,7 @@ class UiPreferences(
         val installed = preferenceStore.getBoolean("nyanime_visual_identity_v1", false)
         if (installed.get()) return
         legacyMangaTheme().set(appTheme().get().takeUnless { it == AppTheme.NYANIME } ?: legacyDefaultTheme)
+        legacyAppTheme().set(legacyMangaTheme().get())
         appTheme().set(AppTheme.NYANIME)
         installed.set(true)
     }

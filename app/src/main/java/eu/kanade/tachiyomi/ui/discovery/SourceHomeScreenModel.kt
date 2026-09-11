@@ -6,6 +6,7 @@ import eu.kanade.tachiyomi.data.discovery.ExtensionHomeServices
 import eu.kanade.tachiyomi.data.discovery.LocalHomeItem
 import eu.kanade.tachiyomi.data.discovery.LocalHomeSections
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -22,6 +23,7 @@ class SourceHomeScreenModel(
     private val locals: LocalHomeSections = Injekt.get(),
 ) : StateScreenModel<SourceHomeScreenModel.State>(State()) {
     private val accessFlow = services.observeGroup(homeKey)
+    private val visible = MutableStateFlow(false)
     private val feeds = SourceHomeFeedLoader(screenModelScope, services.merged) { state.value.access }
 
     init {
@@ -33,15 +35,18 @@ class SourceHomeScreenModel(
                 feeds.reset()
                 mutableState.value = State(access = access)
                 val source = access.group ?: return@collectLatest
-                coroutineScope {
-                    launch {
-                        locals.resume(source.sourceIds).observe().collect { value ->
-                            mutableState.update { it.copy(resume = value) }
+                visible.collectLatest { active ->
+                    if (!active) return@collectLatest
+                    coroutineScope {
+                        launch {
+                            locals.resume(source.sourceIds).observe().collect { value ->
+                                mutableState.update { it.copy(resume = value) }
+                            }
                         }
-                    }
-                    launch {
-                        locals.updates(source.sourceIds).observe().collect { value ->
-                            mutableState.update { it.copy(updates = value) }
+                        launch {
+                            locals.updates(source.sourceIds).observe().collect { value ->
+                                mutableState.update { it.copy(updates = value) }
+                            }
                         }
                     }
                 }
@@ -62,7 +67,15 @@ class SourceHomeScreenModel(
 
     private fun restartArtwork() = mutableState.update { it.copy(artworkRefreshKey = it.artworkRefreshKey + 1) }
 
-    fun onResume() = feeds.refresh(force = false)
+    fun onResume() {
+        visible.value = true
+        feeds.resume()
+    }
+
+    fun onPause() {
+        visible.value = false
+        feeds.pause()
+    }
 
     data class State(
         val access: SourceHomeGroupAccess = SourceHomeGroupAccess(loading = true),

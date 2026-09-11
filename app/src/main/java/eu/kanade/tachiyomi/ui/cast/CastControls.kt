@@ -47,6 +47,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.data.cast.CastController
 import eu.kanade.tachiyomi.data.cast.CastProtocol
 import eu.kanade.tachiyomi.data.cast.CastRequest
@@ -167,8 +168,15 @@ fun CastMiniController(modifier: Modifier = Modifier, includeNavigationInsets: B
     val enabled = state.active && !state.connecting && !state.needsReconnect
     Surface(
         modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(
+            topStart = if (LocalNyanimeStyle.current) 8.dp else 20.dp,
+            topEnd = if (LocalNyanimeStyle.current) 8.dp else 20.dp,
+        ),
+        color = if (LocalNyanimeStyle.current) {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        } else {
+            MaterialTheme.colorScheme.secondaryContainer
+        },
         tonalElevation = 3.dp,
         shadowElevation = 4.dp,
     ) {

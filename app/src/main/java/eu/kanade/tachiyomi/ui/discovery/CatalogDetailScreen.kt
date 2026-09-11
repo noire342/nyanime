@@ -41,6 +41,7 @@ import eu.kanade.presentation.discovery.CatalogDetailsContent
 import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.PosterCard
 import eu.kanade.presentation.discovery.SectionHeader
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
@@ -111,7 +112,13 @@ class CatalogDetailScreen(private val catalogId: Long, private val provider: Str
                             OutlinedTextField(
                                 query,
                                 { query = it },
-                                Modifier.fillMaxWidth(),
+                                if (LocalNyanimeStyle.current) {
+                                    Modifier.fillMaxWidth()
+                                } else {
+                                    Modifier.padding(
+                                        horizontal = 16.dp,
+                                    )
+                                },
                                 label = { Text("Titolo da cercare nelle fonti") },
                                 singleLine = true,
                             )
@@ -175,23 +182,47 @@ class CatalogDetailScreen(private val catalogId: Long, private val provider: Str
                                     Button(
                                         onClick = { model.open(CatalogDetailScreenModel.Action.RESUME) },
                                         enabled = !state.busy,
-                                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                                        shape = RoundedCornerShape(4.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = Color.White,
-                                            contentColor = Color.Black,
+                                        modifier = Modifier.fillMaxWidth().then(
+                                            if (LocalNyanimeStyle.current) Modifier.heightIn(min = 48.dp) else Modifier,
                                         ),
+                                        shape = if (LocalNyanimeStyle.current) {
+                                            RoundedCornerShape(
+                                                4.dp,
+                                            )
+                                        } else {
+                                            ButtonDefaults.shape
+                                        },
+                                        colors = if (LocalNyanimeStyle.current) {
+                                            ButtonDefaults.buttonColors(
+                                                containerColor = Color.White,
+                                                contentColor = Color.Black,
+                                            )
+                                        } else {
+                                            ButtonDefaults.buttonColors()
+                                        },
                                     ) { Text("Riprendi · ${state.next?.name}") }
                                 }
                                 Button(
                                     onClick = { model.open() },
                                     enabled = !state.busy,
-                                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                                    shape = RoundedCornerShape(4.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (state.next == null) Color.White else Color(0xFF262626),
-                                        contentColor = if (state.next == null) Color.Black else Color.White,
+                                    modifier = Modifier.fillMaxWidth().then(
+                                        if (LocalNyanimeStyle.current) Modifier.heightIn(min = 48.dp) else Modifier,
                                     ),
+                                    shape = if (LocalNyanimeStyle.current) {
+                                        RoundedCornerShape(
+                                            4.dp,
+                                        )
+                                    } else {
+                                        ButtonDefaults.shape
+                                    },
+                                    colors = if (LocalNyanimeStyle.current) {
+                                        ButtonDefaults.buttonColors(
+                                            containerColor = if (state.next == null) Color.White else Color(0xFF262626),
+                                            contentColor = if (state.next == null) Color.Black else Color.White,
+                                        )
+                                    } else {
+                                        ButtonDefaults.buttonColors()
+                                    },
                                 ) { Text("Apri episodi") }
                                 if (state.linked?.favorite !=
                                     true

@@ -2,6 +2,8 @@ package eu.kanade.tachiyomi.data.discovery
 
 import android.app.Application
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
+import eu.kanade.domain.entries.anime.model.toSAnime
+import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.network.NetworkHelper
 import tachiyomi.data.discovery.CachedAnimeCatalogRepository
 import tachiyomi.data.discovery.DiscoveryDatabase
@@ -10,6 +12,7 @@ import tachiyomi.domain.discovery.AnimeCatalogCache
 import tachiyomi.domain.discovery.AnimeCatalogRemote
 import tachiyomi.domain.discovery.AnimeCatalogRepository
 import tachiyomi.domain.discovery.AnimeSourceLinkRepository
+import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import uy.kohesive.injekt.api.InjektModule
 import uy.kohesive.injekt.api.InjektRegistrar
 import uy.kohesive.injekt.api.addSingletonFactory
@@ -37,6 +40,24 @@ class DiscoveryModule(private val app: Application) : InjektModule {
             tachiyomi.data.discovery.SqlSourceHomeCache(get(), get())
         }
         addSingletonFactory { ExtensionHomeServices(get(), get(), get(), get()) }
+        addSingletonFactory {
+            val manager = get<AnimeSourceManager>()
+            SourceHomeArtworkResolver(fetch = { anime ->
+                val source = requireNotNull(manager.get(anime.source))
+                val requested = anime.toSAnime()
+                val details = if (anime.fetchType == FetchType.Seasons) {
+                    source.getAnimeSeasonUpdate(requested, emptyList(), fetchDetails = true, fetchSeasons = false).anime
+                } else {
+                    source.getAnimeEpisodeUpdate(
+                        requested,
+                        emptyList(),
+                        fetchDetails = true,
+                        fetchEpisodes = false,
+                    ).anime
+                }
+                SourceHomeArtworkResolver.Artwork(details.thumbnail_url, details.background_url)
+            })
+        }
         addSingletonFactory {
             DiscoverySourceService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get())
         }

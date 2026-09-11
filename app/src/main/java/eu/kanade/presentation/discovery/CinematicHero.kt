@@ -1,5 +1,8 @@
 package eu.kanade.presentation.discovery
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -143,23 +146,41 @@ internal fun CinematicHero(
 }
 
 @Composable
-internal fun CarouselPosition(page: Int, count: Int) {
-    if (count <= 1) return
-    Row(
-        Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val start = (page - 3).coerceIn(0, (count - 7).coerceAtLeast(0))
-        repeat(count.coerceAtMost(7)) { offset ->
-            val selected = start + offset == page
-            Box(
-                Modifier.padding(horizontal = 3.dp).size(if (selected) 18.dp else 5.dp, 3.dp)
-                    .background(
+internal fun CarouselPosition(page: Int, count: Int, onBrowse: (() -> Unit)? = null) {
+    if (count <= 1 && onBrowse == null) return
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (count > 1) {
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val start = (page - 3).coerceIn(0, (count - 7).coerceAtLeast(0))
+                repeat(count.coerceAtMost(7)) { offset ->
+                    val selected = start + offset == page
+                    val targetWidth = if (selected) 20.dp else 5.dp
+                    val width by animateDpAsState(targetWidth, tween(220), label = "heroIndicatorWidth")
+                    val color by animateColorAsState(
                         if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                        RoundedCornerShape(2.dp),
-                    ),
-            )
+                        tween(220),
+                        label = "heroIndicatorColor",
+                    )
+                    Box(
+                        Modifier.padding(horizontal = 3.dp).size(width, 3.dp)
+                            .background(
+                                color,
+                                RoundedCornerShape(2.dp),
+                            ),
+                    )
+                }
+            }
+        }
+        if (onBrowse != null) {
+            TextButton(onClick = onBrowse, modifier = Modifier.fillMaxWidth()) {
+                Text("Tutti i titoli in evidenza", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.size(8.dp))
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(16.dp))
+            }
         }
     }
 }

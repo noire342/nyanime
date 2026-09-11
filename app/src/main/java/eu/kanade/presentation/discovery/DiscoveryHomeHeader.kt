@@ -1,5 +1,8 @@
 package eu.kanade.presentation.discovery
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -39,7 +42,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -48,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.theme.NyanimeWordmark
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import tachiyomi.domain.discovery.SourceHomeGroup
@@ -61,6 +64,16 @@ fun DiscoveryHomeHeader(
     onRefresh: () -> Unit,
     homes: List<SourceHomeGroup>,
 ) {
+    if (!LocalNyanimeStyle.current) {
+        return eu.kanade.presentation.discovery.legacy.DiscoveryHomeHeader(
+            selectedHome,
+            onSelect,
+            onBack,
+            onSearch,
+            onRefresh,
+            homes,
+        )
+    }
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(Modifier.statusBarsPadding()) {
             Row(
@@ -114,6 +127,16 @@ private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup
             key(value) {
                 val bringIntoView = remember { BringIntoViewRequester() }
                 val selected = selectedHome == value
+                val indicatorWidth by animateDpAsState(
+                    if (selected) 32.dp else 0.dp,
+                    tween(220),
+                    label = "homeIndicator",
+                )
+                val labelColor by animateColorAsState(
+                    if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tween(180),
+                    label = "homeLabel",
+                )
                 LaunchedEffect(selected) { if (selected) bringIntoView.bringIntoView() }
                 Column(
                     Modifier.widthIn(min = 64.dp, max = 220.dp).bringIntoViewRequester(bringIntoView)
@@ -127,11 +150,7 @@ private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup
                     ) {
                         Text(
                             label,
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.onSurface
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                            color = labelColor,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                             maxLines = 1,
@@ -140,10 +159,10 @@ private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup
                     }
                     Box(
                         Modifier.width(
-                            32.dp,
+                            indicatorWidth,
                         ).height(
                             3.dp,
-                        ).background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent),
+                        ).background(MaterialTheme.colorScheme.primary),
                     )
                 }
             }

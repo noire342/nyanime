@@ -171,7 +171,6 @@ fun PlayerControls(
     val currentBrightness by viewModel.currentBrightness.collectAsState()
     val anime4kSelection by advancedPlayerPreferences.anime4kActiveSelection().collectAsState()
     val anime4kDiagnosticsEnabled by advancedPlayerPreferences.anime4kDiagnosticsEnabled().collectAsState()
-    val anime4kDiagnostics by advancedPlayerPreferences.anime4kDiagnostics().collectAsState()
 
     val playerTimeToDisappear by playerPreferences.playerTimeToDisappear().collectAsState()
     var resetControls by remember { mutableStateOf(true) }
@@ -238,6 +237,7 @@ fun PlayerControls(
                 val anime4kDiagnosticsOverlay = createRef()
 
                 if (anime4kDiagnosticsEnabled) {
+                    val anime4kDiagnostics by advancedPlayerPreferences.anime4kDiagnostics().collectAsState()
                     Anime4KDiagnosticsOverlay(
                         diagnostics = anime4kDiagnostics,
                         modifier = Modifier.constrainAs(anime4kDiagnosticsOverlay) {

@@ -10,6 +10,36 @@ elementi nascosti e ripristino.
 Il nome e l'icona cambiano; identificativo Android, firma, archivi e integrazioni
 rimangono compatibili. Il player e la sessione Cast mantengono i controlli esistenti.
 
+## ModernUI e interfaccia legacy
+
+In **Impostazioni > Aspetto > ModernUI** è possibile scegliere l'interfaccia.
+ModernUI è attiva per default. Disattivandola vengono ripristinati la Home con
+i selettori compatti, le schede e i caroselli precedenti, l'intestazione dei dettagli,
+la navigazione Material e la presentazione precedente del telecomando Cast.
+La scelta sopravvive al riavvio. Ogni modalità mantiene il proprio tema; il tema
+legacy parte da quello conservato prima del restyling. Nessuna libreria o cronologia
+viene migrata o cancellata cambiando modalità.
+
+La modalità moderna anima l'ingresso delle Home, gli indicatori e la pressione
+sulle locandine. Il banner cambia profondità durante lo scorrimento. Non sono
+presenti animazioni decorative permanenti; le animazioni temporizzate Compose
+rispettano la scala di animazione del sistema.
+
+## Copertine e lavoro in background
+
+Le Home possono ricevere titoli privi di copertina. Per le schede visibili, quando
+un'immagine manca o il suo indirizzo non è più valido, l'app richiede i dettagli
+alla stessa estensione installata. Non ricava indirizzi dal titolo e non contiene
+parser di siti. Il recupero usa al massimo due richieste simultanee, riutilizza
+i risultati per lo stesso titolo e si interrompe quando la schermata si ferma.
+La cache è limitata e il recupero manuale permette di ignorare un risultato scaduto.
+
+Anche i caricamenti delle sezioni si interrompono uscendo dalla Home, mantenendo
+schede e date selezionate per la ripresa. I dati locali di “Continua a guardare”
+restano indipendenti dalle richieste remote. I log del player distinguono le
+transizioni di buffering dalle animazioni; la causa di uno stallo specifico
+richiede una verifica sul dispositivo.
+
 ## Manga
 
 L'aggiornamento conserva il tema precedente per libreria, dettagli, esplorazione

@@ -24,6 +24,20 @@ class SourceHomeFeedLoader(
     val sections = mutableSections.asStateFlow()
     private var generation = 0
     private val tickets = mutableMapOf<String, Int>()
+    private var active = true
+
+    fun pause() {
+        active = false
+        jobs.values.forEach(Job::cancel)
+        jobs.clear()
+        tickets.clear()
+        mutableSections.update { sections -> sections.mapValues { it.value.copy(loading = false) } }
+    }
+
+    fun resume() {
+        active = true
+        refresh(force = false)
+    }
 
     fun reset() {
         generation++
@@ -36,7 +50,7 @@ class SourceHomeFeedLoader(
 
     fun load(request: SourceHomeRequest, refresh: Boolean = false, revalidate: Boolean = false) {
         val current = access()
-        if (current.group == null || current.offline || current.loading) return
+        if (!active || current.group == null || current.offline || current.loading) return
         val id = request.sectionId
         val sameRequest = requests[id] == request
         if (sameRequest && !refresh && (!revalidate || jobs[id]?.isActive == true)) return

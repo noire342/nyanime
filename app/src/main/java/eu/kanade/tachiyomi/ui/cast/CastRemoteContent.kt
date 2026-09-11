@@ -72,6 +72,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.entries.components.ItemCover
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import eu.kanade.tachiyomi.data.cast.CastDevice
 import eu.kanade.tachiyomi.data.cast.CastMedia
@@ -133,11 +134,15 @@ internal fun CastRemoteContent(state: CastState, actions: CastRemoteActions, mod
                         Button(
                             onClick = actions.browse,
                             modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape = RoundedCornerShape(4.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.onSurface,
-                                contentColor = MaterialTheme.colorScheme.surface,
-                            ),
+                            shape = if (LocalNyanimeStyle.current) RoundedCornerShape(4.dp) else ButtonDefaults.shape,
+                            colors = if (LocalNyanimeStyle.current) {
+                                ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.onSurface,
+                                    contentColor = MaterialTheme.colorScheme.surface,
+                                )
+                            } else {
+                                ButtonDefaults.buttonColors()
+                            },
                         ) {
                             Icon(Icons.Default.VideoLibrary, null, Modifier.size(20.dp))
                             Spacer(Modifier.width(10.dp))
@@ -150,7 +155,10 @@ internal fun CastRemoteContent(state: CastState, actions: CastRemoteActions, mod
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         )
                     } else {
-                        Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                        Surface(
+                            shape = RoundedCornerShape(if (LocalNyanimeStyle.current) 8.dp else 28.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                        ) {
                             Column(
                                 Modifier.fillMaxWidth().padding(32.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -227,7 +235,11 @@ private fun RemoteHeader(state: CastState, actions: CastRemoteActions) {
 private fun NowCasting(state: CastState, modifier: Modifier = Modifier) {
     val media = state.media ?: return
     val colors = MaterialTheme.colorScheme
-    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), color = colors.surfaceContainer) {
+    Surface(
+        modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(if (LocalNyanimeStyle.current) 8.dp else 28.dp),
+        color = colors.surfaceContainer,
+    ) {
         Row(
             Modifier.background(
                 Brush.linearGradient(listOf(colors.primaryContainer.copy(alpha = 0.6f), colors.surfaceContainer)),
@@ -293,12 +305,18 @@ private fun NowCasting(state: CastState, modifier: Modifier = Modifier) {
 @Composable
 internal fun CastArtwork(media: CastMedia?, modifier: Modifier = Modifier) {
     if (media?.cover?.url != null) {
-        ItemCover.Book(data = media.cover, modifier = modifier, shape = RoundedCornerShape(4.dp))
+        ItemCover.Book(
+            data = media.cover,
+            modifier = modifier,
+            shape = RoundedCornerShape(if (LocalNyanimeStyle.current) 4.dp else 14.dp),
+        )
     } else {
         Box(
             modifier.aspectRatio(
                 2f / 3f,
-            ).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.primaryContainer),
+            ).clip(
+                RoundedCornerShape(if (LocalNyanimeStyle.current) 4.dp else 14.dp),
+            ).background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Default.Tv, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -392,7 +410,10 @@ private fun PlaybackControls(state: CastState, actions: CastRemoteActions) {
 private fun ReceiverControls(state: CastState, actions: CastRemoteActions) {
     val playback = state.playback
     val enabled = !state.connecting && !state.needsReconnect
-    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(
+        shape = RoundedCornerShape(if (LocalNyanimeStyle.current) 8.dp else 24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (playback.canSetVolume) {
                 LevelControl(

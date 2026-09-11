@@ -1300,6 +1300,9 @@ class PlayerActivity : BaseActivity() {
             }
 
             "paused-for-cache" -> {
+                logcat(LogPriority.INFO) {
+                    "Playback buffering=$value positionSeconds=${viewModel.pos.value}"
+                }
                 viewModel.isLoading.update { value }
             }
 

@@ -39,6 +39,7 @@ import eu.kanade.tachiyomi.ui.cast.CastRemoteActions
 import eu.kanade.tachiyomi.ui.cast.CastRemoteContent
 import tachiyomi.domain.discovery.SectionState
 import tachiyomi.domain.discovery.SourceHomeGroup
+import tachiyomi.domain.discovery.SourceHomePage
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.anime.model.AnimeCover
 import tachiyomi.domain.entries.anime.model.asAnimeCover
@@ -48,6 +49,7 @@ private val titles = listOf("Frieren · Oltre la fine del viaggio", "Cowboy Bebo
 private val previewAnime = titles.mapIndexed { index, title ->
     Anime.create().copy(
         id = index + 1L,
+        url = "/series/preview-$index",
         title = title,
         source = 1,
         thumbnailUrl = "preview://$index",
@@ -91,14 +93,32 @@ private fun PreviewImages() {
 @Preview(name = "Home", widthDp = 393, heightDp = 1100, locale = "it")
 @Preview(name = "HomeLargeText", widthDp = 320, heightDp = 1100, fontScale = 1.4f, locale = "it")
 @Composable
-fun NyanimeHomeScreenshot() {
+fun NyanimeHomeScreenshot() = HomePreview(modern = true)
+
+@PreviewTest
+@Preview(name = "LegacyHome", widthDp = 393, heightDp = 1100, locale = "it")
+@Composable
+fun NyanimeLegacyHomeScreenshot() = HomePreview(modern = false)
+
+@Composable
+private fun HomePreview(modern: Boolean) {
     PreviewImages()
-    TachiyomiPreviewTheme {
+    TachiyomiPreviewTheme(appTheme = if (modern) AppTheme.NYANIME else AppTheme.DEFAULT, modernUi = modern) {
         Surface {
             Column(Modifier.fillMaxSize()) {
                 DiscoveryHomeHeader(null, {}, null, {}, {}, listOf(SourceHomeGroup("cartoons", "Cartoni", emptyList())))
                 LazyColumn {
-                    item { SourceFeaturedCarousel(previewAnime) {} }
+                    if (modern) {
+                        item {
+                            SourceFeaturedSection(
+                                SectionState(SourceHomePage(previewAnime, false), loading = false),
+                                title = "In evidenza",
+                                onBrowse = {},
+                                onRetry = {},
+                                onOpen = {},
+                            )
+                        }
+                    }
                     item { SectionHeader("Continua a guardare") {} }
                     item {
                         LocalAnimeRow(
@@ -119,6 +139,12 @@ fun NyanimeHomeScreenshot() {
                             onHide = {},
                             onPlay = {},
                         )
+                    }
+                    if (!modern) {
+                        item {
+                            SectionHeader("In evidenza") {}
+                            SourceFeaturedCarousel(previewAnime) {}
+                        }
                     }
                     item { SectionHeader("Novità da scoprire") {} }
                     item {
@@ -199,6 +225,48 @@ fun LegacyMangaScreenshot() {
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "NyanimeIcon", widthDp = 393, heightDp = 320, locale = "it")
+@Composable
+fun NyanimeIconScreenshot() {
+    TachiyomiPreviewTheme {
+        androidx.compose.foundation.layout.Column(
+            Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        ) {
+            eu.kanade.presentation.theme.NyanimeWordmark()
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                listOf(108, 72, 48).forEach { size ->
+                    Surface(
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape((size * 0.24f).dp),
+                        color = androidx.compose.ui.graphics.Color(0xFF101010),
+                    ) {
+                        androidx.compose.foundation.Image(
+                            androidx.compose.ui.res.painterResource(
+                                eu.kanade.tachiyomi.R.drawable.ic_launcher_foreground,
+                            ),
+                            "Nyanime",
+                            Modifier.width(size.dp),
+                        )
+                    }
+                }
+            }
+            Surface(
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = androidx.compose.ui.graphics.Color(0xFFE6DFFF),
+            ) {
+                androidx.compose.material3.Icon(
+                    androidx.compose.ui.res.painterResource(eu.kanade.tachiyomi.R.drawable.ic_ani_monochrome_launcher),
+                    "Icona a tema",
+                    Modifier.width(72.dp),
+                    tint = androidx.compose.ui.graphics.Color(0xFF312C42),
+                )
             }
         }
     }

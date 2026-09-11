@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
-import tachiyomi.domain.entries.anime.model.asAnimeCover
 
 @Composable
 fun SourceHomePosterCard(
@@ -17,7 +16,7 @@ fun SourceHomePosterCard(
     val presentation = anime.homePresentation
     PosterCard(
         title = anime.title,
-        cover = anime.asAnimeCover(),
+        cover = anime,
         subtitle = (presentation?.details.orEmpty() + sourceLabel).filter { it.isNotBlank() }.joinToString("\n"),
         onClick = onClick,
         modifier = modifier,

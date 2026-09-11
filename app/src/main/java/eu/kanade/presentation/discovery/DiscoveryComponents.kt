@@ -1,7 +1,11 @@
 package eu.kanade.presentation.discovery
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,6 +45,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -57,10 +63,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.data.discovery.LocalHomeItem
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogFeed
 import tachiyomi.domain.discovery.SectionState
+import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.anime.model.AnimeCover
 import tachiyomi.domain.entries.anime.model.asAnimeCover
 import java.time.Instant
@@ -105,6 +113,7 @@ fun metadataLabel(value: String?): String? = when (value) {
 
 @Composable
 fun SectionHeader(title: String, more: (() -> Unit)? = null) {
+    if (!LocalNyanimeStyle.current) return eu.kanade.presentation.discovery.legacy.SectionHeader(title, more)
     Row(
         Modifier.fillMaxWidth().padding(
             horizontal = 16.dp,
@@ -149,19 +158,44 @@ fun PosterCard(
     subtitleMaxLines: Int = 3,
     artworkRefreshKey: Int = 0,
 ) {
+    if (!LocalNyanimeStyle.current) {
+        return eu.kanade.presentation.discovery.legacy.PosterCard(
+            title,
+            cover,
+            subtitle,
+            onClick,
+            modifier,
+            badges,
+            subtitleMaxLines,
+            artworkRefreshKey,
+        )
+    }
     var information by rememberSaveable(title) { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, tween(140), label = "posterPress")
     if (information) {
         TitleInformationSheet(title, badges.joinToString(" · "), subtitle, { information = false }, onClick)
     }
     Column(
         modifier.width((132 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)
-            .clickable(role = Role.Button, onClickLabel = "Apri $title", onClick = onClick).padding(bottom = 8.dp),
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClickLabel = "Apri $title",
+                onClick = onClick,
+            ).padding(bottom = 8.dp),
     ) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(2f / 3f)
                 .clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
-            if (cover is AnimeCover) {
+            if (cover is AnimeCover || cover is Anime) {
                 SourceHomeArtwork(cover, Modifier.fillMaxSize(), refreshKey = artworkRefreshKey)
             } else {
                 AsyncImage(
@@ -235,6 +269,7 @@ fun CatalogRow(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit, calen
 
 @Composable
 fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit) {
+    if (!LocalNyanimeStyle.current) return eu.kanade.presentation.discovery.legacy.FeaturedCarousel(items, onClick)
     if (items.isEmpty()) return
     val pager = rememberPagerState { items.size.coerceAtMost(5) }
     Column {
@@ -273,6 +308,9 @@ fun LocalAnimeRow(
     onHide: ((LocalHomeItem) -> Unit)? = null,
     onPlay: (LocalHomeItem) -> Unit,
 ) {
+    if (!LocalNyanimeStyle.current) {
+        return eu.kanade.presentation.discovery.legacy.LocalAnimeRow(state, onOpen, emptyMessage, onHide, onPlay)
+    }
     LoadNotice(state.loading, state.error)
     val items = state.data.orEmpty()
     if (!state.loading && items.isEmpty() && state.error == null) {

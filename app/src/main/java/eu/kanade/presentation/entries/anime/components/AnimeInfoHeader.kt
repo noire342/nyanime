@@ -92,6 +92,7 @@ import eu.kanade.presentation.components.DropdownMenu
 import eu.kanade.presentation.discovery.SourceHomeArtwork
 import eu.kanade.presentation.entries.components.DotSeparatorText
 import eu.kanade.presentation.entries.components.ItemCover
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.data.coil.useBackground
@@ -125,6 +126,18 @@ fun AnimeInfoBox(
     doSearch: (query: String, global: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (!LocalNyanimeStyle.current) {
+        return LegacyAnimeInfoBox(
+            isTabletUi,
+            appBarPadding,
+            anime,
+            sourceName,
+            isStubSource,
+            onCoverClick,
+            doSearch,
+            modifier,
+        )
+    }
     Column(modifier.fillMaxWidth()) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val artworkHeight = if (isTabletUi) 280.dp else (maxWidth * 0.66f).coerceIn(220.dp, 360.dp)
@@ -168,7 +181,70 @@ fun AnimeInfoBox(
 }
 
 @Composable
+private fun LegacyAnimeInfoBox(
+    isTabletUi: Boolean,
+    appBarPadding: Dp,
+    anime: Anime,
+    sourceName: String,
+    isStubSource: Boolean,
+    onCoverClick: () -> Unit,
+    doSearch: (query: String, global: Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        // Backdrop
+        val backdropGradientColors = listOf(
+            Color.Transparent,
+            MaterialTheme.colorScheme.background,
+        )
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(anime)
+                .useBackground(true)
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .matchParentSize()
+                .drawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.verticalGradient(colors = backdropGradientColors),
+                    )
+                }
+                .blur(4.dp)
+                .alpha(0.2f),
+        )
+
+        // Anime & source info
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            if (!isTabletUi) {
+                AnimeAndSourceTitlesSmall(
+                    appBarPadding = appBarPadding,
+                    anime = anime,
+                    sourceName = sourceName,
+                    isStubSource = isStubSource,
+                    onCoverClick = onCoverClick,
+                    doSearch = doSearch,
+                )
+            } else {
+                AnimeAndSourceTitlesLarge(
+                    appBarPadding = appBarPadding,
+                    anime = anime,
+                    sourceName = sourceName,
+                    isStubSource = isStubSource,
+                    onCoverClick = onCoverClick,
+                    doSearch = doSearch,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun AnimeWatchButton(resume: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    if (!LocalNyanimeStyle.current) return
     Button(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).heightIn(min = 48.dp),
@@ -220,7 +296,11 @@ fun AnimeActionRow(
             } else {
                 stringResource(MR.strings.add_to_library)
             },
-            icon = if (favorite) Icons.Outlined.Done else Icons.Filled.Add,
+            icon = if (LocalNyanimeStyle.current) {
+                if (favorite) Icons.Outlined.Done else Icons.Filled.Add
+            } else {
+                if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder
+            },
             color = if (favorite) MaterialTheme.colorScheme.primary else defaultActionButtonColor,
             onClick = onAddToLibraryClicked,
             onLongClick = onEditCategory,
@@ -466,7 +546,11 @@ private fun ColumnScope.AnimeContentInfo(
     val context = LocalContext.current
     Text(
         text = title.ifBlank { stringResource(MR.strings.unknown_title) },
-        style = MaterialTheme.typography.headlineMedium,
+        style = if (LocalNyanimeStyle.current) {
+            MaterialTheme.typography.headlineMedium
+        } else {
+            MaterialTheme.typography.titleLarge
+        },
         modifier = Modifier.clickableNoIndication(
             onLongClick = {
                 if (title.isNotBlank()) {

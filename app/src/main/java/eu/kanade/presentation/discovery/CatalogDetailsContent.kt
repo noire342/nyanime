@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogId
 import tachiyomi.domain.discovery.providerLabel
@@ -34,23 +35,32 @@ import tachiyomi.domain.discovery.providerLabel
 @Composable
 fun CatalogDetailsContent(anime: CatalogAnime, actions: @Composable () -> Unit = {}, onRelated: (CatalogId) -> Unit) {
     var expanded by rememberSaveable(anime.id.provider, anime.id.value) { mutableStateOf(false) }
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        Box(Modifier.fillMaxWidth().height((maxWidth * 0.75f).coerceIn(240.dp, 380.dp))) {
-            AsyncImage(
-                anime.banner ?: anime.cover,
-                anime.title,
-                Modifier.matchParentSize(),
-                contentScale = ContentScale.Crop,
-            )
-            Box(
-                Modifier.matchParentSize().background(
-                    Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        0.5f to Color.Transparent,
-                        1f to MaterialTheme.colorScheme.background,
+    if (!LocalNyanimeStyle.current) {
+        AsyncImage(
+            anime.banner ?: anime.cover,
+            anime.title,
+            Modifier.fillMaxWidth().height(230.dp),
+            contentScale = ContentScale.Crop,
+        )
+    } else {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth().height((maxWidth * 0.75f).coerceIn(240.dp, 380.dp))) {
+                AsyncImage(
+                    anime.banner ?: anime.cover,
+                    anime.title,
+                    Modifier.matchParentSize(),
+                    contentScale = ContentScale.Crop,
+                )
+                Box(
+                    Modifier.matchParentSize().background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.5f to Color.Transparent,
+                            1f to MaterialTheme.colorScheme.background,
+                        ),
                     ),
-                ),
-            )
+                )
+            }
         }
     }
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

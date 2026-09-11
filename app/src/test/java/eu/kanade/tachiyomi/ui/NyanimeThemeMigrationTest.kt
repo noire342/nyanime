@@ -11,6 +11,7 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -18,6 +19,26 @@ import tachiyomi.core.common.preference.InMemoryPreferenceStore.InMemoryPreferen
 import tachiyomi.core.common.preference.PreferenceStore
 
 class NyanimeThemeMigrationTest {
+    @Test fun modernUiDefaultsOnAndTurningItOffSurvivesRestartWithoutChangingThemes() {
+        val store = store()
+        val preferences = UiPreferences(store)
+        preferences.appTheme().set(AppTheme.DOOM)
+        preferences.installNyanimeThemeOnce()
+        assertTrue(preferences.modernUi().get())
+        assertEquals(AppTheme.NYANIME, preferences.activeAppTheme())
+        preferences.modernUi().set(false)
+        assertEquals(AppTheme.DOOM, preferences.activeAppTheme())
+        preferences.legacyAppTheme().set(AppTheme.LAVENDER)
+        val recreated = UiPreferences(store)
+        recreated.installNyanimeThemeOnce()
+        assertFalse(recreated.modernUi().get())
+        assertEquals(AppTheme.LAVENDER, recreated.activeAppTheme())
+        assertEquals(AppTheme.DOOM, recreated.legacyMangaTheme().get())
+        recreated.modernUi().set(true)
+        assertEquals(AppTheme.NYANIME, recreated.activeAppTheme())
+        assertEquals(AppTheme.LAVENDER, recreated.legacyAppTheme().get())
+    }
+
     @BeforeEach
     fun configureDevice() {
         mockkStatic("eu.kanade.tachiyomi.util.system.DeviceUtilExtensionsKt")
