@@ -101,7 +101,7 @@ data class SourceHomeRequest(val sectionId: String, val page: Int = 1, val query
     }
 }
 
-data class SourceHomePage(val items: List<Anime>, val hasNextPage: Boolean)
+data class SourceHomePage(val items: List<Anime>, val hasNextPage: Boolean, val title: String? = null)
 
 interface SourceHomeGateway {
     fun observeAccess(): Flow<SourceHomeAccess>

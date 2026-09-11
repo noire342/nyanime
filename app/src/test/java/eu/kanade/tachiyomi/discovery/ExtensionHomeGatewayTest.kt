@@ -33,12 +33,46 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import tachiyomi.domain.discovery.SourceHomePresentation
 import tachiyomi.domain.discovery.SourceHomeRequest
+import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.interactor.NetworkToLocalAnime
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 
 class ExtensionHomeGatewayTest {
+    @Test
+    fun episodeCardsKeepOneLibraryIdentityAndNeverPersistPresentationInTheLibrary() = runBlocking {
+        val local = Anime.create().copy(
+            id = 123,
+            source = 42,
+            url = "/series",
+            title = "Custom",
+            favorite = true,
+            episodeFlags = 81,
+        )
+        fun remote(episode: String) = SAnime.create().apply {
+            title = "Source title"
+            url = "/series"
+            memo =
+                SourceHomePresentation(
+                    id = episode,
+                    badges = listOf(episode),
+                    sectionTitle = "Recent episodes",
+                ).attachTo(memo)
+        }
+        coEvery { toLocal.await(any()) } answers {
+            assertNull(firstArg<Anime>().homePresentation)
+            local
+        }
+        coEvery { engine.getSearchAnime(1, "", any()) } returns
+            AnimesPage(listOf(remote("ep-9"), remote("ep-8"), remote("ep-9")), false)
+        val page = gateway.fetch(gateway.currentAccess(), SourceHomeRequest("popular"))
+        assertEquals(listOf("ep-9", "ep-8"), page.items.map { it.homePresentation?.id })
+        assertTrue(page.items.all { it.id == 123L && it.favorite && it.episodeFlags == 81L && it.title == "Custom" })
+        assertEquals("Recent episodes", page.title)
+    }
+
     private val manager = mockk<AnimeSourceManager>()
     private val extensions = mockk<AnimeExtensionManager>()
     private val visibility = mockk<DiscoverySourceService>()

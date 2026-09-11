@@ -29,16 +29,16 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.discovery.DiscoveryHomeHeader
 import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.LocalAnimeRow
-import eu.kanade.presentation.discovery.PosterCard
 import eu.kanade.presentation.discovery.SectionHeader
 import eu.kanade.presentation.discovery.SourceFeaturedCarousel
+import eu.kanade.presentation.discovery.SourceHomePosterCard
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.SectionState
 import tachiyomi.domain.discovery.SourceHomeGroup
 import tachiyomi.domain.discovery.SourceHomeRequest
-import tachiyomi.domain.entries.anime.model.asAnimeCover
+import tachiyomi.domain.discovery.homeItemKey
 
 @Composable
 fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
@@ -88,7 +88,7 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                     LaunchedEffect(access, section.id) { model.load(section.id) }
                     val value = state.sections[section.id] ?: SectionState()
                     Column {
-                        SectionHeader(row.title) {
+                        SectionHeader(value.data?.title?.takeIf { row.sections.size == 1 } ?: row.title) {
                             navigator.push(SourceHomeListScreen(homeKey, section.id, section.title))
                         }
                         if (row.sections.size > 1) {
@@ -120,10 +120,9 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                                     contentPadding = PaddingValues(horizontal = 16.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
-                                    items(value.data?.items.orEmpty(), key = { it.id }) { anime ->
-                                        PosterCard(
-                                            anime.title,
-                                            anime.asAnimeCover(),
+                                    items(value.data?.items.orEmpty(), key = { it.homeItemKey }) { anime ->
+                                        SourceHomePosterCard(
+                                            anime,
                                             source.sourceLabel(
                                                 anime.source,
                                             ),

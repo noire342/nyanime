@@ -80,7 +80,7 @@ L'identificatore semantico `homes[].id` è condiviso tra estensioni: per contrib
 - Una sola voce di navigazione per ID, con contributi di tutte le estensioni disponibili.
 - Le sezioni con lo stesso ID si uniscono; quelle esclusive si aggiungono. Concordare la semantica degli ID tra produttori: `popular` non deve significare "episodi appena usciti".
 - Anche ricerca e categorie aggregano solo le fonti che le supportano.
-- Risultati alternati tra fonti, preservando gli ordinamenti interni. I doppioni vengono rimossi per identità concreta `source + url`, mai fondendo opere diverse soltanto perché hanno lo stesso titolo.
+- Risultati alternati tra fonti, preservando gli ordinamenti interni. Senza metadati aggiuntivi i doppioni vengono rimossi per identità concreta `source + url`, mai soltanto per titolo. Le schede con un ID di evento distinto restano separate anche se riferite alla stessa serie.
 - Ogni scheda conserva la fonte per episodi, libreria e riproduzione. Nessuna selezione obbligatoria della fonte per aprire la Home.
 - Una fonte lenta o in errore non nasconde i risultati delle altre. Gli errori riportano il produttore interessato; la paginazione tiene conto delle fonti già esaurite.
 - Rimuovendo una fonte spariscono i suoi contributi; la Home sparisce solo quando non rimane nessun produttore disponibile. I collegamenti aperti tornano alla Home quando il gruppo non esiste più.
@@ -88,6 +88,42 @@ L'identificatore semantico `homes[].id` è condiviso tra estensioni: per contrib
 Il nome visualizzato in caso di titoli discordanti viene scelto deterministicamente ordinando le identità dei produttori. Gli ID del produttore includono package, ID Home e ID fonte, per evitare collisioni nelle cache. La revisione include versione dell'estensione e contenuto della dichiarazione.
 
 ## Limiti e privacy
+
+### Dati delle singole schede
+
+L'API pubblica `SAnime.memo` può contenere la chiave facoltativa `aniyomi.home.v1`:
+
+```json
+{
+  "id": "episode-9",
+  "badges": ["DUB", "Ep 9"],
+  "details": ["Orario indicato dalla fonte: 18:30"],
+  "sectionTitle": "Titolo attuale della sezione"
+}
+```
+
+`id` distingue una scheda/evento all'interno della serie, senza cambiare `SAnime.url`.
+La stessa serie può comparire per episodi diversi mantenendo un solo ID in libreria.
+Badge ed etichette sono testo semplice fornito dall'estensione: l'app non interpreta
+episodi, orari, voti o lingue di un sito. Il titolo dinamico viene usato quando i produttori
+concordano; le righe con varianti mantengono il proprio titolo di gruppo.
+
+L'ID è limitato a 512 caratteri; badge e dettagli a 8 elementi, rispettivamente di
+80 e 300 caratteri; il titolo a 100. Controlli, campi malformati e oggetti oltre 8 KiB
+non diventano contenuto eseguibile o dati della libreria. Metadati assenti o non validi
+mantengono il comportamento precedente.
+
+Il gateway rimuove questa chiave prima della conversione nella libreria e la applica
+solo alle copie di presentazione. La cache Home conserva i dati per posizione della
+scheda, così due episodi della stessa serie non si sovrascrivono. Identità, titoli
+personalizzati, preferiti, progressi e gli altri campi memo restano quelli locali.
+Le vecchie pagine della cache sono ancora leggibili. Valgono le medesime esclusioni
+di cache per incognito e solo download.
+
+La proprietà memo è pubblica dall'API 17. Un'estensione compilata con una precedente
+libreria può applicarla tramite un piccolo adattatore opzionale al setter pubblico
+`SAnime.setMemo(JsonObject)`, mantenendo le API precedenti quando il metodo non esiste.
+Il rilevamento riguarda solo questo metodo pubblico, mai classi private della fonte.
 
 Solo lettura locale dell'APK scelto dal loader esistente, anche per installazioni private; nessuna richiesta remota durante il rilevamento delle capacità. Il documento ha un limite di 64 KiB decompressi, 8 Home, 16 sezioni per Home e 100 caratteri per etichetta. ID duplicati nella stessa estensione sono ambigui e ignorati. Versioni sconosciute o documenti malformati non bloccano il catalogo generale. Gli attributi aggiuntivi non eseguono codice e non avviano richieste.
 

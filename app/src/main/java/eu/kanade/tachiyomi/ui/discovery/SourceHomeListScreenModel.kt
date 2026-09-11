@@ -11,6 +11,7 @@ import tachiyomi.domain.discovery.SourceHomeGateway
 import tachiyomi.domain.discovery.SourceHomeGroupAccess
 import tachiyomi.domain.discovery.SourceHomeRepository
 import tachiyomi.domain.discovery.SourceHomeRequest
+import tachiyomi.domain.discovery.homeItemKey
 import tachiyomi.domain.entries.anime.model.Anime
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -63,7 +64,14 @@ class SourceHomeListScreenModel(
                 val result = value.data
                 mutableState.update {
                     it.copy(
-                        items = if (result != null) (previous + result.items).distinctBy(Anime::id) else it.items,
+                        items = if (result !=
+                            null
+                        ) {
+                            (previous + result.items).distinctBy { anime -> anime.homeItemKey }
+                        } else {
+                            it.items
+                        },
+                        title = result?.title ?: it.title,
                         loading = value.loading,
                         error = value.error,
                         stale = value.stale,
@@ -78,6 +86,7 @@ class SourceHomeListScreenModel(
     data class State(
         val access: SourceHomeGroupAccess = SourceHomeGroupAccess(loading = true),
         val query: String = "",
+        val title: String? = null,
         val items: List<Anime> = emptyList(),
         val loading: Boolean = false,
         val stale: Boolean = false,

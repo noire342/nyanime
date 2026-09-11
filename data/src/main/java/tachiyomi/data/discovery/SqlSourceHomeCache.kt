@@ -9,6 +9,8 @@ import tachiyomi.domain.discovery.SourceHomeCache
 import tachiyomi.domain.discovery.SourceHomeCacheEntry
 import tachiyomi.domain.discovery.SourceHomeCacheKey
 import tachiyomi.domain.discovery.SourceHomePage
+import tachiyomi.domain.discovery.SourceHomePresentation
+import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.repository.AnimeRepository
 
 /** Persist references, not copies of library flags/progress; metadata always comes from the local entries. */
@@ -22,6 +24,8 @@ class SqlSourceHomeCache(
         val hasNextPage: Boolean,
         val backgrounds: Map<Long, String> = emptyMap(),
         val descriptions: Map<Long, String> = emptyMap(),
+        val presentations: List<SourceHomePresentation?> = emptyList(),
+        val title: String? = null,
     )
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -36,15 +40,22 @@ class SqlSourceHomeCache(
             ).executeAsOneOrNull() ?: return@withContext null
             val payload = json.decodeFromString<Payload>(row.payload)
             if (payload.ids.size > 200) return@withContext null
-            val items = payload.ids.map { id ->
+            if (payload.presentations.isNotEmpty() &&
+                payload.presentations.size != payload.ids.size
+            ) {
+                return@withContext null
+            }
+            val items = payload.ids.mapIndexed { index, id ->
                 val local = anime.getAnimeById(id)
                 local.copy(
                     backgroundUrl = payload.backgrounds[id] ?: local.backgroundUrl,
                     description = payload.descriptions[id] ?: local.description,
+                    memo = payload.presentations.getOrNull(index)?.bounded()?.attachTo(local.memo)
+                        ?: SourceHomePresentation.without(local.memo),
                 )
             }
             if (items.any { it.source != key.source }) return@withContext null
-            SourceHomeCacheEntry(SourceHomePage(items, payload.hasNextPage), row.fetched_at)
+            SourceHomeCacheEntry(SourceHomePage(items, payload.hasNextPage, payload.title?.take(100)), row.fetched_at)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -61,6 +72,8 @@ class SqlSourceHomeCache(
                 entry.page.hasNextPage,
                 entry.page.items.mapNotNull { item -> item.backgroundUrl?.take(2048)?.let { item.id to it } }.toMap(),
                 entry.page.items.mapNotNull { item -> item.description?.take(8000)?.let { item.id to it } }.toMap(),
+                entry.page.items.map { it.homePresentation?.bounded() },
+                entry.page.title?.take(100),
             ),
         )
         database.transaction {

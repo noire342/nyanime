@@ -19,13 +19,28 @@ import tachiyomi.domain.discovery.SourceHomeAccess
 import tachiyomi.domain.discovery.SourceHomeGroup
 import tachiyomi.domain.discovery.SourceHomeGroupAccess
 import tachiyomi.domain.discovery.SourceHomePage
+import tachiyomi.domain.discovery.SourceHomePresentation
 import tachiyomi.domain.discovery.SourceHomeRepository
 import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.discovery.SourceHomeSection
 import tachiyomi.domain.discovery.SourceHomeSource
+import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
 
 class MergedSourceHomeRepositoryTest {
+    @Test fun mergedFeedsPreserveDifferentEpisodesOfOneSeries() = runBlocking {
+        val a = item(11, 1)
+        val cards = listOf("ep9", "ep8", "ep9").map { id ->
+            a.copy(memo = SourceHomePresentation(id = id).attachTo(a.memo))
+        }
+        val merged = MergedSourceHomeRepository({ source ->
+            provider { flowOf(if (source.id == 1L) page(*cards.toTypedArray()) else page()) }
+        }, { access })
+        val result = merged.observe(access, SourceHomeRequest("popular")).last()
+        assertEquals(listOf("ep9", "ep8"), result.data!!.items.map { it.homePresentation?.id })
+        assertTrue(result.data!!.items.all { it.id == 11L })
+    }
+
     private val shelf = SourceHomeSection("popular", "Popolari", emptyMap())
     private val first =
         SourceHomeSource(

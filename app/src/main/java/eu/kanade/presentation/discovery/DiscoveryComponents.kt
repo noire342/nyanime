@@ -114,6 +114,8 @@ fun PosterCard(
     subtitle: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    badges: List<String> = emptyList(),
+    subtitleMaxLines: Int = 3,
 ) {
     Column(modifier.width(144.dp).clickable(onClick = onClick).padding(bottom = 8.dp)) {
         Box(
@@ -127,6 +129,15 @@ fun PosterCard(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
+            if (badges.isNotEmpty()) {
+                Text(
+                    badges.joinToString(" · "),
+                    Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)).padding(6.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
         Text(
             title,
@@ -138,7 +149,7 @@ fun PosterCard(
         if (!subtitle.isNullOrBlank()) {
             Text(
                 subtitle,
-                maxLines = 3,
+                maxLines = subtitleMaxLines,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

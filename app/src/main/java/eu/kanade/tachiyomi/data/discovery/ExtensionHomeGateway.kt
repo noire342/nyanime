@@ -10,7 +10,9 @@ import kotlinx.coroutines.withTimeout
 import tachiyomi.domain.discovery.SourceHomeAccess
 import tachiyomi.domain.discovery.SourceHomeGateway
 import tachiyomi.domain.discovery.SourceHomePage
+import tachiyomi.domain.discovery.SourceHomePresentation
 import tachiyomi.domain.discovery.SourceHomeRequest
+import tachiyomi.domain.discovery.homeItemKey
 import tachiyomi.domain.entries.anime.interactor.NetworkToLocalAnime
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import java.io.IOException
@@ -43,14 +45,21 @@ class ExtensionHomeGateway(
                     check(access == currentAccess()) { "La fonte è stata disabilitata" }
                     SourceHomePage(
                         page.animes.map { remote ->
-                            val local = toLocal.await(remote.toDomainAnime(source.id))
+                            val presentation = SourceHomePresentation.from(remote.memo)
+                            val incoming = remote.toDomainAnime(source.id)
+                            val local = toLocal.await(
+                                incoming.copy(memo = SourceHomePresentation.without(incoming.memo)),
+                            )
                             // Home artwork is presentation data: never rewrite library flags or progress.
                             local.copy(
                                 backgroundUrl = remote.background_url ?: local.backgroundUrl,
                                 description = remote.description ?: local.description,
+                                memo = presentation?.attachTo(local.memo) ?: SourceHomePresentation.without(local.memo),
                             )
-                        }.distinctBy { it.id },
+                        }.distinctBy { it.homeItemKey },
                         page.hasNextPage,
+                        page.animes.mapNotNull { SourceHomePresentation.from(it.memo)?.sectionTitle }
+                            .distinct().singleOrNull(),
                     )
                 }
             } catch (e: TimeoutCancellationException) {

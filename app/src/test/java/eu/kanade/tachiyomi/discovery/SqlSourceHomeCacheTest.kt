@@ -6,16 +6,43 @@ import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import tachiyomi.data.discovery.DiscoveryDatabase
 import tachiyomi.data.discovery.SqlSourceHomeCache
 import tachiyomi.domain.discovery.SourceHomeCacheEntry
 import tachiyomi.domain.discovery.SourceHomeCacheKey
 import tachiyomi.domain.discovery.SourceHomePage
+import tachiyomi.domain.discovery.SourceHomePresentation
+import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.anime.repository.AnimeRepository
 
 class SqlSourceHomeCacheTest {
+    @Test fun repeatedSeriesCardsRetainTheirOwnMetadataAfterRestart() = runBlocking {
+        JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).use { driver ->
+            DiscoveryDatabase.Schema.create(driver)
+            val cache = SqlSourceHomeCache(DiscoveryDatabase(driver), entries)
+            val cards = listOf("Ep 9", "Ep 8").map { episode ->
+                anime.copy(memo = SourceHomePresentation(id = episode, badges = listOf(episode)).attachTo(anime.memo))
+            }
+            cache.write(key, page.copy(page = SourceHomePage(cards, false, "This season")))
+            coEvery { entries.getAnimeById(10) } returns
+                anime.copy(favorite = true, title = "Updated", episodeFlags = 42)
+            val restored = cache.read(key)!!.page
+            assertEquals(listOf("Ep 9", "Ep 8"), restored.items.map { it.homePresentation!!.badges.single() })
+            assertTrue(
+                restored.items.all {
+                    it.id == 10L &&
+                        it.favorite &&
+                        it.episodeFlags == 42L &&
+                        it.title == "Updated"
+                },
+            )
+            assertEquals("This season", restored.title)
+        }
+    }
+
     private val key = SourceHomeCacheKey("producer", 42, "1", "popular", 1)
     private val anime = Anime.create().copy(id = 10, source = 42, title = "Example")
     private val entries = mockk<AnimeRepository>()

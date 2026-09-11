@@ -17,6 +17,7 @@ import tachiyomi.domain.discovery.SourceHomePage
 import tachiyomi.domain.discovery.SourceHomeRepository
 import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.discovery.SourceHomeSource
+import tachiyomi.domain.discovery.homeItemKey
 
 /** Independent feeds are interleaved fairly; one failing extension never empties its peers. */
 class MergedSourceHomeRepository(
@@ -90,9 +91,17 @@ class MergedSourceHomeRepository(
             val lists = pages.map { it.items }
             val items = (0 until (lists.maxOfOrNull { it.size } ?: 0)).flatMap { row ->
                 lists.mapNotNull { it.getOrNull(row) }
-            }.distinctBy { it.source to it.url }
+            }.distinctBy { it.homeItemKey }
             SectionState(
-                data = if (pages.isEmpty()) null else SourceHomePage(items, pages.any { it.hasNextPage }),
+                data = if (pages.isEmpty()) {
+                    null
+                } else {
+                    SourceHomePage(
+                        items,
+                        pages.any { it.hasNextPage },
+                        pages.mapNotNull { it.title }.distinct().singleOrNull(),
+                    )
+                },
                 loading = states.any { it.loading },
                 stale = states.any { it.stale },
                 error = states.mapNotNull { it.error }.distinct().joinToString("\n").takeIf { it.isNotBlank() },

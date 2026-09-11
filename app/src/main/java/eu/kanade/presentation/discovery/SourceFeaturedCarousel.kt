@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import tachiyomi.domain.discovery.homeItemKey
 import tachiyomi.domain.entries.anime.model.Anime
 
 /** The extension supplies every title, image and synopsis; there is no catalogue resolution here. */
@@ -31,7 +32,7 @@ fun SourceFeaturedCarousel(items: List<Anime>, onClick: (Anime) -> Unit) {
     val pager = rememberPagerState { items.size }
     HorizontalPager(
         state = pager,
-        key = { items[it].id },
+        key = { items[it].homeItemKey },
         contentPadding = PaddingValues(horizontal = 16.dp),
         pageSpacing = 12.dp,
     ) { index ->

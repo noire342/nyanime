@@ -31,11 +31,11 @@ import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.discovery.LoadNotice
-import eu.kanade.presentation.discovery.PosterCard
+import eu.kanade.presentation.discovery.SourceHomePosterCard
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import tachiyomi.domain.discovery.SourceHomeRequest
-import tachiyomi.domain.entries.anime.model.asAnimeCover
+import tachiyomi.domain.discovery.homeItemKey
 
 class SourceHomeListScreen(
     private val homeKey: String,
@@ -64,7 +64,7 @@ class SourceHomeListScreen(
         }
         LaunchedEffect(query) { if (sectionId == SourceHomeRequest.SEARCH) model.search(query) }
         Scaffold(topBar = {
-            TopAppBar(title = { Text(title) }, navigationIcon = {
+            TopAppBar(title = { Text(state.title ?: title) }, navigationIcon = {
                 IconButton(onClick = { navigator.pop() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
             })
         }) { padding ->
@@ -93,10 +93,9 @@ class SourceHomeListScreen(
                         model.load(reset = state.items.isEmpty())
                     }
                 }
-                items(state.items, key = { it.id }) { anime ->
-                    PosterCard(
-                        anime.title,
-                        anime.asAnimeCover(),
+                items(state.items, key = { it.homeItemKey }) { anime ->
+                    SourceHomePosterCard(
+                        anime,
                         source.sourceLabel(anime.source),
                         { navigator.push(AnimeScreen(anime.id, true)) },
                         Modifier.padding(6.dp),
