@@ -43,10 +43,12 @@ class DiscoveryModule(private val app: Application) : InjektModule {
         addSingletonFactory { DiscoveryPlaybackService(get(), get(), get(), get()) }
         addSingletonFactory { tachiyomi.domain.discovery.CatalogSeriesEvidence(get()) }
         addSingletonFactory { SmartSourceResolver(get(), get(), get(), get(), get(), get(), get()) }
+        addSingletonFactory { ResumeVisibility(get()) }
         addSingletonFactory {
             LocalHomeSections { resume, sourceId ->
                 LocalHomeSectionProvider(
-                    get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), resume, sourceId,
+                    get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
+                    resume, sourceId, get(),
                 )
             }
         }

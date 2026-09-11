@@ -40,7 +40,7 @@ fun GlobalAnimeSearchCardRow(
         contentPadding = PaddingValues(MaterialTheme.padding.small),
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.extraSmall),
     ) {
-        items(titles) {
+        items(titles, key = { it.id }) {
             val title by getAnime(it)
             AnimeItem(
                 title = title.title,

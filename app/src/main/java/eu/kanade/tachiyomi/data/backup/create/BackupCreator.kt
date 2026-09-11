@@ -82,12 +82,6 @@ class BackupCreator(
             file = if (isAutoBackup) {
                 // Get dir of file and create
                 val dir = UniFile.fromUri(context, uri)
-                // Delete older backups
-                dir?.listFiles { _, filename -> FILENAME_REGEX.matches(filename) }
-                    .orEmpty()
-                    .sortedByDescending { it.name }
-                    .drop(MAX_AUTO_BACKUPS - 1)
-                    .forEach { it.delete() }
                 // Create new file to place backup
                 dir?.createFile(getFilename())
             } else {
@@ -148,6 +142,14 @@ class BackupCreator(
 
             if (isAutoBackup) {
                 backupPreferences.lastAutoBackupTimestamp().set(Instant.now().toEpochMilli())
+                // Retention cannot invalidate an already verified replacement.
+                runCatching {
+                    val directory = UniFile.fromUri(context, uri)
+                    val files = directory?.listFiles { _, filename -> FILENAME_REGEX.matches(filename) }
+                        .orEmpty().sortedByDescending { it.name }
+                    val obsolete = BackupRetention.obsolete(files.map { it.uri }, fileUri)
+                    files.filter { it.uri in obsolete }.forEach { it.delete() }
+                }.onFailure { logcat(LogPriority.WARN, it) }
             }
 
             return fileUri.toString()
@@ -226,11 +228,11 @@ class BackupCreator(
     }
 
     companion object {
-        private const val MAX_AUTO_BACKUPS: Int = 4
-        private val FILENAME_REGEX = """${BuildConfig.APPLICATION_ID}_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}.tachibk""".toRegex()
+        private val FILENAME_REGEX =
+            """${BuildConfig.APPLICATION_ID}_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2}-\d{3})?\.tachibk""".toRegex()
 
         fun getFilename(): String {
-            val date = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.ENGLISH).format(Date())
+            val date = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss-SSS", Locale.ENGLISH).format(Date())
             return "${BuildConfig.APPLICATION_ID}_$date.tachibk"
         }
     }

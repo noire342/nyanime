@@ -23,6 +23,7 @@ import eu.kanade.tachiyomi.util.system.cancelNotification
 import eu.kanade.tachiyomi.util.system.isRunning
 import eu.kanade.tachiyomi.util.system.setForegroundSafely
 import eu.kanade.tachiyomi.util.system.workManager
+import kotlinx.coroutines.CancellationException
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.backup.service.BackupPreferences
@@ -35,15 +36,12 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
     CoroutineWorker(context, workerParams) {
 
     private val notifier = BackupNotifier(context)
+    private val backupPreferences: BackupPreferences = Injekt.get()
 
     override suspend fun doWork(): Result {
         val isAutoBackup = inputData.getBoolean(IS_AUTO_BACKUP_KEY, true)
 
         if (isAutoBackup && BackupRestoreJob.isRunning(context)) return Result.retry()
-
-        val uri = inputData.getString(LOCATION_URI_KEY)?.toUri()
-            ?: getAutomaticBackupLocation()
-            ?: return Result.failure()
 
         setForegroundSafely()
 
@@ -51,14 +49,31 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
             ?: BackupOptions()
 
         return try {
+            val uri = inputData.getString(LOCATION_URI_KEY)?.toUri()
+                ?: getAutomaticBackupLocation()
+                ?: throw IllegalStateException("Cartella backup non accessibile. Controlla Dati e archiviazione.")
             val location = BackupCreator(context, isAutoBackup).backup(uri, options)
+            if (isAutoBackup) {
+                backupPreferences.autoBackupFailures().set(0)
+                backupPreferences.autoBackupError().set("")
+            }
             if (!isAutoBackup) {
                 notifier.showBackupComplete(UniFile.fromUri(context, location.toUri())!!)
             }
             Result.success()
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             logcat(LogPriority.ERROR, e)
-            if (!isAutoBackup) notifier.showBackupError(e.message)
+            if (isAutoBackup) {
+                val failures = backupPreferences.autoBackupFailures().get().coerceIn(0, 1000) + 1
+                backupPreferences.autoBackupFailures().set(failures)
+                val message = "Backup automatico non riuscito. " +
+                    "Controlla lo spazio e l’accesso alla cartella in Dati e archiviazione."
+                backupPreferences.autoBackupError().set(message)
+                if (BackupRetention.shouldNotify(failures)) notifier.showBackupError(message)
+            } else {
+                notifier.showBackupError(e.message)
+            }
             Result.failure()
         } finally {
             context.cancelNotification(Notifications.ID_BACKUP_PROGRESS)

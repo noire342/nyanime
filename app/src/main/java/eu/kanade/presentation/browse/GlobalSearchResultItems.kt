@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +48,7 @@ fun GlobalSearchResultItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column {
+            Column(Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
@@ -55,7 +56,7 @@ fun GlobalSearchResultItem(
                 Text(text = subtitle)
             }
             IconButton(onClick = onClick) {
-                Icon(imageVector = Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null)
+                Icon(imageVector = Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = title)
             }
         }
         content()
@@ -79,7 +80,7 @@ fun GlobalSearchLoadingResultItem() {
 }
 
 @Composable
-fun GlobalSearchErrorResultItem(message: String?) {
+fun GlobalSearchErrorResultItem(message: String?, onRetry: (() -> Unit)? = null) {
     Column(
         modifier = Modifier
             .padding(
@@ -96,5 +97,6 @@ fun GlobalSearchErrorResultItem(message: String?) {
             text = message ?: stringResource(MR.strings.unknown_error),
             textAlign = TextAlign.Center,
         )
+        if (onRetry != null) TextButton(onClick = onRetry) { Text(stringResource(MR.strings.action_retry)) }
     }
 }

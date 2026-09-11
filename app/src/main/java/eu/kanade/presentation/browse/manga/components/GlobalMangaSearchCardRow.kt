@@ -40,7 +40,7 @@ fun GlobalMangaSearchCardRow(
         contentPadding = PaddingValues(MaterialTheme.padding.small),
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.extraSmall),
     ) {
-        items(titles) {
+        items(titles, key = { it.id }) {
             val title by getManga(it)
             MangaItem(
                 title = title.title,

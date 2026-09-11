@@ -14,6 +14,7 @@ import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.MangaSearchItemResult
 import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.MangaSearchScreenModel
 import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.MangaSourceFilter
+import eu.kanade.tachiyomi.ui.browse.sourceSearchErrorMessage
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.presentation.core.components.material.Scaffold
@@ -30,6 +31,7 @@ fun GlobalMangaSearchScreen(
     onClickSource: (CatalogueSource) -> Unit,
     onClickItem: (Manga) -> Unit,
     onLongClickItem: (Manga) -> Unit,
+    onRetrySource: ((CatalogueSource) -> Unit)? = null,
 ) {
     Scaffold(
         topBar = { scrollBehavior ->
@@ -55,6 +57,7 @@ fun GlobalMangaSearchScreen(
             onClickSource = onClickSource,
             onClickItem = onClickItem,
             onLongClickItem = onLongClickItem,
+            onRetrySource = onRetrySource,
         )
     }
 }
@@ -67,6 +70,7 @@ internal fun GlobalSearchContent(
     onClickSource: (CatalogueSource) -> Unit,
     onClickItem: (Manga) -> Unit,
     onLongClickItem: (Manga) -> Unit,
+    onRetrySource: ((CatalogueSource) -> Unit)? = null,
     fromSourceId: Long? = null,
 ) {
     LazyColumn(
@@ -95,7 +99,10 @@ internal fun GlobalSearchContent(
                             )
                         }
                         is MangaSearchItemResult.Error -> {
-                            GlobalSearchErrorResultItem(message = result.throwable.message)
+                            GlobalSearchErrorResultItem(
+                                message = sourceSearchErrorMessage(result.throwable),
+                                onRetry = onRetrySource?.let { retry -> { retry(source) } },
+                            )
                         }
                     }
                 }

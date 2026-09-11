@@ -27,8 +27,10 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.util.fastForEach
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -90,6 +92,7 @@ object HomeScreen : Screen() {
             // Provide usable navigator to content screen
             CompositionLocalProvider(LocalNavigator provides navigator) {
                 Scaffold(
+                    modifier = Modifier.semantics { testTagsAsResourceId = true },
                     startBar = {
                         if (isTabletUi()) {
                             NavigationRail {
@@ -205,6 +208,7 @@ object HomeScreen : Screen() {
         val scope = rememberCoroutineScope()
         val selected = tabNavigator.current::class == tab::class
         NavigationBarItem(
+            modifier = Modifier.testTag(navigationTag(tab)),
             selected = selected,
             onClick = {
                 if (!selected) {
@@ -233,6 +237,7 @@ object HomeScreen : Screen() {
         val scope = rememberCoroutineScope()
         val selected = tabNavigator.current::class == tab::class
         NavigationRailItem(
+            modifier = Modifier.testTag(navigationTag(tab)),
             selected = selected,
             onClick = {
                 if (!selected) {
@@ -319,6 +324,15 @@ object HomeScreen : Screen() {
                 tint = LocalContentColor.current,
             )
         }
+    }
+
+    private fun navigationTag(tab: eu.kanade.presentation.util.Tab) = when (tab) {
+        AnimeLibraryTab -> "library_anime"
+        MangaLibraryTab -> "library_manga"
+        BrowseTab -> "browse"
+        MoreTab -> "more"
+        eu.kanade.tachiyomi.ui.discovery.DiscoveryTab -> "discovery"
+        else -> "navigation_other"
     }
 
     suspend fun search(query: String) {

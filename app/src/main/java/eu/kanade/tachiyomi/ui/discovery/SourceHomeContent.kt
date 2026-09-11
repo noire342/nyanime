@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.presentation.discovery.ContinueWatchingRow
 import eu.kanade.presentation.discovery.DiscoveryHomeHeader
 import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.LocalAnimeRow
@@ -89,7 +90,7 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                 // Local playback is the first row, regardless of the number/state of remote sections.
                 item(key = "resume:" + source.id) {
                     SectionHeader("Continua a guardare") { navigator.push(SourceHomeHistoryScreen(homeKey)) }
-                    LocalAnimeRow(
+                    ContinueWatchingRow(
                         state.resume,
                         onOpen = { navigator.push(AnimeScreen(it)) },
                         emptyMessage = "I titoli che guardi in questa Home compariranno qui.",

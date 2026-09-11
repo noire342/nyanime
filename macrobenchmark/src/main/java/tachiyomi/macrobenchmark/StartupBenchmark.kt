@@ -75,12 +75,13 @@ abstract class AbstractStartupBenchmark(private val startupMode: StartupMode) {
     fun startupFullCompilation() = startup(CompilationMode.Full())
 
     private fun startup(compilationMode: CompilationMode) = benchmarkRule.measureRepeated(
-        packageName = "xyz.jmir.tachiyomi.mibenchmark",
+        packageName = TARGET_PACKAGE,
         metrics = listOf(StartupTimingMetric()),
         compilationMode = compilationMode,
-        iterations = 10,
+        iterations = 3,
         startupMode = startupMode,
         setupBlock = {
+            if (iteration == 0) prepareFixtures()
             pressHome()
         },
     ) {

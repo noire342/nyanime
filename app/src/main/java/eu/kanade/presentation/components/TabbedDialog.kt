@@ -15,7 +15,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -58,7 +58,8 @@ fun TabbedDialog(
 
         Column {
             Row {
-                PrimaryTabRow(
+                PrimaryScrollableTabRow(
+                    edgePadding = 0.dp,
                     modifier = Modifier.weight(1f),
                     selectedTabIndex = pagerState.currentPage,
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,

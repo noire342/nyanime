@@ -10,20 +10,14 @@ import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.presentation.util.ioCoroutineScope
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.extension.anime.AnimeExtensionManager
+import eu.kanade.tachiyomi.ui.browse.SourceSearchRunner
 import kotlinx.collections.immutable.PersistentMap
-import kotlinx.collections.immutable.mutate
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toPersistentMap
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import tachiyomi.core.common.preference.toggle
 import tachiyomi.domain.entries.anime.interactor.GetAnime
 import tachiyomi.domain.entries.anime.interactor.NetworkToLocalAnime
@@ -31,7 +25,6 @@ import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
-import java.util.concurrent.Executors
 
 abstract class AnimeSearchScreenModel(
     initialState: State = State(),
@@ -43,8 +36,7 @@ abstract class AnimeSearchScreenModel(
     private val preferences: SourcePreferences = Injekt.get(),
 ) : StateScreenModel<AnimeSearchScreenModel.State>(initialState) {
 
-    private val coroutineDispatcher = Executors.newFixedThreadPool(5).asCoroutineDispatcher()
-    private var searchJob: Job? = null
+    private val searches = SourceSearchRunner<AnimeSource>(ioCoroutineScope)
 
     private val enabledLanguages = sourcePreferences.enabledLanguages().get()
     private val disabledSources = sourcePreferences.disabledAnimeSources().get()
@@ -73,7 +65,7 @@ abstract class AnimeSearchScreenModel(
 
     @Composable
     fun getAnime(initialAnime: Anime): androidx.compose.runtime.State<Anime> {
-        return produceState(initialValue = initialAnime) {
+        return produceState(initialValue = initialAnime, key1 = initialAnime.id) {
             getAnime.subscribe(initialAnime.url, initialAnime.source)
                 .filterNotNull()
                 .collectLatest { anime ->
@@ -124,13 +116,20 @@ abstract class AnimeSearchScreenModel(
         val query = state.value.searchQuery
         val sourceFilter = state.value.sourceFilter
 
-        if (query.isNullOrBlank()) return
+        if (query.isNullOrBlank()) {
+            searches.reset()
+            lastQuery = null
+            lastSourceFilter = null
+            updateItems(persistentMapOf())
+            return
+        }
         val sameQuery = this.lastQuery == query
         if (sameQuery && this.lastSourceFilter == sourceFilter) return
 
         this.lastQuery = query
         this.lastSourceFilter = sourceFilter
 
+        searches.reset()
         val sources = getSelectedSources()
 
         // Reuse previous results if possible
@@ -149,32 +148,23 @@ abstract class AnimeSearchScreenModel(
             )
         }
 
-        searchJob = ioCoroutineScope.launch {
-            sources.map { source ->
-                async {
-                    if (state.value.items[source] !is AnimeSearchItemResult.Loading) {
-                        return@async
-                    }
-                    try {
-                        val page = withContext(coroutineDispatcher) {
-                            source.getSearchAnime(1, query, source.getFilterList())
-                        }
+        sources.filter { state.value.items[it] is AnimeSearchItemResult.Loading }
+            .forEach { fetch(it, query) }
+    }
 
-                        val titles = page.animes.map {
-                            networkToLocalAnime.await(it.toDomainAnime(source.id))
-                        }
+    fun retry(source: AnimeSource) {
+        val query = lastQuery ?: return
+        if (source !in getSelectedSources() || state.value.items[source] !is AnimeSearchItemResult.Error) return
+        updateItem(source, AnimeSearchItemResult.Loading)
+        fetch(source, query)
+    }
 
-                        if (isActive) {
-                            updateItem(source, AnimeSearchItemResult.Success(titles))
-                        }
-                    } catch (e: Exception) {
-                        if (isActive) {
-                            updateItem(source, AnimeSearchItemResult.Error(e))
-                        }
-                    }
-                }
-            }
-                .awaitAll()
+    private fun fetch(source: AnimeSource, query: String) {
+        searches.submit(source, fetch = {
+            val page = source.getSearchAnime(1, query, source.getFilterList())
+            page.animes.map { networkToLocalAnime.await(it.toDomainAnime(source.id)) }
+        }) { result ->
+            updateItem(source, result.fold({ AnimeSearchItemResult.Success(it) }, { AnimeSearchItemResult.Error(it) }))
         }
     }
 
@@ -189,10 +179,11 @@ abstract class AnimeSearchScreenModel(
     }
 
     private fun updateItem(source: AnimeSource, result: AnimeSearchItemResult) {
-        val newItems = state.value.items.mutate {
-            it[source] = result
+        mutableState.update { current ->
+            if (source !in current.items) return@update current
+            val items = current.items.put(source, result)
+            current.copy(items = items.toSortedMap(sortComparator(items)).toPersistentMap())
         }
-        updateItems(newItems)
     }
 
     @Immutable
@@ -229,6 +220,6 @@ sealed interface AnimeSearchItemResult {
     }
 
     fun isVisible(onlyShowHasResults: Boolean): Boolean {
-        return !onlyShowHasResults || (this is Success && !this.isEmpty)
+        return !onlyShowHasResults || this !is Success || !isEmpty
     }
 }

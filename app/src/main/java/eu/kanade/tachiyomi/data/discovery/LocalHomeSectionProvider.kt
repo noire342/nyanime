@@ -44,6 +44,7 @@ class LocalHomeSectionProvider(
     private val sourceService: DiscoverySourceService,
     private val resume: Boolean,
     private val sourceIds: Set<Long>? = null,
+    private val visibility: ResumeVisibility,
 ) : HomeSectionProvider<LocalHomeItem> {
     override fun observe() = combine(
         if (resume) {
@@ -66,11 +67,12 @@ class LocalHomeSectionProvider(
             preferences.incognitoAnimeExtensions().changes(),
             preferences.showNsfwSource().changes(),
         ) { _, _, _, _ -> Unit },
-        sources.sources,
+        combine(sources.sources, visibility.hidden.changes()) { _, _ -> Unit },
     ) { entries, _, _, _, _ ->
         var accepted = 0
         val items = entries.mapNotNull { (animeId, episodeId) ->
             if (accepted >= 30) return@mapNotNull null
+            if (resume && animeId.toString() in visibility.hidden.get()) return@mapNotNull null
             val anime = getAnime.await(animeId) ?: return@mapNotNull null
             if (sourceIds != null && anime.source !in sourceIds) return@mapNotNull null
             if (anime.source.toString() in preferences.disabledAnimeSources().get()) return@mapNotNull null

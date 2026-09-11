@@ -85,4 +85,24 @@ class DiscoveryPlaybackTest {
         every { downloads.isEpisodeDownloaded(any(), any(), any(), any(), any()) } returns true
         assertEquals(first.id, service.nextEpisode(anime)?.id)
     }
+
+    @Test
+    fun `recreating playback service preserves persisted position and bookmarks`() = runBlocking {
+        prepare()
+        val persisted = first.copy(lastSecondSeen = 1_250_000, totalSeconds = 2_400_000, bookmark = true)
+        coEvery { episodes.await(1) } returns listOf(persisted, second)
+        val recreated = DiscoveryPlaybackService(history, next, downloads, base)
+        assertEquals(persisted, recreated.nextEpisode(anime))
+        assertEquals(persisted, recreated.nextEpisode(anime))
+    }
+
+    @Test
+    fun `completed episode advances once and new partial progress is retained`() = runBlocking {
+        prepare(seen = true)
+        val persistedNext = second.copy(lastSecondSeen = 90_000, totalSeconds = 1_400_000)
+        coEvery { episodes.await(1) } returns listOf(first.copy(seen = true), persistedNext)
+        assertEquals(persistedNext, service.nextEpisode(anime))
+        val recreated = DiscoveryPlaybackService(history, next, downloads, base)
+        assertEquals(persistedNext, recreated.nextEpisode(anime))
+    }
 }

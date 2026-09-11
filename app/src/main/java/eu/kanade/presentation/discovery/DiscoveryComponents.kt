@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,8 +20,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,6 +37,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -90,7 +98,14 @@ fun SectionHeader(title: String, more: (() -> Unit)? = null) {
         ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            title,
+            Modifier.weight(1f).semantics {
+                heading()
+            },
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+        )
         if (more != null) TextButton(onClick = more) { Text("Mostra tutti") }
     }
 }
@@ -117,15 +132,18 @@ fun PosterCard(
     badges: List<String> = emptyList(),
     subtitleMaxLines: Int = 3,
 ) {
-    Column(modifier.width(144.dp).clickable(onClick = onClick).padding(bottom = 8.dp)) {
+    Column(
+        modifier.width((144 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)
+            .clickable(onClick = onClick).padding(bottom = 8.dp),
+    ) {
         Box(
-            Modifier.fillMaxWidth().height(
-                208.dp,
+            Modifier.fillMaxWidth().aspectRatio(
+                144f / 208f,
             ).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             AsyncImage(
                 model = cover,
-                contentDescription = title,
+                contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
@@ -142,7 +160,7 @@ fun PosterCard(
         Text(
             title,
             Modifier.padding(top = 8.dp),
-            maxLines = 2,
+            maxLines = 3,
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.titleSmall,
         )
@@ -250,6 +268,7 @@ fun LocalAnimeRow(
     state: SectionState<List<LocalHomeItem>>,
     onOpen: (Long) -> Unit,
     emptyMessage: String = "Gli anime che segui compariranno qui.",
+    onHide: ((LocalHomeItem) -> Unit)? = null,
     onPlay: (LocalHomeItem) -> Unit,
 ) {
     LoadNotice(state.loading, state.error)
@@ -266,7 +285,7 @@ fun LocalAnimeRow(
     }
     LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(items, key = { it.anime.id }) { item ->
-            Column(Modifier.width(160.dp)) {
+            Column(Modifier.width((160 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)) {
                 PosterCard(item.anime.title, item.anime.asAnimeCover(), item.episode.name, { onOpen(item.anime.id) })
                 if (item.progress > 0) {
                     LinearProgressIndicator(
@@ -274,7 +293,16 @@ fun LocalAnimeRow(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                TextButton(onClick = { onPlay(item) }) { Text(if (item.progress > 0) "Riprendi" else "Guarda") }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { onPlay(item) }, modifier = Modifier.weight(1f)) {
+                        Text(if (item.progress > 0) "Riprendi" else "Guarda")
+                    }
+                    if (onHide != null) {
+                        IconButton(onClick = { onHide(item) }) {
+                            Icon(Icons.Outlined.VisibilityOff, "Nascondi ${item.anime.title} da Continua a guardare")
+                        }
+                    }
+                }
             }
         }
     }

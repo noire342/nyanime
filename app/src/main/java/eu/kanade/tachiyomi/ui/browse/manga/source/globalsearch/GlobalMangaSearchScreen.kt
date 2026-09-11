@@ -71,6 +71,7 @@ class GlobalMangaSearchScreen(
                 getManga = { screenModel.getManga(it) },
                 onChangeSearchFilter = screenModel::setSourceFilter,
                 onToggleResults = screenModel::toggleFilterResults,
+                onRetrySource = screenModel::retry,
                 onClickSource = {
                     navigator.push(BrowseMangaSourceScreen(it.id, state.searchQuery))
                 },

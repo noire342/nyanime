@@ -36,6 +36,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import eu.kanade.presentation.discovery.CatalogRow
+import eu.kanade.presentation.discovery.ContinueWatchingRow
 import eu.kanade.presentation.discovery.DiscoveryHomeHeader
 import eu.kanade.presentation.discovery.FeaturedCarousel
 import eu.kanade.presentation.discovery.LoadNotice
@@ -126,7 +127,7 @@ data object DiscoveryTab : Tab {
             ) {
                 item(key = "resume") {
                     SectionHeader("Continua a guardare") { navigator.push(HistoriesTab) }
-                    LocalAnimeRow(state.resume, { navigator.push(AnimeScreen(it)) }) { item ->
+                    ContinueWatchingRow(state.resume, { navigator.push(AnimeScreen(it)) }) { item ->
                         scope.launch {
                             context.playDiscoveryEpisode(item.episode)
                         }

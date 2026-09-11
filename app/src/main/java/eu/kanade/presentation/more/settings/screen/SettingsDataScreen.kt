@@ -193,6 +193,7 @@ object SettingsDataScreen : SearchableSettings {
         val navigator = LocalNavigator.currentOrThrow
 
         val lastAutoBackup by backupPreferences.lastAutoBackupTimestamp().collectAsState()
+        val autoBackupError by backupPreferences.autoBackupError().collectAsState()
 
         val chooseBackup = rememberLauncherForActivityResult(
             object : ActivityResultContracts.GetContent() {
@@ -277,7 +278,10 @@ object SettingsDataScreen : SearchableSettings {
                 Preference.PreferenceItem.InfoPreference(
                     stringResource(MR.strings.backup_info) +
                         "\n\n" +
-                        stringResource(MR.strings.last_auto_backup_info, relativeTimeSpanString(lastAutoBackup)),
+                        listOfNotNull(
+                            stringResource(MR.strings.last_auto_backup_info, relativeTimeSpanString(lastAutoBackup)),
+                            autoBackupError.takeIf { it.isNotBlank() },
+                        ).joinToString("\n"),
                 ),
             ),
         )

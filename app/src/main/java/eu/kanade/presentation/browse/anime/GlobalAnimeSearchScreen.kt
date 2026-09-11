@@ -14,6 +14,7 @@ import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.AnimeSearchItemResult
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.AnimeSearchScreenModel
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.AnimeSourceFilter
+import eu.kanade.tachiyomi.ui.browse.sourceSearchErrorMessage
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.presentation.core.components.material.Scaffold
@@ -30,6 +31,7 @@ fun GlobalAnimeSearchScreen(
     onClickSource: (AnimeSource) -> Unit,
     onClickItem: (Anime) -> Unit,
     onLongClickItem: (Anime) -> Unit,
+    onRetrySource: ((AnimeSource) -> Unit)? = null,
 ) {
     Scaffold(
         topBar = { scrollBehavior ->
@@ -55,6 +57,7 @@ fun GlobalAnimeSearchScreen(
             onClickSource = onClickSource,
             onClickItem = onClickItem,
             onLongClickItem = onLongClickItem,
+            onRetrySource = onRetrySource,
         )
     }
 }
@@ -67,6 +70,7 @@ internal fun GlobalSearchContent(
     onClickSource: (AnimeSource) -> Unit,
     onClickItem: (Anime) -> Unit,
     onLongClickItem: (Anime) -> Unit,
+    onRetrySource: ((AnimeSource) -> Unit)? = null,
     fromSourceId: Long? = null,
 ) {
     LazyColumn(
@@ -95,7 +99,10 @@ internal fun GlobalSearchContent(
                             )
                         }
                         is AnimeSearchItemResult.Error -> {
-                            GlobalSearchErrorResultItem(message = result.throwable.message)
+                            GlobalSearchErrorResultItem(
+                                message = sourceSearchErrorMessage(result.throwable),
+                                onRetry = onRetrySource?.let { retry -> { retry(source) } },
+                            )
                         }
                     }
                 }

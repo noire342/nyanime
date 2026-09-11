@@ -75,6 +75,10 @@ android {
         create("benchmark") {
             initWith(release)
 
+            // Profile generation needs source names; timing runs keep release optimizations.
+            val generatingProfile = providers.gradleProperty("profileGeneration").orNull == "true"
+            isMinifyEnabled = !generatingProfile
+            isShrinkResources = !generatingProfile
             isDebuggable = false
             isProfileable = true
             versionNameSuffix = "-benchmark"
@@ -320,14 +324,6 @@ dependencies {
 }
 
 androidComponents {
-    beforeVariants { variantBuilder ->
-        // Disables standardBenchmark
-        if (variantBuilder.buildType == "benchmark") {
-            variantBuilder.enable = variantBuilder.productFlavors.containsAll(
-                listOf("default" to "dev"),
-            )
-        }
-    }
     onVariants(selector().withFlavor("default" to "standard")) {
         // Only excluding in standard flavor because this breaks
         // Layout Inspector's Compose tree
