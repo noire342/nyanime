@@ -291,7 +291,9 @@ class Anime4KTest {
             nowMillis = 2_000L,
         )
 
-        assertEquals(Anime4KMode.ModeAPlusHq, adjustment?.mode)
+        assertEquals(null, adjustment)
+        assertEquals(Anime4KMode.ModeAHq, controller.currentMode)
+        assertEquals(Anime4KMode.ModeAPlusHq, controller.onSample(healthySample(4L))?.mode)
         assertEquals(Anime4KMode.ModeAPlusHq, controller.currentMode)
     }
 
@@ -413,7 +415,7 @@ class Anime4KTest {
         outputDroppedFrames = outputDroppedFrames,
         decoderDroppedFrames = 0L,
         delayedFrames = 0L,
-        estimatedFilterFramesPerSecond = filterFps,
+        renderTimeMillis = filterFps?.let { 1000.0 / it },
         mistimedFrames = 0L,
     )
 }

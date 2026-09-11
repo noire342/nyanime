@@ -14,17 +14,17 @@ class Anime4KSmartController(
 ) {
     companion object {
         private const val MIN_SAMPLE_INTERVAL_MILLIS = 750L
+        private const val MAX_SAMPLE_GAP_MILLIS = 2_500L
         private const val WARMUP_MILLIS = 2_000L
         private const val WINDOW_MILLIS = 5_000L
         private const val DOWNGRADE_COOLDOWN_MILLIS = 1_500L
+        private const val CAPABILITY_SETTLE_MILLIS = 1_500L
         private const val OVERLOADED_WINDOWS_FOR_DOWNGRADE = 2
 
         private const val HEALTHY_HEADROOM = 1.20
         private const val SEVERE_HEADROOM = 0.85
         private const val OUTPUT_DROP_OVERLOAD = 0.01
-        private const val DECODER_DROP_OVERLOAD = 0.0025
         private const val DELAYED_FRAME_OVERLOAD = 0.02
-        private const val MISTIMED_FRAME_OVERLOAD = 0.03
         private const val OUTPUT_DROP_HEALTHY = 0.005
         private const val DECODER_DROP_HEALTHY = 0.001
         private const val DELAYED_FRAME_HEALTHY = 0.01
@@ -38,20 +38,27 @@ class Anime4KSmartController(
         val decoderDrops: Long?,
         val delayedFrames: Long?,
         val mistimedFrames: Long?,
-        val filterFps: Double?,
+        val renderCapacity: Double?,
     )
 
     private var mediaInfo = initialMediaInfo
+    private var measuredWorkload = initialMediaInfo
     private var lastSample: Anime4KPerformanceSample? = null
     private var windowStartSample: Anime4KPerformanceSample? = null
-    private val filterFpsSamples = mutableListOf<Double>()
+    private val renderCapacitySamples = mutableListOf<Double>()
     private var lastTransitionMillis = initialTimestampMillis
+    private var warmupUntilMillis = initialTimestampMillis + WARMUP_MILLIS
     private var overloadedWindows = 0
     private var hasEvaluatedWindow = false
     private var lastReason: String? = "maximum compatible start"
     private var successfulProbes = initialCalibration?.successfulProbes ?: 0
     private val shaderFailedModes = mutableSetOf<Anime4KMode>()
     private val performanceBlockedModes = mutableSetOf<Anime4KMode>()
+    private var pendingCapabilityMode: Anime4KMode? = null
+    private var pendingCapabilitySinceMillis = 0L
+    var hasStableMeasurement: Boolean = false
+        private set
+    private var stableAtMillis = 0L
 
     var currentMode: Anime4KMode = Anime4K.maxSmartMode(initialMediaInfo)
         private set
@@ -63,7 +70,7 @@ class Anime4KSmartController(
         private set
 
     val calibration: Anime4KCalibration
-        get() = Anime4KCalibration(stableMode, successfulProbes, lastTransitionMillis)
+        get() = Anime4KCalibration(stableMode, successfulProbes, stableAtMillis)
 
     private var currentDiagnostics = Anime4KSmartDiagnostics(
         profile = Anime4KProfile.Smart,
@@ -88,27 +95,30 @@ class Anime4KSmartController(
         updatedMediaInfo: Anime4KMediaInfo,
         nowMillis: Long,
     ): Anime4KSmartAdjustment? {
-        if (updatedMediaInfo != mediaInfo) {
-            mediaInfo = updatedMediaInfo
-            performanceBlockedModes.clear()
-            resetTelemetry()
+        val familyChanged = Anime4K.resolveSmartMode(updatedMediaInfo) != Anime4K.resolveSmartMode(mediaInfo)
+        val workloadChanged = !Anime4K.sameWorkload(measuredWorkload, updatedMediaInfo)
+        mediaInfo = updatedMediaInfo
+        if (workloadChanged) {
+            measuredWorkload = updatedMediaInfo
+            hasStableMeasurement = false
+            resetTelemetry(nowMillis)
             lastReason = "media changed"
             updateDiagnostics(Anime4KHealth.Unknown)
         }
         if (isSuspended) return null
 
         if (
+            !familyChanged &&
             Anime4K.isSecondaryMode(currentMode) &&
-            !Anime4K.supportsSecondaryPass(updatedMediaInfo) &&
-            nowMillis - lastTransitionMillis >= DOWNGRADE_COOLDOWN_MILLIS
+            !Anime4K.supportsSecondaryPass(updatedMediaInfo)
         ) {
-            val fallback = Anime4K.primaryVariant(currentMode)
+            val fallback = availableAtOrBelow(Anime4K.primaryVariant(currentMode))
             if (fallback != currentMode) {
-                stableMode = fallback
                 return transition(
                     mode = fallback,
                     nowMillis = nowMillis,
                     reason = "secondary pass no longer compatible",
+                    suspended = fallback == Anime4KMode.Off,
                 )
             }
         }
@@ -116,17 +126,27 @@ class Anime4KSmartController(
         // MPV may expose the final output size or frame-rate metadata only after video reconfig.
         // Re-evaluate the ceiling once those facts become available, but never resurrect a preset
         // that already failed shader compilation or playback-budget checks in this session.
-        val maximum = Anime4K.maxSmartMode(updatedMediaInfo)
+        val maximum = highestAvailableMode(updatedMediaInfo)
+        if (maximum == currentMode || Anime4K.complexityRank(maximum) <= Anime4K.complexityRank(currentMode)) {
+            pendingCapabilityMode = null
+        }
         if (
-            Anime4K.complexityRank(maximum) > Anime4K.complexityRank(currentMode) &&
-            maximum !in shaderFailedModes &&
-            maximum !in performanceBlockedModes &&
-            nowMillis - lastTransitionMillis >= DOWNGRADE_COOLDOWN_MILLIS
+            workloadChanged &&
+            maximum != currentMode &&
+            (familyChanged || Anime4K.complexityRank(maximum) > Anime4K.complexityRank(currentMode))
         ) {
+            if (!familyChanged) {
+                if (pendingCapabilityMode != maximum) {
+                    pendingCapabilityMode = maximum
+                    pendingCapabilitySinceMillis = nowMillis
+                }
+                return null
+            }
             return transition(
                 mode = maximum,
                 nowMillis = nowMillis,
                 reason = "maximum compatible preset resolved",
+                suspended = maximum == Anime4KMode.Off,
             )
         }
         return null
@@ -134,37 +154,59 @@ class Anime4KSmartController(
 
     fun onSample(sample: Anime4KPerformanceSample): Anime4KSmartAdjustment? {
         if (isSuspended) return null
+        if (!sample.playing) {
+            resetTelemetry(sample.timestampMillis)
+            return null
+        }
+        // Resize/zoom animations can cross the 2x boundary repeatedly. Require a stable
+        // capability before increasing quality; incompatible passes are removed immediately.
+        pendingCapabilityMode?.let { mode ->
+            if (sample.timestampMillis - pendingCapabilitySinceMillis >= CAPABILITY_SETTLE_MILLIS &&
+                mode == highestAvailableMode(mediaInfo)
+            ) {
+                return transition(mode, sample.timestampMillis, "maximum compatible preset resolved")
+            }
+        }
         val previous = lastSample
+        if (previous != null &&
+            (
+                sample.timestampMillis < previous.timestampMillis ||
+                    sample.timestampMillis - previous.timestampMillis > MAX_SAMPLE_GAP_MILLIS ||
+                    countersReset(previous, sample)
+                )
+        ) {
+            resetTelemetry(sample.timestampMillis)
+        }
         if (
-            previous != null &&
-            sample.timestampMillis - previous.timestampMillis < MIN_SAMPLE_INTERVAL_MILLIS
+            lastSample != null &&
+            sample.timestampMillis - lastSample!!.timestampMillis < MIN_SAMPLE_INTERVAL_MILLIS
         ) {
             return null
         }
         lastSample = sample
 
-        val filterFps = sample.estimatedFilterFramesPerSecond
-            ?.takeIf { it.isFinite() && it > 0.0 }
-        if (filterFps != null) filterFpsSamples += filterFps
+        // These are measured render-pass costs, never the video's frame cadence (estimated-vf-fps).
+        val renderCapacity = Anime4K.renderCapacity(sample, mediaInfo)
+        if (renderCapacity != null) renderCapacitySamples += renderCapacity
 
-        if (sample.timestampMillis - lastTransitionMillis < WARMUP_MILLIS) {
+        if (sample.timestampMillis < warmupUntilMillis) {
             windowStartSample = null
-            filterFpsSamples.clear()
-            filterFps?.let { filterFpsSamples += it }
+            renderCapacitySamples.clear()
+            renderCapacity?.let { renderCapacitySamples += it }
             updateDiagnostics(
                 health = collectingHealth(),
-                filterFps = filterFps ?: currentDiagnostics.filterFramesPerSecond,
+                renderCapacity = renderCapacity ?: currentDiagnostics.renderCapacityFramesPerSecond,
             )
             return null
         }
 
         val windowStart = windowStartSample ?: run {
             windowStartSample = sample
-            filterFpsSamples.clear()
-            filterFps?.let { filterFpsSamples += it }
+            renderCapacitySamples.clear()
+            renderCapacity?.let { renderCapacitySamples += it }
             updateDiagnostics(
                 health = collectingHealth(),
-                filterFps = filterFps ?: currentDiagnostics.filterFramesPerSecond,
+                renderCapacity = renderCapacity ?: currentDiagnostics.renderCapacityFramesPerSecond,
             )
             return null
         }
@@ -172,7 +214,9 @@ class Anime4KSmartController(
         if (elapsedMillis < WINDOW_MILLIS) {
             updateDiagnostics(
                 health = collectingHealth(),
-                filterFps = filterFpsSamples.averageOrNull() ?: currentDiagnostics.filterFramesPerSecond,
+                renderCapacity =
+                renderCapacitySamples.conservativeCapacityOrNull()
+                    ?: currentDiagnostics.renderCapacityFramesPerSecond,
             )
             return null
         }
@@ -182,46 +226,58 @@ class Anime4KSmartController(
         val window = PerformanceWindow(
             elapsedSeconds = elapsedSeconds,
             expectedFrames = (targetFps * elapsedSeconds).coerceAtLeast(1.0),
-            outputDrops = counterDelta(sample.outputDroppedFrames, windowStart.outputDroppedFrames),
+            outputDrops = counterDelta(sample.outputDroppedFrames, windowStart.outputDroppedFrames)?.let {
+                val intentional = (
+                    (Anime4K.playbackFrameRate(mediaInfo) - targetFps).coerceAtLeast(0.0) *
+                        elapsedSeconds
+                    ).toLong()
+                (it - intentional).coerceAtLeast(0)
+            },
             decoderDrops = counterDelta(sample.decoderDroppedFrames, windowStart.decoderDroppedFrames),
             delayedFrames = counterDelta(sample.delayedFrames, windowStart.delayedFrames),
             mistimedFrames = counterDelta(sample.mistimedFrames, windowStart.mistimedFrames),
-            filterFps = filterFpsSamples.averageOrNull(),
+            renderCapacity = renderCapacitySamples.takeIf { it.size >= 3 && it.size >= elapsedSeconds * 0.6 }
+                ?.conservativeCapacityOrNull(),
         )
         windowStartSample = sample
-        filterFpsSamples.clear()
-        filterFps?.let { filterFpsSamples += it }
+        renderCapacitySamples.clear()
+        renderCapacity?.let { renderCapacitySamples += it }
         return evaluateWindow(window, sample.timestampMillis)
     }
 
     /** Discards measurements across a seek without changing the selected quality. */
-    fun resetTelemetry() {
+    fun resetTelemetry(nowMillis: Long? = null) {
+        nowMillis?.let { warmupUntilMillis = it + WARMUP_MILLIS }
         lastSample = null
         windowStartSample = null
-        filterFpsSamples.clear()
+        renderCapacitySamples.clear()
         overloadedWindows = 0
         hasEvaluatedWindow = false
-        updateDiagnostics(Anime4KHealth.Unknown)
+        updateDiagnostics(Anime4KHealth.Unknown, null, null, null, null, null, null, 0.0)
+    }
+
+    fun invalidateCalibration(nowMillis: Long) {
+        hasStableMeasurement = false
+        resetTelemetry(nowMillis)
     }
 
     /** Explicit user reactivation after Smart has suspended itself at Off. */
     fun resume(nowMillis: Long) {
-        isSuspended = false
         performanceBlockedModes.clear()
+        pendingCapabilityMode = null
         currentMode = highestAvailableMode(mediaInfo)
-        stableMode = currentMode
+        isSuspended = currentMode == Anime4KMode.Off
+        hasStableMeasurement = false
         lastTransitionMillis = nowMillis
         lastReason = "maximum compatible preset reactivated"
-        resetTelemetry()
+        resetTelemetry(nowMillis)
     }
 
     /** Handles a synchronous MPV failure while applying a candidate mode. */
     fun onModeApplyFailure(nowMillis: Long): Anime4KSmartAdjustment? {
         if (currentMode == Anime4KMode.Off) return null
-        performanceBlockedModes += currentMode
-        val fallback = Anime4K.lessDemandingMode(currentMode)
-        val safeFallback = if (fallback == currentMode) Anime4KMode.Off else fallback
-        if (safeFallback != Anime4KMode.Off) stableMode = safeFallback
+        shaderFailedModes += currentMode
+        val safeFallback = availableAtOrBelow(Anime4K.lessDemandingMode(currentMode))
         return transition(
             mode = safeFallback,
             nowMillis = nowMillis,
@@ -239,11 +295,10 @@ class Anime4KSmartController(
             Anime4KMode.entries
                 .filter { failedShader in it.shaderFileNames }
                 .forEach(shaderFailedModes::add)
+            if (failedShader !in currentMode.shaderFileNames) return null
         }
         shaderFailedModes += currentMode
-        val fallback = Anime4K.lessDemandingMode(currentMode)
-        val safeFallback = if (fallback == currentMode) Anime4KMode.Off else fallback
-        if (safeFallback != Anime4KMode.Off) stableMode = safeFallback
+        val safeFallback = availableAtOrBelow(Anime4K.lessDemandingMode(currentMode))
         return transition(
             mode = safeFallback,
             nowMillis = nowMillis,
@@ -261,29 +316,27 @@ class Anime4KSmartController(
         val decoderDropRate = window.rate(window.decoderDrops)
         val delayedFrameRate = window.rate(window.delayedFrames)
         val mistimedFrameRate = window.rate(window.mistimedFrames)
-        val headroom = window.filterFps?.let { it / targetFps }
+        val headroom = window.renderCapacity?.let { it / targetFps }
         val confidence = telemetryConfidence(
-            window.filterFps,
+            window.renderCapacity,
             outputDropRate,
             decoderDropRate,
             delayedFrameRate,
             mistimedFrameRate,
         )
+        val outputBudgetExceeded = headroom == null || headroom < HEALTHY_HEADROOM
 
         val severe =
             (headroom != null && headroom < SEVERE_HEADROOM) ||
-                (outputDropRate ?: 0.0) >= 0.03 ||
-                (decoderDropRate ?: 0.0) >= 0.01 ||
-                (delayedFrameRate ?: 0.0) >= 0.05
+                ((outputDropRate ?: 0.0) >= 0.03 && outputBudgetExceeded) ||
+                ((delayedFrameRate ?: 0.0) >= 0.05 && headroom != null && headroom < 1.05)
         val overloaded =
             severe ||
                 (headroom != null && headroom < 0.98) ||
-                (outputDropRate ?: 0.0) >= OUTPUT_DROP_OVERLOAD ||
-                (decoderDropRate ?: 0.0) >= DECODER_DROP_OVERLOAD ||
-                (delayedFrameRate ?: 0.0) >= DELAYED_FRAME_OVERLOAD ||
-                (mistimedFrameRate ?: 0.0) >= MISTIMED_FRAME_OVERLOAD
+                ((outputDropRate ?: 0.0) >= OUTPUT_DROP_OVERLOAD && outputBudgetExceeded) ||
+                ((delayedFrameRate ?: 0.0) >= DELAYED_FRAME_OVERLOAD && headroom != null && headroom < 1.1)
         val healthy =
-            window.filterFps != null &&
+            window.renderCapacity != null &&
                 confidence >= 0.75 &&
                 (headroom ?: 0.0) >= HEALTHY_HEADROOM &&
                 below(outputDropRate, OUTPUT_DROP_HEALTHY) &&
@@ -300,7 +353,7 @@ class Anime4KSmartController(
         hasEvaluatedWindow = true
         updateDiagnostics(
             health = health,
-            filterFps = window.filterFps,
+            renderCapacity = window.renderCapacity,
             outputDropRate = outputDropRate,
             decoderDropRate = decoderDropRate,
             delayedFrameRate = delayedFrameRate,
@@ -314,10 +367,9 @@ class Anime4KSmartController(
             val shouldDowngrade = severe ||
                 overloadedWindows >= OVERLOADED_WINDOWS_FOR_DOWNGRADE
             if (shouldDowngrade && nowMillis - lastTransitionMillis >= DOWNGRADE_COOLDOWN_MILLIS) {
-                val fallback = Anime4K.lessDemandingMode(currentMode)
+                val fallback = availableAtOrBelow(Anime4K.lessDemandingMode(currentMode))
                 if (fallback != currentMode) {
                     performanceBlockedModes += currentMode
-                    if (fallback != Anime4KMode.Off) stableMode = fallback
                     return transition(
                         mode = fallback,
                         nowMillis = nowMillis,
@@ -332,6 +384,13 @@ class Anime4KSmartController(
         overloadedWindows = 0
         if (!healthy) return null
 
+        if (!hasStableMeasurement || stableMode != currentMode) {
+            stableMode = currentMode
+            stableAtMillis = nowMillis
+            successfulProbes++
+            hasStableMeasurement = true
+        }
+
         // Ceiling-first policy: a healthy window confirms the current level but never triggers a
         // speculative upgrade. A manual reactivation or a new media capability update may choose a
         // higher ceiling explicitly.
@@ -339,7 +398,11 @@ class Anime4KSmartController(
     }
 
     private fun highestAvailableMode(mediaInfo: Anime4KMediaInfo): Anime4KMode {
-        var candidate = Anime4K.maxSmartMode(mediaInfo)
+        return availableAtOrBelow(Anime4K.maxSmartMode(mediaInfo))
+    }
+
+    private fun availableAtOrBelow(mode: Anime4KMode): Anime4KMode {
+        var candidate = mode
         while (
             candidate != Anime4KMode.Off &&
             (candidate in shaderFailedModes || candidate in performanceBlockedModes)
@@ -361,17 +424,18 @@ class Anime4KSmartController(
         suspended: Boolean = false,
     ): Anime4KSmartAdjustment {
         currentMode = mode
-        if (mode != Anime4KMode.Off) stableMode = mode
+        pendingCapabilityMode = null
+        hasStableMeasurement = false
         isSuspended = suspended
         lastTransitionMillis = nowMillis
         lastReason = reason
-        resetTelemetry()
+        resetTelemetry(nowMillis)
         return Anime4KSmartAdjustment(mode, reason)
     }
 
     private fun updateDiagnostics(
         health: Anime4KHealth,
-        filterFps: Double? = currentDiagnostics.filterFramesPerSecond,
+        renderCapacity: Double? = currentDiagnostics.renderCapacityFramesPerSecond,
         outputDropRate: Double? = currentDiagnostics.outputDropRate,
         decoderDropRate: Double? = currentDiagnostics.decoderDropRate,
         delayedFrameRate: Double? = currentDiagnostics.delayedFrameRate,
@@ -387,7 +451,8 @@ class Anime4KSmartController(
             targetWidth = mediaInfo.targetWidth,
             targetHeight = mediaInfo.targetHeight,
             targetFramesPerSecond = Anime4K.effectiveFrameRate(mediaInfo),
-            filterFramesPerSecond = filterFps,
+            renderCapacityFramesPerSecond = renderCapacity,
+            renderTimeMillis = renderCapacity?.takeIf { it > 0 }?.let { 1000.0 / it },
             outputDropRate = outputDropRate,
             decoderDropRate = decoderDropRate,
             delayedFrameRate = delayedFrameRate,
@@ -402,13 +467,13 @@ class Anime4KSmartController(
     }
 
     private fun telemetryConfidence(
-        filterFps: Double?,
+        renderCapacity: Double?,
         outputDropRate: Double?,
         decoderDropRate: Double?,
         delayedFrameRate: Double?,
         mistimedFrameRate: Double?,
     ): Double {
-        return (if (filterFps != null) 0.40 else 0.0) +
+        return (if (renderCapacity != null) 0.40 else 0.0) +
             (if (outputDropRate != null) 0.25 else 0.0) +
             (if (decoderDropRate != null) 0.15 else 0.0) +
             (if (delayedFrameRate != null) 0.10 else 0.0) +
@@ -421,11 +486,23 @@ class Anime4KSmartController(
 
     private fun counterDelta(current: Long?, previous: Long?): Long? {
         return if (current != null && previous != null) {
-            (current - previous).coerceAtLeast(0L)
+            if (current >= previous && previous >= 0) current - previous else null
         } else {
             null
         }
     }
 
-    private fun List<Double>.averageOrNull(): Double? = if (isEmpty()) null else average()
+    // A slow-side percentile avoids a handful of fast frames hiding an expensive scene.
+    private fun List<Double>.conservativeCapacityOrNull(): Double? = if (isEmpty()) null else sorted()[(size - 1) / 4]
+
+    private fun countersReset(previous: Anime4KPerformanceSample, current: Anime4KPerformanceSample): Boolean =
+        listOf(
+            previous.outputDroppedFrames to current.outputDroppedFrames,
+            previous.decoderDroppedFrames to current.decoderDroppedFrames,
+            previous.delayedFrames to current.delayedFrames,
+            previous.mistimedFrames to current.mistimedFrames,
+        ).any { (old, new) -> old != null && new != null && new < old }
+
+    fun suspend(nowMillis: Long): Anime4KSmartAdjustment =
+        transition(Anime4KMode.Off, nowMillis, "shader pipeline unavailable", suspended = true)
 }

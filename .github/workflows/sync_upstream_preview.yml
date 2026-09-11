@@ -133,6 +133,13 @@ jobs:
           printf '%s' "$encoded_keystore" | base64 --decode > "$HOME/.android/debug.keystore"
           chmod 600 "$HOME/.android/debug.keystore"
 
+      - name: Verify Anime4K Lua telemetry
+        if: steps.merge.outputs.build == 'true'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/anime4k-tests"
+          "$RUNNER_TEMP/anime4k-tests/bin/python" -m pip install --disable-pip-version-check lupa==2.8
+          "$RUNNER_TEMP/anime4k-tests/bin/python" scripts/tests/test_anime4k_telemetry.py
+
       - name: Verify merged fork and build preview APK
         if: steps.merge.outputs.build == 'true'
         run: ./gradlew spotlessCheck assemblePreview testDebugUnitTest -Penable-updater --no-daemon

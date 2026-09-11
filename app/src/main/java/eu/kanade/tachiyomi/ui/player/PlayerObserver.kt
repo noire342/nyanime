@@ -56,7 +56,9 @@ class PlayerObserver(val activity: PlayerActivity) :
             else -> LogPriority.VERBOSE
         }
         if (text.contains("HTTP error")) httpError = text
-        if (Anime4K.isShaderError(text)) activity.onAnime4KShaderError(text)
+        if ((logPriority == LogPriority.ERROR || logPriority == LogPriority.WARN) && Anime4K.isShaderError(text)) {
+            activity.onAnime4KShaderError(text)
+        }
         logcat.logcat("mpv/$prefix", logPriority) { text }
     }
 }

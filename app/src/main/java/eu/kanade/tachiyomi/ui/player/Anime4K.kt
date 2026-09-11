@@ -2,7 +2,7 @@ package eu.kanade.tachiyomi.ui.player
 
 import dev.icerock.moko.resources.StringResource
 import tachiyomi.i18n.aniyomi.AYMR
-import kotlin.math.max
+import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.round
 
@@ -178,8 +178,10 @@ data class Anime4KPerformanceSample(
     val outputDroppedFrames: Long?,
     val decoderDroppedFrames: Long?,
     val delayedFrames: Long?,
-    val estimatedFilterFramesPerSecond: Double?,
+    val renderTimeMillis: Double?,
     val mistimedFrames: Long? = null,
+    val redrawTimeMillis: Double? = null,
+    val playing: Boolean = true,
 )
 
 enum class Anime4KHealth {
@@ -198,7 +200,8 @@ data class Anime4KSmartDiagnostics(
     val targetWidth: Int? = null,
     val targetHeight: Int? = null,
     val targetFramesPerSecond: Double? = null,
-    val filterFramesPerSecond: Double? = null,
+    val renderCapacityFramesPerSecond: Double? = null,
+    val renderTimeMillis: Double? = null,
     val outputDropRate: Double? = null,
     val decoderDropRate: Double? = null,
     val delayedFrameRate: Double? = null,
@@ -261,10 +264,10 @@ object Anime4KSelectionRules {
 object Anime4K {
     const val VERSION = "4.0.1"
     const val SHADER_REVISION = "4.0.1"
-    const val CALIBRATION_REVISION = "ahg-2"
+    const val CALIBRATION_REVISION = "gpu-telemetry-3"
 
     /** Anime4K documents secondary passes for an upscale ratio of roughly 2x or higher. */
-    private const val SECONDARY_PASS_MIN_SCALE = 1.85
+    private const val SECONDARY_PASS_MIN_SCALE = 2.0
 
     internal val bundledShaderNames: List<String> = Anime4KMode.entries
         .flatMap { it.shaderFileNames }
@@ -289,7 +292,6 @@ object Anime4K {
         val failureMarker = listOf(
             "error",
             "fail",
-            "compil",
             "invalid",
             "not found",
             "unable",
@@ -338,13 +340,14 @@ object Anime4K {
 
     /** Returns the effective upscale ratio, taking the limiting axis and invalid dimensions into account. */
     fun upscaleScale(mediaInfo: Anime4KMediaInfo): Double {
-        val sourceLongSide = max(mediaInfo.sourceWidth, mediaInfo.sourceHeight).coerceAtLeast(1)
-        val sourceShortSide = min(mediaInfo.sourceWidth, mediaInfo.sourceHeight).coerceAtLeast(1)
-        val targetLongSide = max(mediaInfo.targetWidth, mediaInfo.targetHeight).coerceAtLeast(1)
-        val targetShortSide = min(mediaInfo.targetWidth, mediaInfo.targetHeight).coerceAtLeast(1)
+        if (minOf(mediaInfo.sourceWidth, mediaInfo.sourceHeight, mediaInfo.targetWidth, mediaInfo.targetHeight) <=
+            0
+        ) {
+            return 0.0
+        }
         return min(
-            targetLongSide.toDouble() / sourceLongSide,
-            targetShortSide.toDouble() / sourceShortSide,
+            mediaInfo.targetWidth.toDouble() / mediaInfo.sourceWidth,
+            mediaInfo.targetHeight.toDouble() / mediaInfo.sourceHeight,
         )
     }
 
@@ -360,6 +363,13 @@ object Anime4K {
      * does need twice the normal filter throughput.
      */
     fun effectiveFrameRate(mediaInfo: Anime4KMediaInfo): Double {
+        val playbackFps = playbackFrameRate(mediaInfo)
+        val displayFps = mediaInfo.displayRefreshRate
+            ?.takeIf { it.isFinite() && it > 0.0 }
+        return min(playbackFps, displayFps ?: playbackFps)
+    }
+
+    fun playbackFrameRate(mediaInfo: Anime4KMediaInfo): Double {
         val sourceFps = mediaInfo.framesPerSecond
             .takeIf { it.isFinite() && it > 0.0 }
             ?: 24.0
@@ -369,9 +379,33 @@ object Anime4K {
         val playbackFps = (sourceFps * playbackSpeed)
             .takeIf { it.isFinite() && it > 0.0 }
             ?: sourceFps
-        val displayFps = mediaInfo.displayRefreshRate
-            ?.takeIf { it.isFinite() && it > 0.0 }
-        return min(playbackFps, displayFps ?: playbackFps)
+        return playbackFps
+    }
+
+    /** vo-passes costs are nanoseconds converted by the Lua adapter; cadence is not GPU capacity. */
+    fun renderCapacity(sample: Anime4KPerformanceSample, mediaInfo: Anime4KMediaInfo): Double? {
+        val fresh = sample.renderTimeMillis?.takeIf { it.isFinite() && it > 0.0 && it < 10_000.0 }
+            ?: return null
+        val targetFps = effectiveFrameRate(mediaInfo)
+        val refresh = mediaInfo.displayRefreshRate?.takeIf { it.isFinite() && it > 0.0 } ?: targetFps
+        val redraw = sample.redrawTimeMillis?.takeIf { it.isFinite() && it >= 0.0 && it < 10_000.0 } ?: 0.0
+        // Repeated presentations can still cost GPU time on high-refresh displays.
+        val cost = fresh + redraw * ((refresh / targetFps) - 1.0).coerceAtLeast(0.0)
+        return (1000.0 / cost).takeIf { it.isFinite() && it > 0.0 }
+    }
+
+    /** Small refresh-rate jitter must not reset the governor or invalidate a measured window. */
+    fun sameWorkload(first: Anime4KMediaInfo, second: Anime4KMediaInfo): Boolean {
+        fun close(a: Double, b: Double): Boolean = abs(a - b) <= maxOf(abs(a), abs(b), 1.0) * 0.02
+        return first.sourceWidth == second.sourceWidth &&
+            first.sourceHeight == second.sourceHeight &&
+            close(first.targetWidth.toDouble(), second.targetWidth.toDouble()) &&
+            close(first.targetHeight.toDouble(), second.targetHeight.toDouble()) &&
+            first.frameRateKnown == second.frameRateKnown &&
+            close(playbackFrameRate(first), playbackFrameRate(second)) &&
+            close(effectiveFrameRate(first), effectiveFrameRate(second)) &&
+            close(first.displayRefreshRate ?: 0.0, second.displayRefreshRate ?: 0.0) &&
+            supportsSecondaryPass(first) == supportsSecondaryPass(second)
     }
 
     fun resolveFramesPerSecond(estimated: Double?, container: Double?): Double {

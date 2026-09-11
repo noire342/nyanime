@@ -1,130 +1,104 @@
 package eu.kanade.tachiyomi.ui.player
 
 import android.content.Context
-import com.hippo.unifile.UniFile
 import `is`.xyz.mpv.MPVLib
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
-/**
- * Boundary around filesystem and MPV side effects. The governor and preset rules depend only
- * on the domain API, while this adapter owns shader installation and list replacement.
- */
-class Anime4KShaderPipeline(
-    private val context: Context,
-    private val shaderListReader: () -> String? = {
-        MPVLib.getPropertyString("glsl-shaders")
-    },
-    private val commandSender: (Array<String>) -> Unit = { command ->
-        MPVLib.command(command)
-    },
+/** Owns bundled assets and replaces only the app's entries in MPV's shader list. */
+class Anime4KShaderPipeline internal constructor(
+    private val shaderDir: File,
+    private val assetReader: (String) -> InputStream,
+    private val shaderListReader: () -> String?,
+    private val commandSender: (Array<String>) -> Unit,
 ) {
-    companion object {
-        private const val ASSET_DIRECTORY = "anime4k"
-        private const val MPV_DIRECTORY = "mpv"
-        private const val MPV_SHADERS_DIRECTORY = "anime4k-shaders"
-        private const val REVISION_FILE = ".revision"
-    }
+    constructor(context: Context) : this(
+        shaderDir = File(context.filesDir, "mpv/anime4k-shaders"),
+        assetReader = { context.assets.open("anime4k/$it") },
+        shaderListReader = { MPVLib.getPropertyString("glsl-shaders") },
+        commandSender = { MPVLib.command(it) },
+    )
 
-    private val bundledShaderNamesLowercase = Anime4K.bundledShaderNames
-        .map(String::lowercase)
-        .toSet()
+    private val shaderNames = Anime4K.bundledShaderNames.toSet()
+    private var assetsVerified = false
 
-    /** Copies the curated set outside MPV's replaceable user-shader directory. */
-    fun copyAssets(mpvDir: UniFile) {
-        val mpvPath = mpvDir.filePath ?: return
-        val shadersDir = File(mpvPath, MPV_SHADERS_DIRECTORY)
-        if (!shadersDir.exists() && !shadersDir.mkdirs()) return
-
-        val revisionFile = File(shadersDir, REVISION_FILE)
-        val complete = Anime4K.bundledShaderNames.all { File(shadersDir, it).isFile }
-        if (complete && revisionFile.readTextOrNull() == Anime4K.SHADER_REVISION) return
-
-        val copied = Anime4K.bundledShaderNames.map { filename ->
-            copyAsset(
-                assetPath = "$ASSET_DIRECTORY/$filename",
-                outputFile = File(shadersDir, filename),
-            )
-        }.all { it }
-
-        if (copied && Anime4K.bundledShaderNames.all { File(shadersDir, it).isFile }) {
-            runCatching { revisionFile.writeText(Anime4K.SHADER_REVISION) }
-                .onFailure { error ->
-                    logcat(LogPriority.ERROR, error) { "Failed to write Anime4K revision marker" }
+    /** Verify bytes once per player initialization, repairing interrupted or corrupt copies. */
+    @Synchronized
+    fun copyAssets(): Boolean {
+        assetsVerified = false
+        return try {
+            if (!shaderDir.isDirectory && !shaderDir.mkdirs()) return false
+            for (filename in shaderNames) {
+                val expected = assetReader(filename).use { it.readBytes() }
+                if (expected.isEmpty()) throw IOException("Empty bundled Anime4K shader: $filename")
+                val outputFile = File(shaderDir, filename)
+                val matches = outputFile.isFile &&
+                    outputFile.length() == expected.size.toLong() &&
+                    outputFile.readBytes().contentEquals(expected)
+                if (!matches) {
+                    val temporaryFile = File(shaderDir, "$filename.tmp")
+                    try {
+                        temporaryFile.writeBytes(expected)
+                        try {
+                            Files.move(
+                                temporaryFile.toPath(),
+                                outputFile.toPath(),
+                                StandardCopyOption.REPLACE_EXISTING,
+                                StandardCopyOption.ATOMIC_MOVE,
+                            )
+                        } catch (_: AtomicMoveNotSupportedException) {
+                            Files.move(temporaryFile.toPath(), outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                        }
+                    } finally {
+                        temporaryFile.delete()
+                    }
                 }
+            }
+            assetsVerified = true
+            true
+        } catch (error: IOException) {
+            logcat(LogPriority.ERROR, error) { "Failed to install Anime4K shaders" }
+            false
         }
     }
 
-    /**
-     * Replaces only Anime4K entries in MPV's shader list. User-configured shaders are preserved.
-     */
     @Synchronized
     fun apply(mode: Anime4KMode): Boolean {
-        val shaderDir = shaderDirectory()
-        if (mode != Anime4KMode.Off && mode.shaderFileNames.any { !File(shaderDir, it).isFile }) {
-            logcat(LogPriority.ERROR) {
-                "Anime4K ${Anime4K.VERSION} assets are incomplete; keeping the current shader pipeline"
-            }
-            return false
-        }
-
         return try {
-            val existingShaders = shaderListReader()
-                ?.split(File.pathSeparatorChar)
-                .orEmpty()
-                .filter(String::isNotBlank)
-                .filterNot(::isBundledAnime4KPath)
-            val targetShaders = (
-                existingShaders + mode.shaderFileNames.map { File(shaderDir, it).absolutePath }
-                ).distinct()
-            val command = if (targetShaders.isEmpty()) {
-                arrayOf("change-list", "glsl-shaders", "clr", "")
-            } else {
-                arrayOf(
-                    "change-list",
-                    "glsl-shaders",
-                    "set",
-                    targetShaders.joinToString(File.pathSeparator),
-                )
+            if (mode != Anime4KMode.Off && !assetsVerified) return false
+            if (mode.shaderFileNames.any { !File(shaderDir, it).isFile || File(shaderDir, it).length() == 0L }) {
+                logcat(LogPriority.ERROR) { "Anime4K assets are incomplete; keeping the current shader pipeline" }
+                return false
             }
-            commandSender(command)
+            // Null means MPV could not read the property. Treating it as an empty list would
+            // erase custom shaders on the next successful command.
+            val shaderList = shaderListReader() ?: return false
+            val current = shaderList.split(File.pathSeparatorChar).filter(String::isNotBlank)
+            val target =
+                current.filterNot(::isOwnedShader) + mode.shaderFileNames.map { File(shaderDir, it).absolutePath }
+            if (current == target) return true
+            commandSender(
+                if (target.isEmpty()) {
+                    arrayOf("change-list", "glsl-shaders", "clr", "")
+                } else {
+                    arrayOf("change-list", "glsl-shaders", "set", target.joinToString(File.pathSeparator))
+                },
+            )
             true
-        } catch (error: RuntimeException) {
+        } catch (error: Exception) {
             logcat(LogPriority.ERROR, error) { "Failed to apply Anime4K mode ${mode.name}" }
             false
         }
     }
 
-    private fun shaderDirectory(): File = File(
-        context.filesDir,
-        "$MPV_DIRECTORY/$MPV_SHADERS_DIRECTORY",
-    )
-
-    private fun isBundledAnime4KPath(path: String): Boolean {
-        return File(path).name.lowercase() in bundledShaderNamesLowercase
-    }
-
-    private fun File.readTextOrNull(): String? = runCatching { readText() }.getOrNull()
-
-    private fun copyAsset(
-        assetPath: String,
-        outputFile: File,
-    ): Boolean {
-        return try {
-            val temporaryFile = File(outputFile.parentFile, "${outputFile.name}.tmp")
-            context.assets.open(assetPath).use { input ->
-                temporaryFile.outputStream().use { output -> input.copyTo(output) }
-            }
-            if (!temporaryFile.renameTo(outputFile)) {
-                temporaryFile.copyTo(outputFile, overwrite = true)
-                temporaryFile.delete()
-            }
-            true
-        } catch (error: IOException) {
-            logcat(LogPriority.ERROR, error) { "Failed to copy Anime4K asset: $assetPath" }
-            false
-        }
+    private fun isOwnedShader(path: String): Boolean {
+        val file = File(path)
+        return file.name in shaderNames && file.canonicalFile.parentFile == shaderDir.canonicalFile
     }
 }

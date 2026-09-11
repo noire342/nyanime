@@ -47,8 +47,7 @@ fun Anime4KDiagnosticsOverlay(
             )
             Row(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "FPS ${decimal(diagnostics.targetFramesPerSecond)} / " +
-                        decimal(diagnostics.filterFramesPerSecond),
+                    text = "FPS ${decimal(diagnostics.targetFramesPerSecond)}",
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.labelSmall,
                 )
@@ -57,6 +56,10 @@ fun Anime4KDiagnosticsOverlay(
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
+            Text(
+                text = "GPU ${decimal(diagnostics.renderTimeMillis)} ms / frame",
+                style = MaterialTheme.typography.labelSmall,
+            )
             Text(
                 text = "headroom ${decimal(diagnostics.headroom)} · conf " +
                     percent(diagnostics.confidence),
