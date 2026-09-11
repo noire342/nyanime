@@ -21,14 +21,22 @@ class UiPreferences(
 
     fun appTheme() = preferenceStore.getEnum(
         "pref_app_theme",
-        if (DeviceUtil.isDynamicColorAvailable) {
-            AppTheme.MONET
-        } else {
-            AppTheme.DEFAULT
-        },
+        AppTheme.NYANIME,
     )
 
     fun themeDarkAmoled() = preferenceStore.getBoolean("pref_theme_dark_amoled_key", false)
+
+    private val legacyDefaultTheme get() = if (DeviceUtil.isDynamicColorAvailable) AppTheme.MONET else AppTheme.DEFAULT
+
+    fun legacyMangaTheme() = preferenceStore.getEnum("nyanime_legacy_manga_theme", legacyDefaultTheme)
+
+    fun installNyanimeThemeOnce() {
+        val installed = preferenceStore.getBoolean("nyanime_visual_identity_v1", false)
+        if (installed.get()) return
+        legacyMangaTheme().set(appTheme().get().takeUnless { it == AppTheme.NYANIME } ?: legacyDefaultTheme)
+        appTheme().set(AppTheme.NYANIME)
+        installed.set(true)
+    }
 
     fun relativeTime() = preferenceStore.getBoolean("relative_time_v2", true)
 

@@ -44,6 +44,7 @@ import eu.kanade.presentation.browse.manga.MissingSourceScreen
 import eu.kanade.presentation.browse.manga.components.BrowseMangaSourceToolbar
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.entries.manga.DuplicateMangaDialog
+import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.core.common.Constants
@@ -80,6 +81,11 @@ data class BrowseMangaSourceScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         if (!ifMangaSourcesLoaded()) {
             LoadingScreen()
             return

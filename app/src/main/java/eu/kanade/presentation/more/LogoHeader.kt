@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.theme.NyanimeWordmark
 import eu.kanade.tachiyomi.R
 
 @Composable
@@ -25,10 +26,11 @@ fun LogoHeader() {
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
-                .padding(vertical = 56.dp)
+                .padding(top = 32.dp, bottom = 8.dp)
                 .size(64.dp),
         )
 
+        NyanimeWordmark(Modifier.padding(bottom = 24.dp))
         HorizontalDivider()
     }
 }

@@ -12,7 +12,7 @@ class GoogleCastOptions : OptionsProvider {
         .setReceiverApplicationId(CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID)
         .setStopReceiverApplicationWhenEndingSession(true)
         .setResumeSavedSession(false)
-        // UltraYomi owns the session notification for both Cast and DLNA.
+        // Nyanime owns the session notification for both Cast and DLNA.
         .setCastMediaOptions(
             CastMediaOptions.Builder().setNotificationOptions(null).setMediaSessionEnabled(false).build(),
         )

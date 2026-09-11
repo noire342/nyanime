@@ -125,6 +125,10 @@ data object DiscoveryTab : Tab {
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                item(key = "hero") {
+                    val featured = state.catalog[CatalogFeed.TRENDING] ?: SectionState()
+                    FeaturedCarousel(featured.data?.items.orEmpty(), openCatalog)
+                }
                 item(key = "resume") {
                     SectionHeader("Continua a guardare") { navigator.push(HistoriesTab) }
                     ContinueWatchingRow(state.resume, { navigator.push(AnimeScreen(it)) }) { item ->
@@ -144,10 +148,6 @@ data object DiscoveryTab : Tab {
                         TextButton(onClick = { navigator.push(HistoriesTab) }) { Text("Cronologia") }
                     }
                     if (state.offline) Text("Solo download · catalogo salvato", Modifier.padding(horizontal = 16.dp))
-                }
-                item(key = "hero") {
-                    val featured = state.catalog[CatalogFeed.TRENDING] ?: SectionState()
-                    FeaturedCarousel(featured.data?.items.orEmpty(), openCatalog)
                 }
                 state.catalogueOutage?.let { message ->
                     item(key = "catalogue-outage") {

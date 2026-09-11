@@ -9,11 +9,13 @@ plugins {
     id("com.github.zellius.shortcut-helper")
     kotlin("plugin.serialization")
     alias(libs.plugins.aboutLibraries)
+    id("com.android.compose.screenshot") version "0.0.1-alpha15"
 }
 
 shortcutHelper.setFilePath("./shortcuts.xml")
 
 android {
+    experimentalProperties["android.experimental.enableScreenshotTest"] = true
     namespace = "eu.kanade.tachiyomi"
 
     defaultConfig {
@@ -188,7 +190,22 @@ kotlin {
     }
 }
 
+// Artwork is an optional test-only JAR, so renders never add pictures to application assets.
+val nyanimePreviewArtwork by tasks.registering(Jar::class) {
+    archiveFileName.set("nyanime-preview-artwork.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("screenshot-artwork"))
+    providers.environmentVariable("NYANIME_PREVIEW_ARTWORK").orNull?.let { directory ->
+        from(directory) {
+            include("poster-*.jpg", "backdrop.jpg")
+            into("nyanime-preview")
+        }
+    }
+}
+
 dependencies {
+    add("screenshotTestImplementation", files(nyanimePreviewArtwork))
+    add("screenshotTestImplementation", "com.android.tools.screenshot:screenshot-validation-api:0.0.1-alpha15")
+    add("screenshotTestImplementation", "io.coil-kt.coil3:coil-test:3.1.0")
     implementation(projects.i18n)
     implementation(projects.i18nAniyomi)
     implementation(projects.core.archive)

@@ -147,7 +147,10 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
             .onEach { ImageUtil.hardwareBitmapThreshold = it }
             .launchIn(scope)
 
-        setAppCompatDelegateThemeMode(Injekt.get<UiPreferences>().themeMode().get())
+        Injekt.get<UiPreferences>().let {
+            it.installNyanimeThemeOnce()
+            setAppCompatDelegateThemeMode(it.themeMode().get())
+        }
 
         // Updates widget update
         with(MangaWidgetManager(Injekt.get(), Injekt.get())) {

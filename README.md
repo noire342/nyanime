@@ -1,25 +1,27 @@
 <div align="center">
 
-<a href="https://aniyomi.org">
-    <img src="./.github/assets/logo.png" alt="Aniyomi logo" title="Aniyomi logo" width="80"/>
+<a href="https://github.com/noire342/ultrayomi/releases">
+    <img src="./.github/assets/nyanime.svg" alt="Nyanime logo" title="Nyanime logo" width="80"/>
 </a>
 
-# Aniyomi [App](#)
+# Nyanime
 
-### Full-featured player and reader, based on ~~Tachiyomi~~ Mihon.
+### A video-focused AniYomi fork, with its manga reader preserved.
 Discover and watch anime, cartoons, series, and more – easier than ever on your Android device.
 
-[![Discord server](https://img.shields.io/discord/841701076242530374.svg?label=&labelColor=6A7EC2&color=7389D8&logo=discord&logoColor=FFFFFF)](https://discord.gg/F32UjdJZrR)
-[![GitHub downloads](https://img.shields.io/github/downloads/aniyomiorg/aniyomi/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/aniyomiorg/aniyomi/releases)
+Nyanime adds a cinematic anime interface, Anime4K enhancements and background Cast controls.
+See the [interface guide](docs/nyanime-ui.md) and [Cast guide](docs/casting.md).
 
-[![CI](https://img.shields.io/github/actions/workflow/status/aniyomiorg/aniyomi/build_push.yml?labelColor=27303D)](https://github.com/aniyomiorg/aniyomi/actions/workflows/build_push.yml)
+[![Discord server](https://img.shields.io/discord/841701076242530374.svg?label=&labelColor=6A7EC2&color=7389D8&logo=discord&logoColor=FFFFFF)](https://discord.gg/F32UjdJZrR)
+[![GitHub downloads](https://img.shields.io/github/downloads/noire342/ultrayomi/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/noire342/ultrayomi/releases)
+
+[![CI](https://img.shields.io/github/actions/workflow/status/noire342/ultrayomi/build_push.yml?branch=dev&labelColor=27303D)](https://github.com/noire342/ultrayomi/actions/workflows/build_push.yml)
 [![License: Apache-2.0](https://img.shields.io/github/license/aniyomiorg/aniyomi?labelColor=27303D&color=818cf8)](/LICENSE)
 [![Translation status](https://img.shields.io/weblate/progress/aniyomi?labelColor=27303D&color=946300)](https://hosted.weblate.org/engage/aniyomi/)
 
 ## Download
 
-[![Aniyomi Stable](https://img.shields.io/github/release/aniyomiorg/aniyomi.svg?maxAge=3600&label=Stable&labelColor=06599d&color=043b69)](https://github.com/aniyomiorg/aniyomi/releases)
-[![Aniyomi Preview](https://img.shields.io/github/v/release/aniyomiorg/aniyomi-preview.svg?maxAge=3600&label=Beta&labelColor=2c2c47&color=1c1c39)](https://github.com/aniyomiorg/aniyomi-preview/releases)
+[Download the latest signed Nyanime APK](https://github.com/noire342/ultrayomi/releases).
 
 *Requires Android 8.0 or higher.*
 

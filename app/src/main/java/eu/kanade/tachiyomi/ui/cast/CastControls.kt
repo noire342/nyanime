@@ -167,8 +167,8 @@ fun CastMiniController(modifier: Modifier = Modifier, includeNavigationInsets: B
     val enabled = state.active && !state.connecting && !state.needsReconnect
     Surface(
         modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 3.dp,
         shadowElevation = 4.dp,
     ) {

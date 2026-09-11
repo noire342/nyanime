@@ -68,6 +68,7 @@ import eu.kanade.presentation.entries.anime.components.AnimeActionRow
 import eu.kanade.presentation.entries.anime.components.AnimeEpisodeListItem
 import eu.kanade.presentation.entries.anime.components.AnimeInfoBox
 import eu.kanade.presentation.entries.anime.components.AnimeSeasonListItem
+import eu.kanade.presentation.entries.anime.components.AnimeWatchButton
 import eu.kanade.presentation.entries.anime.components.EpisodeDownloadAction
 import eu.kanade.presentation.entries.anime.components.ExpandableAnimeDescription
 import eu.kanade.presentation.entries.anime.components.NextEpisodeAiringListItem
@@ -502,19 +503,29 @@ private fun AnimeScreenSmallImpl(
                         contentType = EntryScreenItem.ACTION_ROW,
                         span = { GridItemSpan(maxLineSpan) },
                     ) {
-                        AnimeActionRow(
-                            favorite = state.anime.favorite,
-                            trackingCount = state.trackingCount,
-                            nextUpdate = nextUpdate,
-                            isUserIntervalMode = state.anime.fetchInterval < 0,
-                            onAddToLibraryClicked = onAddToLibraryClicked,
-                            onWebViewClicked = onWebViewClicked,
-                            onWebViewLongClicked = onWebViewLongClicked,
-                            onTrackingClicked = onTrackingClicked,
-                            onEditIntervalClicked = onEditIntervalClicked,
-                            onEditCategory = onEditCategoryClicked,
-                            modifier = Modifier.ignorePadding(offsetGridPaddingPx),
-                        )
+                        Column {
+                            if (state.episodes.isNotEmpty()) {
+                                AnimeWatchButton(
+                                    state.episodes.any {
+                                        it.episode.seen || it.episode.lastSecondSeen > 0
+                                    },
+                                    onContinueWatching,
+                                )
+                            }
+                            AnimeActionRow(
+                                favorite = state.anime.favorite,
+                                trackingCount = state.trackingCount,
+                                nextUpdate = nextUpdate,
+                                isUserIntervalMode = state.anime.fetchInterval < 0,
+                                onAddToLibraryClicked = onAddToLibraryClicked,
+                                onWebViewClicked = onWebViewClicked,
+                                onWebViewLongClicked = onWebViewLongClicked,
+                                onTrackingClicked = onTrackingClicked,
+                                onEditIntervalClicked = onEditIntervalClicked,
+                                onEditCategory = onEditCategoryClicked,
+                                modifier = Modifier.ignorePadding(offsetGridPaddingPx),
+                            )
+                        }
                     }
 
                     item(
@@ -833,6 +844,14 @@ fun AnimeScreenLargeImpl(
                                 onCoverClick = onCoverClicked,
                                 doSearch = onSearch,
                             )
+                            if (state.episodes.isNotEmpty()) {
+                                AnimeWatchButton(
+                                    state.episodes.any {
+                                        it.episode.seen || it.episode.lastSecondSeen > 0
+                                    },
+                                    onContinueWatching,
+                                )
+                            }
                             AnimeActionRow(
                                 favorite = state.anime.favorite,
                                 trackingCount = state.trackingCount,

@@ -31,6 +31,7 @@ fun Screen.mangaSourcesTab(): TabContent {
     val state by screenModel.state.collectAsState()
 
     return TabContent(
+        legacyManga = true,
         titleRes = AYMR.strings.label_manga_sources,
         actions = persistentListOf(
             AppBar.Action(

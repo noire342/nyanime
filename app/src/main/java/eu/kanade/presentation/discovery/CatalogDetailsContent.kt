@@ -1,6 +1,9 @@
 package eu.kanade.presentation.discovery
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +20,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,12 +34,25 @@ import tachiyomi.domain.discovery.providerLabel
 @Composable
 fun CatalogDetailsContent(anime: CatalogAnime, actions: @Composable () -> Unit = {}, onRelated: (CatalogId) -> Unit) {
     var expanded by rememberSaveable(anime.id.provider, anime.id.value) { mutableStateOf(false) }
-    AsyncImage(
-        anime.banner ?: anime.cover,
-        anime.title,
-        Modifier.fillMaxWidth().height(230.dp),
-        contentScale = ContentScale.Crop,
-    )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().height((maxWidth * 0.75f).coerceIn(240.dp, 380.dp))) {
+            AsyncImage(
+                anime.banner ?: anime.cover,
+                anime.title,
+                Modifier.matchParentSize(),
+                contentScale = ContentScale.Crop,
+            )
+            Box(
+                Modifier.matchParentSize().background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.5f to Color.Transparent,
+                        1f to MaterialTheme.colorScheme.background,
+                    ),
+                ),
+            )
+        }
+    }
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(anime.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         if (anime.alternateTitles.isNotEmpty()) {
@@ -63,9 +81,7 @@ fun CatalogDetailsContent(anime: CatalogAnime, actions: @Composable () -> Unit =
             maxLines = if (expanded) Int.MAX_VALUE else 6,
             overflow = TextOverflow.Ellipsis,
         )
-        if (anime.synopsis !=
-            null
-        ) {
+        if (anime.synopsis != null) {
             TextButton(onClick = {
                 expanded = !expanded
             }) { Text(if (expanded) "Riduci trama" else "Leggi tutta la trama") }

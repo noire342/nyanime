@@ -16,5 +16,10 @@ local.properties
 /.local/
 /private/
 
+# Local Compose preview renders may use private artwork
+/app/src/screenshotTestDebug/
+/app/src/screenshotTestRelease/
+/app/src/screenshotTestPreview/
+
 # macOS specific files
 .DS_Store

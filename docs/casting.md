@@ -1,8 +1,8 @@
-# Cast in UltraYomi
+# Cast in Nyanime
 
 The player Cast button discovers Google Cast and UPnP/DLNA renderers on the same
 Wi-Fi/Ethernet LAN. Fire TV is outside this implementation. This is original
-UltraYomi code using the Google sender SDK and UPnP AV services.
+Nyanime code using the Google sender SDK and UPnP AV services.
 
 ## Using the phone as a remote
 

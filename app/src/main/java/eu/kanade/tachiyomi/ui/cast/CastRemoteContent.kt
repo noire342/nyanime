@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -132,6 +133,11 @@ internal fun CastRemoteContent(state: CastState, actions: CastRemoteActions, mod
                         Button(
                             onClick = actions.browse,
                             modifier = Modifier.fillMaxWidth().height(52.dp),
+                            shape = RoundedCornerShape(4.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.onSurface,
+                                contentColor = MaterialTheme.colorScheme.surface,
+                            ),
                         ) {
                             Icon(Icons.Default.VideoLibrary, null, Modifier.size(20.dp))
                             Spacer(Modifier.width(10.dp))
@@ -144,7 +150,7 @@ internal fun CastRemoteContent(state: CastState, actions: CastRemoteActions, mod
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         )
                     } else {
-                        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                        Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                             Column(
                                 Modifier.fillMaxWidth().padding(32.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -221,7 +227,7 @@ private fun RemoteHeader(state: CastState, actions: CastRemoteActions) {
 private fun NowCasting(state: CastState, modifier: Modifier = Modifier) {
     val media = state.media ?: return
     val colors = MaterialTheme.colorScheme
-    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = colors.surfaceContainer) {
+    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), color = colors.surfaceContainer) {
         Row(
             Modifier.background(
                 Brush.linearGradient(listOf(colors.primaryContainer.copy(alpha = 0.6f), colors.surfaceContainer)),
@@ -287,12 +293,12 @@ private fun NowCasting(state: CastState, modifier: Modifier = Modifier) {
 @Composable
 internal fun CastArtwork(media: CastMedia?, modifier: Modifier = Modifier) {
     if (media?.cover?.url != null) {
-        ItemCover.Book(data = media.cover, modifier = modifier, shape = RoundedCornerShape(14.dp))
+        ItemCover.Book(data = media.cover, modifier = modifier, shape = RoundedCornerShape(4.dp))
     } else {
         Box(
             modifier.aspectRatio(
                 2f / 3f,
-            ).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.primaryContainer),
+            ).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Default.Tv, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -386,7 +392,7 @@ private fun PlaybackControls(state: CastState, actions: CastRemoteActions) {
 private fun ReceiverControls(state: CastState, actions: CastRemoteActions) {
     val playback = state.playback
     val enabled = !state.connecting && !state.needsReconnect
-    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (playback.canSetVolume) {
                 LevelControl(

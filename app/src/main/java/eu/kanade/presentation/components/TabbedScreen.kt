@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.icerock.moko.resources.StringResource
+import eu.kanade.presentation.theme.MangaSectionTheme
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.launch
@@ -47,76 +48,78 @@ fun TabbedScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    Scaffold(
-        topBar = {
-            if (titleRes != null) {
-                val tab = tabs[state.currentPage]
-                val searchEnabled = tab.searchEnabled
+    MangaSectionTheme(legacy = tabs[state.currentPage].legacyManga) {
+        Scaffold(
+            topBar = {
+                if (titleRes != null) {
+                    val tab = tabs[state.currentPage]
+                    val searchEnabled = tab.searchEnabled
 
-                val actualQuery = when (state.currentPage % 2) {
-                    1 -> mangaSearchQuery // History and Browse
-                    else -> animeSearchQuery
-                }
+                    val actualQuery = when (state.currentPage % 2) {
+                        1 -> mangaSearchQuery // History and Browse
+                        else -> animeSearchQuery
+                    }
 
-                val actualOnChange = when (state.currentPage % 2) {
-                    1 -> onChangeMangaSearchQuery // History and Browse
-                    else -> onChangeAnimeSearchQuery
-                }
+                    val actualOnChange = when (state.currentPage % 2) {
+                        1 -> onChangeMangaSearchQuery // History and Browse
+                        else -> onChangeAnimeSearchQuery
+                    }
 
-                SearchToolbar(
-                    titleContent = {
-                        AppBarTitle(
-                            stringResource(titleRes),
-                            modifier = modifier,
-                            null,
-                            tab.numberTitle,
-                        )
-                    },
-                    searchEnabled = searchEnabled,
-                    searchQuery = if (searchEnabled) actualQuery else null,
-                    onChangeSearchQuery = actualOnChange,
-                    actions = { AppBarActions(tab.actions) },
-                    navigateUp = tab.navigateUp,
-                )
-            }
-        },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-    ) { contentPadding ->
-        Column(
-            modifier = Modifier.padding(
-                top = contentPadding.calculateTopPadding(),
-                start = contentPadding.calculateStartPadding(LocalLayoutDirection.current),
-                end = contentPadding.calculateEndPadding(LocalLayoutDirection.current),
-            ),
-        ) {
-            FlexibleTabRow(
-                scrollable = scrollable,
-                selectedTabIndex = state.currentPage,
-            ) {
-                tabs.forEachIndexed { index, tab ->
-                    Tab(
-                        selected = state.currentPage == index,
-                        onClick = { scope.launch { state.animateScrollToPage(index) } },
-                        text = {
-                            TabText(
-                                text = stringResource(tab.titleRes),
-                                badgeCount = tab.badgeNumber,
+                    SearchToolbar(
+                        titleContent = {
+                            AppBarTitle(
+                                stringResource(titleRes),
+                                modifier = modifier,
+                                null,
+                                tab.numberTitle,
                             )
                         },
-                        unselectedContentColor = MaterialTheme.colorScheme.onSurface,
+                        searchEnabled = searchEnabled,
+                        searchQuery = if (searchEnabled) actualQuery else null,
+                        onChangeSearchQuery = actualOnChange,
+                        actions = { AppBarActions(tab.actions) },
+                        navigateUp = tab.navigateUp,
                     )
                 }
-            }
+            },
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        ) { contentPadding ->
+            Column(
+                modifier = Modifier.padding(
+                    top = contentPadding.calculateTopPadding(),
+                    start = contentPadding.calculateStartPadding(LocalLayoutDirection.current),
+                    end = contentPadding.calculateEndPadding(LocalLayoutDirection.current),
+                ),
+            ) {
+                FlexibleTabRow(
+                    scrollable = scrollable,
+                    selectedTabIndex = state.currentPage,
+                ) {
+                    tabs.forEachIndexed { index, tab ->
+                        Tab(
+                            selected = state.currentPage == index,
+                            onClick = { scope.launch { state.animateScrollToPage(index) } },
+                            text = {
+                                TabText(
+                                    text = stringResource(tab.titleRes),
+                                    badgeCount = tab.badgeNumber,
+                                )
+                            },
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
 
-            HorizontalPager(
-                modifier = Modifier.fillMaxSize(),
-                state = state,
-                verticalAlignment = Alignment.Top,
-            ) { page ->
-                tabs[page].content(
-                    PaddingValues(bottom = contentPadding.calculateBottomPadding()),
-                    snackbarHostState,
-                )
+                HorizontalPager(
+                    modifier = Modifier.fillMaxSize(),
+                    state = state,
+                    verticalAlignment = Alignment.Top,
+                ) { page ->
+                    tabs[page].content(
+                        PaddingValues(bottom = contentPadding.calculateBottomPadding()),
+                        snackbarHostState,
+                    )
+                }
             }
         }
     }
@@ -124,6 +127,7 @@ fun TabbedScreen(
 
 data class TabContent(
     val titleRes: StringResource,
+    val legacyManga: Boolean = false,
     val badgeNumber: Int? = null,
     val searchEnabled: Boolean = false,
     val actions: ImmutableList<AppBar.AppBarAction> = persistentListOf(),

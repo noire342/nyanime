@@ -193,20 +193,21 @@ class MainActivity : BaseActivity() {
             val indexing by downloadCache.isInitializing.collectAsState()
             val indexingAnime by animeDownloadCache.isInitializing.collectAsState()
 
-            val isSystemInDarkTheme = isSystemInDarkTheme()
+            val navigationBackgroundColor = eu.kanade.presentation.theme.LocalMangaSurfaces.current
+                ?.values?.firstOrNull() ?: MaterialTheme.colorScheme.surface
             val statusBarBackgroundColor = when {
                 indexing || indexingAnime -> IndexingBannerBackgroundColor
                 downloadOnly -> DownloadedOnlyBannerBackgroundColor
                 incognito || incognitoAnime -> IncognitoModeBannerBackgroundColor
-                else -> MaterialTheme.colorScheme.surface
+                else -> navigationBackgroundColor
             }
-            LaunchedEffect(isSystemInDarkTheme, statusBarBackgroundColor) {
+            LaunchedEffect(navigationBackgroundColor, statusBarBackgroundColor) {
                 // Draw edge-to-edge and set system bars color to transparent
                 val lightStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.BLACK)
                 val darkStyle = SystemBarStyle.dark(Color.TRANSPARENT)
                 enableEdgeToEdge(
                     statusBarStyle = if (statusBarBackgroundColor.luminance() > 0.5) lightStyle else darkStyle,
-                    navigationBarStyle = if (isSystemInDarkTheme) darkStyle else lightStyle,
+                    navigationBarStyle = if (navigationBackgroundColor.luminance() > 0.5) lightStyle else darkStyle,
                 )
             }
 

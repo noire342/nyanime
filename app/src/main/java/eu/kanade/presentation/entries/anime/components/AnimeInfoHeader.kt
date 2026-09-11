@@ -7,8 +7,10 @@ import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
@@ -18,17 +20,21 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.PersonOutline
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.AttachMoney
 import androidx.compose.material.icons.outlined.Block
@@ -40,12 +46,15 @@ import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
@@ -69,6 +78,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -79,6 +89,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import eu.kanade.presentation.components.DropdownMenu
+import eu.kanade.presentation.discovery.SourceHomeArtwork
 import eu.kanade.presentation.entries.components.DotSeparatorText
 import eu.kanade.presentation.entries.components.ItemCover
 import eu.kanade.tachiyomi.R
@@ -114,54 +125,65 @@ fun AnimeInfoBox(
     doSearch: (query: String, global: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier) {
-        // Backdrop
-        val backdropGradientColors = listOf(
-            Color.Transparent,
-            MaterialTheme.colorScheme.background,
-        )
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(anime)
-                .useBackground(true)
-                .crossfade(true)
-                .build(),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .matchParentSize()
-                .drawWithContent {
-                    drawContent()
-                    drawRect(
-                        brush = Brush.verticalGradient(colors = backdropGradientColors),
-                    )
-                }
-                .blur(4.dp)
-                .alpha(0.2f),
-        )
-
-        // Anime & source info
-        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-            if (!isTabletUi) {
-                AnimeAndSourceTitlesSmall(
-                    appBarPadding = appBarPadding,
-                    anime = anime,
-                    sourceName = sourceName,
-                    isStubSource = isStubSource,
-                    onCoverClick = onCoverClick,
-                    doSearch = doSearch,
+    Column(modifier.fillMaxWidth()) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val artworkHeight = if (isTabletUi) 280.dp else (maxWidth * 0.66f).coerceIn(220.dp, 360.dp)
+            Box(Modifier.fillMaxWidth().height(artworkHeight + appBarPadding)) {
+                SourceHomeArtwork(
+                    anime,
+                    Modifier.matchParentSize(),
+                    background = !anime.backgroundUrl.isNullOrBlank(),
                 )
-            } else {
-                AnimeAndSourceTitlesLarge(
-                    appBarPadding = appBarPadding,
-                    anime = anime,
-                    sourceName = sourceName,
-                    isStubSource = isStubSource,
-                    onCoverClick = onCoverClick,
-                    doSearch = doSearch,
+                Box(
+                    Modifier.matchParentSize().background(
+                        Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.6f),
+                            0.4f to Color.Transparent,
+                            1f to MaterialTheme.colorScheme.background,
+                        ),
+                    ),
                 )
+                OutlinedButton(
+                    onClick = onCoverClick,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.Black.copy(alpha = 0.65f),
+                        contentColor = Color.White,
+                    ),
+                ) { Text("Immagini") }
             }
         }
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            AnimeContentInfo(
+                title = anime.title,
+                author = anime.author,
+                artist = anime.artist,
+                status = anime.status,
+                sourceName = sourceName,
+                isStubSource = isStubSource,
+                doSearch = doSearch,
+            )
+        }
+    }
+}
+
+@Composable
+fun AnimeWatchButton(resume: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).heightIn(min = 48.dp),
+        shape = RoundedCornerShape(4.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.onSurface,
+            contentColor = MaterialTheme.colorScheme.surface,
+        ),
+    ) {
+        Icon(Icons.Filled.PlayArrow, null, Modifier.size(26.dp))
+        Text(
+            stringResource(if (resume) MR.strings.action_resume else MR.strings.action_start),
+            Modifier.padding(start = 8.dp),
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -198,7 +220,7 @@ fun AnimeActionRow(
             } else {
                 stringResource(MR.strings.add_to_library)
             },
-            icon = if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+            icon = if (favorite) Icons.Outlined.Done else Icons.Filled.Add,
             color = if (favorite) MaterialTheme.colorScheme.primary else defaultActionButtonColor,
             onClick = onAddToLibraryClicked,
             onLongClick = onEditCategory,
@@ -444,7 +466,7 @@ private fun ColumnScope.AnimeContentInfo(
     val context = LocalContext.current
     Text(
         text = title.ifBlank { stringResource(MR.strings.unknown_title) },
-        style = MaterialTheme.typography.titleLarge,
+        style = MaterialTheme.typography.headlineMedium,
         modifier = Modifier.clickableNoIndication(
             onLongClick = {
                 if (title.isNotBlank()) {

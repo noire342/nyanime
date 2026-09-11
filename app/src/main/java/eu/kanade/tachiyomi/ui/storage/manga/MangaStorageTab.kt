@@ -19,6 +19,7 @@ fun Screen.mangaStorageTab(): TabContent {
     val state by screenModel.state.collectAsState()
 
     return TabContent(
+        legacyManga = true,
         titleRes = AYMR.strings.label_manga,
         content = { contentPadding, _ ->
             StorageScreenContent(

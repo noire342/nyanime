@@ -5,6 +5,7 @@ import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 
 enum class AppTheme(val titleRes: StringResource?) {
+    NYANIME(AYMR.strings.theme_nyanime),
     DEFAULT(MR.strings.label_default),
     MONET(MR.strings.theme_monet),
     CLOUDFLARE(AYMR.strings.theme_cloudflare),

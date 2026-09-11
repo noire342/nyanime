@@ -37,6 +37,7 @@ import eu.kanade.presentation.library.components.LibraryToolbar
 import eu.kanade.presentation.library.manga.MangaLibraryContent
 import eu.kanade.presentation.library.manga.MangaLibrarySettingsDialog
 import eu.kanade.presentation.more.onboarding.GETTING_STARTED_URL
+import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.library.manga.MangaLibraryUpdateJob
@@ -90,6 +91,11 @@ data object MangaLibraryTab : Tab {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         val navigator = LocalNavigator.currentOrThrow
         val context = LocalContext.current
         val scope = rememberCoroutineScope()

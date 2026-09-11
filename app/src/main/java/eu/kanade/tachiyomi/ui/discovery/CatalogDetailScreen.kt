@@ -5,13 +5,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.model.rememberScreenModel
@@ -164,20 +168,30 @@ class CatalogDetailScreen(private val catalogId: Long, private val provider: Str
                     item {
                         CatalogDetailsContent(anime, actions = {
                             Column(
-                                Modifier.padding(horizontal = 16.dp),
+                                Modifier.fillMaxWidth(),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 if (state.next != null) {
                                     Button(
                                         onClick = { model.open(CatalogDetailScreenModel.Action.RESUME) },
                                         enabled = !state.busy,
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                        shape = RoundedCornerShape(4.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color.White,
+                                            contentColor = Color.Black,
+                                        ),
                                     ) { Text("Riprendi · ${state.next?.name}") }
                                 }
                                 Button(
                                     onClick = { model.open() },
                                     enabled = !state.busy,
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                                    shape = RoundedCornerShape(4.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (state.next == null) Color.White else Color(0xFF262626),
+                                        contentColor = if (state.next == null) Color.Black else Color.White,
+                                    ),
                                 ) { Text("Apri episodi") }
                                 if (state.linked?.favorite !=
                                     true

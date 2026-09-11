@@ -124,7 +124,7 @@ class CastController private constructor(private val context: Context) {
         try {
             ContextCompat.startForegroundService(context, Intent(context, CastSessionService::class.java))
         } catch (_: Exception) {
-            mutableState.update { it.copy(connecting = false, error = "Apri UltraYomi per avviare il Cast") }
+            mutableState.update { it.copy(connecting = false, error = "Apri Nyanime per avviare il Cast") }
             return
         }
         loading = scope.launch {

@@ -41,7 +41,7 @@ class AppUpdateChecker {
 }
 
 /** GitHub repository that publishes the fork's signed APK releases. */
-const val GITHUB_REPO = "lorenzogarrone/ultrayomi"
+const val GITHUB_REPO = "noire342/ultrayomi"
 
 val RELEASE_TAG: String by lazy {
     if (isPreviewBuildType) {

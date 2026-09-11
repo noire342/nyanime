@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,23 +15,34 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +50,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -104,10 +117,12 @@ fun SectionHeader(title: String, more: (() -> Unit)? = null) {
             Modifier.weight(1f).semantics {
                 heading()
             },
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
         )
-        if (more != null) TextButton(onClick = more) { Text("Mostra tutti") }
+        if (more != null) {
+            IconButton(onClick = more) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "Mostra tutti: $title") }
+        }
     }
 }
 
@@ -134,14 +149,17 @@ fun PosterCard(
     subtitleMaxLines: Int = 3,
     artworkRefreshKey: Int = 0,
 ) {
+    var information by rememberSaveable(title) { mutableStateOf(false) }
+    if (information) {
+        TitleInformationSheet(title, badges.joinToString(" · "), subtitle, { information = false }, onClick)
+    }
     Column(
-        modifier.width((144 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)
-            .clickable(onClick = onClick).padding(bottom = 8.dp),
+        modifier.width((132 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)
+            .clickable(role = Role.Button, onClickLabel = "Apri $title", onClick = onClick).padding(bottom = 8.dp),
     ) {
         Box(
-            Modifier.fillMaxWidth().aspectRatio(
-                144f / 208f,
-            ).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+            Modifier.fillMaxWidth().aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             if (cover is AnimeCover) {
                 SourceHomeArtwork(cover, Modifier.fillMaxSize(), refreshKey = artworkRefreshKey)
@@ -157,23 +175,35 @@ fun PosterCard(
                 Text(
                     badges.joinToString(" · "),
                     Modifier.align(Alignment.BottomStart).fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)).padding(6.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                        .background(Color.Black.copy(alpha = 0.84f)).padding(horizontal = 6.dp, vertical = 5.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
+            }
+            if (!subtitle.isNullOrBlank() || badges.isNotEmpty()) {
+                IconButton(onClick = { information = true }, modifier = Modifier.align(Alignment.TopEnd)) {
+                    Icon(
+                        Icons.Outlined.Info,
+                        "Informazioni su $title",
+                        Modifier.background(Color.Black.copy(alpha = 0.72f), CircleShape).padding(3.dp),
+                        tint = Color.White,
+                    )
+                }
             }
         }
         Text(
             title,
             Modifier.padding(top = 8.dp),
-            maxLines = 3,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.titleSmall,
         )
         if (!subtitle.isNullOrBlank()) {
             Text(
                 subtitle,
-                maxLines = subtitleMaxLines,
+                maxLines = subtitleMaxLines.coerceIn(1, 2),
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -207,65 +237,31 @@ fun CatalogRow(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit, calen
 fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit) {
     if (items.isEmpty()) return
     val pager = rememberPagerState { items.size.coerceAtMost(5) }
-    HorizontalPager(state = pager, contentPadding = PaddingValues(horizontal = 16.dp), pageSpacing = 12.dp) { index ->
-        val anime = items[index]
-        Card(onClick = { onClick(anime) }, modifier = Modifier.fillMaxWidth()) {
-            Box(Modifier.fillMaxWidth().heightIn(min = 340.dp)) {
+    Column {
+        HorizontalPager(state = pager, key = { "${items[it].id.provider}:${items[it].id.value}" }) { index ->
+            val anime = items[index]
+            CinematicHero(
+                title = anime.title,
+                eyebrow = "In evidenza · ${index + 1} di ${pager.pageCount}",
+                metadata = listOfNotNull(
+                    anime.score?.let {
+                        "★ $it/100"
+                    },
+                    anime.genres.joinToString(" · "),
+                ).joinToString(" · "),
+                description = anime.synopsis,
+                actionLabel = "Scopri il titolo",
+                onOpen = { onClick(anime) },
+            ) {
                 AsyncImage(
                     anime.banner ?: anime.cover,
-                    anime.title,
+                    null,
                     Modifier.matchParentSize(),
                     contentScale = ContentScale.Crop,
                 )
-                Column(
-                    Modifier.fillMaxWidth().background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.Black.copy(alpha = 0.15f),
-                                Color.Black.copy(alpha = 0.95f),
-                            ),
-                        ),
-                    ).padding(20.dp),
-
-                ) {
-                    Text(
-                        "IN EVIDENZA · ${index + 1}/${pager.pageCount}",
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                    Spacer(Modifier.height(100.dp))
-                    Text(
-                        anime.title,
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    val highlights = listOfNotNull(
-                        anime.score?.let { "★ $it/100" },
-                        anime.genres.take(2).joinToString(" · ").takeIf { it.isNotBlank() },
-                    ).joinToString(" · ")
-                    Text(highlights, color = Color.White, style = MaterialTheme.typography.labelMedium)
-                    anime.synopsis?.let {
-                        Text(
-                            it,
-                            Modifier.padding(top = 8.dp),
-                            color = Color.White,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    Text(
-                        "Scopri l’anime →",
-                        Modifier.padding(top = 12.dp),
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
             }
         }
+        CarouselPosition(pager.currentPage, pager.pageCount)
     }
 }
 
@@ -282,30 +278,85 @@ fun LocalAnimeRow(
     if (!state.loading && items.isEmpty() && state.error == null) {
         Text(
             emptyMessage,
-            Modifier.padding(
-                horizontal = 16.dp,
-                vertical = 8.dp,
-            ),
+            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             style = MaterialTheme.typography.bodyMedium,
         )
     }
-    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(items, key = { it.anime.id }) { item ->
-            Column(Modifier.width((160 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)) {
-                PosterCard(item.anime.title, item.anime.asAnimeCover(), item.episode.name, { onOpen(item.anime.id) })
-                if (item.progress > 0) {
-                    LinearProgressIndicator(
-                        progress = { item.progress },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { onPlay(item) }, modifier = Modifier.weight(1f)) {
-                        Text(if (item.progress > 0) "Riprendi" else "Guarda")
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val cardWidth = (228 * LocalDensity.current.fontScale.coerceIn(1f, 1.4f)).dp
+            .coerceAtMost((maxWidth - 32.dp).coerceAtLeast(160.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(items, key = { it.anime.id }) { item ->
+                Column(Modifier.width(cardWidth)) {
+                    Box(
+                        Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    ) {
+                        SourceHomeArtwork(
+                            item.anime,
+                            Modifier.fillMaxSize(),
+                            background = !item.anime.backgroundUrl.isNullOrBlank(),
+                        )
+                        Box(
+                            Modifier.fillMaxSize().background(
+                                Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))),
+                            ),
+                        )
+                        FilledIconButton(
+                            onClick = { onPlay(item) },
+                            modifier = Modifier.align(Alignment.Center).size(48.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.75f),
+                                contentColor = Color.White,
+                            ),
+                        ) {
+                            Icon(
+                                Icons.Filled.PlayArrow,
+                                (if (item.progress > 0) "Riprendi " else "Guarda ") + item.anime.title,
+                                Modifier.size(32.dp),
+                            )
+                        }
+                        LinearProgressIndicator(
+                            progress = { item.progress.coerceIn(0f, 1f) },
+                            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp),
+                            trackColor = Color.White.copy(alpha = 0.3f),
+                            gapSize = 0.dp,
+                            drawStopIndicator = {},
+                        )
                     }
-                    if (onHide != null) {
-                        IconButton(onClick = { onHide(item) }) {
-                            Icon(Icons.Outlined.VisibilityOff, "Nascondi ${item.anime.title} da Continua a guardare")
+                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.Top) {
+                        Column(
+                            Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Apri scheda", onClick = {
+                                onOpen(item.anime.id)
+                            }),
+                        ) {
+                            Text(
+                                item.anime.title,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                item.episode.name,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        IconButton(onClick = { onOpen(item.anime.id) }, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.Outlined.Info, "Scheda di ${item.anime.title}")
+                        }
+                        if (onHide != null) {
+                            IconButton(onClick = { onHide(item) }, modifier = Modifier.size(48.dp)) {
+                                Icon(
+                                    Icons.Outlined.VisibilityOff,
+                                    "Nascondi ${item.anime.title} da Continua a guardare",
+                                )
+                            }
                         }
                     }
                 }

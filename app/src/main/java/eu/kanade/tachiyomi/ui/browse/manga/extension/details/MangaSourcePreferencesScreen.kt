@@ -33,6 +33,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.core.util.ifMangaSourcesLoaded
 import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.preference.SharedPreferencesDataStore
@@ -49,6 +50,11 @@ class MangaSourcePreferencesScreen(val sourceId: Long) : Screen() {
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         if (!ifMangaSourcesLoaded()) {
             LoadingScreen()
             return

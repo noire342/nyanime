@@ -57,6 +57,11 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
     val source = access.group
     // Parent and child observe availability independently: never render a stale branded frame.
     if (access.loading || source == null) return
+    val featuredRow = source.rows.firstOrNull { row ->
+        row.sections.size == 1 && row.sections.first().layout == "featured" && !row.sections.first().supportsDate
+    }
+    val heroSection = featuredRow?.sections?.firstOrNull()
+        ?: source.rows.firstOrNull()?.sections?.firstOrNull()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { model.onResume() }
     LaunchedEffect(access) { model.onResume() }
     Scaffold(topBar = {
@@ -87,7 +92,31 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // Local playback is the first row, regardless of the number/state of remote sections.
+                if (!access.offline && heroSection != null) {
+                    item(key = "hero:" + source.id) {
+                        LaunchedEffect(access, heroSection.id) { model.load(heroSection.id) }
+                        val featured = state.sections[heroSection.id] ?: SectionState()
+                        SourceFeaturedCarousel(
+                            if (featuredRow !=
+                                null
+                            ) {
+                                featured.data?.items.orEmpty()
+                            } else {
+                                featured.data?.items.orEmpty().take(8)
+                            },
+                            state.artworkRefreshKey,
+                        ) { navigator.push(AnimeScreen(it.id, true)) }
+                        if (featuredRow != null) {
+                            SectionHeader(featured.data?.title ?: heroSection.title) {
+                                navigator.push(SourceHomeListScreen(homeKey, heroSection.id, heroSection.title))
+                            }
+                            LoadNotice(featured.loading, featured.error, featured.stale) {
+                                model.load(heroSection.id, true)
+                            }
+                        }
+                    }
+                }
+                // Local playback never depends on a successful remote feed or a featured row.
                 item(key = "resume:" + source.id) {
                     SectionHeader("Continua a guardare") { navigator.push(SourceHomeHistoryScreen(homeKey)) }
                     ContinueWatchingRow(
@@ -102,7 +131,7 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                     }
                 }
                 if (!access.offline) {
-                    items(source.rows, key = { it.id }) { row ->
+                    items(source.rows.filter { it.id != featuredRow?.id }, key = { it.id }) { row ->
                         var selection by rememberSaveable(homeKey, row.id) { mutableStateOf<String?>(null) }
                         val variantStates = rememberSaveableStateHolder()
                         val section = row.selected(selection)
@@ -182,7 +211,9 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                         }
                     }
                     if (source.sections.isEmpty()) {
-                        item { Text("Aggiorna l’estensione per usare le sezioni della Home", Modifier.padding(16.dp)) }
+                        item {
+                            Text("Aggiorna l’estensione per usare le sezioni della Home", Modifier.padding(16.dp))
+                        }
                     }
                 }
                 item(key = "updates:" + source.id) {

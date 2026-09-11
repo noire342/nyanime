@@ -37,6 +37,7 @@ import eu.kanade.presentation.entries.manga.DuplicateMangaDialog
 import eu.kanade.presentation.entries.manga.MangaScreen
 import eu.kanade.presentation.entries.manga.components.MangaCoverDialog
 import eu.kanade.presentation.entries.manga.components.ScanlatorFilterDialog
+import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.isTabletUi
@@ -79,6 +80,11 @@ class MangaScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         if (!ifMangaSourcesLoaded()) {
             LoadingScreen()
             return

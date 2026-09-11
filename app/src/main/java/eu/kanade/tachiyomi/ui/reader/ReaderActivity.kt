@@ -337,7 +337,7 @@ class ReaderActivity : BaseActivity() {
      * Initializes the reader menu. It sets up click listeners and the initial visibility.
      */
     private fun initializeMenu() {
-        binding.pageNumber.setComposeContent {
+        binding.pageNumber.setComposeContent(legacyManga = true) {
             val state by viewModel.state.collectAsState()
             val showPageNumber by viewModel.readerPreferences.showPageNumber().collectAsState()
 
@@ -349,7 +349,7 @@ class ReaderActivity : BaseActivity() {
             }
         }
 
-        binding.dialogRoot.setComposeContent {
+        binding.dialogRoot.setComposeContent(legacyManga = true) {
             val state by viewModel.state.collectAsState()
             val settingsScreenModel = remember {
                 ReaderSettingsScreenModel(

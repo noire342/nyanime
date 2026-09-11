@@ -296,16 +296,16 @@ jobs:
           fork_commit_count="$(git rev-list --count HEAD)"
           tag="r${fork_commit_count}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          notes="AniYomi bleeding-edge build from $UPSTREAM_REPOSITORY:$UPSTREAM_BRANCH at $MAIN_SHA (fork commit $fork_commit_count)."
+          notes="Nyanime preview based on $UPSTREAM_REPOSITORY:$UPSTREAM_BRANCH at $MAIN_SHA (fork commit $fork_commit_count)."
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" dist/*.apk dist/SHA256SUMS \
               --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
-              --title "AniYomi preview $tag" --notes "$notes"
+              --title "Nyanime preview $tag" --notes "$notes"
           else
             gh release create "$tag" dist/*.apk dist/SHA256SUMS \
               --repo "$GITHUB_REPOSITORY" --target "$SYNC_BRANCH" \
-              --title "AniYomi preview $tag" --prerelease --notes "$notes"
+              --title "Nyanime preview $tag" --prerelease --notes "$notes"
           fi
 
       - name: Open or update synchronization PR
