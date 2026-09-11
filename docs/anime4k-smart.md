@@ -78,7 +78,9 @@ verification. Off remains available if verification fails. Mode changes replace
 only bundled filenames owned by the private `mpv/anime4k-shaders` directory.
 Other paths, ordering and repetitions survive. An unreadable MPV list fails
 without sending a destructive replacement. An identical target list sends no
-command.
+command. After sending a change, the list is read back before confirming the
+active preset: the Android JNI wrapper discards `mpv_command` return codes,
+so the absence of an exception does not acknowledge the change.
 
 ## Verification
 

@@ -98,6 +98,25 @@ class Anime4KShaderPipelineTest {
     }
 
     @Test
+    fun `silently rejected native commands cannot report the requested preset as active`() {
+        var actual = ""
+        val pipeline = Anime4KShaderPipeline(
+            File(directory, "owned"),
+            { it.byteInputStream() },
+            { actual },
+            { commands += it.toList() },
+        )
+        assertTrue(pipeline.copyAssets())
+        assertFalse(pipeline.apply(Anime4KMode.ModeA))
+        actual = Anime4KMode.ModeA.shaderFileNames.joinToString(File.pathSeparator) {
+            File(directory, "owned/$it").absolutePath
+        }
+        assertFalse(pipeline.apply(Anime4KMode.Off))
+        assertTrue(pipeline.apply(Anime4KMode.ModeA))
+        assertEquals(2, commands.size)
+    }
+
+    @Test
     fun `failed revalidation cannot activate partially verified cached assets`() {
         var failRead = false
         val pipeline = Anime4KShaderPipeline(

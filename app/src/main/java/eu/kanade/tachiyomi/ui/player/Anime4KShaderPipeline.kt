@@ -90,7 +90,10 @@ class Anime4KShaderPipeline internal constructor(
                     arrayOf("change-list", "glsl-shaders", "set", target.joinToString(File.pathSeparator))
                 },
             )
-            true
+            // MPVLib.command returns void and its JNI wrapper discards mpv_command errors.
+            // A synchronous readback is the acknowledgement before updating the active profile.
+            val applied = shaderListReader()?.split(File.pathSeparatorChar)?.filter(String::isNotBlank)
+            applied == target
         } catch (error: Exception) {
             logcat(LogPriority.ERROR, error) { "Failed to apply Anime4K mode ${mode.name}" }
             false
