@@ -8,13 +8,6 @@ on:
         type: choice
         options: [all, interface]
         default: all
-  push:
-    branches: [dev]
-    paths:
-      - .github/workflows/app_performance.yml
-      - macrobenchmark/**
-      - app/src/benchmark/**
-
 permissions:
   contents: read
 

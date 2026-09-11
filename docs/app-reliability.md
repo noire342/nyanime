@@ -87,7 +87,8 @@ blocco seguito da corruzione audio/video, che richiede log raccolti durante l'ev
 
 Riferimenti: [HTTP range](https://www.rfc-editor.org/rfc/rfc9110.html#name-range-requests),
 [profili Android](https://developer.android.com/topic/performance/baselineprofiles/create-baselineprofile).
-# Copertine delle Home delle estensioni
+
+## Copertine delle Home delle estensioni
 
 Le Home usano subito le copertine non vuote fornite dall'estensione, anche quando
 un titolo esiste gia nella libreria con un indirizzo vecchio o senza immagine.
@@ -106,3 +107,6 @@ La prova Android `sourceArtworkRecoversAutomaticallyManuallyAndAfterHomeRefresh`
 usa lo stesso componente delle Home con trasferimenti sintetici interrotti.
 Controlla recupero automatico, arresto dei tentativi, comando manuale e refresh,
 con immagini e gerarchie UI. Le fixture appartengono solo alla variante benchmark.
+Le prove su emulatore sono esclusivamente manuali: non partono piu a ogni push.
+Per questa correzione l'esecuzione e stata annullata su richiesta dell'utente;
+la compilazione e i test JVM restano parte della verifica del rilascio.
