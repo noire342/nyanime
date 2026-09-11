@@ -83,11 +83,11 @@ class ResumableVideoTransfer(
                 val total: Long
                 if (response.code == 206) {
                     val parts = RANGE.matchEntire(range.orEmpty())?.destructured
-                        ?: throw IOException("Invalid Content-Range")
+                        ?: invalidRange("Invalid Content-Range")
                     val (from, to, length) = parts
-                    start = from.toLongOrNull() ?: throw IOException("Invalid range start")
-                    val end = to.toLongOrNull() ?: throw IOException("Invalid range end")
-                    total = length.toLongOrNull() ?: throw IOException("Invalid range length")
+                    start = from.toLongOrNull() ?: invalidRange("Invalid range start")
+                    val end = to.toLongOrNull() ?: invalidRange("Invalid range end")
+                    total = length.toLongOrNull() ?: invalidRange("Invalid range length")
                     if (offset == 0L ||
                         start != offset ||
                         end != total - 1 ||
@@ -95,8 +95,7 @@ class ResumableVideoTransfer(
                         etag != previous?.etag ||
                         (response.body.contentLength() >= 0 && response.body.contentLength() != total - start)
                     ) {
-                        store.metadata = null
-                        throw IOException("Server returned a different video range")
+                        invalidRange("Server returned a different video range")
                     }
                 } else {
                     if (response.code != 200) {
@@ -148,6 +147,11 @@ class ResumableVideoTransfer(
         } finally {
             cancellation.cancel()
         }
+    }
+
+    private fun invalidRange(message: String): Nothing {
+        store.metadata = null
+        throw IOException(message)
     }
 
     companion object {

@@ -1,5 +1,7 @@
 package eu.kanade.tachiyomi.data.download.anime
 
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.Headers
 import okhttp3.OkHttpClient
@@ -91,18 +93,56 @@ class ResumableVideoTransferTest {
     }
 
     @Test fun changedValidatorOrWrongOffsetCannotCorruptPartial() = runBlocking {
+        for ((etag, range) in listOf(
+            "\"v2\"" to "bytes 3-5/6",
+            "\"v1\"" to "bytes 2-5/6",
+            "\"v1\"" to "bytes 3-6/7",
+            "\"v1\"" to "malformed",
+            "\"v1\"" to "bytes 3-99999999999999999999999/6",
+        )) {
+            val store = Store()
+            val transfer = ResumableVideoTransfer(
+                client(
+                    { response(it, "abc", 6) },
+                    { response(it, "def", code = 206, etag = etag, range = range) },
+                    {
+                        assertNull(it.header("Range"))
+                        response(it, "whole")
+                    },
+                ),
+                store,
+            )
+            runCatching { transfer.download(url, headers) { _, _ -> } }
+            assertThrows(IOException::class.java) { runBlocking { transfer.download(url, headers) { _, _ -> } } }
+            assertEquals("abc", store.bytes.toString(Charsets.UTF_8))
+            assertNull(store.metadata)
+            transfer.download(url, headers) { _, _ -> }
+            assertEquals("whole", store.bytes.toString(Charsets.UTF_8))
+        }
+    }
+
+    @Test fun cancellationPreservesOnlyWrittenBytesForTheNextAttempt() = runBlocking {
         val store = Store()
+        val payload = "a".repeat(100_000)
         val transfer = ResumableVideoTransfer(
             client(
-                { response(it, "abc", 6) },
-                { response(it, "def", code = 206, etag = "\"v2\"", range = "bytes 3-5/6") },
+                { response(it, payload) },
+                {
+                    val offset = store.size().toInt()
+                    assertEquals("bytes=$offset-", it.header("Range"))
+                    response(it, payload.substring(offset), code = 206, range = "bytes $offset-99999/100000")
+                },
             ),
             store,
         )
-        runCatching { transfer.download(url, headers) { _, _ -> } }
-        assertThrows(IOException::class.java) { runBlocking { transfer.download(url, headers) { _, _ -> } } }
-        assertEquals("abc", store.bytes.toString(Charsets.UTF_8))
-        assertNull(store.metadata)
+        val job = launch {
+            transfer.download(url, headers) { _, _ -> cancel() }
+        }
+        job.join()
+        assertTrue(job.isCancelled)
+        assertTrue(store.size() in 1 until payload.length.toLong())
+        transfer.download(url, headers) { _, _ -> }
+        assertEquals(payload, store.bytes.toString(Charsets.UTF_8))
     }
 
     @Test fun changedUrlAndMissingStrongValidatorStartFromZero() = runBlocking {
