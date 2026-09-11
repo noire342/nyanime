@@ -1,5 +1,10 @@
 # Home anime e selezione automatica delle fonti
 
+Le integrazioni per singole fonti, i relativi pacchetti e i dati raccolti da siti
+si mantengono fuori dal repository pubblico. Gli esempi e i test del contratto
+usano nomi e dati fittizi. Eventuale materiale privato nel checkout appartiene
+alle directory locali ignorate `.local/` o `private/`.
+
 La Home aggiunge catalogo pubblico AniList, cronologia locale, nuovi episodi rilevati e feed
 delle estensioni. Il player, Anime4K, package, firma e aggiornamento dell'app restano quelli del fork.
 

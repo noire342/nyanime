@@ -12,5 +12,9 @@ build
 # Configuration files
 local.properties
 
+# Private integration fixtures and local maintenance material
+/.local/
+/private/
+
 # macOS specific files
 .DS_Store
