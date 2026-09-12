@@ -353,7 +353,6 @@ class WatchRoomController(
                 val allowed = state.value.sharedControls &&
                     (
                         incoming.command == "pause" ||
-                            (incoming.command == "play" || peers[sender]?.first?.ready == true) &&
                             incoming.media?.key == player.sample().media?.key
                         )
                 if (allowed) applyCommand(incoming)

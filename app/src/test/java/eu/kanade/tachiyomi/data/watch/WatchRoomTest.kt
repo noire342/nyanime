@@ -143,6 +143,27 @@ class WatchRoomTest {
     }
 
     @Test
+    fun guestCanSeekWhileHostStillSeesItsPreviousBufferingStatus() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.resumeByUser()
+        room.advance()
+        room.guestPlayer.buffering = true
+        room.guestPlayer.ready = false
+        room.advance()
+        assertTrue(room.hostPlayer.paused)
+        // Releasing a seek gesture sends its command before the next presence update.
+        room.guestPlayer.buffering = false
+        room.guestPlayer.ready = true
+        room.guest.requestSeek(400.0)
+        room.advance()
+        assertTrue(room.hostPlayer.sample().position >= 400.0)
+        assertTrue(abs(room.hostPlayer.sample().position - room.guestPlayer.sample().position) < 0.4)
+        assertFalse(room.hostPlayer.paused)
+        assertFalse(room.guestPlayer.paused)
+    }
+
+    @Test
     fun bufferingPausesGroupUntilGuestIsReady() = runTest {
         val room = Pairing(this)
         room.join()
