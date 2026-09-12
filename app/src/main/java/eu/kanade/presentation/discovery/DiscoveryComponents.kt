@@ -63,6 +63,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import eu.kanade.presentation.motion.posterOpen
+import eu.kanade.presentation.motion.posterSource
+import eu.kanade.presentation.motion.posterSourcePlaceholder
+import eu.kanade.presentation.motion.rememberPosterSource
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.data.discovery.LocalHomeItem
 import tachiyomi.domain.discovery.CatalogAnime
@@ -171,6 +175,8 @@ fun PosterCard(
         )
     }
     var information by rememberSaveable(title) { mutableStateOf(false) }
+    val poster = rememberPosterSource(cover)
+    val openDetails = posterOpen(poster, title, onClick)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.96f else 1f, tween(140), label = "posterPress")
@@ -188,7 +194,7 @@ fun PosterCard(
                 indication = null,
                 role = Role.Button,
                 onClickLabel = "Apri $title",
-                onClick = onClick,
+                onClick = openDetails,
             ).padding(bottom = 8.dp),
     ) {
         Box(
@@ -196,12 +202,21 @@ fun PosterCard(
                 .clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             if (cover is AnimeCover || cover is Anime) {
-                SourceHomeArtwork(cover, Modifier.fillMaxSize(), refreshKey = artworkRefreshKey)
+                SourceHomeArtwork(
+                    cover,
+                    Modifier.fillMaxSize().posterSource(poster),
+                    refreshKey = artworkRefreshKey,
+                    initialPainter = posterSourcePlaceholder(poster),
+                    onPainterReady = { poster.painter = it },
+                )
             } else {
                 AsyncImage(
                     model = cover,
+                    placeholder = posterSourcePlaceholder(poster),
+                    error = posterSourcePlaceholder(poster),
+                    onSuccess = { poster.painter = it.painter },
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().posterSource(poster),
                     contentScale = ContentScale.Crop,
                 )
             }
@@ -275,6 +290,8 @@ fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit)
     Column {
         HorizontalPager(state = pager, key = { "${items[it].id.provider}:${items[it].id.value}" }) { index ->
             val anime = items[index]
+            val poster = rememberPosterSource(anime.banner ?: anime.cover)
+            val openDetails = posterOpen(poster, anime.title) { onClick(anime) }
             CinematicHero(
                 title = anime.title,
                 eyebrow = "In evidenza · ${index + 1} di ${pager.pageCount}",
@@ -286,12 +303,15 @@ fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit)
                 ).joinToString(" · "),
                 description = anime.synopsis,
                 actionLabel = "Scopri il titolo",
-                onOpen = { onClick(anime) },
+                onOpen = openDetails,
             ) {
                 AsyncImage(
                     anime.banner ?: anime.cover,
                     null,
-                    Modifier.matchParentSize(),
+                    Modifier.matchParentSize().posterSource(poster),
+                    placeholder = posterSourcePlaceholder(poster),
+                    error = posterSourcePlaceholder(poster),
+                    onSuccess = { poster.painter = it.painter },
                     contentScale = ContentScale.Crop,
                 )
             }
@@ -328,6 +348,8 @@ fun LocalAnimeRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(items, key = { it.anime.id }) { item ->
+                val poster = rememberPosterSource(item.anime)
+                val openDetails = posterOpen(poster, item.anime.title) { onOpen(item.anime.id) }
                 Column(Modifier.width(cardWidth)) {
                     Box(
                         Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(4.dp))
@@ -335,8 +357,10 @@ fun LocalAnimeRow(
                     ) {
                         SourceHomeArtwork(
                             item.anime,
-                            Modifier.fillMaxSize(),
+                            Modifier.fillMaxSize().posterSource(poster),
                             background = !item.anime.backgroundUrl.isNullOrBlank(),
+                            initialPainter = posterSourcePlaceholder(poster),
+                            onPainterReady = { poster.painter = it },
                         )
                         Box(
                             Modifier.fillMaxSize().background(
@@ -368,7 +392,7 @@ fun LocalAnimeRow(
                     Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.Top) {
                         Column(
                             Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Apri scheda", onClick = {
-                                onOpen(item.anime.id)
+                                openDetails()
                             }),
                         ) {
                             Text(
@@ -385,7 +409,7 @@ fun LocalAnimeRow(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        IconButton(onClick = { onOpen(item.anime.id) }, modifier = Modifier.size(48.dp)) {
+                        IconButton(onClick = openDetails, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Outlined.Info, "Scheda di ${item.anime.title}")
                         }
                         if (onHide != null) {

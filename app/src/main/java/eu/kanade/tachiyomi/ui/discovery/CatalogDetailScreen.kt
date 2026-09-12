@@ -41,6 +41,10 @@ import eu.kanade.presentation.discovery.CatalogDetailsContent
 import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.PosterCard
 import eu.kanade.presentation.discovery.SectionHeader
+import eu.kanade.presentation.motion.PosterDetailsScreen
+import eu.kanade.presentation.motion.PosterLoadingBody
+import eu.kanade.presentation.motion.holdPosterDetails
+import eu.kanade.presentation.motion.posterDetailPreview
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
@@ -52,7 +56,8 @@ import tachiyomi.domain.entries.anime.model.asAnimeCover
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
-class CatalogDetailScreen(private val catalogId: Long, private val provider: String = "anilist") : Screen() {
+class CatalogDetailScreen(private val catalogId: Long, private val provider: String = "anilist") :
+    Screen(), PosterDetailsScreen {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
@@ -63,6 +68,7 @@ class CatalogDetailScreen(private val catalogId: Long, private val provider: Str
         var query by rememberSaveable { mutableStateOf("") }
         var manualVersion by rememberSaveable { mutableStateOf(false) }
         val anime = state.details.data
+        val loadingPoster = posterDetailPreview() != null && (anime == null || holdPosterDetails())
         LaunchedEffect(state.query) { if (query.isBlank()) query = state.query }
         LaunchedEffect(model) {
             if (manualVersion) model.search(query)
@@ -171,6 +177,8 @@ class CatalogDetailScreen(private val catalogId: Long, private val provider: Str
                             )
                         }
                     }
+                } else if (loadingPoster) {
+                    item { PosterLoadingBody(catalog = true) }
                 } else if (anime != null) {
                     item {
                         CatalogDetailsContent(anime, actions = {

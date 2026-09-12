@@ -71,6 +71,8 @@ fun SourceHomeArtwork(
     background: Boolean = false,
     refreshKey: Int = 0,
     imageLoader: ImageLoader = SingletonImageLoader.get(LocalContext.current),
+    initialPainter: Painter? = null,
+    onPainterReady: (Painter) -> Unit = {},
 ) {
     val reduceMotion = if (LocalInspectionMode.current) {
         false
@@ -78,7 +80,7 @@ fun SourceHomeArtwork(
         Injekt.get<PlayerPreferences>().reduceMotion().collectAsState().value
     }
     key(sourceHomeArtworkIdentity(data), background) {
-        var previousPainter by remember { mutableStateOf<Painter?>(null) }
+        var previousPainter by remember { mutableStateOf(initialPainter) }
         key(data, refreshKey) {
             var attempt by remember { mutableIntStateOf(0) }
             var failure by remember { mutableStateOf<Throwable?>(null) }
@@ -160,6 +162,7 @@ fun SourceHomeArtwork(
                             error = previousPainter,
                             onSuccess = {
                                 previousPainter = it.painter
+                                onPainterReady(it.painter)
                                 failure = null
                             },
                             onError = {

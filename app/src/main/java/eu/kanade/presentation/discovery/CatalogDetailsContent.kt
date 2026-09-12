@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import eu.kanade.presentation.motion.PosterDetailArtwork
+import eu.kanade.presentation.motion.posterDetailHeight
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogId
@@ -44,12 +46,10 @@ fun CatalogDetailsContent(anime: CatalogAnime, actions: @Composable () -> Unit =
         )
     } else {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            Box(Modifier.fillMaxWidth().height((maxWidth * 0.75f).coerceIn(240.dp, 380.dp))) {
-                AsyncImage(
+            Box(Modifier.fillMaxWidth().height(posterDetailHeight(maxWidth, tablet = false, catalog = true))) {
+                PosterDetailArtwork(
                     anime.banner ?: anime.cover,
-                    anime.title,
                     Modifier.matchParentSize(),
-                    contentScale = ContentScale.Crop,
                 )
                 Box(
                     Modifier.matchParentSize().background(

@@ -40,6 +40,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.kanade.presentation.entries.components.ItemCover
+import eu.kanade.presentation.motion.PosterSource
+import eu.kanade.presentation.motion.posterOpen
+import eu.kanade.presentation.motion.posterSource
+import eu.kanade.presentation.motion.posterSourcePlaceholder
+import eu.kanade.presentation.motion.rememberPosterSource
+import eu.kanade.presentation.theme.LocalNyanimeStyle
+import tachiyomi.domain.entries.anime.model.AnimeCover
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.BadgeGroup
 import tachiyomi.presentation.core.i18n.stringResource
@@ -81,9 +88,12 @@ fun EntryCompactGridItem(
     coverBadgeStart: @Composable (RowScope.() -> Unit)? = null,
     coverBadgeEnd: @Composable (RowScope.() -> Unit)? = null,
 ) {
+    val poster = rememberAnimePosterSource(coverData)
+    val openDetails = if (poster != null) posterOpen(poster, title.orEmpty(), onClick) else onClick
+
     GridItemSelectable(
         isSelected = isSelected,
-        onClick = onClick,
+        onClick = openDetails,
         onLongClick = onLongClick,
     ) {
         EntryGridCover(
@@ -91,8 +101,11 @@ fun EntryCompactGridItem(
                 ItemCover.Book(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha),
+                        .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha)
+                        .posterSource(poster),
                     data = coverData,
+                    initialPainter = posterSourcePlaceholder(poster),
+                    onPainterReady = { poster?.painter = it },
                 )
             },
             badgesStart = coverBadgeStart,
@@ -186,9 +199,12 @@ fun EntryComfortableGridItem(
     coverBadgeEnd: (@Composable RowScope.() -> Unit)? = null,
     onClickContinueViewing: (() -> Unit)? = null,
 ) {
+    val poster = rememberAnimePosterSource(coverData)
+    val openDetails = if (poster != null) posterOpen(poster, title.orEmpty(), onClick) else onClick
+
     GridItemSelectable(
         isSelected = isSelected,
-        onClick = onClick,
+        onClick = openDetails,
         onLongClick = onLongClick,
     ) {
         Column {
@@ -197,8 +213,11 @@ fun EntryComfortableGridItem(
                     ItemCover.Book(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha),
+                            .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha)
+                            .posterSource(poster),
                         data = coverData,
+                        initialPainter = posterSourcePlaceholder(poster),
+                        onPainterReady = { poster?.painter = it },
                     )
                 },
                 badgesStart = coverBadgeStart,
@@ -345,6 +364,9 @@ fun EntryListItem(
     containerHeight: Int = 0,
     modifier: Modifier = Modifier,
 ) {
+    val poster = rememberAnimePosterSource(coverData)
+    val openDetails = if (poster != null) posterOpen(poster, title.orEmpty(), onClick) else onClick
+
     Row(
         modifier = modifier
             .selectedBackground(isSelected)
@@ -358,7 +380,7 @@ fun EntryListItem(
                 },
             )
             .combinedClickable(
-                onClick = onClick,
+                onClick = openDetails,
                 onLongClick = onLongClick,
             )
             .padding(horizontal = 16.dp, vertical = 3.dp),
@@ -367,8 +389,10 @@ fun EntryListItem(
         ItemCover.Book(
             modifier = Modifier
                 .fillMaxHeight()
-                .alpha(coverAlpha),
+                .alpha(coverAlpha).posterSource(poster),
             data = coverData,
+            initialPainter = posterSourcePlaceholder(poster),
+            onPainterReady = { poster?.painter = it },
         )
         Text(
             text = title,
@@ -415,3 +439,7 @@ private fun ContinueViewingButton(
         }
     }
 }
+
+@Composable
+private fun rememberAnimePosterSource(cover: EntryCoverModel): PosterSource? =
+    if (LocalNyanimeStyle.current && cover is AnimeCover) rememberPosterSource(cover) else null

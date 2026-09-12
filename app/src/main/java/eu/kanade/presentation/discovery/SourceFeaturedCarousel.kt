@@ -7,6 +7,10 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import eu.kanade.presentation.motion.posterOpen
+import eu.kanade.presentation.motion.posterSource
+import eu.kanade.presentation.motion.posterSourcePlaceholder
+import eu.kanade.presentation.motion.rememberPosterSource
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import tachiyomi.domain.discovery.homeItemKey
 import tachiyomi.domain.discovery.homePresentation
@@ -30,6 +34,8 @@ fun SourceFeaturedCarousel(
     Column {
         HorizontalPager(state = pager, key = { items[it].homeItemKey }) { index ->
             val anime = items[index]
+            val poster = rememberPosterSource(anime)
+            val openDetails = posterOpen(poster, anime.title) { onClick(anime) }
             val presentation = anime.homePresentation
             Box(
                 Modifier.graphicsLayer {
@@ -48,14 +54,16 @@ fun SourceFeaturedCarousel(
                     metadata = (presentation?.badges.orEmpty() + presentation?.details.orEmpty()).joinToString(" · "),
                     description = anime.description,
                     actionLabel = "Apri episodi",
-                    onOpen = { onClick(anime) },
+                    onOpen = openDetails,
                 ) {
                     SourceHomeArtwork(
                         data = anime,
                         background = !anime.backgroundUrl.isNullOrBlank(),
                         refreshKey = refreshKey,
                         contentDescription = null,
-                        modifier = Modifier.matchParentSize(),
+                        modifier = Modifier.matchParentSize().posterSource(poster),
+                        initialPainter = posterSourcePlaceholder(poster),
+                        onPainterReady = { poster.painter = it },
                     )
                 }
             }

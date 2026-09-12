@@ -92,6 +92,8 @@ import eu.kanade.presentation.components.DropdownMenu
 import eu.kanade.presentation.discovery.SourceHomeArtwork
 import eu.kanade.presentation.entries.components.DotSeparatorText
 import eu.kanade.presentation.entries.components.ItemCover
+import eu.kanade.presentation.motion.PosterDetailArtwork
+import eu.kanade.presentation.motion.posterDetailHeight
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.animesource.model.SAnime
@@ -140,12 +142,13 @@ fun AnimeInfoBox(
     }
     Column(modifier.fillMaxWidth()) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val artworkHeight = if (isTabletUi) 280.dp else (maxWidth * 0.66f).coerceIn(220.dp, 360.dp)
+            val artworkHeight = posterDetailHeight(maxWidth, isTabletUi)
             Box(Modifier.fillMaxWidth().height(artworkHeight + appBarPadding)) {
-                SourceHomeArtwork(
+                PosterDetailArtwork(
                     anime,
                     Modifier.matchParentSize(),
                     background = !anime.backgroundUrl.isNullOrBlank(),
+                    sourceArtwork = true,
                 )
                 Box(
                     Modifier.matchParentSize().background(
