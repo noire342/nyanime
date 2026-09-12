@@ -11,6 +11,7 @@ data class SourceHomeSection(
     val layout: String = "posters",
     val group: SourceHomeSectionGroup? = null,
     val dateFilter: String? = null,
+    val moreSelections: Map<String, String>? = null,
 )
 
 /** Optional presentation only; requests and caches still use the concrete section ID. */

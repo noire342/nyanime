@@ -215,7 +215,7 @@ object HomeScreen : Screen() {
                         tabNavigator.current = when (it) {
                             is Tab.Home -> eu.kanade.tachiyomi.ui.discovery.DiscoveryTab
                             is Tab.AnimeLib -> AnimeLibraryTab
-                            is Tab.Library -> MangaLibraryTab
+                            is Tab.Library -> MangaLibraryTab.also { tab -> tab.libraryRequested.value = true }
                             is Tab.Updates -> UpdatesTab
                             is Tab.History -> HistoriesTab
                             is Tab.Browse -> {

@@ -73,6 +73,7 @@ import tachiyomi.source.local.entries.manga.LocalMangaSource
 data class BrowseMangaSourceScreen(
     val sourceId: Long,
     private val listingQuery: String?,
+    private val initialSelections: Map<String, String> = emptyMap(),
 ) : Screen(), AssistContentScreen {
 
     private var assistUrl: String? = null
@@ -91,7 +92,9 @@ data class BrowseMangaSourceScreen(
             return
         }
 
-        val screenModel = rememberScreenModel { BrowseMangaSourceScreenModel(sourceId, listingQuery) }
+        val screenModel = rememberScreenModel {
+            BrowseMangaSourceScreenModel(sourceId, listingQuery, initialSelections = initialSelections)
+        }
         val state by screenModel.state.collectAsState()
 
         val navigator = LocalNavigator.currentOrThrow

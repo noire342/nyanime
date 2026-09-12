@@ -72,6 +72,7 @@ class BrowseMangaSourceScreenModel(
     private val updateManga: UpdateManga = Injekt.get(),
     private val addTracks: AddMangaTracks = Injekt.get(),
     private val getIncognitoState: GetMangaIncognitoState = Injekt.get(),
+    initialSelections: Map<String, String> = emptyMap(),
 ) : StateScreenModel<BrowseMangaSourceScreenModel.State>(State(Listing.valueOf(listingQuery))) {
 
     var displayMode by sourcePreferences.sourceDisplayMode().asState(screenModelScope)
@@ -83,15 +84,32 @@ class BrowseMangaSourceScreenModel(
             mutableState.update {
                 var query: String? = null
                 var listing = it.listing
+                val displayFilters = source.getFilterList()
 
                 if (listing is Listing.Search) {
                     query = listing.query
                     listing = Listing.Search(query, source.getFilterList())
                 }
 
+                if (initialSelections.isNotEmpty()) {
+                    val section = tachiyomi.domain.discovery.SourceHomeSection(
+                        "navigation",
+                        "Archivio",
+                        initialSelections,
+                    )
+                    val filters = source.getFilterList()
+                    if (eu.kanade.tachiyomi.data.discovery.MangaHomeFilters.supports(filters, section)) {
+                        listing =
+                            Listing.Search(
+                                query,
+                                eu.kanade.tachiyomi.data.discovery.MangaHomeFilters.apply(filters, section),
+                            )
+                        eu.kanade.tachiyomi.data.discovery.MangaHomeFilters.apply(displayFilters, section)
+                    }
+                }
                 it.copy(
                     listing = listing,
-                    filters = source.getFilterList(),
+                    filters = displayFilters,
                     toolbarQuery = query,
                 )
             }

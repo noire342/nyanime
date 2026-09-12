@@ -1,5 +1,11 @@
 -dontobfuscate
 
+# Optional presentation setter invoked by source APKs compiled against the stable manga API.
+-keepclassmembers class eu.kanade.tachiyomi.source.model.SMangaImpl {
+    public void setHomePresentation(java.lang.String);
+    public java.lang.String getHomePresentation();
+}
+
 -keep,allowoptimization class eu.kanade.**
 -keep,allowoptimization class tachiyomi.**
 -keep,allowoptimization class mihon.**

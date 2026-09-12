@@ -68,6 +68,8 @@ import tachiyomi.source.local.entries.manga.isLocal
 
 data object MangaLibraryTab : Tab {
 
+    val libraryRequested = kotlinx.coroutines.flow.MutableStateFlow(false)
+
     @OptIn(ExperimentalAnimationGraphicsApi::class)
     override val options: TabOptions
         @Composable
@@ -85,13 +87,16 @@ data object MangaLibraryTab : Tab {
         }
 
     override suspend fun onReselect(navigator: Navigator) {
+        libraryRequested.value = true
         requestOpenSettingsSheet()
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
-        LegacyMangaTheme { LegacyContent() }
+        LegacyMangaTheme {
+            eu.kanade.tachiyomi.ui.discovery.manga.MangaHomeTabContent { LegacyContent() }
+        }
     }
 
     @Composable
@@ -327,7 +332,10 @@ data object MangaLibraryTab : Tab {
 
     // For invoking search from other screen
     private val queryEvent = Channel<String>()
-    suspend fun search(query: String) = queryEvent.send(query)
+    suspend fun search(query: String) {
+        libraryRequested.value = true
+        queryEvent.send(query)
+    }
 
     // For opening settings sheet in LibraryController
     private val requestSettingsSheetEvent = Channel<Unit>()
