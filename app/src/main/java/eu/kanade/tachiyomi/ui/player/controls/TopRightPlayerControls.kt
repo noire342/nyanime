@@ -18,6 +18,7 @@
 package eu.kanade.tachiyomi.ui.player.controls
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,7 +28,12 @@ import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,7 +41,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import eu.kanade.tachiyomi.ui.player.controls.components.AutoPlaySwitch
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
+import eu.kanade.tachiyomi.ui.player.controls.components.sheets.formatSleepTimerRemaining
+import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.padding
+import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.theme.active
 
 @Composable
@@ -64,67 +73,89 @@ fun TopRightPlayerControls(
     isAnime4KMaximumEnabled: Boolean,
     onToggleAnime4KMaximum: () -> Unit,
 
+    sleepTimerRemaining: Int,
+    onSleepTimerClick: () -> Unit,
+
     // more
     onMoreClick: () -> Unit,
     onMoreLongClick: () -> Unit,
 
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Absolute.SpaceEvenly,
-    ) {
-        AutoPlaySwitch(
-            isChecked = autoPlayEnabled,
-            onToggleAutoPlay = onToggleAutoPlay,
-            modifier = Modifier
-                .padding(vertical = MaterialTheme.padding.medium, horizontal = MaterialTheme.padding.mediumSmall)
-                .size(width = 48.dp, height = 24.dp),
-        )
-        ControlsButton(
-            icon = Icons.Default.Cast,
-            title = "Trasmetti alla TV",
-            onClick = onCastClick,
-            horizontalSpacing = MaterialTheme.padding.mediumSmall,
-        )
-        ControlsButton(
-            icon = Icons.Default.Subtitles,
-            onClick = onSubtitlesClick,
-            onLongClick = onSubtitlesLongClick,
-            horizontalSpacing = MaterialTheme.padding.mediumSmall,
-        )
-        ControlsButton(
-            icon = Icons.Default.Audiotrack,
-            onClick = onAudioClick,
-            onLongClick = onAudioLongClick,
-            horizontalSpacing = MaterialTheme.padding.mediumSmall,
-        )
-        if (isEpisodeOnline == true) {
+    Column(modifier, horizontalAlignment = Alignment.End) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Absolute.SpaceEvenly,
+        ) {
+            AutoPlaySwitch(
+                isChecked = autoPlayEnabled,
+                onToggleAutoPlay = onToggleAutoPlay,
+                modifier = Modifier
+                    .padding(vertical = MaterialTheme.padding.medium, horizontal = MaterialTheme.padding.mediumSmall)
+                    .size(width = 48.dp, height = 24.dp),
+            )
             ControlsButton(
-                icon = Icons.Default.HighQuality,
-                onClick = onQualityClick,
-                onLongClick = onQualityClick,
+                icon = Icons.Default.Cast,
+                title = "Trasmetti alla TV",
+                onClick = onCastClick,
+                horizontalSpacing = MaterialTheme.padding.mediumSmall,
+            )
+            ControlsButton(
+                icon = Icons.Default.Subtitles,
+                onClick = onSubtitlesClick,
+                onLongClick = onSubtitlesLongClick,
+                horizontalSpacing = MaterialTheme.padding.mediumSmall,
+            )
+            ControlsButton(
+                icon = Icons.Default.Audiotrack,
+                onClick = onAudioClick,
+                onLongClick = onAudioLongClick,
+                horizontalSpacing = MaterialTheme.padding.mediumSmall,
+            )
+            if (isEpisodeOnline == true) {
+                ControlsButton(
+                    icon = Icons.Default.HighQuality,
+                    onClick = onQualityClick,
+                    onLongClick = onQualityClick,
+                    horizontalSpacing = MaterialTheme.padding.mediumSmall,
+                )
+            }
+            ControlsButton(
+                text = anime4KSmartLabel,
+                onClick = onToggleAnime4KSmart,
+                color = if (isAnime4KSmartEnabled) MaterialTheme.colorScheme.active else Color.White,
+                horizontalSpacing = MaterialTheme.padding.mediumSmall,
+            )
+            ControlsButton(
+                text = "4K",
+                onClick = onToggleAnime4KMaximum,
+                color = if (isAnime4KMaximumEnabled) MaterialTheme.colorScheme.active else Color.White,
+                horizontalSpacing = MaterialTheme.padding.mediumSmall,
+            )
+            ControlsButton(
+                icon = Icons.Default.MoreVert,
+                onClick = onMoreClick,
+                onLongClick = onMoreLongClick,
                 horizontalSpacing = MaterialTheme.padding.mediumSmall,
             )
         }
-        ControlsButton(
-            text = anime4KSmartLabel,
-            onClick = onToggleAnime4KSmart,
-            color = if (isAnime4KSmartEnabled) MaterialTheme.colorScheme.active else Color.White,
-            horizontalSpacing = MaterialTheme.padding.mediumSmall,
-        )
-        ControlsButton(
-            text = "4K",
-            onClick = onToggleAnime4KMaximum,
-            color = if (isAnime4KMaximumEnabled) MaterialTheme.colorScheme.active else Color.White,
-            horizontalSpacing = MaterialTheme.padding.mediumSmall,
-        )
-        ControlsButton(
-            icon = Icons.Default.MoreVert,
-            onClick = onMoreClick,
-            onLongClick = onMoreLongClick,
-            horizontalSpacing = MaterialTheme.padding.mediumSmall,
-        )
+
+        if (sleepTimerRemaining > 0) {
+            AssistChip(
+                onClick = onSleepTimerClick,
+                colors = AssistChipDefaults.assistChipColors(containerColor = Color.Black.copy(alpha = 0.65f)),
+                label = {
+                    Text(
+                        stringResource(
+                            AYMR.strings.timer_remaining,
+                            formatSleepTimerRemaining(sleepTimerRemaining),
+                        ),
+                        color = Color.White,
+                    )
+                },
+                leadingIcon = { Icon(Icons.Outlined.Timer, null, tint = Color.White) },
+                modifier = Modifier.padding(end = 8.dp),
+            )
+        }
     }
 }

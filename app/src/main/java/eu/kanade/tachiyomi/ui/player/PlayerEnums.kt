@@ -104,6 +104,7 @@ enum class Sheets {
     QualityTracks,
     Chapters,
     More,
+    SleepTimer,
     Screenshot,
 }
 

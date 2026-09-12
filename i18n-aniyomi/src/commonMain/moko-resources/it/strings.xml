@@ -548,4 +548,18 @@
     <string name="pref_download_fillermarked_items">Consenti il download degli episodi segnati come filler</string>
     <string name="show_episode_previews">Miniature episodi</string>
     <string name="show_episode_summaries">Riepiloghi episodi</string>
+    <string name="timer_pause_description">Il video si mette in pausa allo scadere del tempo.</string>
+    <string name="timer_quick_hint">Tocca una durata per avviare</string>
+    <string name="timer_restart_hint">Reimposta la durata da adesso</string>
+    <string name="timer_custom_minutes">Durata in minuti</string>
+    <string name="timer_duration_range">Da 1 a 1439 minuti (23 h e 59 min)</string>
+    <string name="timer_minutes_unit">min</string>
+    <string name="timer_quick_durations">Torna alle durate rapide</string>
+    <string name="timer_custom_duration">Durata personalizzata</string>
+    <string name="timer_update">Aggiorna timer</string>
+    <string name="timer_start">Avvia timer</string>
+    <string name="timer_pause_in">Il video si fermerà tra</string>
+    <string name="timer_add_fifteen">+15 minuti</string>
+    <string name="timer_stop">Disattiva timer</string>
+    <string name="timer_entry_hint">Durate rapide e timer personalizzato</string>
 </resources>

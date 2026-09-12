@@ -8,6 +8,53 @@ import org.junit.jupiter.api.Test
 
 class PlayerSleepTimerTest {
     @Test
+    fun `adding time preserves the exact deadline between ticks`() = runTest {
+        var expired = 0
+        val timer = PlayerSleepTimer(backgroundScope, { testScheduler.currentTime }) { expired++ }
+        timer.start(10)
+        advanceTimeBy(1250)
+        timer.extend(900)
+        assertEquals(909, timer.remainingTime.value)
+        advanceTimeBy(908749)
+        runCurrent()
+        assertEquals(0, expired)
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(1, expired)
+    }
+
+    @Test
+    fun `add time never revives a cancelled or already due timer`() = runTest {
+        var clock = 0L
+        var expired = 0
+        val timer = PlayerSleepTimer(backgroundScope, { clock }) { expired++ }
+        timer.extend(900)
+        assertEquals(0, timer.remainingTime.value)
+        timer.start(10)
+        runCurrent()
+        clock = 10001L
+        timer.extend(900)
+        advanceTimeBy(1000)
+        runCurrent()
+        assertEquals(1, expired)
+        assertEquals(0, timer.remainingTime.value)
+        timer.start(60)
+        timer.start(0)
+        timer.extend(900)
+        assertEquals(0, timer.remainingTime.value)
+    }
+
+    @Test
+    fun `repeated additions are bounded without integer overflow`() = runTest {
+        val timer = PlayerSleepTimer(backgroundScope, { testScheduler.currentTime }) {}
+        timer.start(Int.MAX_VALUE)
+        timer.extend(Int.MAX_VALUE)
+        assertEquals(Int.MAX_VALUE, timer.remainingTime.value)
+        timer.extend(-1)
+        assertEquals(Int.MAX_VALUE, timer.remainingTime.value)
+    }
+
+    @Test
     fun `timer expires exactly at its deadline and only once`() = runTest {
         var expired = 0
         val timer = PlayerSleepTimer(backgroundScope, { testScheduler.currentTime }) { expired++ }

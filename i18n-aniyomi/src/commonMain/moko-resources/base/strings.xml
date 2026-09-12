@@ -636,4 +636,18 @@
     <string name="show_episode_summaries">Episode summaries</string>
     <string name="discovery_home">Home</string>
     <string name="discovery_navigation">Home, Anime, Manga, Esplora, Altro</string>
+    <string name="timer_pause_description">Playback pauses when the timer ends.</string>
+    <string name="timer_quick_hint">Tap a duration to start</string>
+    <string name="timer_restart_hint">Set a new duration from now</string>
+    <string name="timer_custom_minutes">Duration in minutes</string>
+    <string name="timer_duration_range">From 1 to 1439 minutes (23 h 59 min)</string>
+    <string name="timer_minutes_unit">min</string>
+    <string name="timer_quick_durations">Back to quick durations</string>
+    <string name="timer_custom_duration">Custom duration</string>
+    <string name="timer_update">Update timer</string>
+    <string name="timer_start">Start timer</string>
+    <string name="timer_pause_in">Playback pauses in</string>
+    <string name="timer_add_fifteen">+15 minutes</string>
+    <string name="timer_stop">Turn off timer</string>
+    <string name="timer_entry_hint">Quick durations and custom timer</string>
 </resources>

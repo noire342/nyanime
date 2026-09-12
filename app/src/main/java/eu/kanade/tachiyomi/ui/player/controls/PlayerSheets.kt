@@ -35,6 +35,7 @@ import eu.kanade.tachiyomi.ui.player.controls.components.sheets.MoreSheet
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.PlaybackSpeedSheet
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.QualitySheet
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.ScreenshotSheet
+import eu.kanade.tachiyomi.ui.player.controls.components.sheets.SleepTimerDialog
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.SubtitlesSheet
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -82,6 +83,9 @@ fun PlayerSheets(
     // More sheet
     sleepTimerTimeRemaining: Int,
     onStartSleepTimer: (Int) -> Unit,
+    onExtendSleepTimer: (Int) -> Unit,
+    onOpenSleepTimer: () -> Unit,
+    reduceMotion: Boolean,
     buttons: ImmutableList<CustomButton>,
     onSelectAnime4KCustom: (Anime4KMode) -> Unit,
 
@@ -162,12 +166,19 @@ fun PlayerSheets(
             )
         }
 
+        Sheets.SleepTimer -> SleepTimerDialog(
+            remainingTime = sleepTimerTimeRemaining,
+            onStartTimer = onStartSleepTimer,
+            onExtendTimer = onExtendSleepTimer,
+            onDismissRequest = onDismissRequest,
+            reduceMotion = reduceMotion,
+        )
         Sheets.More -> {
             MoreSheet(
                 selectedDecoder = decoder,
                 onSelectDecoder = onUpdateDecoder,
                 remainingTime = sleepTimerTimeRemaining,
-                onStartTimer = onStartSleepTimer,
+                onOpenSleepTimer = onOpenSleepTimer,
                 onDismissRequest = onDismissRequest,
                 onEnterFiltersPanel = { onOpenPanel(Panels.VideoFilters) },
                 customButtons = buttons,

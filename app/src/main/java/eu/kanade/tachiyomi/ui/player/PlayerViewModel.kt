@@ -360,6 +360,10 @@ class PlayerViewModel @JvmOverloads constructor(
         sleepTimer.start(seconds)
     }
 
+    fun extendTimer(seconds: Int) {
+        sleepTimer.extend(seconds)
+    }
+
     fun isEpisodeOnline(): Boolean? {
         val anime = currentAnime.value ?: return null
         val episode = currentEpisode.value ?: return null

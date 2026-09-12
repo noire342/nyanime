@@ -153,6 +153,7 @@ fun PlayerControls(
     val subtitlePreferences = remember { Injekt.get<SubtitlePreferences>() }
     val interactionSource = remember { MutableInteractionSource() }
 
+    val reduceMotion by playerPreferences.reduceMotion().collectAsState()
     val controlsShown by viewModel.controlsShown.collectAsState()
     val areControlsLocked by viewModel.areControlsLocked.collectAsState()
     val seekBarShown by viewModel.seekBarShown.collectAsState()
@@ -255,7 +256,6 @@ fun PlayerControls(
                 val volume by viewModel.currentVolume.collectAsState()
                 val mpvVolume by viewModel.currentMPVVolume.collectAsState()
                 val swapVolumeAndBrightness by gesturePreferences.swapVolumeBrightness().collectAsState()
-                val reduceMotion by playerPreferences.reduceMotion().collectAsState()
 
                 LaunchedEffect(volume, mpvVolume, isVolumeSliderShown) {
                     delay(2000)
@@ -525,6 +525,7 @@ fun PlayerControls(
                         end.linkTo(parent.end)
                     },
                 ) {
+                    val sleepTimerTimeRemaining by viewModel.remainingTime.collectAsState()
                     TopRightPlayerControls(
                         onCastClick = {
                             if (castActivity.castRequest() != null) {
@@ -550,6 +551,8 @@ fun PlayerControls(
                         onToggleAnime4KSmart = onToggleAnime4KSmart,
                         isAnime4KMaximumEnabled = anime4kSelection.profile == Anime4KProfile.Maximum,
                         onToggleAnime4KMaximum = onToggleAnime4KMaximum,
+                        sleepTimerRemaining = sleepTimerTimeRemaining,
+                        onSleepTimerClick = { viewModel.showSheet(Sheets.SleepTimer) },
                         onMoreClick = { viewModel.showSheet(Sheets.More) },
                         onMoreLongClick = { viewModel.showPanel(Panels.VideoFilters) },
                     )
@@ -699,6 +702,9 @@ fun PlayerControls(
             onSpeedChange = { MPVLib.setPropertyDouble("speed", it.toFixed(2).toDouble()) },
             sleepTimerTimeRemaining = sleepTimerTimeRemaining,
             onStartSleepTimer = viewModel::startTimer,
+            onExtendSleepTimer = viewModel::extendTimer,
+            onOpenSleepTimer = { viewModel.showSheet(Sheets.SleepTimer) },
+            reduceMotion = reduceMotion,
             buttons = customButtons.getButtons().toImmutableList(),
             onSelectAnime4KCustom = onSelectAnime4KCustom,
 

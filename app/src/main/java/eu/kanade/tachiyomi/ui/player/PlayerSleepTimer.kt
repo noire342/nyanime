@@ -14,22 +14,36 @@ internal class PlayerSleepTimer(
     private val onExpired: () -> Unit,
 ) {
     private var job: Job? = null
+    private var deadline: Long? = null
     private val remaining = MutableStateFlow(0)
     val remainingTime = remaining.asStateFlow()
 
     fun start(seconds: Int) {
+        startMillis(seconds.coerceAtLeast(0) * 1000L)
+    }
+
+    /** Extend the actual deadline, without rounding seconds or reviving an expired timer. */
+    fun extend(seconds: Int) {
+        val millisLeft = (deadline ?: return) - nowMillis()
+        if (millisLeft <= 0L || seconds <= 0) return
+        startMillis((millisLeft + seconds * 1000L).coerceAtMost(Int.MAX_VALUE * 1000L))
+    }
+
+    private fun startMillis(duration: Long) {
         job?.cancel()
-        val duration = seconds.coerceAtLeast(0)
-        remaining.value = duration
-        if (duration == 0) return
-        val deadline = nowMillis() + duration * 1000L
+        deadline = null
+        remaining.value = ((duration + 999L) / 1000L).toInt()
+        if (duration == 0L) return
+        val target = nowMillis() + duration
+        deadline = target
         job = scope.launch {
             while (true) {
-                val millisLeft = deadline - nowMillis()
+                val millisLeft = target - nowMillis()
                 remaining.value = ((millisLeft.coerceAtLeast(0L) + 999L) / 1000L).toInt()
                 if (millisLeft <= 0L) break
                 delay(minOf(millisLeft, 1000L))
             }
+            deadline = null
             onExpired()
         }
     }
