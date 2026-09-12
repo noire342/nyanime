@@ -405,6 +405,7 @@ class PlayerActivity : BaseActivity() {
         }
 
         player.isExiting = true
+        viewModel.cancelNextEpisode()
         if (isFinishing) {
             viewModel.deletePendingEpisodes()
             MPVLib.command(arrayOf("stop"))
@@ -1447,8 +1448,11 @@ class PlayerActivity : BaseActivity() {
                 override fun onReceive(context: Context?, intent: Intent?) {
                     if (intent == null || intent.action != PIP_INTENTS_FILTER) return
                     when (intent.getIntExtra(PIP_INTENT_ACTION, 0)) {
-                        PIP_PAUSE -> viewModel.pause()
-                        PIP_PLAY -> viewModel.unpause()
+                        PIP_PAUSE -> {
+                            viewModel.cancelNextEpisode()
+                            viewModel.pause()
+                        }
+                        PIP_PLAY -> viewModel.resumeByUser()
                         PIP_NEXT -> viewModel.changeEpisode(false)
                         PIP_PREVIOUS -> viewModel.changeEpisode(true)
                         PIP_SKIP -> viewModel.seekBy(10)
@@ -1640,6 +1644,7 @@ class PlayerActivity : BaseActivity() {
      * @param autoPlay whether the episode is switching due to auto play
      */
     internal fun changeEpisode(episodeId: Long?, autoPlay: Boolean = false) {
+        viewModel.prepareMediaChange(episodeId)
         fileLoadedJob?.cancel()
         viewModel.sheetShown.update { _ -> Sheets.None }
         viewModel.panelShown.update { _ -> Panels.None }
@@ -1712,6 +1717,7 @@ class PlayerActivity : BaseActivity() {
             }
             return
         }
+        viewModel.prepareMediaChange(viewModel.currentEpisode.value?.id)
         httpServer?.stop()
         httpServer = null
 
@@ -2068,8 +2074,6 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun endFile(eofReached: Boolean) {
-        if (eofReached && playerPreferences.autoplayEnabled().get()) {
-            viewModel.changeEpisode(previous = false, autoPlay = true)
-        }
+        viewModel.onPlaybackEof(eofReached)
     }
 }

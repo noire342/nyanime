@@ -31,9 +31,11 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.LocalContentColor
@@ -48,14 +50,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
+import eu.kanade.presentation.discovery.SourceHomeArtwork
 import eu.kanade.presentation.more.settings.screen.player.custombutton.getButtons
 import eu.kanade.presentation.theme.playerRippleConfiguration
 import eu.kanade.tachiyomi.ui.cast.CastDevicesDialog
@@ -74,6 +79,7 @@ import eu.kanade.tachiyomi.ui.player.controls.components.Anime4KDiagnosticsOverl
 import eu.kanade.tachiyomi.ui.player.controls.components.BrightnessOverlay
 import eu.kanade.tachiyomi.ui.player.controls.components.BrightnessSlider
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
+import eu.kanade.tachiyomi.ui.player.controls.components.NextEpisodeCard
 import eu.kanade.tachiyomi.ui.player.controls.components.SeekbarWithTimers
 import eu.kanade.tachiyomi.ui.player.controls.components.TextPlayerUpdate
 import eu.kanade.tachiyomi.ui.player.controls.components.ThumbnailPreview
@@ -526,6 +532,7 @@ fun PlayerControls(
                     },
                 ) {
                     val sleepTimerTimeRemaining by viewModel.remainingTime.collectAsState()
+                    val sleepTimerEndEpisode by viewModel.sleepTimerEndEpisode.collectAsState()
                     TopRightPlayerControls(
                         onCastClick = {
                             if (castActivity.castRequest() != null) {
@@ -552,6 +559,7 @@ fun PlayerControls(
                         isAnime4KMaximumEnabled = anime4kSelection.profile == Anime4KProfile.Maximum,
                         onToggleAnime4KMaximum = onToggleAnime4KMaximum,
                         sleepTimerRemaining = sleepTimerTimeRemaining,
+                        sleepTimerAtEpisodeEnd = sleepTimerEndEpisode != null,
                         onSleepTimerClick = { viewModel.showSheet(Sheets.SleepTimer) },
                         onMoreClick = { viewModel.showSheet(Sheets.More) },
                         onMoreLongClick = { viewModel.showPanel(Panels.VideoFilters) },
@@ -664,6 +672,8 @@ fun PlayerControls(
         val decoder by viewModel.currentDecoder.collectAsState()
         val speed by viewModel.playbackSpeed.collectAsState()
         val sleepTimerTimeRemaining by viewModel.remainingTime.collectAsState()
+        val sleepTimerEndEpisode by viewModel.sleepTimerEndEpisode.collectAsState()
+        val lastCustomTimerMinutes by playerPreferences.lastSleepTimerMinutes().collectAsState()
         val showSubtitles by subtitlePreferences.screenshotSubtitles().collectAsState()
         val currentSource by viewModel.currentSource.collectAsState()
         val showFailedHosters by playerPreferences.showFailedHosters().collectAsState()
@@ -702,6 +712,10 @@ fun PlayerControls(
             onSpeedChange = { MPVLib.setPropertyDouble("speed", it.toFixed(2).toDouble()) },
             sleepTimerTimeRemaining = sleepTimerTimeRemaining,
             onStartSleepTimer = viewModel::startTimer,
+            onStartCustomSleepTimer = viewModel::startCustomTimer,
+            onEndSleepTimer = viewModel::stopAtEpisodeEnd,
+            sleepTimerAtEpisodeEnd = sleepTimerEndEpisode != null,
+            lastCustomTimerMinutes = lastCustomTimerMinutes,
             onExtendSleepTimer = viewModel::extendTimer,
             onOpenSleepTimer = { viewModel.showSheet(Sheets.SleepTimer) },
             reduceMotion = reduceMotion,
@@ -734,6 +748,44 @@ fun PlayerControls(
         val dialog by viewModel.dialogShown.collectAsState()
         val anime by viewModel.currentAnime.collectAsState()
         val playlist by viewModel.currentPlaylist.collectAsState()
+        val nextEpisodePrompt by viewModel.nextEpisodePrompt.collectAsState()
+
+        // Reading configuration also refreshes visibility when entering or leaving PiP.
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        val inPip = remember(configuration) { activity.isInPictureInPictureMode }
+        Box(
+            Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp),
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            AnimatedVisibility(
+                visible = nextEpisodePrompt != null &&
+                    !areControlsLocked &&
+                    !inPip &&
+                    sheetShown == Sheets.None &&
+                    panel == Panels.None &&
+                    dialog == Dialogs.None,
+                enter = fadeIn(tween(if (reduceMotion) 0 else 220)) +
+                    slideInVertically(tween(if (reduceMotion) 0 else 260)) { it / 5 },
+                exit = fadeOut(tween(if (reduceMotion) 0 else 120)),
+            ) {
+                val prompt = nextEpisodePrompt
+                val nextEpisode = playlist.firstOrNull { it.id == prompt?.episodeId }
+                if (prompt != null && nextEpisode != null) {
+                    NextEpisodeCard(
+                        seriesTitle = anime?.title.orEmpty(),
+                        episodeTitle = nextEpisode.name,
+                        secondsRemaining = prompt.secondsRemaining,
+                        onPlayNow = viewModel::playNextEpisodeNow,
+                        onCancel = {
+                            viewModel.cancelNextEpisode()
+                            viewModel.showControls()
+                        },
+                        reduceMotion = reduceMotion,
+                        artwork = { anime?.let { SourceHomeArtwork(it, Modifier.fillMaxSize()) } },
+                    )
+                }
+            }
+        }
 
         PlayerDialogs(
             dialogShown = dialog,

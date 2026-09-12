@@ -81,6 +81,7 @@ fun TopRightPlayerControls(
     onMoreLongClick: () -> Unit,
 
     modifier: Modifier = Modifier,
+    sleepTimerAtEpisodeEnd: Boolean = false,
 ) {
     Column(modifier, horizontalAlignment = Alignment.End) {
         Row(
@@ -140,16 +141,17 @@ fun TopRightPlayerControls(
             )
         }
 
-        if (sleepTimerRemaining > 0) {
+        if (sleepTimerRemaining > 0 || sleepTimerAtEpisodeEnd) {
             AssistChip(
                 onClick = onSleepTimerClick,
                 colors = AssistChipDefaults.assistChipColors(containerColor = Color.Black.copy(alpha = 0.65f)),
                 label = {
                     Text(
-                        stringResource(
-                            AYMR.strings.timer_remaining,
-                            formatSleepTimerRemaining(sleepTimerRemaining),
-                        ),
+                        if (sleepTimerAtEpisodeEnd) {
+                            stringResource(AYMR.strings.timer_end_episode_short)
+                        } else {
+                            stringResource(AYMR.strings.timer_remaining, formatSleepTimerRemaining(sleepTimerRemaining))
+                        },
                         color = Color.White,
                     )
                 },

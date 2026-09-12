@@ -89,6 +89,10 @@ fun SleepTimerDialog(
     onExtendTimer: (Int) -> Unit,
     onDismissRequest: () -> Unit,
     reduceMotion: Boolean,
+    atEpisodeEnd: Boolean,
+    initialCustomMinutes: Int,
+    onStartCustomTimer: (Int) -> Unit,
+    onEndTimer: () -> Unit,
 ) {
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -117,6 +121,16 @@ fun SleepTimerDialog(
                     onExtendTimer(it)
                     onDismissRequest()
                 },
+                onStartCustomTimer = {
+                    onStartCustomTimer(it)
+                    onDismissRequest()
+                },
+                onEndTimer = {
+                    onEndTimer()
+                    onDismissRequest()
+                },
+                atEpisodeEnd = atEpisodeEnd,
+                initialCustomMinutes = initialCustomMinutes,
                 onDismissRequest = onDismissRequest,
                 reduceMotion = reduceMotion,
                 modifier = Modifier.widthIn(max = 760.dp).fillMaxWidth(),
@@ -134,13 +148,18 @@ fun SleepTimerContent(
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
     initiallyCustom: Boolean = false,
+    initialCustomMinutes: Int = 30,
+    atEpisodeEnd: Boolean = false,
+    onStartCustomTimer: (Int) -> Unit = onStartTimer,
+    onEndTimer: () -> Unit = {},
 ) {
     var custom by rememberSaveable { mutableStateOf(initiallyCustom) }
     var minutes by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue("30", selection = TextRange(0, 2)))
+        val initial = (initialCustomMinutes.takeIf { it in 1..1439 } ?: 30).toString()
+        mutableStateOf(TextFieldValue(initial, selection = TextRange(0, initial.length)))
     }
     val seconds = sleepTimerDurationSeconds(minutes.text)
-    val active = remainingTime > 0
+    val active = remainingTime > 0 || atEpisodeEnd
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     BoxWithConstraints(modifier) {
@@ -208,7 +227,7 @@ fun SleepTimerContent(
                                     keyboardType = KeyboardType.Number,
                                     imeAction = ImeAction.Done,
                                 ),
-                                keyboardActions = KeyboardActions(onDone = { seconds?.let(onStartTimer) }),
+                                keyboardActions = KeyboardActions(onDone = { seconds?.let(onStartCustomTimer) }),
                                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                             )
                             LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -216,7 +235,12 @@ fun SleepTimerContent(
                     } else {
                         val overview: @Composable () -> Unit = {
                             if (active) {
-                                SleepTimerCountdown(remainingTime, onExtendTimer, onCancel = { onStartTimer(0) })
+                                SleepTimerCountdown(
+                                    remainingTime,
+                                    onExtendTimer,
+                                    onCancel = { onStartTimer(0) },
+                                    atEpisodeEnd = atEpisodeEnd,
+                                )
                             } else {
                                 Text(
                                     stringResource(AYMR.strings.timer_pause_description),
@@ -229,7 +253,12 @@ fun SleepTimerContent(
                             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) { overview() }
                                 Column(Modifier.weight(1.25f).verticalScroll(rememberScrollState())) {
-                                    SleepTimerDurations(active, onStartTimer, onCustom = { custom = true })
+                                    SleepTimerDurations(
+                                        active,
+                                        onStartTimer,
+                                        onCustom = { custom = true },
+                                        onEndTimer = onEndTimer,
+                                    )
                                 }
                             }
                         } else {
@@ -238,14 +267,19 @@ fun SleepTimerContent(
                                 verticalArrangement = Arrangement.spacedBy(20.dp),
                             ) {
                                 overview()
-                                SleepTimerDurations(active, onStartTimer, onCustom = { custom = true })
+                                SleepTimerDurations(
+                                    active,
+                                    onStartTimer,
+                                    onCustom = { custom = true },
+                                    onEndTimer = onEndTimer,
+                                )
                             }
                         }
                     }
                 }
                 if (custom) {
                     Button(
-                        onClick = { seconds?.let(onStartTimer) },
+                        onClick = { seconds?.let(onStartCustomTimer) },
                         enabled = seconds != null,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     ) {
@@ -258,7 +292,12 @@ fun SleepTimerContent(
 }
 
 @Composable
-private fun SleepTimerDurations(active: Boolean, onStartTimer: (Int) -> Unit, onCustom: () -> Unit) {
+private fun SleepTimerDurations(
+    active: Boolean,
+    onStartTimer: (Int) -> Unit,
+    onCustom: () -> Unit,
+    onEndTimer: () -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             stringResource(if (active) AYMR.strings.timer_restart_hint else AYMR.strings.timer_quick_hint),
@@ -275,7 +314,7 @@ private fun SleepTimerDurations(active: Boolean, onStartTimer: (Int) -> Unit, on
                         modifier = Modifier.weight(1f),
                     ) {
                         Column(
-                            Modifier.padding(vertical = 10.dp),
+                            Modifier.padding(vertical = 6.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(value.toString(), style = MaterialTheme.typography.headlineSmall)
@@ -289,15 +328,35 @@ private fun SleepTimerDurations(active: Boolean, onStartTimer: (Int) -> Unit, on
                 }
             }
         }
-        TextButton(onClick = onCustom, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(AYMR.strings.timer_custom_duration), modifier = Modifier.weight(1f))
-            Icon(Icons.AutoMirrored.Default.ArrowForward, contentDescription = null)
+        val endButton: @Composable (Modifier) -> Unit = { buttonModifier ->
+            TextButton(onClick = onEndTimer, modifier = buttonModifier.heightIn(min = 48.dp)) {
+                Text(stringResource(AYMR.strings.timer_at_episode_end))
+            }
+        }
+        val customButton: @Composable (Modifier) -> Unit = { buttonModifier ->
+            TextButton(onClick = onCustom, modifier = buttonModifier.heightIn(min = 48.dp)) {
+                Text(stringResource(AYMR.strings.timer_custom_duration))
+            }
+        }
+        if (LocalDensity.current.fontScale > 1.3f) {
+            endButton(Modifier.fillMaxWidth())
+            customButton(Modifier.fillMaxWidth())
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                endButton(Modifier.weight(1f))
+                customButton(Modifier.weight(1f))
+            }
         }
     }
 }
 
 @Composable
-private fun SleepTimerCountdown(remainingTime: Int, onExtendTimer: (Int) -> Unit, onCancel: () -> Unit) {
+private fun SleepTimerCountdown(
+    remainingTime: Int,
+    onExtendTimer: (Int) -> Unit,
+    onCancel: () -> Unit,
+    atEpisodeEnd: Boolean,
+) {
     val colors = MaterialTheme.colorScheme
     Surface(shape = RoundedCornerShape(20.dp), color = colors.surfaceContainerHigh) {
         Column(
@@ -309,13 +368,22 @@ private fun SleepTimerCountdown(remainingTime: Int, onExtendTimer: (Int) -> Unit
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(stringResource(AYMR.strings.timer_pause_in), style = MaterialTheme.typography.labelLarge)
-            Text(
-                formatSleepTimerRemaining(remainingTime),
-                style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
-            )
-            FilledTonalButton(onClick = { onExtendTimer(15 * 60) }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(AYMR.strings.timer_add_fifteen))
+            if (atEpisodeEnd) {
+                Icon(Icons.Outlined.Bedtime, null, tint = colors.primary, modifier = Modifier.size(28.dp))
+                Text(stringResource(AYMR.strings.timer_at_episode_end), style = MaterialTheme.typography.titleLarge)
+                Text(
+                    stringResource(AYMR.strings.timer_episode_end_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                Text(stringResource(AYMR.strings.timer_pause_in), style = MaterialTheme.typography.labelLarge)
+                Text(
+                    formatSleepTimerRemaining(remainingTime),
+                    style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
+                )
+                FilledTonalButton(onClick = { onExtendTimer(15 * 60) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(AYMR.strings.timer_add_fifteen))
+                }
             }
             TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(AYMR.strings.timer_stop))
@@ -325,7 +393,7 @@ private fun SleepTimerCountdown(remainingTime: Int, onExtendTimer: (Int) -> Unit
 }
 
 @Composable
-fun SleepTimerEntry(remainingTime: Int, onClick: () -> Unit) {
+fun SleepTimerEntry(remainingTime: Int, onClick: () -> Unit, atEpisodeEnd: Boolean = false) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
@@ -339,7 +407,9 @@ fun SleepTimerEntry(remainingTime: Int, onClick: () -> Unit) {
             Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(stringResource(AYMR.strings.timer_title), style = MaterialTheme.typography.titleMedium)
                 Text(
-                    if (remainingTime > 0) {
+                    if (atEpisodeEnd) {
+                        stringResource(AYMR.strings.timer_at_episode_end)
+                    } else if (remainingTime > 0) {
                         stringResource(AYMR.strings.timer_remaining, formatSleepTimerRemaining(remainingTime))
                     } else {
                         stringResource(AYMR.strings.timer_entry_hint)

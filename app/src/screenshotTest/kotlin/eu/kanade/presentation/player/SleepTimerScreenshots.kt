@@ -42,15 +42,41 @@ fun SleepTimerCustomScreenshot() = TimerPreview(0, custom = true)
 fun SleepTimerLegacyScreenshot() = TimerPreview(1742, modern = false)
 
 @Composable
-private fun TimerPreview(remaining: Int, custom: Boolean = false, modern: Boolean = true) {
+private fun TimerPreview(
+    remaining: Int,
+    custom: Boolean = false,
+    modern: Boolean = true,
+    endEpisode: Boolean = false,
+    customMinutes: Int = 30,
+) {
     TachiyomiPreviewTheme(appTheme = if (modern) AppTheme.NYANIME else AppTheme.DEFAULT, modernUi = modern) {
         Surface {
             Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
-                SleepTimerContent(remaining, {}, {}, {}, initiallyCustom = custom)
+                SleepTimerContent(
+                    remaining,
+                    {},
+                    {},
+                    {},
+                    initiallyCustom = custom,
+                    atEpisodeEnd = endEpisode,
+                    initialCustomMinutes = customMinutes,
+                )
             }
         }
     }
 }
+
+@PreviewTest
+@Preview(name = "EndPortrait", widthDp = 393, heightDp = 780, locale = "it")
+@Preview(name = "EndLandscape", widthDp = 800, heightDp = 360, locale = "it")
+@Preview(name = "EndLargeText", widthDp = 320, heightDp = 720, fontScale = 1.5f, locale = "it")
+@Composable
+fun SleepTimerEndScreenshot() = TimerPreview(0, endEpisode = true)
+
+@PreviewTest
+@Preview(name = "RememberedCustom", widthDp = 393, heightDp = 640, locale = "it")
+@Composable
+fun SleepTimerRememberedScreenshot() = TimerPreview(0, custom = true, customMinutes = 75)
 
 @PreviewTest
 @Preview(name = "Entry", widthDp = 393, heightDp = 140, locale = "it")

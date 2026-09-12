@@ -69,6 +69,7 @@ fun MoreSheet(
     selectedDecoder: Decoder,
     onSelectDecoder: (Decoder) -> Unit,
     remainingTime: Int,
+    timerAtEpisodeEnd: Boolean,
     onOpenSleepTimer: () -> Unit,
     onDismissRequest: () -> Unit,
     onEnterFiltersPanel: () -> Unit,
@@ -110,7 +111,7 @@ fun MoreSheet(
                     )
                 }
             }
-            SleepTimerEntry(remainingTime, onOpenSleepTimer)
+            SleepTimerEntry(remainingTime, onOpenSleepTimer, timerAtEpisodeEnd)
 
             Text(stringResource(AYMR.strings.player_hwdec_mode))
             LazyRow(

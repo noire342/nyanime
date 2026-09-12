@@ -41,6 +41,7 @@ class PlayerPreferences(
     fun showSystemStatusBar() = preferenceStore.getBoolean("pref_show_system_status_bar", false)
     fun reduceMotion() = preferenceStore.getBoolean("pref_reduce_motion", false)
     fun playerTimeToDisappear() = preferenceStore.getInt("pref_player_time_to_disappear", 4000)
+    fun lastSleepTimerMinutes() = preferenceStore.getInt("last_sleep_timer_custom_minutes", 30)
     fun panelOpacity() = preferenceStore.getInt("pref_panel_opacity", 60)
 
     // Skip intro button

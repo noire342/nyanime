@@ -4,9 +4,71 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class PlayerSleepTimerTest {
+    @Test
+    fun `episode timer waits for the selected episode and expires once`() = runTest {
+        var expired = 0
+        val timer = PlayerSleepTimer(backgroundScope, { testScheduler.currentTime }) { expired++ }
+        timer.stopAtEpisodeEnd(7)
+        advanceTimeBy(7_200_000)
+        assertEquals(0, expired)
+        assertFalse(timer.onEpisodeEnded(6))
+        assertEquals(7L, timer.endEpisodeId.value)
+        assertTrue(timer.onEpisodeEnded(7))
+        assertTrue(timer.onEpisodeEnded(7))
+        assertEquals(1, expired)
+        assertNull(timer.endEpisodeId.value)
+        assertFalse(timer.allowsAutoPlay(7))
+        timer.acknowledgeUserPlayback()
+        assertTrue(timer.allowsAutoPlay(7))
+    }
+
+    @Test
+    fun `quality reload preserves end mode but explicit different episode cancels it`() = runTest {
+        val timer = PlayerSleepTimer(backgroundScope, { testScheduler.currentTime }) {}
+        timer.stopAtEpisodeEnd(7)
+        timer.onEpisodeChanged(7)
+        assertEquals(7L, timer.endEpisodeId.value)
+        timer.onEpisodeChanged(8)
+        assertNull(timer.endEpisodeId.value)
+        assertTrue(timer.allowsAutoPlay(8))
+    }
+
+    @Test
+    fun `duration timer keeps its deadline across episode changes`() = runTest {
+        var expired = 0
+        val timer = PlayerSleepTimer(backgroundScope, { testScheduler.currentTime }) { expired++ }
+        timer.start(60)
+        advanceTimeBy(20_000)
+        timer.onEpisodeChanged(8)
+        advanceTimeBy(40_000)
+        runCurrent()
+        assertEquals(1, expired)
+    }
+
+    @Test
+    fun `switching timer modes cancels the old trigger`() = runTest {
+        var expired = 0
+        val timer = PlayerSleepTimer(backgroundScope, { testScheduler.currentTime }) { expired++ }
+        timer.start(10)
+        timer.stopAtEpisodeEnd(7)
+        advanceTimeBy(20_000)
+        assertEquals(0, expired)
+        timer.start(60)
+        assertNull(timer.endEpisodeId.value)
+        assertFalse(timer.onEpisodeEnded(7))
+        timer.stopAtEpisodeEnd(7)
+        timer.start(0)
+        assertFalse(timer.onEpisodeEnded(7))
+        advanceTimeBy(120_000)
+        assertEquals(0, expired)
+    }
+
     @Test
     fun `adding time preserves the exact deadline between ticks`() = runTest {
         var expired = 0

@@ -315,11 +315,64 @@ class PlayerViewModel @JvmOverloads constructor(
     private val _isSeekingForwards = MutableStateFlow(false)
     val isSeekingForwards = _isSeekingForwards.asStateFlow()
 
+    private val completion = PlayerPlaybackCompletion(
+        scope = viewModelScope,
+        nowMillis = android.os.SystemClock::elapsedRealtime,
+        canAdvance = ::canAutoAdvance,
+        onPlayNext = { nextId ->
+            if (getAdjacentEpisodeId(previous = false) == nextId) {
+                activity.changeEpisode(nextId, autoPlay = true)
+            }
+        },
+    )
+    val nextEpisodePrompt = completion.prompt
+
     private val sleepTimer = PlayerSleepTimer(viewModelScope, android.os.SystemClock::elapsedRealtime) {
+        completion.cancel()
         pause()
         Injekt.get<Application>().toast(AYMR.strings.toast_sleep_timer_ended)
     }
     val remainingTime = sleepTimer.remainingTime
+    val sleepTimerEndEpisode = sleepTimer.endEpisodeId
+
+    private fun canAutoAdvance(): Boolean {
+        val currentId = currentEpisode.value?.id ?: return false
+        val cast = CastController.get(activity.applicationContext).state.value
+        return !activity.player.isExiting &&
+            !remoteProgressOwned &&
+            !cast.active &&
+            !cast.connecting &&
+            !isLoadingEpisode.value &&
+            playerPreferences.autoplayEnabled().get() &&
+            sheetShown.value == Sheets.None &&
+            panelShown.value == Panels.None &&
+            dialogShown.value == Dialogs.None &&
+            sleepTimer.allowsAutoPlay(currentId)
+    }
+
+    fun onPlaybackEof(reached: Boolean) {
+        if (!reached) {
+            completion.playbackRestarted()
+            return
+        }
+        val currentId = currentEpisode.value?.id ?: return
+        if (isLoadingEpisode.value || remoteProgressOwned) return
+        sleepTimer.onEpisodeEnded(currentId)
+        completion.onEnded(
+            nextEpisodeId = getAdjacentEpisodeId(previous = false).takeIf { it >= 0 },
+            autoPlay = playerPreferences.autoplayEnabled().get(),
+        )
+        if (nextEpisodePrompt.value != null) hideControls()
+    }
+
+    fun cancelNextEpisode() = completion.cancel()
+
+    fun playNextEpisodeNow() = completion.playNow()
+
+    fun prepareMediaChange(episodeId: Long?) {
+        completion.playbackRestarted()
+        if (episodeId != null && episodeId != currentEpisode.value?.id) sleepTimer.onEpisodeChanged(episodeId)
+    }
 
     val cachePath: String = activity.cacheDir.path
 
@@ -358,6 +411,19 @@ class PlayerViewModel @JvmOverloads constructor(
      */
     fun startTimer(seconds: Int) {
         sleepTimer.start(seconds)
+    }
+
+    fun startCustomTimer(seconds: Int) {
+        if (seconds % 60 != 0 || seconds / 60 !in 1..1439) return
+        playerPreferences.lastSleepTimerMinutes().set(seconds / 60)
+        startTimer(seconds)
+    }
+
+    fun stopAtEpisodeEnd() {
+        val currentId = currentEpisode.value?.id ?: return
+        sleepTimer.stopAtEpisodeEnd(currentId)
+        completion.cancel()
+        if (completion.atEnd) sleepTimer.onEpisodeEnded(currentId)
     }
 
     fun extendTimer(seconds: Int) {
@@ -643,11 +709,18 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun pauseUnpause() {
+        completion.cancel()
         if (paused.value) {
-            unpause()
+            resumeByUser()
         } else {
             pause()
         }
+    }
+
+    fun resumeByUser() {
+        completion.cancel()
+        sleepTimer.acknowledgeUserPlayback()
+        unpause()
     }
 
     fun pause() {
@@ -714,6 +787,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun showSheet(sheet: Sheets) {
+        if (sheet != Sheets.None) completion.cancel()
         sheetShown.update { sheet }
         if (sheet == Sheets.None) {
             resetDismissSheet()
@@ -726,6 +800,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun showPanel(panel: Panels) {
+        if (panel != Panels.None) completion.cancel()
         panelShown.update { panel }
         if (panel == Panels.None) {
             showControls()
@@ -737,6 +812,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun showDialog(dialog: Dialogs) {
+        if (dialog != Dialogs.None) completion.cancel()
         dialogShown.update { dialog }
         if (dialog == Dialogs.None) {
             showControls()
@@ -748,11 +824,13 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun seekBy(offset: Int, precise: Boolean = false) {
+        completion.playbackRestarted()
         MPVLib.command(arrayOf("seek", offset.toString(), if (precise) "relative+exact" else "relative"))
     }
 
     fun seekTo(position: Int, precise: Boolean = true) {
         if (position !in 0..(activity.player.duration ?: 0)) return
+        completion.playbackRestarted()
         MPVLib.command(arrayOf("seek", position.toString(), if (precise) "absolute" else "absolute+keyframes"))
     }
 
@@ -807,6 +885,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun setAutoPlay(value: Boolean) {
+        if (!value) completion.cancel()
         val textRes = if (value) {
             AYMR.strings.enable_auto_play
         } else {

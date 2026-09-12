@@ -562,4 +562,11 @@
     <string name="timer_add_fifteen">+15 minuti</string>
     <string name="timer_stop">Disattiva timer</string>
     <string name="timer_entry_hint">Durate rapide e timer personalizzato</string>
+    <string name="timer_at_episode_end">Alla fine dell’episodio</string>
+    <string name="timer_end_episode_short">Fine episodio</string>
+    <string name="timer_episode_end_description">Pausa al termine di questo episodio. Il successivo non partirà automaticamente.</string>
+    <string name="player_up_next">Prossimo episodio</string>
+    <string name="player_up_next_countdown">Inizia tra %d s</string>
+    <string name="player_up_next_play_now">Riproduci ora</string>
+    <string name="home_artwork_retry">Ricarica immagine</string>
 </resources>

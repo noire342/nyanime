@@ -650,4 +650,11 @@
     <string name="timer_add_fifteen">+15 minutes</string>
     <string name="timer_stop">Turn off timer</string>
     <string name="timer_entry_hint">Quick durations and custom timer</string>
+    <string name="timer_at_episode_end">At the end of the episode</string>
+    <string name="timer_end_episode_short">Episode end</string>
+    <string name="timer_episode_end_description">Stop after this episode. The next episode will not start automatically.</string>
+    <string name="player_up_next">Up next</string>
+    <string name="player_up_next_countdown">Starting in %d s</string>
+    <string name="player_up_next_play_now">Play now</string>
+    <string name="home_artwork_retry">Reload image</string>
 </resources>
