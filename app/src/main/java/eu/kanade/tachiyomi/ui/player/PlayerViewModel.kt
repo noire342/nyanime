@@ -315,9 +315,11 @@ class PlayerViewModel @JvmOverloads constructor(
     private val _isSeekingForwards = MutableStateFlow(false)
     val isSeekingForwards = _isSeekingForwards.asStateFlow()
 
-    private var timerJob: Job? = null
-    private val _remainingTime = MutableStateFlow(0)
-    val remainingTime = _remainingTime.asStateFlow()
+    private val sleepTimer = PlayerSleepTimer(viewModelScope, android.os.SystemClock::elapsedRealtime) {
+        pause()
+        Injekt.get<Application>().toast(AYMR.strings.toast_sleep_timer_ended)
+    }
+    val remainingTime = sleepTimer.remainingTime
 
     val cachePath: String = activity.cacheDir.path
 
@@ -355,17 +357,7 @@ class PlayerViewModel @JvmOverloads constructor(
      * Starts a sleep timer/cancels the current timer if [seconds] is less than 1.
      */
     fun startTimer(seconds: Int) {
-        timerJob?.cancel()
-        _remainingTime.value = seconds
-        if (seconds < 1) return
-        timerJob = viewModelScope.launch {
-            for (time in seconds downTo 0) {
-                _remainingTime.value = time
-                delay(1000)
-            }
-            pause()
-            withUIContext { Injekt.get<Application>().toast(AYMR.strings.toast_sleep_timer_ended) }
-        }
+        sleepTimer.start(seconds)
     }
 
     fun isEpisodeOnline(): Boolean? {

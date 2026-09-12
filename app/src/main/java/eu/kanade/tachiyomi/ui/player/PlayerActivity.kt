@@ -255,6 +255,7 @@ class PlayerActivity : BaseActivity() {
             finish()
             return
         }
+        advancedPlayerPreferences.beginAnime4kSession()
         NotificationReceiver.dismissNotification(
             this,
             animeId.hashCode(),
@@ -668,6 +669,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun applyAnime4K() {
+        advancedPlayerPreferences.beginAnime4kSession()
         // The episode profile is loaded after MPV has identified the current episode. Never
         // apply a previous episode's profile during MPV initialization.
         anime4kShaderPipeline.apply(Anime4KMode.Off)

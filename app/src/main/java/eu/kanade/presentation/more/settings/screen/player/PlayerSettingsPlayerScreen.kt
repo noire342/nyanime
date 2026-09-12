@@ -21,6 +21,7 @@ import eu.kanade.tachiyomi.ui.player.PlayerOrientation
 import eu.kanade.tachiyomi.ui.player.VLC_PLAYER
 import eu.kanade.tachiyomi.ui.player.WEB_VIDEO_CASTER
 import eu.kanade.tachiyomi.ui.player.X_PLAYER
+import eu.kanade.tachiyomi.ui.player.settings.AdvancedPlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
@@ -42,6 +43,7 @@ object PlayerSettingsPlayerScreen : SearchableSettings {
     @Composable
     override fun getPreferences(): List<Preference> {
         val playerPreferences = remember { Injekt.get<PlayerPreferences>() }
+        val advancedPlayerPreferences = remember { Injekt.get<AdvancedPlayerPreferences>() }
         val basePreferences = remember { Injekt.get<BasePreferences>() }
         val deviceSupportsPip = basePreferences.deviceHasPip()
 
@@ -69,6 +71,16 @@ object PlayerSettingsPlayerScreen : SearchableSettings {
                     stringResource(it.titleRes)
                 }.toPersistentMap(),
                 title = stringResource(AYMR.strings.pref_category_player_orientation),
+            ),
+            Preference.PreferenceGroup(
+                title = stringResource(AYMR.strings.pref_anime4k),
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = advancedPlayerPreferences.anime4kSmartAutoStart(),
+                        title = stringResource(AYMR.strings.pref_anime4k_smart_auto_start),
+                        subtitle = stringResource(AYMR.strings.pref_anime4k_smart_auto_start_summary),
+                    ),
+                ),
             ),
             getControlsGroup(playerPreferences = playerPreferences),
             getHosterGroup(playerPreferences = playerPreferences),

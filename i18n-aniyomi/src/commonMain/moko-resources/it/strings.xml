@@ -139,6 +139,8 @@
     <string name="pref_reset_mpv_conf">Reimposta configurazione MPV</string>
     <string name="pref_mpv_input">Modifica mappa dei tasti del file di input MPV</string>
     <string name="pref_anime4k">Anime4K</string>
+    <string name="pref_anime4k_smart_auto_start">Avvia Smart automaticamente</string>
+    <string name="pref_anime4k_smart_auto_start_summary">Se disattivato, Smart resta spento quando apri un video. Puoi comunque attivarlo dal pulsante SM.</string>
     <string name="pref_anime4k_summary">Preset Anime4K rapidi e HQ per il player interno (HQ usa più GPU)</string>
     <string name="pref_anime4k_max">Massimo (A+A HQ)</string>
     <string name="pref_anime4k_off">Disattivato</string>

@@ -30,6 +30,7 @@ class AdvancedPlayerPreferences(
     fun mpvUserFiles() = preferenceStore.getBoolean("mpv_scripts", false)
     fun mpvConf() = preferenceStore.getString("pref_mpv_conf", "")
     fun mpvInput() = preferenceStore.getString("pref_mpv_input", "")
+    fun anime4kSmartAutoStart() = preferenceStore.getBoolean("pref_anime4k_smart_auto_start", true)
     fun anime4kMode() = preferenceStore.getEnum("pref_anime4k_mode", Anime4KMode.Off)
     fun anime4kProfile() = preferenceStore.getEnum(
         "pref_anime4k_profile",
@@ -59,15 +60,29 @@ class AdvancedPlayerPreferences(
         anime4kDiagnosticsFlow.value = diagnostics
     }
 
+    fun beginAnime4kSession() {
+        activeEpisodeKey = null
+    }
+
     fun loadAnime4kEpisodeProfile(animeId: Long?, episodeId: Long?): Anime4KEpisodeProfile {
-        activeEpisodeKey = episodeKey(animeId, episodeId)
+        val key = episodeKey(animeId, episodeId)
+        // A quality change or stream recovery keeps the choice made in the current player.
+        val active = anime4kActiveSelectionState.value.takeIf { key != null && key == activeEpisodeKey }
+        activeEpisodeKey = key
         val stored = activeEpisodeKey
             ?.let { preferenceStore.getString(it, "").get() }
             ?.let(::decodeEpisodeProfile)
-        val profile = stored ?: Anime4KEpisodeProfile(Anime4KProfile.Smart)
-        if (stored == null) {
-            saveAnime4kEpisodeProfile(animeId, episodeId, profile)
+        val candidate = stored ?: Anime4KEpisodeProfile(Anime4KProfile.Smart)
+        val profile = when {
+            active != null -> Anime4KEpisodeProfile(
+                active.profile,
+                if (active.profile == Anime4KProfile.Custom) active.mode else Anime4KMode.Off,
+            )
+            candidate.profile == Anime4KProfile.Smart && !anime4kSmartAutoStart().get() ->
+                Anime4KEpisodeProfile(Anime4KProfile.Off)
+            else -> candidate
         }
+        // Only an explicit player choice is saved; the default must follow future setting changes.
         setAnime4kActiveSelection(profile.toSelection())
         setAnime4kDiagnostics(
             Anime4KSmartDiagnostics(

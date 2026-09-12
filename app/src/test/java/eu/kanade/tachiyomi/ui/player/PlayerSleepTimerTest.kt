@@ -1,0 +1,75 @@
+package eu.kanade.tachiyomi.ui.player
+
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+
+class PlayerSleepTimerTest {
+    @Test
+    fun `timer expires exactly at its deadline and only once`() = runTest {
+        var expired = 0
+        val timer = PlayerSleepTimer(backgroundScope, { testScheduler.currentTime }) { expired++ }
+        timer.start(30 * 60)
+        assertEquals(1800, timer.remainingTime.value)
+        advanceTimeBy(1_799_000)
+        runCurrent()
+        assertEquals(1, timer.remainingTime.value)
+        assertEquals(0, expired)
+        advanceTimeBy(1000)
+        runCurrent()
+        assertEquals(0, timer.remainingTime.value)
+        assertEquals(1, expired)
+        advanceTimeBy(5000)
+        runCurrent()
+        assertEquals(1, expired)
+    }
+
+    @Test
+    fun `delayed callbacks catch up with elapsed time instead of extending the timer`() = runTest {
+        var clock = 0L
+        var expired = 0
+        val timer = PlayerSleepTimer(backgroundScope, { clock }) { expired++ }
+        timer.start(60)
+        runCurrent()
+        clock = 65_000L
+        advanceTimeBy(1000)
+        runCurrent()
+        assertEquals(1, expired)
+        assertEquals(0, timer.remainingTime.value)
+    }
+
+    @Test
+    fun `replacing or cancelling a timer cannot trigger its old deadline`() = runTest {
+        var expired = 0
+        val timer = PlayerSleepTimer(backgroundScope, { testScheduler.currentTime }) { expired++ }
+        timer.start(10)
+        advanceTimeBy(9000)
+        timer.start(30)
+        advanceTimeBy(1500)
+        runCurrent()
+        assertEquals(0, expired)
+        timer.start(0)
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(0, expired)
+        assertEquals(0, timer.remainingTime.value)
+    }
+
+    @Test
+    fun `large durations do not overflow and negative durations cancel`() = runTest {
+        var expired = 0
+        val timer = PlayerSleepTimer(backgroundScope, { testScheduler.currentTime }) { expired++ }
+        timer.start(Int.MAX_VALUE)
+        runCurrent()
+        assertEquals(Int.MAX_VALUE, timer.remainingTime.value)
+        advanceTimeBy(1000)
+        runCurrent()
+        assertEquals(Int.MAX_VALUE - 1, timer.remainingTime.value)
+        timer.start(-1)
+        runCurrent()
+        assertEquals(0, timer.remainingTime.value)
+        assertEquals(0, expired)
+    }
+}
