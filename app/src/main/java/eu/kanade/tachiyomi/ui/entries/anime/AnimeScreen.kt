@@ -40,7 +40,6 @@ import eu.kanade.presentation.entries.components.SetIntervalDialog
 import eu.kanade.presentation.more.settings.screen.player.PlayerSettingsGesturesScreen.SkipIntroLengthDialog
 import eu.kanade.presentation.motion.PosterAnimeLoadingScreen
 import eu.kanade.presentation.motion.PosterDetailsScreen
-import eu.kanade.presentation.motion.holdPosterDetails
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.formatEpisodeNumber
@@ -106,7 +105,7 @@ class AnimeScreen(
 
         val state by screenModel.state.collectAsStateWithLifecycle()
 
-        if (state is AnimeScreenModel.State.Loading || holdPosterDetails()) {
+        if (state is AnimeScreenModel.State.Loading) {
             PosterAnimeLoadingScreen(isTabletUi(), navigator::pop)
             return
         }

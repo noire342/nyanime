@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.motion.modernMotionEnabled
 
 /** Artwork and actions stay owned by the existing catalogue/source integration. */
 @Composable
@@ -148,6 +149,7 @@ internal fun CinematicHero(
 @Composable
 internal fun CarouselPosition(page: Int, count: Int, onBrowse: (() -> Unit)? = null) {
     if (count <= 1 && onBrowse == null) return
+    val duration = if (modernMotionEnabled()) 220 else 0
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         if (count > 1) {
             Row(
@@ -159,10 +161,10 @@ internal fun CarouselPosition(page: Int, count: Int, onBrowse: (() -> Unit)? = n
                 repeat(count.coerceAtMost(7)) { offset ->
                     val selected = start + offset == page
                     val targetWidth = if (selected) 20.dp else 5.dp
-                    val width by animateDpAsState(targetWidth, tween(220), label = "heroIndicatorWidth")
+                    val width by animateDpAsState(targetWidth, tween(duration), label = "heroIndicatorWidth")
                     val color by animateColorAsState(
                         if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                        tween(220),
+                        tween(duration),
                         label = "heroIndicatorColor",
                     )
                     Box(

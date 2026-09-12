@@ -7,6 +7,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.motion.posterOpen
 import eu.kanade.presentation.motion.posterSource
 import eu.kanade.presentation.motion.posterSourcePlaceholder
@@ -31,6 +32,7 @@ fun SourceFeaturedCarousel(
     }
     if (items.isEmpty()) return
     val pager = rememberPagerState { items.size }
+    val motion = modernMotionEnabled()
     Column {
         HorizontalPager(state = pager, key = { items[it].homeItemKey }) { index ->
             val anime = items[index]
@@ -43,9 +45,7 @@ fun SourceFeaturedCarousel(
                         0f,
                         1f,
                     )
-                    alpha = 1f - offset * 0.25f
-                    scaleX = 1f - offset * 0.035f
-                    scaleY = scaleX
+                    alpha = if (motion) 1f - offset * 0.25f else 1f
                 },
             ) {
                 CinematicHero(

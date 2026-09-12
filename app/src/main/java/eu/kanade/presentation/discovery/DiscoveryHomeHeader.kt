@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.theme.NyanimeWordmark
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
@@ -116,6 +117,7 @@ fun DiscoveryHomeHeader(
 /** Availability and selection remain owned by the generic extension Home contract. */
 @Composable
 private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
+    val motion = modernMotionEnabled()
     val choices = (if (homes.any { it.primary }) emptyList() else listOf(null to "Anime")) +
         homes.sortedWith(compareByDescending<SourceHomeGroup> { it.primary }.thenBy { it.title }).map { home ->
             home.id to home.title
@@ -133,7 +135,7 @@ private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup
                     val selected = selectedHome == value
                     val indicatorWidth by animateDpAsState(
                         if (selected) 32.dp else 0.dp,
-                        tween(220),
+                        tween(if (motion) 220 else 0),
                         label = "homeIndicator",
                     )
                     val labelColor by animateColorAsState(
@@ -142,7 +144,7 @@ private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
-                        tween(180),
+                        tween(if (motion) 180 else 0),
                         label = "homeLabel",
                     )
                     LaunchedEffect(selected, viewportWidth) { if (selected) bringIntoView.bringIntoView() }
@@ -160,7 +162,7 @@ private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup
                                 label,
                                 color = labelColor,
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )

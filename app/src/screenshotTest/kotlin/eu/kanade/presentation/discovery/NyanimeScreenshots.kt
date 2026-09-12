@@ -107,7 +107,7 @@ private val previewAnime = titles.mapIndexed { index, title ->
 /** Optional local artwork is never downloaded by previews or packaged in the application. */
 @Composable
 @OptIn(DelicateCoilApi::class)
-private fun PreviewImages() {
+internal fun PreviewImages() {
     val context = LocalContext.current
     remember(context) {
         val images = (0..2).map { index ->

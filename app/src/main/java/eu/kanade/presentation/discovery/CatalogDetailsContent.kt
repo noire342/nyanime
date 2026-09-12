@@ -1,9 +1,6 @@
 package eu.kanade.presentation.discovery
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,15 +17,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import eu.kanade.presentation.motion.PosterDetailArtwork
-import eu.kanade.presentation.motion.posterDetailHeight
+import eu.kanade.presentation.motion.PosterDetailHero
+import eu.kanade.presentation.motion.PosterDetailTitle
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogId
@@ -45,26 +40,14 @@ fun CatalogDetailsContent(anime: CatalogAnime, actions: @Composable () -> Unit =
             contentScale = ContentScale.Crop,
         )
     } else {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            Box(Modifier.fillMaxWidth().height(posterDetailHeight(maxWidth, tablet = false, catalog = true))) {
-                PosterDetailArtwork(
-                    anime.banner ?: anime.cover,
-                    Modifier.matchParentSize(),
-                )
-                Box(
-                    Modifier.matchParentSize().background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.5f to Color.Transparent,
-                            1f to MaterialTheme.colorScheme.background,
-                        ),
-                    ),
-                )
-            }
-        }
+        PosterDetailHero(anime.banner ?: anime.cover, catalog = true)
     }
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(anime.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        if (LocalNyanimeStyle.current) {
+            PosterDetailTitle(anime.title, catalog = true)
+        } else {
+            Text(anime.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        }
         if (anime.alternateTitles.isNotEmpty()) {
             Text(
                 anime.alternateTitles.joinToString(" · "),

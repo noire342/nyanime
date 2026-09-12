@@ -8,6 +8,7 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -38,7 +39,6 @@ internal data class PosterScene(
     val visibility: AnimatedVisibilityScope,
     val route: String,
     val active: PosterRoute<Painter>?,
-    val entering: Boolean,
     val running: Boolean,
     val enabled: Boolean,
 )
@@ -76,8 +76,9 @@ internal fun <T> PosterNavigationTransition(
             transitionSpec = {
                 if (enabled && state.between(routeKey(initialState), routeKey(targetState)) != null) {
                     (
-                        fadeIn(tween(POSTER_TRANSITION_MILLIS, easing = FastOutSlowInEasing)) togetherWith
-                            fadeOut(tween(POSTER_TRANSITION_MILLIS))
+                        fadeIn(
+                            tween(POSTER_TRANSITION_MILLIS - 80, delayMillis = 80, easing = LinearOutSlowInEasing),
+                        ) togetherWith fadeOut(tween(200))
                         ).using(null)
                 } else {
                     transitionSpec()
@@ -93,7 +94,6 @@ internal fun <T> PosterNavigationTransition(
                     this,
                     key,
                     active,
-                    entering = moving && key == targetKey,
                     running = moving,
                     enabled = enabled,
                 ),
@@ -188,10 +188,7 @@ internal fun posterDetailPreview(): PosterRoute<Painter>? {
 }
 
 @Composable
-internal fun holdPosterDetails(): Boolean {
-    val scene = LocalPosterScene.current ?: return false
-    return scene.enabled && scene.entering && scene.state.destination(scene.route) != null
-}
+internal fun posterNavigationRunning(): Boolean = LocalPosterScene.current?.running == true
 
 @Composable
 internal fun posterRequestsEnabled(): Boolean {

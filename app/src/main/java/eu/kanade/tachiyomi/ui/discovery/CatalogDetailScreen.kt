@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.ui.discovery
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,7 +44,6 @@ import eu.kanade.presentation.discovery.PosterCard
 import eu.kanade.presentation.discovery.SectionHeader
 import eu.kanade.presentation.motion.PosterDetailsScreen
 import eu.kanade.presentation.motion.PosterLoadingBody
-import eu.kanade.presentation.motion.holdPosterDetails
 import eu.kanade.presentation.motion.posterDetailPreview
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.util.Screen
@@ -68,7 +68,7 @@ class CatalogDetailScreen(private val catalogId: Long, private val provider: Str
         var query by rememberSaveable { mutableStateOf("") }
         var manualVersion by rememberSaveable { mutableStateOf(false) }
         val anime = state.details.data
-        val loadingPoster = posterDetailPreview() != null && (anime == null || holdPosterDetails())
+        val loadingPoster = posterDetailPreview() != null && anime == null
         LaunchedEffect(state.query) { if (query.isBlank()) query = state.query }
         LaunchedEffect(model) {
             if (manualVersion) model.search(query)
@@ -104,11 +104,13 @@ class CatalogDetailScreen(private val catalogId: Long, private val provider: Str
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 item {
-                    LoadNotice(
-                        state.details.loading || state.busy,
-                        state.details.error,
-                        state.details.stale,
-                    ) { model.load(true) }
+                    Box(Modifier.heightIn(min = if (LocalNyanimeStyle.current) 4.dp else 0.dp)) {
+                        LoadNotice(
+                            state.details.loading || state.busy,
+                            state.details.error,
+                            state.details.stale,
+                        ) { model.load(true) }
+                    }
                 }
                 state.message?.let { message -> item { Text(message, Modifier.padding(16.dp)) } }
                 if (state.resolver) {

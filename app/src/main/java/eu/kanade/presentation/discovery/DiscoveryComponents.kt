@@ -63,6 +63,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.motion.posterOpen
 import eu.kanade.presentation.motion.posterSource
 import eu.kanade.presentation.motion.posterSourcePlaceholder
@@ -179,15 +180,15 @@ fun PosterCard(
     val openDetails = posterOpen(poster, title, onClick)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.96f else 1f, tween(140), label = "posterPress")
+    val motion = modernMotionEnabled()
+    val pressAlpha = animateFloatAsState(if (motion && pressed) 0.9f else 1f, tween(100), label = "posterPress")
     if (information) {
         TitleInformationSheet(title, badges.joinToString(" · "), subtitle, { information = false }, onClick)
     }
     Column(
         modifier.width((132 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)
             .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
+                alpha = pressAlpha.value
             }
             .clickable(
                 interactionSource = interaction,

@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
@@ -89,11 +88,10 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import eu.kanade.presentation.components.DropdownMenu
-import eu.kanade.presentation.discovery.SourceHomeArtwork
 import eu.kanade.presentation.entries.components.DotSeparatorText
 import eu.kanade.presentation.entries.components.ItemCover
-import eu.kanade.presentation.motion.PosterDetailArtwork
-import eu.kanade.presentation.motion.posterDetailHeight
+import eu.kanade.presentation.motion.PosterDetailHero
+import eu.kanade.presentation.motion.PosterDetailTitle
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.animesource.model.SAnime
@@ -141,33 +139,21 @@ fun AnimeInfoBox(
         )
     }
     Column(modifier.fillMaxWidth()) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val artworkHeight = posterDetailHeight(maxWidth, isTabletUi)
-            Box(Modifier.fillMaxWidth().height(artworkHeight + appBarPadding)) {
-                PosterDetailArtwork(
-                    anime,
-                    Modifier.matchParentSize(),
-                    background = !anime.backgroundUrl.isNullOrBlank(),
-                    sourceArtwork = true,
-                )
-                Box(
-                    Modifier.matchParentSize().background(
-                        Brush.verticalGradient(
-                            0f to Color.Black.copy(alpha = 0.6f),
-                            0.4f to Color.Transparent,
-                            1f to MaterialTheme.colorScheme.background,
-                        ),
-                    ),
-                )
-                OutlinedButton(
-                    onClick = onCoverClick,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.Black.copy(alpha = 0.65f),
-                        contentColor = Color.White,
-                    ),
-                ) { Text("Immagini") }
-            }
+        PosterDetailHero(
+            anime,
+            tablet = isTabletUi,
+            appBarPadding = appBarPadding,
+            background = !anime.backgroundUrl.isNullOrBlank(),
+            sourceArtwork = true,
+        ) {
+            OutlinedButton(
+                onClick = onCoverClick,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.Black.copy(alpha = 0.65f),
+                    contentColor = Color.White,
+                ),
+            ) { Text("Immagini") }
         }
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             AnimeContentInfo(
@@ -547,26 +533,27 @@ private fun ColumnScope.AnimeContentInfo(
     textAlign: TextAlign? = LocalTextStyle.current.textAlign,
 ) {
     val context = LocalContext.current
-    Text(
-        text = title.ifBlank { stringResource(MR.strings.unknown_title) },
-        style = if (LocalNyanimeStyle.current) {
-            MaterialTheme.typography.headlineMedium
-        } else {
-            MaterialTheme.typography.titleLarge
+    val titleModifier = Modifier.clickableNoIndication(
+        onLongClick = {
+            if (title.isNotBlank()) {
+                context.copyToClipboard(
+                    title,
+                    title,
+                )
+            }
         },
-        modifier = Modifier.clickableNoIndication(
-            onLongClick = {
-                if (title.isNotBlank()) {
-                    context.copyToClipboard(
-                        title,
-                        title,
-                    )
-                }
-            },
-            onClick = { if (title.isNotBlank()) doSearch(title, true) },
-        ),
-        textAlign = textAlign,
+        onClick = { if (title.isNotBlank()) doSearch(title, true) },
     )
+    if (LocalNyanimeStyle.current) {
+        PosterDetailTitle(title, titleModifier, textAlign = textAlign)
+    } else {
+        Text(
+            text = title.ifBlank { stringResource(MR.strings.unknown_title) },
+            style = MaterialTheme.typography.titleLarge,
+            modifier = titleModifier,
+            textAlign = textAlign,
+        )
+    }
 
     Spacer(modifier = Modifier.height(2.dp))
 

@@ -7,8 +7,11 @@ import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -25,11 +28,22 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.android.tools.screenshot.PreviewTest
 import eu.kanade.domain.ui.model.AppTheme
+import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.discovery.CatalogDetailsContent
+import eu.kanade.presentation.discovery.PreviewImages
+import eu.kanade.presentation.entries.anime.components.AnimeInfoBox
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
+import tachiyomi.domain.discovery.CatalogAnime
+import tachiyomi.domain.discovery.CatalogId
+import tachiyomi.domain.entries.anime.model.Anime
+import tachiyomi.presentation.core.components.TwoPanelBox
+import tachiyomi.presentation.core.components.material.Scaffold
 
 @PreviewTest
 @Preview(name = "PosterOrigin", widthDp = 393, heightDp = 760, locale = "it")
@@ -45,13 +59,27 @@ fun PosterOriginScreenshot() = PosterMotionPreview("home")
 fun PosterDetailScreenshot() = PosterMotionPreview("detail")
 
 @PreviewTest
+@Preview(name = "ReadyDetail", widthDp = 393, heightDp = 760, locale = "it")
+@Preview(name = "ReadyDetailLargeText", widthDp = 320, heightDp = 760, fontScale = 1.4f, locale = "it")
+@Preview(name = "ReadyDetailTablet", widthDp = 1000, heightDp = 700, locale = "it")
+@Composable
+fun PosterReadyDetailScreenshot() = PosterMotionPreview("detail", ready = true)
+
+@PreviewTest
 @Preview(name = "WarmCatalogDetail", widthDp = 393, heightDp = 760, locale = "it")
 @Composable
 fun PosterCatalogScreenshot() = PosterMotionPreview("detail", catalog = true)
 
+@PreviewTest
+@Preview(name = "ReadyCatalogDetail", widthDp = 393, heightDp = 760, locale = "it")
+@Composable
+fun PosterReadyCatalogScreenshot() = PosterMotionPreview("detail", catalog = true, ready = true)
+
 /** Static transition endpoints; the host renderer does not advance the animation clock. */
 @Composable
-private fun PosterMotionPreview(initial: String, catalog: Boolean = false) {
+private fun PosterMotionPreview(initial: String, catalog: Boolean = false, ready: Boolean = false) {
+    PreviewImages()
+    val title = "Oltre la fine del viaggio · Il ritorno nella città delle stelle"
     val artwork = remember {
         PosterSource::class.java.classLoader?.getResourceAsStream("nyanime-preview/poster-0.jpg")
             ?.use { BitmapFactory.decodeStream(it) }
@@ -60,7 +88,7 @@ private fun PosterMotionPreview(initial: String, catalog: Boolean = false) {
     }
     val state = remember {
         PosterNavigationState<Painter>().apply {
-            connect("home", "detail", "selected-poster", "Oltre la fine del viaggio", artwork)
+            connect("home", "detail", "selected-poster", title, artwork)
         }
     }
     val transition = updateTransition(initial, label = "poster_preview")
@@ -90,7 +118,15 @@ private fun PosterMotionPreview(initial: String, catalog: Boolean = false) {
                         )
                     }
                 } else if (catalog) {
-                    PosterLoadingBody(catalog = true)
+                    if (ready) {
+                        Column {
+                            CatalogDetailsContent(CatalogAnime(CatalogId(value = 1), title, cover = "preview://0")) {}
+                        }
+                    } else {
+                        PosterLoadingBody(catalog = true)
+                    }
+                } else if (ready) {
+                    ReadyAnimeHeader(title)
                 } else {
                     PosterAnimeLoadingScreen(
                         tablet =
@@ -98,6 +134,38 @@ private fun PosterMotionPreview(initial: String, catalog: Boolean = false) {
                     ) {}
                 }
             }
+        }
+    }
+}
+
+/** The production header inside the same scaffold and panels as the actual details screen. */
+@Composable
+private fun ReadyAnimeHeader(title: String) {
+    val tablet = LocalConfiguration.current.screenWidthDp >= 800
+    val anime = remember(title) {
+        Anime.create().copy(
+            id = 1,
+            source = 1,
+            url = "/series/preview-0",
+            title = title,
+            thumbnailUrl = "preview://0",
+            initialized = true,
+        )
+    }
+    Scaffold(
+        topBar = { AppBar(titleContent = {}, navigateUp = {}, backgroundColor = Color.Transparent) },
+    ) { padding ->
+        val direction = LocalLayoutDirection.current
+        Box(
+            Modifier.padding(
+                start = padding.calculateStartPadding(direction),
+                end = padding.calculateEndPadding(direction),
+            ),
+        ) {
+            val header: @Composable () -> Unit = {
+                AnimeInfoBox(tablet, padding.calculateTopPadding(), anime, "Fonte installata", false, {}, { _, _ -> })
+            }
+            if (tablet) TwoPanelBox(startContent = { header() }, endContent = {}) else header()
         }
     }
 }

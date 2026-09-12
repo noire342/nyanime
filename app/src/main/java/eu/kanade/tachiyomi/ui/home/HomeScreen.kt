@@ -3,6 +3,8 @@ package eu.kanade.tachiyomi.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
@@ -44,6 +46,7 @@ import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.TabNavigator
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.ui.UiPreferences
+import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.theme.MangaSectionTheme
 import eu.kanade.presentation.util.Screen
@@ -98,6 +101,8 @@ object HomeScreen : Screen() {
             key = TAB_NAVIGATOR_KEY,
         ) { tabNavigator ->
             MangaSectionTheme(legacy = tabNavigator.current == MangaLibraryTab) {
+                val modern = LocalNyanimeStyle.current
+                val motion = modernMotionEnabled()
                 // Provide usable navigator to content screen
                 CompositionLocalProvider(LocalNavigator provides navigator) {
                     Scaffold(
@@ -150,11 +155,15 @@ object HomeScreen : Screen() {
                             AnimatedContent(
                                 targetState = tabNavigator.current,
                                 transitionSpec = {
-                                    materialFadeThroughIn(
-                                        initialScale = 1f,
-                                        durationMillis = TAB_FADE_DURATION,
-                                    ) togetherWith
-                                        materialFadeThroughOut(durationMillis = TAB_FADE_DURATION)
+                                    if (modern && !motion) {
+                                        EnterTransition.None togetherWith ExitTransition.None
+                                    } else {
+                                        val fade = materialFadeThroughIn(
+                                            initialScale = 1f,
+                                            durationMillis = TAB_FADE_DURATION,
+                                        ) togetherWith materialFadeThroughOut(durationMillis = TAB_FADE_DURATION)
+                                        if (modern) fade.using(null) else fade
+                                    }
                                 },
                                 label = "tabContent",
                             ) {
