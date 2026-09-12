@@ -25,6 +25,12 @@ sulle locandine. Il banner cambia profondità durante lo scorrimento. Non sono
 presenti animazioni decorative permanenti; le animazioni temporizzate Compose
 rispettano la scala di animazione del sistema.
 
+Le categorie della Home sono centrate quando entrano nella larghezza disponibile
+e restano scorrevoli con testo grande o schermi stretti. Il refresh fluttuante
+delle schermate anime compare solo trascinando per aggiornare, senza comparire
+durante le aperture o gli aggiornamenti automatici. L'icona usa la N rossa
+originale, anche nelle build preview e nella variante monocromatica Android.
+
 ## Copertine e lavoro in background
 
 Le Home possono ricevere titoli privi di copertina. Per le schede visibili, quando

@@ -77,6 +77,7 @@ fun AnimeUpdateScreen(
                 var isRefreshing by remember { mutableStateOf(false) }
 
                 PullRefresh(
+                    indicatorOnGestureOnly = true,
                     refreshing = isRefreshing,
                     onRefresh = {
                         val started = onUpdateLibrary()

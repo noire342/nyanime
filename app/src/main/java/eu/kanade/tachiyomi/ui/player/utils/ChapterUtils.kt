@@ -10,6 +10,12 @@ import kotlin.math.abs
 
 class ChapterUtils {
     companion object {
+        fun skipTarget(chapters: List<IndexedSegment>, chapterIndex: Int, position: Float, duration: Float): Float {
+            if (chapterIndex !in chapters.indices) return position
+            val end = chapters.getOrNull(chapterIndex + 1)?.start ?: duration
+            return end.takeIf { it.isFinite() && it > position } ?: position
+        }
+
         fun ChapterType.getStringRes(): StringResource? = when (this) {
             ChapterType.Opening -> AYMR.strings.player_chapter_type_opening
             ChapterType.Ending -> AYMR.strings.player_chapter_type_ending

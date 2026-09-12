@@ -465,6 +465,7 @@ private fun AnimeScreenSmallImpl(
             val topPadding = contentPadding.calculateTopPadding()
 
             PullRefresh(
+                indicatorOnGestureOnly = true,
                 refreshing = state.isRefreshingData,
                 onRefresh = onRefresh,
                 enabled = !isAnySelected,
@@ -815,6 +816,7 @@ fun AnimeScreenLargeImpl(
             },
         ) { contentPadding ->
             PullRefresh(
+                indicatorOnGestureOnly = true,
                 refreshing = state.isRefreshingData,
                 onRefresh = onRefresh,
                 enabled = !isAnySelected,

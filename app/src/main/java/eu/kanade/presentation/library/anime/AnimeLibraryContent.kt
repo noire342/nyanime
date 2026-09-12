@@ -83,6 +83,7 @@ fun AnimeLibraryContent(
         }
 
         PullRefresh(
+            indicatorOnGestureOnly = true,
             refreshing = isRefreshing,
             onRefresh = {
                 val started = onRefresh(categories[currentPage()])

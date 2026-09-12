@@ -80,6 +80,7 @@ import eu.kanade.tachiyomi.ui.player.loader.HosterLoader
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.utils.AniSkipApi
+import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
 import eu.kanade.tachiyomi.ui.player.utils.TrackSelect
 import eu.kanade.tachiyomi.ui.reader.SaveImageNotifier
@@ -2046,27 +2047,24 @@ class PlayerViewModel @JvmOverloads constructor(
      * Returns the response of the AniSkipApi for this episode.
      * just works if tracking is enabled.
      */
+    private val aniSkipApi by lazy { AniSkipApi() }
+
     suspend fun aniSkipResponse(playerDuration: Int?): List<TimeStamp>? {
         val animeId = currentAnime.value?.id ?: return null
+        val episodeNumber = currentEpisode.value?.episode_number?.toDouble() ?: return null
+        val duration = playerDuration?.takeIf { it > 0 }?.toLong() ?: return null
+        if (!episodeNumber.isFinite() || episodeNumber < 0) return null
         val trackerManager = Injekt.get<TrackerManager>()
-        var malId: Long?
-        val episodeNumber = currentEpisode.value?.episode_number?.toInt() ?: return null
-        if (getTracks.await(animeId).isEmpty()) {
-            logcat { "AniSkip: No tracks found for anime $animeId" }
-            return null
-        }
-
-        getTracks.await(animeId).map { track ->
-            val tracker = trackerManager.get(track.trackerId)
-            malId = when (tracker) {
-                is MyAnimeList -> track.remoteId
-                is Anilist -> AniSkipApi().getMalIdFromAL(track.remoteId)
+        val tracks = getTracks.await(animeId).sortedBy { trackerManager.get(it.trackerId) !is MyAnimeList }
+        val requestedIds = mutableSetOf<Long>()
+        for (track in tracks) {
+            val malId = when (trackerManager.get(track.trackerId)) {
+                is MyAnimeList -> track.remoteId.takeIf { it > 0 }
+                is Anilist -> aniSkipApi.getMalIdFromAL(track.remoteId)
                 else -> null
-            }
-            val duration = playerDuration ?: return null
-            return malId?.let {
-                AniSkipApi().getResult(it.toInt(), episodeNumber, duration.toLong())
-            }
+            } ?: continue
+            if (!requestedIds.add(malId)) continue
+            aniSkipApi.getResult(malId, episodeNumber, duration)?.let { return it }
         }
         return null
     }
@@ -2092,7 +2090,7 @@ class PlayerViewModel @JvmOverloads constructor(
                 _skipIntroText.update { _ -> null }
                 waitingSkipIntro = defaultWaitingTime
             } else {
-                val nextChapterPos = chapters.value.getOrNull(chapterIndex + 1)?.start ?: pos.value
+                val nextChapterPos = ChapterUtils.skipTarget(chapters.value, chapterIndex, pos.value, duration.value)
 
                 if (netflixStyle) {
                     // show a toast with the seconds before the skip
@@ -2156,7 +2154,7 @@ class PlayerViewModel @JvmOverloads constructor(
                 return
             }
 
-            val nextChapterPos = chapters.value.getOrNull(chapterIndex + 1)?.start ?: pos.value
+            val nextChapterPos = ChapterUtils.skipTarget(chapters.value, chapterIndex, pos.value, duration.value)
 
             seekToWithText(
                 seekValue = nextChapterPos.toInt(),

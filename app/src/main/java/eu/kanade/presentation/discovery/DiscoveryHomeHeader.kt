@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -119,51 +120,59 @@ private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup
         homes.sortedWith(compareByDescending<SourceHomeGroup> { it.primary }.thenBy { it.title }).map { home ->
             home.id to home.title
         }
-    Row(
-        Modifier.fillMaxWidth().selectableGroup().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
-    ) {
-        choices.forEach { (value, label) ->
-            key(value) {
-                val bringIntoView = remember { BringIntoViewRequester() }
-                val selected = selectedHome == value
-                val indicatorWidth by animateDpAsState(
-                    if (selected) 32.dp else 0.dp,
-                    tween(220),
-                    label = "homeIndicator",
-                )
-                val labelColor by animateColorAsState(
-                    if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                    tween(180),
-                    label = "homeLabel",
-                )
-                LaunchedEffect(selected) { if (selected) bringIntoView.bringIntoView() }
-                Column(
-                    Modifier.widthIn(min = 64.dp, max = 220.dp).bringIntoViewRequester(bringIntoView)
-                        .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(value) })
-                        .semantics { contentDescription = "Home $label" },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Box(
-                        Modifier.heightIn(min = 48.dp).padding(horizontal = 4.dp),
-                        contentAlignment = Alignment.Center,
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val viewportWidth = maxWidth
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).widthIn(min = viewportWidth)
+                .selectableGroup().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+        ) {
+            choices.forEach { (value, label) ->
+                key(value) {
+                    val bringIntoView = remember { BringIntoViewRequester() }
+                    val selected = selectedHome == value
+                    val indicatorWidth by animateDpAsState(
+                        if (selected) 32.dp else 0.dp,
+                        tween(220),
+                        label = "homeIndicator",
+                    )
+                    val labelColor by animateColorAsState(
+                        if (selected) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        tween(180),
+                        label = "homeLabel",
+                    )
+                    LaunchedEffect(selected, viewportWidth) { if (selected) bringIntoView.bringIntoView() }
+                    Column(
+                        Modifier.widthIn(min = 64.dp, max = 220.dp).bringIntoViewRequester(bringIntoView)
+                            .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(value) })
+                            .semantics { contentDescription = "Home $label" },
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(
-                            label,
-                            color = labelColor,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                        Box(
+                            Modifier.heightIn(min = 48.dp).padding(horizontal = 4.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                label,
+                                color = labelColor,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Box(
+                            Modifier.width(
+                                indicatorWidth,
+                            ).height(
+                                3.dp,
+                            ).background(MaterialTheme.colorScheme.primary),
                         )
                     }
-                    Box(
-                        Modifier.width(
-                            indicatorWidth,
-                        ).height(
-                            3.dp,
-                        ).background(MaterialTheme.colorScheme.primary),
-                    )
                 }
             }
         }

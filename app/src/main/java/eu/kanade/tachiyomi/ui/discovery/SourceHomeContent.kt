@@ -89,6 +89,7 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
     }) { padding ->
         HomeContentReveal(homeKey) {
             PullRefresh(
+                indicatorOnGestureOnly = true,
                 refreshing = state.sections.values.any { it.loading },
                 enabled = !access.offline,
                 onRefresh = model::refresh,

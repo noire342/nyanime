@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -44,6 +45,49 @@ import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.anime.model.AnimeCover
 import tachiyomi.domain.entries.anime.model.asAnimeCover
 import tachiyomi.domain.items.episode.model.Episode
+import tachiyomi.presentation.core.components.material.PullRefresh
+
+@PreviewTest
+@Preview(name = "FourTabs", widthDp = 393, heightDp = 150, locale = "it")
+@Preview(name = "FourTabsWide", widthDp = 800, heightDp = 150, locale = "it")
+@Preview(name = "FourTabsLargeText", widthDp = 320, heightDp = 170, fontScale = 1.4f, locale = "it")
+@Composable
+fun NyanimeCenteredTabsScreenshot() {
+    TachiyomiPreviewTheme(appTheme = AppTheme.NYANIME) {
+        DiscoveryHomeHeader(
+            null,
+            {},
+            null,
+            {},
+            {},
+            listOf(
+                SourceHomeGroup("cartoons", "Cartoni", emptyList()),
+                SourceHomeGroup("films", "Film", emptyList()),
+                SourceHomeGroup("series", "Serie TV", emptyList()),
+            ),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "AutomaticRefresh", widthDp = 393, heightDp = 240, locale = "it")
+@Composable
+fun NyanimeAutomaticRefreshScreenshot() {
+    TachiyomiPreviewTheme(appTheme = AppTheme.NYANIME) {
+        Surface {
+            Column {
+                DiscoveryHomeHeader(null, {}, null, {}, {}, emptyList())
+                PullRefresh(refreshing = true, enabled = true, onRefresh = {}, indicatorOnGestureOnly = true) {
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        items(3) {
+                            Text("Contenuto della Home", Modifier.padding(16.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 private val titles = listOf("Frieren · Oltre la fine del viaggio", "Cowboy Bebop", "Dungeon Meshi")
 private val previewAnime = titles.mapIndexed { index, title ->

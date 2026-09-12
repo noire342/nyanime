@@ -92,12 +92,16 @@ import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPVLib
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
@@ -182,6 +186,7 @@ class PlayerActivity : BaseActivity() {
     private var pipReceiver: BroadcastReceiver? = null
     private var httpServer: HttpServer? = null
     private val anime4kShaderPipeline by lazy { Anime4KShaderPipeline(this) }
+    private var fileLoadedJob: Job? = null
     private var anime4kSmartController: Anime4KSmartController? = null
     private var anime4kSmartNeedsMediaResolution = true
     private var anime4kSmartResolutionRetryCount = 0
@@ -239,6 +244,7 @@ class PlayerActivity : BaseActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        fileLoadedJob?.cancel()
 
         val animeId = intent.extras?.getLong("animeId") ?: -1
         val episodeId = intent.extras?.getLong("episodeId") ?: -1
@@ -356,6 +362,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onDestroy() {
+        fileLoadedJob?.cancel()
         player.isExiting = true
 
         httpServer?.stop()
@@ -1366,9 +1373,11 @@ class PlayerActivity : BaseActivity() {
     internal fun event(eventId: Int) {
         if (player.isExiting) return
         when (eventId) {
+            MPVLib.mpvEventId.MPV_EVENT_START_FILE -> fileLoadedJob?.cancel()
             MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED -> {
                 loadAnime4KForCurrentEpisode()
-                viewModel.viewModelScope.launchIO { fileLoaded() }
+                fileLoadedJob?.cancel()
+                fileLoadedJob = lifecycleScope.launchIO { fileLoaded() }
             }
             MPVLib.mpvEventId.MPV_EVENT_VIDEO_RECONFIG -> requestAnime4KMediaRefresh()
             MPVLib.mpvEventId.MPV_EVENT_SEEK -> {
@@ -1629,6 +1638,7 @@ class PlayerActivity : BaseActivity() {
      * @param autoPlay whether the episode is switching due to auto play
      */
     internal fun changeEpisode(episodeId: Long?, autoPlay: Boolean = false) {
+        fileLoadedJob?.cancel()
         viewModel.sheetShown.update { _ -> Sheets.None }
         viewModel.panelShown.update { _ -> Panels.None }
         viewModel.pause()
@@ -1913,7 +1923,7 @@ class PlayerActivity : BaseActivity() {
     // at void eu.kanade.tachiyomi.ui.player.PlayerActivity.fileLoaded() (PlayerActivity.kt:1874)
     // at void eu.kanade.tachiyomi.ui.player.PlayerActivity.event(int) (PlayerActivity.kt:1566)
     // at void is.xyz.mpv.MPVLib.event(int) (MPVLib.java:86)
-    private fun fileLoaded() {
+    private suspend fun fileLoaded() {
         if (player.isExiting) return
         if (castController.state.value.active || castController.state.value.connecting) {
             player.paused = true
@@ -1927,25 +1937,33 @@ class PlayerActivity : BaseActivity() {
         setupChapters()
         setupTracks()
 
-        // aniSkip stuff
         viewModel.waitingSkipIntro = playerPreferences.waitingTimeIntroSkip().get()
-        runBlocking {
-            if (
-                viewModel.introSkipEnabled &&
-                playerPreferences.aniSkipEnabled().get() &&
-                !(playerPreferences.disableAniSkipOnChapters().get() && viewModel.chapters.value.isNotEmpty())
+        if (!viewModel.introSkipEnabled ||
+            !playerPreferences.aniSkipEnabled().get() ||
+            (playerPreferences.disableAniSkipOnChapters().get() && viewModel.chapters.value.isNotEmpty())
+        ) {
+            return
+        }
+        val animeId = viewModel.currentAnime.value?.id ?: return
+        val episodeId = viewModel.currentEpisode.value?.id ?: return
+        val video = viewModel.currentVideo.value ?: return
+        val duration = player.duration ?: return
+        val stamps = withTimeoutOrNull(8_000L) { viewModel.aniSkipResponse(duration) } ?: return
+        withContext(Dispatchers.Main.immediate) {
+            currentCoroutineContext().ensureActive()
+            if (player.isExiting ||
+                viewModel.currentAnime.value?.id != animeId ||
+                viewModel.currentEpisode.value?.id != episodeId ||
+                viewModel.currentVideo.value !== video ||
+                castController.state.value.active ||
+                castController.state.value.connecting
             ) {
-                viewModel.aniSkipResponse(player.duration)?.let {
-                    viewModel.updateChapters(
-                        ChapterUtils.mergeChapters(
-                            currentChapters = viewModel.chapters.value,
-                            stamps = it,
-                            duration = player.duration,
-                        ),
-                    )
-                    viewModel.setChapter(viewModel.pos.value)
-                }
+                return@withContext
             }
+            viewModel.updateChapters(
+                ChapterUtils.mergeChapters(viewModel.chapters.value, stamps, duration),
+            )
+            viewModel.setChapter(viewModel.pos.value)
         }
     }
 
