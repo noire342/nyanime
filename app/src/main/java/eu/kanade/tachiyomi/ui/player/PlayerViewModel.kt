@@ -96,12 +96,15 @@ import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPVLib
 import `is`.xyz.mpv.Utils
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -109,6 +112,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
@@ -213,6 +217,8 @@ class PlayerViewModel @JvmOverloads constructor(
     val animeTitle = MutableStateFlow("")
 
     val isLoading = MutableStateFlow(true)
+    val playbackLoad = PlaybackLoadMonitor(viewModelScope, { activity.onPlaybackFailure(PlaybackFailure.Timeout) })
+    val playbackLoadState = playbackLoad.state
     val playbackSpeed = MutableStateFlow(playerPreferences.playerSpeed().get())
 
     private val _subtitleTracks = MutableStateFlow<List<VideoTrack>>(emptyList())
@@ -356,7 +362,7 @@ class PlayerViewModel @JvmOverloads constructor(
             return
         }
         val currentId = currentEpisode.value?.id ?: return
-        if (isLoadingEpisode.value || remoteProgressOwned) return
+        if (isLoadingEpisode.value || remoteProgressOwned || !playbackLoadState.value.canSaveProgress) return
         sleepTimer.onEpisodeEnded(currentId)
         completion.onEnded(
             nextEpisodeId = getAdjacentEpisodeId(previous = false).takeIf { it >= 0 },
@@ -443,6 +449,21 @@ class PlayerViewModel @JvmOverloads constructor(
 
     fun updateIsLoadingEpisode(value: Boolean) {
         _isLoadingEpisode.update { _ -> value }
+    }
+
+    fun onPlaybackFailed(reason: PlaybackFailure) {
+        playbackLoad.fail(reason)
+        isLoading.value = false
+        updateIsLoadingEpisode(false)
+        updateIsLoadingHosters(false)
+        isLoadingTracks.value = true
+        cancelHosterVideoLinksJob()
+        completion.cancel()
+        showControls()
+    }
+
+    fun retryPlayback() {
+        activity.changeEpisode(currentEpisode.value?.id)
     }
 
     private fun updateEpisodeList(episodeList: List<Episode>) {
@@ -1112,6 +1133,7 @@ class PlayerViewModel @JvmOverloads constructor(
         _hosterList.update { _ -> emptyList() }
         _hosterExpandedList.update { _ -> emptyList() }
         _selectedHosterVideoIndex.update { _ -> Pair(-1, -1) }
+        _currentVideo.value = null
         thumbnailTileCache.clear()
         thumbnailFetchJob?.cancel()
         lastThumbnailFetch = 0L
@@ -1458,6 +1480,10 @@ class PlayerViewModel @JvmOverloads constructor(
         }
 
         getHosterVideoLinksJob?.cancel()
+        if (hosterList.any { !it.lazy }) {
+            playbackLoad.begin()
+            isLoading.value = true
+        }
         getHosterVideoLinksJob = viewModelScope.launchIO {
             _hosterState.update { _ ->
                 hosterList.map { hoster ->
@@ -1481,7 +1507,7 @@ class PlayerViewModel @JvmOverloads constructor(
                     hosterList.mapIndexed { hosterIdx, hoster ->
                         async {
                             val hosterState = EpisodeLoader.loadHosterVideos(source, hoster)
-
+                            currentCoroutineContext().ensureActive()
                             _hosterState.updateAt(hosterIdx, hosterState)
 
                             if (hosterState is HosterState.Ready) {
@@ -1533,11 +1559,13 @@ class PlayerViewModel @JvmOverloads constructor(
                     }
                 }
             } catch (e: CancellationException) {
-                _hosterState.update { _ ->
-                    hosterList.map { HosterState.Idle(it.hosterName) }
-                }
-
+                // A newer episode owns the state now; cancellation must not overwrite its hosters.
                 throw e
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main.immediate) {
+                    currentCoroutineContext().ensureActive()
+                    activity.onPlaybackFailure(PlaybackFailure.fromNative(e.message.orEmpty()))
+                }
             }
         }
     }
@@ -1607,7 +1635,10 @@ class PlayerViewModel @JvmOverloads constructor(
             loadThumbnails(resolvedVideo, source)
         }
 
-        activity.setVideo(resolvedVideo)
+        withContext(Dispatchers.Main.immediate) {
+            currentCoroutineContext().ensureActive()
+            activity.setVideo(resolvedVideo)
+        }
         return true
     }
 
@@ -1714,6 +1745,7 @@ class PlayerViewModel @JvmOverloads constructor(
         updateEpisode(chosenEpisode)
 
         return withIOContext {
+            currentHosterList = null // Never replay a previous episode's URLs after resolution fails.
             try {
                 val currentEpisode =
                     currentEpisode.value
@@ -1726,6 +1758,7 @@ class PlayerViewModel @JvmOverloads constructor(
 
                 this@PlayerViewModel.episodeId = currentEpisode.id!!
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 logcat(LogPriority.ERROR, e) { e.message ?: "Error getting links" }
             }
 
@@ -1744,7 +1777,7 @@ class PlayerViewModel @JvmOverloads constructor(
     private fun onSecondReached(position: Int, duration: Int) {
         val cast = CastController.get(activity.applicationContext).state.value
         if (remoteProgressOwned || cast.active || cast.connecting) return
-        if (isLoadingEpisode.value) return
+        if (isLoadingEpisode.value || !playbackLoadState.value.canSaveProgress) return
         val currentEp = currentEpisode.value ?: return
         if (episodeId == -1L) return
         if (duration == 0) return

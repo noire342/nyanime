@@ -569,4 +569,10 @@
     <string name="player_up_next_countdown">Inizia tra %d s</string>
     <string name="player_up_next_play_now">Riproduci ora</string>
     <string name="home_artwork_retry">Ricarica immagine</string>
+    <string name="player_error_format">Il server non ha restituito un video riproducibile. Riprova o verifica la pagina della fonte.</string>
+    <string name="player_error_network">Impossibile raggiungere il video. Controlla la connessione o riprova per aggiornare il collegamento.</string>
+    <string name="player_error_source_page">Il server ha restituito una pagina web al posto del video. Apri la fonte per verificare eventuali controlli o episodi non disponibili.</string>
+    <string name="player_error_timeout">La riproduzione non è partita o ripresa in tempo. Riprova per aggiornare il collegamento: il punto salvato viene conservato.</string>
+    <string name="player_error_unknown">Riproduzione non riuscita. Riprova o apri la fonte per verificare l’episodio.</string>
+    <string name="player_open_source">Apri fonte</string>
 </resources>

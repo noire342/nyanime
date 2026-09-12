@@ -32,7 +32,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.ui.player.PlaybackFailure
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
+import eu.kanade.tachiyomi.ui.player.controls.components.PlaybackErrorControls
 import `is`.xyz.mpv.Utils
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.padding
@@ -62,6 +64,9 @@ fun MiddlePlayerControls(
     enter: EnterTransition,
     exit: ExitTransition,
     modifier: Modifier = Modifier,
+    failure: PlaybackFailure? = null,
+    onRetry: () -> Unit = {},
+    onOpenSource: (() -> Unit)? = null,
 ) {
     Row(
         modifier,
@@ -86,6 +91,7 @@ fun MiddlePlayerControls(
         val icon = AnimatedImageVector.animatedVectorResource(R.drawable.anim_play_to_pause)
         val interaction = remember { MutableInteractionSource() }
         when {
+            failure != null -> PlaybackErrorControls(failure, onRetry, onOpenSource)
             gestureSeekAmount != null -> {
                 Text(
                     stringResource(

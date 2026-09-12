@@ -165,6 +165,8 @@ fun PlayerControls(
     val seekBarShown by viewModel.seekBarShown.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isLoadingEpisode by viewModel.isLoadingEpisode.collectAsState()
+    val playbackLoad by viewModel.playbackLoadState.collectAsState()
+    val playbackActivity = LocalContext.current as PlayerActivity
     val duration by viewModel.duration.collectAsState()
     val position by viewModel.pos.collectAsState()
     val seekPosition by viewModel.seekPosition.collectAsState()
@@ -406,7 +408,8 @@ fun PlayerControls(
                     visible =
                     (controlsShown && !areControlsLocked || gestureSeekAmount != null) ||
                         isLoading ||
-                        isLoadingEpisode,
+                        isLoadingEpisode ||
+                        playbackLoad.failure != null,
                     enter = fadeIn(playerControlsEnterAnimationSpec()),
                     exit = fadeOut(playerControlsExitAnimationSpec()),
                     modifier = Modifier.constrainAs(centerControls) {
@@ -430,6 +433,15 @@ fun PlayerControls(
                         paused = paused,
                         gestureSeekAmount = gestureSeekAmount,
                         onPlayPauseClick = viewModel::pauseUnpause,
+                        failure = playbackLoad.failure,
+                        onRetry = viewModel::retryPlayback,
+                        onOpenSource = if (viewModel.isEpisodeOnline() ==
+                            true
+                        ) {
+                            playbackActivity::openPlaybackSource
+                        } else {
+                            null
+                        },
                         enter = fadeIn(playerControlsEnterAnimationSpec()),
                         exit = fadeOut(playerControlsExitAnimationSpec()),
                     )

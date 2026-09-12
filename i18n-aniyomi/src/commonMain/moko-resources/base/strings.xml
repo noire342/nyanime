@@ -657,4 +657,10 @@
     <string name="player_up_next_countdown">Starting in %d s</string>
     <string name="player_up_next_play_now">Play now</string>
     <string name="home_artwork_retry">Reload image</string>
+    <string name="player_error_format">The server did not return a playable video. Retry or check the source page.</string>
+    <string name="player_error_network">The video could not be reached. Check your connection or retry to refresh the link.</string>
+    <string name="player_error_source_page">The server returned a web page instead of a video. Open the source to check for a verification or an unavailable episode.</string>
+    <string name="player_error_timeout">Playback did not start or resume in time. Retry to refresh the video link; your saved position is preserved.</string>
+    <string name="player_error_unknown">Playback failed. Retry or open the source to check the episode.</string>
+    <string name="player_open_source">Open source</string>
 </resources>

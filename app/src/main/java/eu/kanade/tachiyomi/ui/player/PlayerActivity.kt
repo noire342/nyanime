@@ -62,6 +62,7 @@ import aniyomi.core.common.torrent.TorrentPreferences
 import aniyomi.core.common.torrent.TorrentServerApi
 import aniyomi.core.common.torrent.TorrentServerUtils
 import com.hippo.unifile.UniFile
+import eu.kanade.domain.items.episode.model.toSEpisode
 import eu.kanade.presentation.theme.TachiyomiTheme
 import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.animesource.model.ChapterType
@@ -73,6 +74,7 @@ import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.data.cast.CastController
 import eu.kanade.tachiyomi.data.cast.CastHandoffPolicy
 import eu.kanade.tachiyomi.data.cast.CastRequest
+import eu.kanade.tachiyomi.data.database.models.anime.toDomainEpisode
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
@@ -187,6 +189,9 @@ class PlayerActivity : BaseActivity() {
     private var httpServer: HttpServer? = null
     private val anime4kShaderPipeline by lazy { Anime4KShaderPipeline(this) }
     private var fileLoadedJob: Job? = null
+    private var videoLoadJob: Job? = null
+    private var handledFailureGeneration = -1L
+    internal val playbackGeneration: Long get() = viewModel.playbackLoadState.value.generation
     private var anime4kSmartController: Anime4KSmartController? = null
     private var anime4kSmartNeedsMediaResolution = true
     private var anime4kSmartResolutionRetryCount = 0
@@ -363,6 +368,8 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onDestroy() {
+        videoLoadJob?.cancel()
+        viewModel.playbackLoad.cancel()
         fileLoadedJob?.cancel()
         player.isExiting = true
 
@@ -1313,11 +1320,13 @@ class PlayerActivity : BaseActivity() {
                 logcat(LogPriority.INFO) {
                     "Playback buffering=$value positionSeconds=${viewModel.pos.value}"
                 }
-                viewModel.isLoading.update { value }
+                viewModel.playbackLoad.buffering(value)
+                viewModel.isLoading.value = viewModel.playbackLoadState.value.loading
             }
 
             "seeking" -> {
-                viewModel.isLoading.update { value }
+                viewModel.playbackLoad.seeking(value)
+                viewModel.isLoading.value = viewModel.playbackLoadState.value.loading
             }
 
             "eof-reached" -> {
@@ -1378,16 +1387,22 @@ class PlayerActivity : BaseActivity() {
         when (eventId) {
             MPVLib.mpvEventId.MPV_EVENT_START_FILE -> fileLoadedJob?.cancel()
             MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED -> {
+                if (viewModel.playbackLoadState.value.failure != null) return
                 loadAnime4KForCurrentEpisode()
                 fileLoadedJob?.cancel()
-                fileLoadedJob = lifecycleScope.launchIO { fileLoaded() }
+                fileLoadedJob = lifecycleScope.launch { fileLoaded() }
             }
             MPVLib.mpvEventId.MPV_EVENT_VIDEO_RECONFIG -> requestAnime4KMediaRefresh()
             MPVLib.mpvEventId.MPV_EVENT_SEEK -> {
                 anime4kSmartController?.resetTelemetry(SystemClock.elapsedRealtime())
-                viewModel.isLoading.update { true }
+                viewModel.playbackLoad.seeking(true)
+                viewModel.isLoading.value = viewModel.playbackLoadState.value.loading
             }
-            MPVLib.mpvEventId.MPV_EVENT_PLAYBACK_RESTART -> player.isExiting = false
+            MPVLib.mpvEventId.MPV_EVENT_PLAYBACK_RESTART -> {
+                player.isExiting = false
+                viewModel.playbackLoad.restarted(MPVLib.getPropertyBoolean("paused-for-cache") == true)
+                viewModel.isLoading.value = viewModel.playbackLoadState.value.loading
+            }
         }
     }
 
@@ -1644,6 +1659,8 @@ class PlayerActivity : BaseActivity() {
      * @param autoPlay whether the episode is switching due to auto play
      */
     internal fun changeEpisode(episodeId: Long?, autoPlay: Boolean = false) {
+        videoLoadJob?.cancel()
+        viewModel.playbackLoad.begin()
         viewModel.prepareMediaChange(episodeId)
         fileLoadedJob?.cancel()
         viewModel.sheetShown.update { _ -> Sheets.None }
@@ -1668,6 +1685,8 @@ class PlayerActivity : BaseActivity() {
                         launchUI { toast(AYMR.strings.no_next_episode) }
                     }
                     viewModel.isLoading.update { _ -> false }
+                    viewModel.updateIsLoadingEpisode(false)
+                    viewModel.playbackLoad.cancel()
                 }
 
                 else -> {
@@ -1690,6 +1709,7 @@ class PlayerActivity : BaseActivity() {
                         }
                     } else {
                         logcat(LogPriority.ERROR) { "Error getting links" }
+                        onPlaybackFailure(PlaybackFailure.Network)
                     }
 
                     if (isInPictureInPictureMode && pipEpisodeToasts) {
@@ -1722,6 +1742,10 @@ class PlayerActivity : BaseActivity() {
         httpServer = null
 
         setHttpOptions(video)
+        videoLoadJob?.cancel()
+        viewModel.playbackLoad.begin()
+        viewModel.isLoading.value = true
+        playerObserver.clearError()
 
         if (viewModel.isLoadingEpisode.value) {
             viewModel.currentEpisode.value?.let { episode ->
@@ -1732,12 +1756,10 @@ class PlayerActivity : BaseActivity() {
                     } else {
                         episode.last_second_seen
                     }
-                MPVLib.command(arrayOf("set", "start", "${resumePosition / 1000F}"))
+                MPVLib.command(arrayOf("set", "start", "${resumePosition.coerceAtLeast(0) / 1000.0}"))
             }
         } else {
-            player.timePos?.let {
-                MPVLib.command(arrayOf("set", "start", "${player.timePos}"))
-            }
+            MPVLib.command(arrayOf("set", "start", "${player.timePos ?: 0.0}"))
         }
 
         val videoOptions = video.mpvArgs.joinToString(",") { (option, value) ->
@@ -1751,12 +1773,12 @@ class PlayerActivity : BaseActivity() {
                     video.videoUrl.endsWith("torrent")
                 )
         ) {
-            launchIO {
+            videoLoadJob = launchVideoLoad {
                 TorrentServerService.start()
                 torrentLinkHandler(video.videoUrl, video.videoTitle, videoOptions)
             }
         } else {
-            launchIO {
+            videoLoadJob = launchVideoLoad {
                 val httpSource = viewModel.currentSource.value as? AnimeHttpSource
                 var videoUrl: String = video.videoUrl
                 if (video.usesHttpServer() && httpSource != null) {
@@ -1768,8 +1790,9 @@ class PlayerActivity : BaseActivity() {
                         logcat(LogPriority.ERROR, e) { "Failed to start http server" }
                         launchUI {
                             toast(AYMR.strings.http_server_start_failure)
+                            onPlaybackFailure(PlaybackFailure.Unknown)
                         }
-                        return@launchIO
+                        return@launchVideoLoad
                     }
 
                     val newVideo = video.copyHttpServer(port)
@@ -1777,6 +1800,7 @@ class PlayerActivity : BaseActivity() {
                     viewModel.updateVideo(newVideo)
                 }
 
+                currentCoroutineContext().ensureActive()
                 MPVLib.command(
                     arrayOf(
                         "loadfile",
@@ -1856,11 +1880,10 @@ class PlayerActivity : BaseActivity() {
     }
 
     fun setHttpOptions(video: Video) {
-        if (viewModel.isEpisodeOnline() != true) return
-        val source = viewModel.currentSource.value as? AnimeHttpSource ?: return
+        val source = viewModel.currentSource.value as? AnimeHttpSource
 
-        val headers = (video.headers ?: source.headers)
-            .toMultimap()
+        val headers = (video.headers ?: source?.headers)
+            ?.toMultimap().orEmpty()
             .mapValues { it.value.firstOrNull() ?: "" }
             .toMutableMap()
 
@@ -1874,6 +1897,60 @@ class PlayerActivity : BaseActivity() {
         // MPVLib.setOptionString("cache-on-disk", "yes")
         // val cacheDir = File(applicationContext.filesDir, "media").path
         // MPVLib.setOptionString("cache-dir", cacheDir)
+    }
+
+    internal fun onPlaybackFailure(reason: PlaybackFailure) {
+        if (isDestroyed || isFinishing) return
+        if (handledFailureGeneration == playbackGeneration) return
+        handledFailureGeneration = playbackGeneration
+        fileLoadedJob?.cancel()
+        videoLoadJob?.cancel()
+        viewModel.onPlaybackFailed(reason)
+        player.paused = true
+        // Stop stale native I/O after the failure state is published. Never reset saved progress.
+        MPVLib.command(arrayOf("stop"))
+    }
+
+    private fun launchVideoLoad(block: suspend () -> Unit): Job {
+        val generation = playbackGeneration
+        return lifecycleScope.launchIO {
+            try {
+                block()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main.immediate) {
+                    if (playbackGeneration == generation) {
+                        onPlaybackFailure(PlaybackFailure.fromNative(e.message.orEmpty()))
+                    }
+                }
+            }
+        }
+    }
+
+    internal fun openPlaybackSource() {
+        val source = viewModel.currentSource.value as? AnimeHttpSource ?: return
+        val episode = viewModel.currentEpisode.value ?: return
+        lifecycleScope.launch {
+            try {
+                val domainEpisode = episode.toDomainEpisode() ?: return@launch
+                val url = withContext(Dispatchers.IO) {
+                    source.getEpisodeUrl(domainEpisode.toSEpisode())
+                }
+                startActivity(
+                    eu.kanade.tachiyomi.ui.webview.WebViewActivity.newIntent(
+                        this@PlayerActivity,
+                        url,
+                        source.id,
+                        isAnime = true,
+                    ),
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                toast(AYMR.strings.player_error_source_page)
+            }
+        }
     }
 
     /**
@@ -1932,7 +2009,7 @@ class PlayerActivity : BaseActivity() {
     // at void eu.kanade.tachiyomi.ui.player.PlayerActivity.event(int) (PlayerActivity.kt:1566)
     // at void is.xyz.mpv.MPVLib.event(int) (MPVLib.java:86)
     private suspend fun fileLoaded() {
-        if (player.isExiting) return
+        if (player.isExiting || viewModel.playbackLoadState.value.failure != null) return
         if (castController.state.value.active || castController.state.value.connecting) {
             player.paused = true
             return
