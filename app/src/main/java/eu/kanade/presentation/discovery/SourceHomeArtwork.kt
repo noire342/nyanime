@@ -34,10 +34,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
-import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import eu.kanade.tachiyomi.data.coil.ArtworkHttpException
 import eu.kanade.tachiyomi.data.coil.ArtworkRequestPolicy
 import eu.kanade.tachiyomi.data.coil.artworkTimeout
@@ -95,7 +93,6 @@ fun SourceHomeArtwork(
             val request = remember(artwork, useBackground, attempt, context, reduceMotion) {
                 ImageRequest.Builder(context).data(artwork).useBackground(useBackground)
                     .artworkTimeout(ArtworkRequestPolicy.HOME_TIMEOUT_MILLIS)
-                    .crossfade(if (reduceMotion) 0 else 220)
                     // A failed decode must not keep rereading an unusable disk entry on retry.
                     .diskCachePolicy(if (attempt == 0) CachePolicy.ENABLED else CachePolicy.WRITE_ONLY)
                     .build()
@@ -152,14 +149,13 @@ fun SourceHomeArtwork(
                 }
                 if (active) {
                     key(attempt) {
-                        AsyncImage(
+                        FadingAsyncImage(
                             model = request,
                             imageLoader = imageLoader,
                             contentDescription = contentDescription,
                             modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                            placeholder = previousPainter,
-                            error = previousPainter,
+                            previousPainter = previousPainter,
+                            reduceMotion = reduceMotion,
                             onSuccess = {
                                 previousPainter = it.painter
                                 onPainterReady(it.painter)

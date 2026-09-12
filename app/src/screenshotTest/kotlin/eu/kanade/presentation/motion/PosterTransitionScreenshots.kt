@@ -36,6 +36,7 @@ import com.android.tools.screenshot.PreviewTest
 import eu.kanade.domain.ui.model.AppTheme
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.discovery.CatalogDetailsContent
+import eu.kanade.presentation.discovery.CinematicHero
 import eu.kanade.presentation.discovery.PreviewImages
 import eu.kanade.presentation.entries.anime.components.AnimeInfoBox
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
@@ -75,11 +76,33 @@ fun PosterCatalogScreenshot() = PosterMotionPreview("detail", catalog = true)
 @Composable
 fun PosterReadyCatalogScreenshot() = PosterMotionPreview("detail", catalog = true, ready = true)
 
+@PreviewTest
+@Preview(name = "HeroShortTitle", widthDp = 393, heightDp = 760, locale = "it")
+@Preview(name = "HeroShortTitleLargeText", widthDp = 320, heightDp = 760, fontScale = 1.4f, locale = "it")
+@Composable
+fun PosterHeroShortTitleScreenshot() = PosterMotionPreview("home", hero = true, shortTitle = true)
+
+@PreviewTest
+@Preview(name = "HeroLongTitle", widthDp = 393, heightDp = 760, locale = "it")
+@Preview(name = "HeroLongTitleLargeText", widthDp = 320, heightDp = 760, fontScale = 1.4f, locale = "it")
+@Composable
+fun PosterHeroLongTitleScreenshot() = PosterMotionPreview("home", hero = true)
+
 /** Static transition endpoints; the host renderer does not advance the animation clock. */
 @Composable
-private fun PosterMotionPreview(initial: String, catalog: Boolean = false, ready: Boolean = false) {
+private fun PosterMotionPreview(
+    initial: String,
+    catalog: Boolean = false,
+    ready: Boolean = false,
+    hero: Boolean = false,
+    shortTitle: Boolean = false,
+) {
     PreviewImages()
-    val title = "Oltre la fine del viaggio · Il ritorno nella città delle stelle"
+    val title = if (shortTitle) {
+        "Oltre il viaggio"
+    } else {
+        "Oltre la fine del viaggio · Il ritorno nella città delle stelle"
+    }
     val artwork = remember {
         PosterSource::class.java.classLoader?.getResourceAsStream("nyanime-preview/poster-0.jpg")
             ?.use { BitmapFactory.decodeStream(it) }
@@ -103,7 +126,20 @@ private fun PosterMotionPreview(initial: String, catalog: Boolean = false, ready
                 state = state,
                 modifier = Modifier.fillMaxSize(),
             ) { screen ->
-                if (screen == "home") {
+                if (screen == "home" && hero) {
+                    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        val source = remember { PosterSource("selected-poster") }
+                        CinematicHero(title, "In evidenza", "Serie · 24 episodi", null, "Apri episodi", {
+                        }, poster = source) {
+                            Image(
+                                artwork,
+                                null,
+                                Modifier.matchParentSize().posterSource(source),
+                                contentScale = ContentScale.Crop,
+                            )
+                        }
+                    }
+                } else if (screen == "home") {
                     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp)) {
                         Text("NYANIME", color = Color(0xFFE50914), style = MaterialTheme.typography.headlineLarge)
                         Spacer(Modifier.height(40.dp))

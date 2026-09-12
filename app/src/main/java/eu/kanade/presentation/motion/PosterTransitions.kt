@@ -11,9 +11,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -26,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
 import cafe.adriel.voyager.navigator.LocalNavigator
 import eu.kanade.presentation.discovery.sourceHomeArtworkIdentity
 import java.util.UUID
@@ -75,11 +74,7 @@ internal fun <T> PosterNavigationTransition(
         navigation.AnimatedContent(
             transitionSpec = {
                 if (enabled && state.between(routeKey(initialState), routeKey(targetState)) != null) {
-                    (
-                        fadeIn(
-                            tween(POSTER_TRANSITION_MILLIS - 80, delayMillis = 80, easing = LinearOutSlowInEasing),
-                        ) togetherWith fadeOut(tween(200))
-                        ).using(null)
+                    ModernMotion.transform(true, POSTER_TRANSITION_MILLIS).using(null)
                 } else {
                     transitionSpec()
                 }
@@ -158,9 +153,12 @@ internal fun Modifier.posterSource(source: PosterSource?): Modifier {
     val scene = LocalPosterScene.current ?: return this
     if (!scene.enabled) return this
     return with(scene.shared) {
-        this@posterSource.sharedElement(
+        this@posterSource.sharedBounds(
             sharedContentState = rememberSharedContentState(source.element),
             animatedVisibilityScope = scene.visibility,
+            enter = ModernMotion.enter(POSTER_TRANSITION_MILLIS),
+            exit = fadeOut(tween(POSTER_TRANSITION_MILLIS, easing = LinearOutSlowInEasing)),
+            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.Crop),
             boundsTransform = { _, _ -> tween(POSTER_TRANSITION_MILLIS, easing = FastOutSlowInEasing) },
         )
     }
@@ -173,9 +171,12 @@ internal fun Modifier.posterDestination(): Modifier {
     val origin = scene.state.destination(scene.route) ?: return this
     if (!scene.enabled) return this
     return with(scene.shared) {
-        this@posterDestination.sharedElement(
+        this@posterDestination.sharedBounds(
             sharedContentState = rememberSharedContentState(origin.element),
             animatedVisibilityScope = scene.visibility,
+            enter = ModernMotion.enter(POSTER_TRANSITION_MILLIS),
+            exit = fadeOut(tween(POSTER_TRANSITION_MILLIS, easing = LinearOutSlowInEasing)),
+            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.Crop),
             boundsTransform = { _, _ -> tween(POSTER_TRANSITION_MILLIS, easing = FastOutSlowInEasing) },
         )
     }

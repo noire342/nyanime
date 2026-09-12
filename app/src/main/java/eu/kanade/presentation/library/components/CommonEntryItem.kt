@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.kanade.presentation.entries.components.ItemCover
 import eu.kanade.presentation.motion.PosterSource
+import eu.kanade.presentation.motion.posterForeground
 import eu.kanade.presentation.motion.posterOpen
 import eu.kanade.presentation.motion.posterSource
 import eu.kanade.presentation.motion.posterSourcePlaceholder
@@ -97,6 +98,7 @@ fun EntryCompactGridItem(
         onLongClick = onLongClick,
     ) {
         EntryGridCover(
+            poster = poster,
             cover = {
                 ItemCover.Book(
                     modifier = Modifier
@@ -209,6 +211,7 @@ fun EntryComfortableGridItem(
     ) {
         Column {
             EntryGridCover(
+                poster = poster,
                 cover = {
                     ItemCover.Book(
                         modifier = Modifier
@@ -236,7 +239,7 @@ fun EntryComfortableGridItem(
                 },
             )
             GridItemTitle(
-                modifier = Modifier.padding(4.dp),
+                modifier = Modifier.posterForeground(poster).padding(4.dp),
                 title = title,
                 style = MaterialTheme.typography.titleSmall,
                 minLines = 2,
@@ -252,6 +255,7 @@ fun EntryComfortableGridItem(
 @Composable
 private fun EntryGridCover(
     modifier: Modifier = Modifier,
+    poster: PosterSource? = null,
     cover: @Composable BoxScope.() -> Unit = {},
     badgesStart: (@Composable RowScope.() -> Unit)? = null,
     badgesEnd: (@Composable RowScope.() -> Unit)? = null,
@@ -263,23 +267,25 @@ private fun EntryGridCover(
             .aspectRatio(ItemCover.Book.ratio),
     ) {
         cover()
-        content?.invoke(this)
-        if (badgesStart != null) {
-            BadgeGroup(
-                modifier = Modifier
-                    .padding(4.dp)
-                    .align(Alignment.TopStart),
-                content = badgesStart,
-            )
-        }
+        Box(Modifier.matchParentSize().posterForeground(poster)) {
+            content?.invoke(this)
+            if (badgesStart != null) {
+                BadgeGroup(
+                    modifier = Modifier
+                        .padding(4.dp)
+                        .align(Alignment.TopStart),
+                    content = badgesStart,
+                )
+            }
 
-        if (badgesEnd != null) {
-            BadgeGroup(
-                modifier = Modifier
-                    .padding(4.dp)
-                    .align(Alignment.TopEnd),
-                content = badgesEnd,
-            )
+            if (badgesEnd != null) {
+                BadgeGroup(
+                    modifier = Modifier
+                        .padding(4.dp)
+                        .align(Alignment.TopEnd),
+                    content = badgesEnd,
+                )
+            }
         }
     }
 }
@@ -397,18 +403,19 @@ fun EntryListItem(
         Text(
             text = title,
             modifier = Modifier
+                .posterForeground(poster)
                 .padding(horizontal = 16.dp)
                 .weight(1f),
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.bodyMedium,
         )
-        BadgeGroup(content = badge)
+        BadgeGroup(modifier = Modifier.posterForeground(poster), content = badge)
         if (onClickContinueViewing != null) {
             ContinueViewingButton(
                 size = ContinueViewingButtonSizeSmall,
                 iconSize = ContinueViewingButtonIconSizeSmall,
                 onClick = onClickContinueViewing,
-                modifier = Modifier.padding(start = ContinueViewingButtonListSpacing),
+                modifier = Modifier.posterForeground(poster).padding(start = ContinueViewingButtonListSpacing),
             )
         }
     }

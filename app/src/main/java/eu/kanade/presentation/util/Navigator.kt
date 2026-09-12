@@ -2,10 +2,7 @@ package eu.kanade.presentation.util
 
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -20,6 +17,7 @@ import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.ScreenTransitionContent
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.domain.ui.model.NavStyle
+import eu.kanade.presentation.motion.ModernMotion
 import eu.kanade.presentation.motion.PosterNavigationTransition
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
@@ -103,7 +101,7 @@ fun ScreenTransition(
         retainedRoutes = navigator.items.map { it.key }.toSet(),
         enabled = modern && !reduceMotion,
         transitionSpec = {
-            if (modern && reduceMotion) EnterTransition.None togetherWith ExitTransition.None else transition()
+            if (modern) ModernMotion.transform(!reduceMotion).using(null) else transition()
         },
         modifier = modifier,
     ) { screen ->

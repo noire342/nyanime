@@ -1,8 +1,6 @@
 package eu.kanade.presentation.entries.anime.components
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
@@ -92,6 +90,8 @@ import eu.kanade.presentation.entries.components.DotSeparatorText
 import eu.kanade.presentation.entries.components.ItemCover
 import eu.kanade.presentation.motion.PosterDetailHero
 import eu.kanade.presentation.motion.PosterDetailTitle
+import eu.kanade.presentation.motion.animateModernContentSize
+import eu.kanade.presentation.motion.posterForeground
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.animesource.model.SAnime
@@ -155,7 +155,10 @@ fun AnimeInfoBox(
                 ),
             ) { Text("Immagini") }
         }
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(
+            Modifier.fillMaxWidth().posterForeground().padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             AnimeContentInfo(
                 title = anime.title,
                 author = anime.author,
@@ -378,7 +381,7 @@ fun ExpandableAnimeDescription(
                 modifier = Modifier
                     .padding(top = 8.dp)
                     .padding(vertical = 12.dp)
-                    .animateContentSize(animationSpec = spring())
+                    .animateModernContentSize()
                     .fillMaxWidth(),
             ) {
                 var showMenu by remember { mutableStateOf(false) }

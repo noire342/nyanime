@@ -13,6 +13,9 @@ import cafe.adriel.voyager.core.annotation.InternalVoyagerApi
 import cafe.adriel.voyager.core.lifecycle.DisposableEffectIgnoringConfiguration
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
+import eu.kanade.presentation.motion.ModernMotion
+import eu.kanade.presentation.motion.modernMotionEnabled
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.util.ScreenTransition
 import eu.kanade.presentation.util.isTabletUi
 import tachiyomi.presentation.core.components.AdaptiveSheet as AdaptiveSheetImpl
@@ -73,6 +76,8 @@ fun AdaptiveSheet(
     content: @Composable () -> Unit,
 ) {
     val isTabletUi = isTabletUi()
+    val modern = LocalNyanimeStyle.current
+    val motion = modernMotionEnabled()
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -83,6 +88,12 @@ fun AdaptiveSheet(
             isTabletUi = isTabletUi,
             enableSwipeDismiss = enableSwipeDismiss,
             onDismissRequest = onDismissRequest,
+            animationDurationMillis = if (modern) {
+                if (motion) ModernMotion.PAGE_MILLIS else 0
+            } else {
+                350
+            },
+            waitForDismissAnimation = modern,
         ) {
             content()
         }

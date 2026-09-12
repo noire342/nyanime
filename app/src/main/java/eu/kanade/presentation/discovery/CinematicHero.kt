@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,11 +37,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.motion.PosterSource
 import eu.kanade.presentation.motion.modernMotionEnabled
+import eu.kanade.presentation.motion.posterForeground
 
 /** Artwork and actions stay owned by the existing catalogue/source integration. */
 @Composable
@@ -51,6 +55,7 @@ internal fun CinematicHero(
     description: String?,
     actionLabel: String,
     onOpen: () -> Unit,
+    poster: PosterSource? = null,
     artwork: @Composable BoxScope.() -> Unit,
 ) {
     var showInformation by rememberSaveable(title) { mutableStateOf(false) }
@@ -63,7 +68,7 @@ internal fun CinematicHero(
         Box(Modifier.fillMaxWidth().heightIn(min = artworkHeight)) {
             artwork()
             Box(
-                Modifier.matchParentSize().background(
+                Modifier.matchParentSize().posterForeground(poster, zIndex = 1f).background(
                     Brush.verticalGradient(
                         0f to Color.Black.copy(alpha = 0.12f),
                         0.38f to Color.Black.copy(alpha = 0.05f),
@@ -73,7 +78,7 @@ internal fun CinematicHero(
                 ),
             )
             Column(
-                Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+                Modifier.fillMaxWidth().posterForeground(poster).padding(horizontal = 24.dp)
                     .padding(top = artworkHeight * 0.52f, bottom = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 horizontalAlignment = if (compact) Alignment.CenterHorizontally else Alignment.Start,
@@ -85,33 +90,43 @@ internal fun CinematicHero(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    title,
-                    modifier = Modifier.widthIn(max = 680.dp),
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    textAlign = if (compact) TextAlign.Center else TextAlign.Start,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!metadata.isNullOrBlank()) {
+                Box(
+                    Modifier.widthIn(max = 680.dp).fillMaxWidth()
+                        .height(
+                            with(LocalDensity.current) {
+                                MaterialTheme.typography.headlineMedium.lineHeight.toDp() *
+                                    3
+                            },
+                        ),
+                ) {
                     Text(
-                        metadata,
-                        color = Color.White.copy(alpha = 0.86f),
-                        style = MaterialTheme.typography.labelMedium,
+                        title,
+                        modifier = Modifier.align(if (compact) Alignment.BottomCenter else Alignment.BottomStart),
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
                         textAlign = if (compact) TextAlign.Center else TextAlign.Start,
-                        maxLines = 2,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (!compact && !description.isNullOrBlank()) {
+                Text(
+                    metadata.orEmpty(),
+                    color = Color.White.copy(alpha = 0.86f),
+                    style = MaterialTheme.typography.labelMedium,
+                    textAlign = if (compact) TextAlign.Center else TextAlign.Start,
+                    maxLines = 2,
+                    minLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!compact) {
                     Text(
-                        description,
+                        description.orEmpty(),
                         modifier = Modifier.widthIn(max = 640.dp),
                         color = Color.White.copy(alpha = 0.8f),
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
+                        minLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }

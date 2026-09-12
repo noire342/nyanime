@@ -55,6 +55,7 @@ fun SourceFeaturedCarousel(
                     description = anime.description,
                     actionLabel = "Apri episodi",
                     onOpen = openDetails,
+                    poster = poster,
                 ) {
                     SourceHomeArtwork(
                         data = anime,

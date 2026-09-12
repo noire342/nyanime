@@ -20,6 +20,8 @@ package eu.kanade.presentation.player.components
 import android.annotation.SuppressLint
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -43,9 +45,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.tooling.preview.Preview
+import eu.kanade.presentation.motion.ModernMotion
+import eu.kanade.presentation.motion.animateModernContentSize
+import eu.kanade.presentation.motion.modernMotionEnabled
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import tachiyomi.presentation.core.components.material.padding
 
 @SuppressLint("UnrememberedMutableState")
@@ -61,9 +67,15 @@ fun ExpandableCard(
     elevation: CardElevation = CardDefaults.cardElevation(),
     content: @Composable () -> Unit,
 ) {
-    val rotationState by animateFloatAsState(if (isExpanded) 0f else 180f, label = "card_rotation")
+    val modern = LocalNyanimeStyle.current
+    val motion = modernMotionEnabled()
+    val rotationState = animateFloatAsState(
+        if (isExpanded) 0f else 180f,
+        animationSpec = if (modern) tween(if (motion) ModernMotion.RESIZE_MILLIS else 0) else spring(),
+        label = "card_rotation",
+    )
     Card(
-        modifier = modifier.animateContentSize(),
+        modifier = modifier.animateModernContentSize(),
         colors = colors,
         shape = shape,
         border = border,
@@ -78,13 +90,13 @@ fun ExpandableCard(
             title(isExpanded)
             Spacer(Modifier.weight(1f))
             IconButton(
-                modifier = Modifier.rotate(rotationState),
+                modifier = Modifier.graphicsLayer { rotationZ = rotationState.value },
                 onClick = { onExpand(!isExpanded) },
             ) {
                 Icon(Icons.Default.ArrowDropDown, null)
             }
         }
-        Box(Modifier.animateContentSize()) {
+        Box(if (modern) Modifier else Modifier.animateContentSize()) {
             if (isExpanded) content()
         }
     }

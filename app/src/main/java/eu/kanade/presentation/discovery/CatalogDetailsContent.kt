@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import eu.kanade.presentation.motion.PosterDetailHero
 import eu.kanade.presentation.motion.PosterDetailTitle
+import eu.kanade.presentation.motion.posterForeground
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogId
@@ -42,7 +43,7 @@ fun CatalogDetailsContent(anime: CatalogAnime, actions: @Composable () -> Unit =
     } else {
         PosterDetailHero(anime.banner ?: anime.cover, catalog = true)
     }
-    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.posterForeground().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (LocalNyanimeStyle.current) {
             PosterDetailTitle(anime.title, catalog = true)
         } else {

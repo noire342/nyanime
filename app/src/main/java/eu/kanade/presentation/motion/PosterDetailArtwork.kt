@@ -18,7 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -29,12 +33,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.discovery.ArtworkPlaceholder
+import eu.kanade.presentation.discovery.FadingAsyncImage
 import eu.kanade.presentation.discovery.SourceHomeArtwork
+import eu.kanade.presentation.discovery.sourceHomeArtworkIdentity
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.TwoPanelBox
 import tachiyomi.presentation.core.components.material.Scaffold
@@ -62,7 +67,7 @@ internal fun PosterDetailHero(
         Box(Modifier.fillMaxWidth().height(posterDetailHeight(maxWidth, tablet, catalog) + appBarPadding)) {
             PosterDetailArtwork(data, Modifier.matchParentSize(), background, sourceArtwork)
             Box(
-                Modifier.matchParentSize().background(
+                Modifier.matchParentSize().posterForeground(zIndex = 1f).background(
                     Brush.verticalGradient(
                         0f to if (catalog) Color.Transparent else Color.Black.copy(alpha = 0.6f),
                         (if (catalog) 0.5f else 0.4f) to Color.Transparent,
@@ -70,7 +75,7 @@ internal fun PosterDetailHero(
                     ),
                 ),
             )
-            actions()
+            Box(Modifier.matchParentSize().posterForeground(), content = actions)
         }
     }
 }
@@ -101,9 +106,11 @@ internal fun PosterDetailArtwork(
 ) {
     val preview = posterDetailPreview()?.artwork
     val canRequest = posterRequestsEnabled()
+    var requested by remember(data?.let(::sourceHomeArtworkIdentity)) { mutableStateOf(canRequest || preview == null) }
+    LaunchedEffect(canRequest) { if (canRequest) requested = true }
     Box(modifier.posterDestination()) {
         when {
-            (data == null || !canRequest) && preview != null -> Image(
+            (data == null || !requested) && preview != null -> Image(
                 preview,
                 null,
                 Modifier.fillMaxSize(),
@@ -119,15 +126,14 @@ internal fun PosterDetailArtwork(
             else -> {
                 val context = LocalContext.current
                 val request = remember(data, context) {
-                    ImageRequest.Builder(context).data(data).crossfade(180).build()
+                    ImageRequest.Builder(context).data(data).build()
                 }
-                AsyncImage(
-                    request,
-                    null,
-                    Modifier.fillMaxSize(),
-                    placeholder = preview,
-                    error = preview,
-                    contentScale = ContentScale.Crop,
+                FadingAsyncImage(
+                    model = request,
+                    imageLoader = SingletonImageLoader.get(context),
+                    modifier = Modifier.fillMaxSize(),
+                    previousPainter = preview,
+                    reduceMotion = !modernMotionEnabled(),
                 )
             }
         }
@@ -144,7 +150,7 @@ internal fun PosterLoadingBody(
     Column {
         PosterDetailHero(null, tablet, catalog, appBarPadding)
         Column(
-            Modifier.padding(horizontal = 16.dp).padding(top = if (catalog) 16.dp else 0.dp),
+            Modifier.posterForeground().padding(horizontal = 16.dp).padding(top = if (catalog) 16.dp else 0.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             PosterDetailTitle(title, catalog = catalog)

@@ -52,6 +52,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.motion.modernMotionEnabled
+import eu.kanade.presentation.motion.posterForeground
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.theme.NyanimeWordmark
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
@@ -76,7 +77,7 @@ fun DiscoveryHomeHeader(
             homes,
         )
     }
-    Surface(color = MaterialTheme.colorScheme.background) {
+    Surface(modifier = Modifier.posterForeground(zIndex = 3f), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.statusBarsPadding()) {
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 12.dp),

@@ -11,9 +11,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 /** Compact cards retain their complete extension metadata in an accessible information sheet. */
 @Composable
@@ -24,7 +31,10 @@ internal fun TitleInformationSheet(
     onDismiss: () -> Unit,
     onOpen: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+    var opening by remember { mutableStateOf(false) }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp).navigationBarsPadding(),
@@ -41,9 +51,23 @@ internal fun TitleInformationSheet(
             }
             Button(
                 onClick = {
-                    onDismiss()
-                    onOpen()
+                    if (!opening) {
+                        opening = true
+                        scope.launch {
+                            try {
+                                sheetState.hide()
+                                if (!sheetState.isVisible) {
+                                    onDismiss()
+                                    onOpen()
+                                }
+                            } finally {
+                                // A gesture can interrupt hide(); keep the action usable afterwards.
+                                opening = false
+                            }
+                        }
+                    }
                 },
+                enabled = !opening,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Apri scheda completa") }
         }

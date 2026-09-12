@@ -64,6 +64,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import eu.kanade.presentation.motion.modernMotionEnabled
+import eu.kanade.presentation.motion.posterForeground
 import eu.kanade.presentation.motion.posterOpen
 import eu.kanade.presentation.motion.posterSource
 import eu.kanade.presentation.motion.posterSourcePlaceholder
@@ -225,6 +226,7 @@ fun PosterCard(
                 Text(
                     badges.joinToString(" · "),
                     Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                        .posterForeground(poster)
                         .background(Color.Black.copy(alpha = 0.84f)).padding(horizontal = 6.dp, vertical = 5.dp),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White,
@@ -233,7 +235,9 @@ fun PosterCard(
                 )
             }
             if (!subtitle.isNullOrBlank() || badges.isNotEmpty()) {
-                IconButton(onClick = { information = true }, modifier = Modifier.align(Alignment.TopEnd)) {
+                IconButton(onClick = {
+                    information = true
+                }, modifier = Modifier.align(Alignment.TopEnd).posterForeground(poster)) {
                     Icon(
                         Icons.Outlined.Info,
                         "Informazioni su $title",
@@ -245,20 +249,21 @@ fun PosterCard(
         }
         Text(
             title,
-            Modifier.padding(top = 8.dp),
+            Modifier.posterForeground(poster).padding(top = 8.dp),
             maxLines = 2,
+            minLines = 2,
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.titleSmall,
         )
-        if (!subtitle.isNullOrBlank()) {
-            Text(
-                subtitle,
-                maxLines = subtitleMaxLines.coerceIn(1, 2),
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            subtitle.orEmpty(),
+            modifier = Modifier.posterForeground(poster),
+            maxLines = subtitleMaxLines.coerceIn(1, 2),
+            minLines = subtitleMaxLines.coerceIn(1, 2),
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -305,6 +310,7 @@ fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit)
                 description = anime.synopsis,
                 actionLabel = "Scopri il titolo",
                 onOpen = openDetails,
+                poster = poster,
             ) {
                 AsyncImage(
                     anime.banner ?: anime.cover,
@@ -364,13 +370,13 @@ fun LocalAnimeRow(
                             onPainterReady = { poster.painter = it },
                         )
                         Box(
-                            Modifier.fillMaxSize().background(
+                            Modifier.fillMaxSize().posterForeground(poster, zIndex = 1f).background(
                                 Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))),
                             ),
                         )
                         FilledIconButton(
                             onClick = { onPlay(item) },
-                            modifier = Modifier.align(Alignment.Center).size(48.dp),
+                            modifier = Modifier.align(Alignment.Center).size(48.dp).posterForeground(poster),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = Color.Black.copy(alpha = 0.75f),
                                 contentColor = Color.White,
@@ -384,13 +390,18 @@ fun LocalAnimeRow(
                         }
                         LinearProgressIndicator(
                             progress = { item.progress.coerceIn(0f, 1f) },
-                            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp),
+                            modifier = Modifier.align(
+                                Alignment.BottomCenter,
+                            ).fillMaxWidth().height(3.dp).posterForeground(poster),
                             trackColor = Color.White.copy(alpha = 0.3f),
                             gapSize = 0.dp,
                             drawStopIndicator = {},
                         )
                     }
-                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.Top) {
+                    Row(
+                        Modifier.fillMaxWidth().posterForeground(poster).padding(top = 6.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
                         Column(
                             Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Apri scheda", onClick = {
                                 openDetails()
@@ -399,12 +410,14 @@ fun LocalAnimeRow(
                             Text(
                                 item.anime.title,
                                 maxLines = 2,
+                                minLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             Text(
                                 item.episode.name,
                                 maxLines = 2,
+                                minLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

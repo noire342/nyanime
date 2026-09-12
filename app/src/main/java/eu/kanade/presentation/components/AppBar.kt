@@ -53,6 +53,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import eu.kanade.presentation.motion.posterForeground
 import kotlinx.collections.immutable.ImmutableList
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.Pill
@@ -132,7 +133,7 @@ fun AppBar(
     scrollBehavior: TopAppBarScrollBehavior? = null,
 ) {
     Column(
-        modifier = modifier,
+        modifier = modifier.posterForeground(zIndex = 3f),
     ) {
         TopAppBar(
             navigationIcon = {

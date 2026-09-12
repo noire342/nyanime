@@ -3,8 +3,7 @@ package eu.kanade.tachiyomi.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
@@ -46,7 +45,9 @@ import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.TabNavigator
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.ui.UiPreferences
+import eu.kanade.presentation.motion.ModernMotion
 import eu.kanade.presentation.motion.modernMotionEnabled
+import eu.kanade.presentation.motion.posterForeground
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.theme.MangaSectionTheme
 import eu.kanade.presentation.util.Screen
@@ -109,7 +110,7 @@ object HomeScreen : Screen() {
                         modifier = Modifier.semantics { testTagsAsResourceId = true },
                         startBar = {
                             if (isTabletUi()) {
-                                NavigationRail {
+                                NavigationRail(modifier = Modifier.posterForeground(zIndex = 3f)) {
                                     navStyle.visibleTabs.fastForEach {
                                         NavigationRailItem(it)
                                     }
@@ -123,12 +124,24 @@ object HomeScreen : Screen() {
                             val showNavigation = !isTabletUi() &&
                                 bottomNavVisible &&
                                 tabNavigator.current !in navStyle.overflowTabs
-                            Column {
+                            Column(Modifier.posterForeground(zIndex = 3f)) {
                                 CastMiniController(includeNavigationInsets = !showNavigation)
                                 AnimatedVisibility(
                                     visible = showNavigation,
-                                    enter = expandVertically(),
-                                    exit = shrinkVertically(),
+                                    enter = if (modern) {
+                                        expandVertically(
+                                            tween(if (motion) ModernMotion.RESIZE_MILLIS else 0),
+                                        )
+                                    } else {
+                                        expandVertically()
+                                    },
+                                    exit = if (modern) {
+                                        shrinkVertically(
+                                            tween(if (motion) ModernMotion.RESIZE_MILLIS else 0),
+                                        )
+                                    } else {
+                                        shrinkVertically()
+                                    },
                                 ) {
                                     NavigationBar(
                                         containerColor = if (LocalNyanimeStyle.current) {
@@ -155,14 +168,14 @@ object HomeScreen : Screen() {
                             AnimatedContent(
                                 targetState = tabNavigator.current,
                                 transitionSpec = {
-                                    if (modern && !motion) {
-                                        EnterTransition.None togetherWith ExitTransition.None
+                                    if (modern) {
+                                        ModernMotion.transform(motion).using(null)
                                     } else {
                                         val fade = materialFadeThroughIn(
                                             initialScale = 1f,
                                             durationMillis = TAB_FADE_DURATION,
                                         ) togetherWith materialFadeThroughOut(durationMillis = TAB_FADE_DURATION)
-                                        if (modern) fade.using(null) else fade
+                                        fade
                                     }
                                 },
                                 label = "tabContent",
