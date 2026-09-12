@@ -158,6 +158,9 @@ class PlayerActivity : BaseActivity() {
         val episode = viewModel.currentEpisode.value ?: return
         onNewIntent(newIntent(this, anime.id, episode.id))
     }
+    internal fun openWatchVideo(animeId: Long, episodeId: Long) {
+        onNewIntent(newIntent(this, animeId, episodeId))
+    }
     private val viewModel by viewModels<PlayerViewModel>(factoryProducer = { PlayerViewModelProviderFactory(this) })
     private val binding by lazy { PlayerLayoutBinding.inflate(layoutInflater) }
     private val playerObserver by lazy { PlayerObserver(this) }
@@ -215,6 +218,7 @@ class PlayerActivity : BaseActivity() {
         var initialized = false
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
+                viewModel.watchTogether.hold()
                 viewModel.pause()
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
@@ -364,10 +368,12 @@ class PlayerActivity : BaseActivity() {
             }
         }
 
+        viewModel.bindWatchPlayer()
         onNewIntent(this.intent)
     }
 
     override fun onDestroy() {
+        viewModel.watchManager.detach(this)
         videoLoadJob?.cancel()
         viewModel.playbackLoad.cancel()
         fileLoadedJob?.cancel()
@@ -411,6 +417,7 @@ class PlayerActivity : BaseActivity() {
             return
         }
 
+        viewModel.watchTogether.hold()
         player.isExiting = true
         viewModel.cancelNextEpisode()
         if (isFinishing) {
@@ -1211,6 +1218,7 @@ class PlayerActivity : BaseActivity() {
             -> {
                 val oldRestore = restoreAudioFocus
                 val wasPlayerPaused = player.paused ?: false
+                viewModel.watchTogether.hold()
                 viewModel.pause()
                 restoreAudioFocus = {
                     oldRestore()
@@ -1304,11 +1312,11 @@ class PlayerActivity : BaseActivity() {
         when (property) {
             "pause" -> {
                 if (value && player.paused == true) {
-                    viewModel.pause()
+                    if (viewModel.watchTogether.active) viewModel.onNativePause(true) else viewModel.pause()
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 } else if (!value && player.paused == false) {
-                    viewModel.unpause()
-                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    if (viewModel.watchTogether.active) viewModel.onNativePause(false) else viewModel.unpause()
+                    if (!viewModel.paused.value) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 }
 
                 runCatching {
@@ -1370,7 +1378,14 @@ class PlayerActivity : BaseActivity() {
         if (player.isExiting) return
         when (property) {
             "speed" -> {
-                viewModel.playbackSpeed.update { value.toFloat() }
+                val baseSpeed = if (viewModel.watchTogether.isManagedSpeed(value)) {
+                    viewModel.watchTogether.preferredSpeed().also {
+                        if (kotlin.math.abs(viewModel.playbackSpeed.value - it) < 0.0001) return
+                    }
+                } else {
+                    value
+                }
+                viewModel.playbackSpeed.update { baseSpeed.toFloat() }
                 anime4kSmartController?.resetTelemetry(SystemClock.elapsedRealtime())
                 requestAnime4KMediaRefresh()
             }
@@ -1465,7 +1480,7 @@ class PlayerActivity : BaseActivity() {
                     when (intent.getIntExtra(PIP_INTENT_ACTION, 0)) {
                         PIP_PAUSE -> {
                             viewModel.cancelNextEpisode()
-                            viewModel.pause()
+                            viewModel.pauseByUser()
                         }
                         PIP_PLAY -> viewModel.resumeByUser()
                         PIP_NEXT -> viewModel.changeEpisode(false)
@@ -1556,7 +1571,7 @@ class PlayerActivity : BaseActivity() {
                             SingleActionGesture.Seek -> {}
                             SingleActionGesture.PlayPause -> {
                                 super.onPlay()
-                                viewModel.unpause()
+                                viewModel.resumeByUser()
                                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                             }
                             SingleActionGesture.Custom -> {
@@ -1573,7 +1588,7 @@ class PlayerActivity : BaseActivity() {
                             SingleActionGesture.Seek -> {}
                             SingleActionGesture.PlayPause -> {
                                 super.onPause()
-                                viewModel.pause()
+                                viewModel.pauseByUser()
                                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                             }
                             SingleActionGesture.Custom -> {
@@ -1658,7 +1673,11 @@ class PlayerActivity : BaseActivity() {
      * @param episodeId id of the episode to switch the player to
      * @param autoPlay whether the episode is switching due to auto play
      */
-    internal fun changeEpisode(episodeId: Long?, autoPlay: Boolean = false) {
+    internal fun changeEpisode(episodeId: Long?, autoPlay: Boolean = false, fromWatchRoom: Boolean = false) {
+        if (viewModel.watchTogether.active && !viewModel.watchTogether.state.value.host && !fromWatchRoom) {
+            showToast("L'episodio viene scelto da chi ha creato la stanza")
+            return
+        }
         videoLoadJob?.cancel()
         viewModel.playbackLoad.begin()
         viewModel.prepareMediaChange(episodeId)

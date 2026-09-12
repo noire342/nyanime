@@ -87,6 +87,7 @@ fun DiscoveryHomeHeader(
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
                 }
                 NyanimeWordmark(Modifier.weight(1f).padding(start = 4.dp))
+                eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
                 if (onSearch != null) {
                     IconButton(onClick = onSearch) {
                         Icon(

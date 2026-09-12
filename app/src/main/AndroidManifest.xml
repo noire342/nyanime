@@ -63,6 +63,14 @@
             android:name=".ui.cast.CastRemoteActivity"
             android:exported="false"
             android:theme="@style/Theme.Tachiyomi" />
+        <activity
+            android:name=".ui.watch.WatchTogetherActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Tachiyomi" />
+        <service
+            android:name=".data.watch.WatchSessionService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <activity
             android:name=".ui.main.MainActivity"

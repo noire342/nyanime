@@ -337,6 +337,9 @@ dependencies {
     implementation(aniyomilibs.nanohttpd)
     implementation(libs.cast.framework)
     implementation(libs.media.router)
+    implementation(libs.watch.secp256k1)
+    implementation(libs.watch.secp256k1.android)
+    testRuntimeOnly(libs.watch.secp256k1.jvm)
     // seeker seek bar
     implementation(aniyomilibs.seeker)
     // true type parser

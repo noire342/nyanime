@@ -105,6 +105,7 @@ enum class Sheets {
     Chapters,
     More,
     SleepTimer,
+    WatchTogether,
     Screenshot,
 }
 

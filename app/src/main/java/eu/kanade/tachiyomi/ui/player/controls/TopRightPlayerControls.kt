@@ -82,8 +82,11 @@ fun TopRightPlayerControls(
 
     modifier: Modifier = Modifier,
     sleepTimerAtEpisodeEnd: Boolean = false,
+    watchRoom: eu.kanade.tachiyomi.data.watch.WatchRoomState = eu.kanade.tachiyomi.data.watch.WatchRoomState(),
+    onWatchTogetherClick: () -> Unit = {},
 ) {
     Column(modifier, horizontalAlignment = Alignment.End) {
+        eu.kanade.tachiyomi.ui.watch.WatchRoomChip(watchRoom, onWatchTogetherClick)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Absolute.SpaceEvenly,

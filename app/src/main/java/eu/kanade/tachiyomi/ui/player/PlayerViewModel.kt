@@ -72,6 +72,10 @@ import eu.kanade.tachiyomi.data.saver.Location
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.data.track.anilist.Anilist
 import eu.kanade.tachiyomi.data.track.myanimelist.MyAnimeList
+import eu.kanade.tachiyomi.data.watch.WatchMedia
+import eu.kanade.tachiyomi.data.watch.WatchPlayback
+import eu.kanade.tachiyomi.data.watch.WatchPlayer
+import eu.kanade.tachiyomi.data.watch.WatchTogetherManager
 import eu.kanade.tachiyomi.ui.player.controls.components.IndexedSegment
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.HosterState
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.getChangedAt
@@ -221,6 +225,94 @@ class PlayerViewModel @JvmOverloads constructor(
     val playbackLoadState = playbackLoad.state
     val playbackSpeed = MutableStateFlow(playerPreferences.playerSpeed().get())
 
+    val watchManager by lazy { WatchTogetherManager.get(activity) }
+    val watchTogether get() = watchManager.controller
+
+    fun bindWatchPlayer() {
+        watchManager.attach(
+            activity,
+            object : WatchPlayer {
+                override fun sample(): WatchPlayback {
+                    val anime = currentAnime.value
+                    val episode = currentEpisode.value
+                    val load = playbackLoadState.value
+                    val duration = if (load.started) {
+                        runCatching {
+                            MPVLib.getPropertyDouble("duration")
+                        }.getOrDefault(0.0)
+                    } else {
+                        0.0
+                    }
+                    val position = runCatching { MPVLib.getPropertyDouble("time-pos") }.getOrDefault(0.0)
+                    val media = if (anime != null && episode != null) {
+                        WatchMedia(
+                            anime.title.take(240),
+                            episode.name.take(240),
+                            episode.episode_number.toDouble(),
+                            duration.takeIf { it.isFinite() }?.coerceIn(0.0, 86_400.0) ?: 0.0,
+                            anime.source,
+                            anime.url,
+                            episode.url,
+                        )
+                    } else {
+                        null
+                    }
+                    return WatchPlayback(
+                        media = media,
+                        position = position.takeIf { it.isFinite() }?.coerceIn(0.0, 86_400.0) ?: 0.0,
+                        paused = paused.value,
+                        ready = load.started &&
+                            load.failure == null &&
+                            !load.opening &&
+                            !load.seeking &&
+                            !isLoadingEpisode.value &&
+                            !isSeeking.value &&
+                            !activity.player.isExiting,
+                        buffering = load.buffering || load.seeking || isSeeking.value,
+                        speed = playbackSpeed.value.toDouble(),
+                        ended = runCatching { MPVLib.getPropertyBoolean("eof-reached") == true }.getOrDefault(false),
+                    )
+                }
+                override fun pause(paused: Boolean) {
+                    if (!activity.player.isExiting) activity.player.paused = paused
+                    _paused.value = paused
+                }
+                override fun seek(seconds: Double) {
+                    if (!activity.player.isExiting) {
+                        completion.playbackRestarted()
+                        MPVLib.command(arrayOf("seek", seconds.toString(), "absolute+exact"))
+                    }
+                }
+                override fun speed(value: Double) {
+                    if (!activity.player.isExiting) MPVLib.setPropertyDouble("speed", value)
+                }
+                override fun userResumed() {
+                    sleepTimer.acknowledgeUserPlayback()
+                }
+            },
+        ) { animeId, episodeId ->
+            if (currentAnime.value?.id == animeId) {
+                activity.changeEpisode(episodeId, autoPlay = true, fromWatchRoom = true)
+            } else {
+                activity.openWatchVideo(animeId, episodeId)
+            }
+        }
+    }
+
+    fun onNativePause(paused: Boolean) {
+        val effective = paused || watchTogether.active && watchTogether.expectsPaused
+        _paused.value = effective
+        if (effective != paused) activity.player.paused = effective
+    }
+
+    fun pauseByUser() {
+        if (!watchTogether.requestPause(true)) pause()
+    }
+
+    fun setPlaybackSpeedByUser(speed: Double) {
+        if (!watchTogether.requestSpeed(speed)) MPVLib.setPropertyDouble("speed", speed)
+    }
+
     private val _subtitleTracks = MutableStateFlow<List<VideoTrack>>(emptyList())
     val subtitleTracks = _subtitleTracks.asStateFlow()
     private val _selectedSubtitles = MutableStateFlow(Pair(-1, -1))
@@ -335,6 +427,7 @@ class PlayerViewModel @JvmOverloads constructor(
 
     private val sleepTimer = PlayerSleepTimer(viewModelScope, android.os.SystemClock::elapsedRealtime) {
         completion.cancel()
+        watchTogether.hold()
         pause()
         Injekt.get<Application>().toast(AYMR.strings.toast_sleep_timer_ended)
     }
@@ -345,6 +438,7 @@ class PlayerViewModel @JvmOverloads constructor(
         val currentId = currentEpisode.value?.id ?: return false
         val cast = CastController.get(activity.applicationContext).state.value
         return !activity.player.isExiting &&
+            (!watchTogether.active || watchTogether.state.value.host) &&
             !remoteProgressOwned &&
             !cast.active &&
             !cast.connecting &&
@@ -731,16 +825,27 @@ class PlayerViewModel @JvmOverloads constructor(
 
     fun pauseUnpause() {
         completion.cancel()
+        if (watchTogether.active) {
+            if (watchTogether.state.value.playRequested &&
+                !watchTogether.state.value.localHold
+            ) {
+                pauseByUser()
+            } else {
+                resumeByUser()
+            }
+            return
+        }
         if (paused.value) {
             resumeByUser()
         } else {
-            pause()
+            pauseByUser()
         }
     }
 
     fun resumeByUser() {
         completion.cancel()
         sleepTimer.acknowledgeUserPlayback()
+        if (watchTogether.resumeByUser()) return
         unpause()
     }
 
@@ -845,11 +950,16 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun seekBy(offset: Int, precise: Boolean = false) {
+        if (watchTogether.active) {
+            watchTogether.requestSeek(runCatching { MPVLib.getPropertyDouble("time-pos") }.getOrDefault(0.0) + offset)
+            return
+        }
         completion.playbackRestarted()
         MPVLib.command(arrayOf("seek", offset.toString(), if (precise) "relative+exact" else "relative"))
     }
 
     fun seekTo(position: Int, precise: Boolean = true) {
+        if (watchTogether.requestSeek(position.toDouble())) return
         if (position !in 0..(activity.player.duration ?: 0)) return
         completion.playbackRestarted()
         MPVLib.command(arrayOf("seek", position.toString(), if (precise) "absolute" else "absolute+keyframes"))

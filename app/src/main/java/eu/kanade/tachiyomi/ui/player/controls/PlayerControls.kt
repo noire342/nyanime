@@ -117,6 +117,11 @@ fun PlayerControls(
     val spacing = MaterialTheme.padding
     val castActivity = LocalContext.current as PlayerActivity
     val castState by castActivity.castController.state.collectAsState()
+    LaunchedEffect(castState.active, castState.connecting) {
+        if (castState.active || castState.connecting) {
+            viewModel.watchTogether.state.collect { if (it.active) viewModel.watchTogether.leave() }
+        }
+    }
     var showCastDevices by remember { mutableStateOf(false) }
     if (showCastDevices) {
         CastDevicesDialog(request = { castActivity.castRequest() }, onDismiss = { showCastDevices = false })
@@ -545,6 +550,7 @@ fun PlayerControls(
                 ) {
                     val sleepTimerTimeRemaining by viewModel.remainingTime.collectAsState()
                     val sleepTimerEndEpisode by viewModel.sleepTimerEndEpisode.collectAsState()
+                    val watchRoom by viewModel.watchTogether.state.collectAsState()
                     TopRightPlayerControls(
                         onCastClick = {
                             if (castActivity.castRequest() != null) {
@@ -575,6 +581,8 @@ fun PlayerControls(
                         onSleepTimerClick = { viewModel.showSheet(Sheets.SleepTimer) },
                         onMoreClick = { viewModel.showSheet(Sheets.More) },
                         onMoreLongClick = { viewModel.showPanel(Panels.VideoFilters) },
+                        watchRoom = watchRoom,
+                        onWatchTogetherClick = { viewModel.showSheet(Sheets.WatchTogether) },
                     )
                 }
                 // Bottom right controls
@@ -651,7 +659,7 @@ fun PlayerControls(
                         onLockControls = viewModel::lockControls,
                         onCycleRotation = viewModel::cycleScreenRotations,
                         onPlaybackSpeedChange = {
-                            MPVLib.setPropertyDouble("speed", it.toDouble())
+                            viewModel.setPlaybackSpeedByUser(it.toDouble())
                         },
                         onOpenSheet = viewModel::showSheet,
                     )
@@ -721,7 +729,7 @@ fun PlayerControls(
             decoder = decoder,
             onUpdateDecoder = viewModel::updateDecoder,
             speed = speed,
-            onSpeedChange = { MPVLib.setPropertyDouble("speed", it.toFixed(2).toDouble()) },
+            onSpeedChange = { viewModel.setPlaybackSpeedByUser(it.toFixed(2).toDouble()) },
             sleepTimerTimeRemaining = sleepTimerTimeRemaining,
             onStartSleepTimer = viewModel::startTimer,
             onStartCustomSleepTimer = viewModel::startCustomTimer,
@@ -730,6 +738,7 @@ fun PlayerControls(
             lastCustomTimerMinutes = lastCustomTimerMinutes,
             onExtendSleepTimer = viewModel::extendTimer,
             onOpenSleepTimer = { viewModel.showSheet(Sheets.SleepTimer) },
+            onOpenWatchTogether = { viewModel.showSheet(Sheets.WatchTogether) },
             reduceMotion = reduceMotion,
             buttons = customButtons.getButtons().toImmutableList(),
             onSelectAnime4KCustom = onSelectAnime4KCustom,

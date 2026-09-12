@@ -1,0 +1,79 @@
+# Guarda insieme
+
+The Home group button and the player's More sheet open the same room interface.
+Create a code, share it, and let friends enter it in their Home. The creator chooses the title and
+episode. Guests resolve that catalog entry through their own installed, trusted extension and the
+normal player loader. No video is relayed and no resolved hoster links, request headers or cookies
+are sent. The same usable extension is required for automatic opening; a missing source is reported
+with a retry action instead of silently starting a different title.
+
+## Connection and privacy
+
+The transport implements Nostr NIP-01 using ephemeral kind 20971 events, a random x room tag,
+and outbound TLS WebSockets to two independent relays. This is a decentralized relay architecture,
+not pure peer-to-peer and not serverless. It needs no application account, Nyanime backend,
+incoming port or router configuration. Public relay availability remains an external dependency.
+Subscription readiness, publish rejections, reconnect backoff and duplicate delivery are handled.
+An explicit custom relay list is supported by the invitation codec and controller.
+
+The compact NY1. code encodes a 128-bit random secret and a 96-bit fingerprint of the creator's
+ephemeral public key. It is a capability: sharing the code admits someone into the room.
+Every participant has a separate ephemeral Schnorr identity. Full event signatures are verified
+with ACINQ's Apache-2.0 Kotlin bindings to Bitcoin Core libsecp256k1; the creator's fingerprint
+pins the authoritative sender. The AES-256-GCM key is domain-separated from the secret,
+with fresh 96-bit nonces and room, author and timestamp bound as authenticated data.
+This is an application envelope, not NIP-44 messaging.
+
+Relays can observe IP addresses, random room tags, event authors, timing and ciphertext sizes.
+They cannot decrypt room metadata. Ephemeral events are not expected to be stored by compliant
+relays; this is not a storage guarantee. The app does not persist room keys or signing identities.
+An active room expires after 24 hours; closing it discards its creator identity.
+
+## Playback ownership
+
+The creator orders shared play/pause/seek/speed requests and broadcasts complete snapshots.
+Commands have a separate monotonic sequence lane from presence messages, with acknowledgements
+and bounded retries. Newer commands win; late older seeks cannot reverse a newer seek.
+Room generations reject callbacks from closed connections. Guest observations never become commands.
+
+Playback intent is separate from effective pause state. Buffering pauses the group by default
+without losing the intent to resume; pressing Pause while waiting cancels that intent for everyone.
+Old-episode readiness cannot release a new episode. The creator can disable shared controls or
+waiting for all participants. There are at most eight participants including the creator.
+
+Clock probes use monotonic timestamps and low-RTT samples. Followers extrapolate the authoritative
+position and use a deadband, bounded 3% speed corrections and seek cooldowns. Explicit seeks carry
+a revision and bypass the cooldown once. Temporary corrections do not change the chosen base speed
+or repeatedly reset Anime4K calibration. Different-duration editions stay paused with an explanation.
+
+Sleep expiry, audio-focus loss and backgrounding create a local safety hold. A remote Play cannot
+clear that hold; an explicit local Play is required. Guest autoplay cannot pick its own episode.
+The host's existing next-episode flow chooses the next catalog reference and guests open it
+automatically. Existing native HLS, buffering recovery, decoding and Anime4K algorithms are unchanged.
+
+The application room owner outlives player activities. A foreground connected-device service keeps
+room messaging alive while browsing, with an explicit leave notification. Native player attachment
+and detachment are explicit; stale source-resolution results cannot open an older selection.
+Source catalog references are constrained to the installed source's origin before a remote fetch.
+If an extension refreshes an episode URL, the uniquely resolved local entry is bound to the host's
+selection. Its actual duration is still checked, and another local episode cannot inherit that binding.
+When the creator disappears, followers pause and reconnect; they do not elect competing creators.
+Leaving a room restores the original speed and keeps local playback paused.
+
+## Verification
+
+WatchRoomTest exercises clocks, shared commands, lost/reordered messages, readiness barriers,
+local holds, episode changes, creator loss, closure, room limits and stale callbacks.
+WatchCryptoTest covers authenticated envelopes, invitation parsing, tampering, expiry,
+foreign origins and malformed fields.
+
+NostrWatchTransportTest is opt-in through NYANIME_WATCH_NETWORK_TEST=1.
+Two independent clients exchange synthetic encrypted events in both directions through each
+configured default relay. It does not send user content or credentials.
+
+Compose screenshots cover entry, active-room, error, portrait, landscape and large-text layouts.
+Host-side tests and renders do not replace two-phone playback validation.
+
+Protocol reference: https://github.com/nostr-protocol/nips/blob/master/01.md
+
+Cryptography implementation: https://github.com/ACINQ/secp256k1-kmp

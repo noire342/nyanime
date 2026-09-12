@@ -89,6 +89,7 @@ fun PlayerSheets(
     lastCustomTimerMinutes: Int,
     onExtendSleepTimer: (Int) -> Unit,
     onOpenSleepTimer: () -> Unit,
+    onOpenWatchTogether: () -> Unit,
     reduceMotion: Boolean,
     buttons: ImmutableList<CustomButton>,
     onSelectAnime4KCustom: (Anime4KMode) -> Unit,
@@ -109,6 +110,7 @@ fun PlayerSheets(
     dismissSheet: Boolean,
 ) {
     when (sheetShown) {
+        Sheets.WatchTogether -> eu.kanade.tachiyomi.ui.watch.WatchTogetherSheet(onDismissRequest)
         Sheets.None -> {}
         Sheets.SubtitleTracks -> {
             val subtitlesPicker = rememberLauncherForActivityResult(
@@ -188,6 +190,7 @@ fun PlayerSheets(
                 remainingTime = sleepTimerTimeRemaining,
                 timerAtEpisodeEnd = sleepTimerAtEpisodeEnd,
                 onOpenSleepTimer = onOpenSleepTimer,
+                onOpenWatchTogether = onOpenWatchTogether,
                 onDismissRequest = onDismissRequest,
                 onEnterFiltersPanel = { onOpenPanel(Panels.VideoFilters) },
                 customButtons = buttons,

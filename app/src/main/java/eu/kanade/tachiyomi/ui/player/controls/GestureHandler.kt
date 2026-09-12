@@ -162,7 +162,7 @@ fun GestureHandler(
                         tryAwaitRelease()
                         if (isLongPressing) {
                             isLongPressing = false
-                            MPVLib.setPropertyDouble("speed", originalSpeed.toDouble())
+                            viewModel.setPlaybackSpeedByUser(originalSpeed.toDouble())
                             viewModel.playerUpdate.update { PlayerUpdates.None }
                         }
                         interactionSource.emit(PressInteraction.Release(press))

@@ -69,6 +69,7 @@ fun DiscoveryHomeHeader(
             }
         },
         actions = {
+            eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
             if (onSearch != null) {
                 IconButton(onClick = onSearch) {
                     Icon(

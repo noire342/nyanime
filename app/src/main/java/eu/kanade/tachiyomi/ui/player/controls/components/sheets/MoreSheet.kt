@@ -71,6 +71,7 @@ fun MoreSheet(
     remainingTime: Int,
     timerAtEpisodeEnd: Boolean,
     onOpenSleepTimer: () -> Unit,
+    onOpenWatchTogether: () -> Unit,
     onDismissRequest: () -> Unit,
     onEnterFiltersPanel: () -> Unit,
     customButtons: ImmutableList<CustomButton>,
@@ -112,6 +113,9 @@ fun MoreSheet(
                 }
             }
             SleepTimerEntry(remainingTime, onOpenSleepTimer, timerAtEpisodeEnd)
+            TextButton(onClick = onOpenWatchTogether, modifier = Modifier.fillMaxWidth()) {
+                Text("Guarda insieme", style = MaterialTheme.typography.titleMedium)
+            }
 
             Text(stringResource(AYMR.strings.player_hwdec_mode))
             LazyRow(
