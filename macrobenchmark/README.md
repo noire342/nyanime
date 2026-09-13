@@ -1,4 +1,4 @@
-# App benchmarks
+# Nyanime benchmarks
 
 The isolated package is `xyz.jmir.tachiyomi.mi.anime4k.benchmark`.
 Build with `:app:assembleBenchmark :macrobenchmark:assembleBenchmark`.
@@ -10,7 +10,7 @@ Fixtures contain 500 anime, 501 manga and eight synthetic local pages. The setup
 activity exists only in the benchmark variant. No user database or extensions are
 required. Home feeds are seeded in the real catalogue cache before each run.
 
-The `App performance and interface checks` workflow (manual or benchmark changes on dev) preserves startup and
+The `App performance and interface checks` workflow runs only when manually requested and preserves startup and
 frame timing JSON, traces, screenshots and generated baseline profiles. Emulator
 results verify repeatability and regressions; they do not establish phone speed,
 GPU capacity, power consumption or thermal behavior.

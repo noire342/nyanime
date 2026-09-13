@@ -21,7 +21,9 @@ legacy parte da quello conservato prima del restyling. Nessuna libreria o cronol
 viene migrata o cancellata cambiando modalità.
 
 La modalità moderna anima l'ingresso delle Home, gli indicatori e la pressione
-sulle locandine. Il banner cambia profondità durante lo scorrimento. Non sono
+sulle locandine. La copertina accompagna l'apertura e il ritorno dai dettagli;
+sfondi, ombre, testi e pannelli hanno transizioni coordinate. Il banner cambia
+profondità durante lo scorrimento. Non sono
 presenti animazioni decorative permanenti; le animazioni temporizzate Compose
 rispettano la scala di animazione del sistema.
 
@@ -52,6 +54,12 @@ L'aggiornamento conserva il tema precedente per libreria, dettagli, esplorazione
 e lettore manga. La preferenza dedicata in Aspetto permette di modificarlo.
 La migrazione viene applicata una sola volta e preserva le scelte successive,
 la modalità chiara/scura e l'impostazione AMOLED.
+
+Con un'estensione manga che dichiara una Home compatibile, la scheda Manga offre
+Home e Biblioteca. Sezioni, classifiche, date e azioni dei capitoli provengono
+dall'estensione; Continua a leggere usa la cronologia locale. Senza questa capacità
+si apre la biblioteca esistente. Il [contratto manga](manga-home-api.md) descrive
+le regole, mantenendo tema, lettore e avanzamento indipendenti.
 
 ## Riferimento visivo
 

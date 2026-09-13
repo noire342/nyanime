@@ -1,89 +1,177 @@
 <div align="center">
-
-<a href="https://github.com/noire342/ultrayomi/releases">
-    <img src="./.github/assets/nyanime.svg" alt="Nyanime logo" title="Nyanime logo" width="80"/>
-</a>
-
-# Nyanime
-
-### A video-focused AniYomi fork, with its manga reader preserved.
-Discover and watch anime, cartoons, series, and more – easier than ever on your Android device.
-
-Nyanime adds a cinematic anime interface, Anime4K enhancements and background Cast controls.
-See the [interface guide](docs/nyanime-ui.md) and [Cast guide](docs/casting.md).
-
-[![Discord server](https://img.shields.io/discord/841701076242530374.svg?label=&labelColor=6A7EC2&color=7389D8&logo=discord&logoColor=FFFFFF)](https://discord.gg/F32UjdJZrR)
-[![GitHub downloads](https://img.shields.io/github/downloads/noire342/ultrayomi/total?label=downloads&labelColor=27303D&color=0D1117&logo=github&logoColor=FFFFFF&style=flat)](https://github.com/noire342/ultrayomi/releases)
-
-[![CI](https://img.shields.io/github/actions/workflow/status/noire342/ultrayomi/build_push.yml?branch=dev&labelColor=27303D)](https://github.com/noire342/ultrayomi/actions/workflows/build_push.yml)
-[![License: Apache-2.0](https://img.shields.io/github/license/aniyomiorg/aniyomi?labelColor=27303D&color=818cf8)](/LICENSE)
-[![Translation status](https://img.shields.io/weblate/progress/aniyomi?labelColor=27303D&color=946300)](https://hosted.weblate.org/engage/aniyomi/)
-
-## Download
-
-[Download the latest signed Nyanime APK](https://github.com/noire342/ultrayomi/releases).
-
-*Requires Android 8.0 or higher.*
-
-## Features
-
-<div align="left">
-
-* Local reading and watching of content.
-* A configurable reader with multiple viewers, reading directions and other settings.
-* A configurable player built on mpv-android with multiple options and settings.
-* Tracker support: [MyAnimeList](https://myanimelist.net/), [AniList](https://anilist.co/), [Kitsu](https://kitsu.app/), [MangaUpdates](https://mangaupdates.com), [Shikimori](https://shikimori.one), [Simkl](https://simkl.com/), and [Bangumi](https://bgm.tv/) support.
-* Categories to organize your library.
-* Light and dark themes.
-* Schedule updating your library for new chapters/episodes.
-* Create backups locally to read/watch offline or to your desired cloud service.
-* Plus much more...
-
+  <img src=".github/assets/nyanime.svg" alt="Logo Nyanime: N rossa su sfondo nero" width="112" height="112" />
+  <h1>Nyanime</h1>
+  <p><strong>Scopri. Guarda. Leggi. Insieme.</strong></p>
+  <p>La tua libreria video e manga su Android, con un'interfaccia cinematografica,<br />
+  Anime4K, Cast e visione sincronizzata con gli amici.</p>
 </div>
 
-## Contributing
+**Nyanime** è un fork di AniYomi che aggiunge una nuova esperienza video e conserva
+le funzioni di gestione e lettura manga. La ModernUI è attiva di default e si può
+disabilitare per tornare all'interfaccia legacy. Il tema manga resta indipendente.
 
-[Code of conduct](./CODE_OF_CONDUCT.md) · [Contributing guide](./CONTRIBUTING.md)
+[Funzionalità complete](docs/features.md) · [Primi passi e FAQ](docs/getting-started.md) ·
+[Documentazione](docs/README.md) · [Novità](CHANGELOG.md) · [Contribuire](CONTRIBUTING.md)
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+## L'esperienza Nyanime
 
-Before reporting a new issue, take a look at the [FAQ](https://aniyomi.org/docs/faq/general), the [changelog](https://aniyomi.org/changelogs/) and the already opened [issues](https://github.com/aniyomiorg/aniyomi/issues); if you got any questions, join our [Discord server](https://discord.gg/F32UjdJZrR).
+| Funzione | Cosa puoi fare |
+| --- | --- |
+| **ModernUI reversibile** | Sfoglia banner, locandine e caroselli; apri le schede con transizioni della copertina e torna alla UI legacy dalle impostazioni. |
+| **Home ricche di contenuti** | Esplora cataloghi, stagioni, classifiche e calendario; usa le Home anime e manga definite dalle estensioni compatibili. |
+| **Riprendi da dove eri** | Ritrova “Continua a guardare” e “Continua a leggere”, con avanzamento locale e accesso all'episodio o capitolo. |
+| **Anime4K Smart** | Applica shader nel player interno con qualità adattiva, avvio automatico configurabile e modalità manuali. |
+| **Guarda insieme** | Genera un codice, invita gli amici e sincronizza episodio, play, pausa, spostamenti e velocità, ognuno con il proprio streaming. |
+| **Cast con telecomando** | Trasmetti a Google Cast o UPnP/DLNA e continua a usare l'app dal telefono, con controlli e ripresa locale. |
+| **Player curato** | Usa tracce audio e sottotitoli, gesti, PiP, AniSkip, timer di sospensione e passaggio al prossimo episodio. |
+| **Manga completo** | Mantieni libreria e lettore legacy, con Home opzionali, aggiornamenti dei capitoli e tutte le modalità di lettura. |
 
-### Repositories
+## Tutte le aree dell'app
 
-[![aniyomiorg/aniyomi-website - GitHub](https://github-readme-stats.vercel.app/api/pin/?username=aniyomiorg&repo=aniyomi-website&bg_color=161B22&text_color=c9d1d9&title_color=818cf8&icon_color=818cf8&border_radius=8&hide_border=true&description_lines_count=2)](https://github.com/aniyomiorg/aniyomi-website/)
-[![aniyomiorg/aniyomi-mpv-lib - GitHub](https://github-readme-stats.vercel.app/api/pin/?username=aniyomiorg&repo=aniyomi-mpv-lib&bg_color=161B22&text_color=c9d1d9&title_color=818cf8&icon_color=818cf8&border_radius=8&hide_border=true&description_lines_count=2)](https://github.com/aniyomiorg/aniyomi-mpv-lib/)
+### Home, ricerca e scoperta
 
-### Credits
+- Catalogo AniList con tendenze, stagioni, classifiche, ricerca, dettagli e calendario;
+  passaggio a Kitsu quando il catalogo principale non è disponibile.
+- Apertura degli episodi attraverso le estensioni installate, con associazione del
+  titolo e della stagione e possibilità di correggere manualmente la versione.
+- Home delle estensioni anime: sezioni, categorie video, filtri, date, banner,
+  aggiornamenti e paginazione dichiarati dall'estensione.
+- Home delle estensioni manga: novità, classifiche, titoli in evidenza, aggiornamenti
+  e pulsanti per aprire i capitoli esatti.
+- Ricerca globale anime e manga, nelle singole fonti e nelle librerie, con nuovi
+  tentativi per fonte e conservazione dei risultati durante gli aggiornamenti.
+- “Continua a guardare” anche nelle Home Anime e Cartoni, titoli nascondibili e
+  ripristinabili senza cancellare cronologia o avanzamento; “Continua a leggere”
+  nelle Home manga compatibili.
+- Copertine con segnaposto discreti, comparsa graduale, recupero delle immagini
+  mancanti tramite l'estensione e nuovi tentativi limitati.
 
-Thank you to all the people who have contributed!
+### Riproduzione video e Anime4K
 
-<a href="https://github.com/aniyomiorg/aniyomi/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=aniyomiorg/aniyomi" alt="Aniyomi app contributors" title="Aniyomi app contributors" width="800"/>
-</a>
+- Player interno basato su mpv, ripresa della posizione, scelta di episodio,
+  sorgente video e qualità; stagioni e host quando forniti dall'estensione.
+- Velocità configurabile, proporzioni, orientamento, gesti di volume, luminosità,
+  avanzamento e doppio tocco; controlli multimediali e Picture-in-Picture.
+- Tracce audio, lingue preferite, ritardo audio, correzione del tono,
+  configurazione dei canali e amplificazione del volume.
+- Sottotitoli principali e secondari, tracce esterne, lingue e filtri di preferenza,
+  ritardo, velocità, caratteri, dimensioni, colori, bordi e posizione.
+- Decodifica hardware configurabile, debanding, filtri dell'immagine, statistiche,
+  configurazione e script mpv, pulsanti personalizzati e player esterno.
+- Streaming torrent tramite l'integrazione esistente, quando supportato dalla fonte.
+- AniSkip facoltativo per sigle e segmenti disponibili, con salto manuale o automatico.
+- Timer con durate rapide, durata personalizzata memorizzata, estensione di 15 minuti
+  e arresto alla fine dell'episodio.
+- Autoplay configurabile, scheda del prossimo episodio, conto alla rovescia,
+  “Riproduci ora” e “Annulla”, coordinati con il timer.
+- Anime4K con **Smart, Massimo, Personalizzato e Spento**, scelte per episodio,
+  diagnostica e protezione dagli errori degli shader. L'avvio automatico di Smart
+  è attivo di default e disattivabile.
 
-### Disclaimer
+### Guarda insieme e Cast
 
-The developer(s) of this application does not have any affiliation with the content providers available, and this application hosts zero content.
+- Stanze fino a **8 persone**, creazione o ingresso tramite codice, invito con link e QR.
+- L'host sceglie l'episodio; gli ospiti lo aprono con la propria estensione compatibile.
+  Play, pausa, avanzamento e velocità sono condivisi; l'host può limitare i controlli.
+- Attesa dei partecipanti pronti, ripartenza con conto alla rovescia, correzione
+  graduale degli scostamenti, gestione del buffering e riconnessione.
+- Indicazione di chi sta caricando e di chi ha usato i controlli, salti coordinati
+  e preparazione del prossimo episodio.
+- Barra della stanza durante la navigazione, ritorno rapido al player e pausa
+  protetta quando scade il timer o il telefono perde il focus audio.
+- Stanze cifrate tramite relay Nostr: nessun account Nyanime e nessuna apertura
+  di porte; i video, i cookie e gli indirizzi degli streaming non sono condivisi.
+- Google Cast e UPnP/DLNA sulla rete locale, con play, pausa, avanzamento,
+  episodio precedente/successivo, volume, notifica e telecomando persistente.
+- Cambio del video mentre si naviga nell'app, ripresa sul telefono e luminosità
+  remota sui ricevitori DLNA che la espongono.
 
-### License
+### Manga, librerie e lettura
 
-<pre>
-Copyright © 2015 Javier Tomás
-Copyright © 2024 Mihon Open Source Project
-Copyright © 2024 Aniyomi Open Source Project
+- Librerie anime e manga con categorie, ricerca, filtri, ordinamenti, selezione
+  multipla, copertine personalizzate, cronologia e aggiornamenti.
+- Gestione di episodi e capitoli visti/letti, segnalibri, filtri e ordine crescente
+  o decrescente; migrazione verso un'altra fonte.
+- Lettura da sinistra a destra, da destra a sinistra, verticale, webtoon e continua.
+- Zoom, ritaglio dei bordi, gestione delle pagine doppie, orientamento,
+  margini webtoon, luminosità, filtri colore e navigazione con i tasti volume.
+- Avanzamento e impostazioni di lettura per titolo, salto dei capitoli già letti,
+  filtrati o duplicati, salvataggio e condivisione delle pagine.
+- Video locali, cartelle di immagini, archivi manga e immagini negli EPUB;
+  nessuna estensione necessaria per i file locali supportati.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+### Download, tracker, dati e personalizzazione
 
-http://www.apache.org/licenses/LICENSE-2.0
+- Download di episodi e capitoli, code, limite di velocità e concorrenza,
+  modalità solo Wi-Fi e **Solo scaricati**.
+- Download automatici delle novità o durante lettura/visione, regole per categoria,
+  pulizia dei contenuti già consumati e salvataggio dei capitoli in CBZ.
+- Ripresa dei download HTTP compatibili, controllo dello spazio e recupero
+  dei collegamenti scaduti attraverso l'estensione; downloader esterni facoltativi.
+- Tracker **MyAnimeList, AniList, Kitsu, MangaUpdates, Shikimori, Simkl e Bangumi**;
+  integrazioni con **Komga, Kavita, Suwayomi e Jellyfin** nei casi supportati.
+- Backup manuali e automatici, ripristino, esportazione degli elenchi della libreria,
+  scelta dell'archiviazione e gestione delle cache.
+- Gestione di repository, estensioni, lingue e fiducia automatica configurabile;
+  notifiche di aggiornamento separate e senza ripetere la stessa versione.
+- Risparmio dati delle immagini, DNS-over-HTTPS, strumenti diagnostici,
+  manutenzione delle cache e installatore delle estensioni configurabile.
+- Modalità incognito, blocco biometrico, protezione delle schermate e contenuto
+  delle notifiche configurabile.
+- Temi, modalità chiara/scura, AMOLED, tema manga separato, navigazione
+  personalizzabile, layout adattivi e opzioni per ridurre il movimento.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-</pre>
+Le condizioni e le opzioni sono descritte nel [catalogo completo delle funzionalità](docs/features.md).
 
-</div>
+## Installazione
+
+Serve **Android 8.0 o successivo**. Installa l'APK Nyanime ricevuto dal manutentore
+o compilato da questo repository; non è necessario un account Nyanime.
+Non viene indicato un canale pubblico di download che potrebbe non essere disponibile.
+
+Le build producono varianti per `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`
+e universale. Il file deve essere compatibile con il dispositivo; per aggiornare
+una copia esistente devono corrispondere anche package e firma.
+
+La [guida iniziale](docs/getting-started.md) spiega installazione, estensioni,
+backup, preferenze principali e problemi comuni.
+
+## Da sapere
+
+- L'app non include né ospita contenuti. Le estensioni forniscono accesso e logica
+  delle fonti; quelle con Home compatibile determinano dati e sezioni visualizzati.
+- **Guarda insieme usa server relay esterni**: è decentralizzato, ma non è P2P puro.
+  Ogni partecipante deve poter aprire il contenuto autonomamente; qualità della
+  rete ed edizione del video incidono sulla sincronizzazione.
+- **Anime4K è disabilitato nelle stanze** e non viene applicato ai video via Cast.
+  Al ritorno alla visione locale fuori dalla stanza si recupera la scelta prevista.
+- Il Cast richiede un ricevitore compatibile sulla stessa rete. Codec, sottotitoli
+  e luminosità dipendono dal ricevitore; non sono disponibili transcodifica,
+  mirroring dello schermo o un ricevitore Fire TV dedicato.
+- Un backup conserva dati e preferenze selezionati: **non contiene i video o
+  le pagine scaricati**. Incognito non rende anonime le connessioni di rete.
+- Una funzione e i suoi test automatici non garantiscono compatibilità
+  con ogni fonte, dispositivo o rete.
+
+## Documentazione e contributi
+
+Parti dall'[indice delle guide](docs/README.md). Per segnalazioni e modifiche usa
+gli strumenti di **questo repository**, se hai accesso, seguendo
+[CONTRIBUTING.md](CONTRIBUTING.md) e il [codice di condotta](CODE_OF_CONDUCT.md).
+Le personalizzazioni Nyanime non sono gestite dall'assistenza dei progetti upstream.
+
+I materiali delle integrazioni private restano fuori dal repository dell'app:
+la documentazione e i test usano esempi generici.
+
+## Crediti e licenze
+
+Nyanime deriva da [AniYomi](https://github.com/aniyomiorg/aniyomi) e conserva il
+lavoro di [Mihon](https://github.com/mihonapp/mihon), Tachiyomi e dei loro contributori.
+Usa mpv e la relativa integrazione Android, FFmpeg, gli shader Anime4K e altre
+librerie con le rispettive licenze. Il riferimento visivo del restyling è indicato
+nella [guida all'interfaccia](docs/nyanime-ui.md).
+
+Il codice dell'app è distribuito secondo [Apache License 2.0](LICENSE), mantenendo
+le attribuzioni originali. Le dipendenze hanno licenze proprie: consulta
+[i crediti dei componenti](docs/credits.md), la documentazione del
+[demuxer nativo](tools/native/README.md) e le licenze incluse nell'app.

@@ -59,8 +59,9 @@ representative at an online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community moderators responsible for enforcement at
-the [Tachiyomi Discord server](https://discord.gg/tachiyomi).
+reported to the maintainers responsible for this Nyanime repository through
+an existing private project contact. Do not post personal incident details in
+public issues or send Nyanime reports to an upstream project's support channels.
 All complaints will be reviewed and investigated promptly and fairly.
 
 All community moderators are obligated to respect the privacy and security of the

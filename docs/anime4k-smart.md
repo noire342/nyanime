@@ -1,5 +1,12 @@
 # Anime4K Smart
 
+Automatic Smart startup is enabled by default and can be disabled in the internal
+player settings without removing manual Smart selection. Saved manual choices
+remain independent; see [startup and sleep controls](player-startup-and-sleep.md).
+Anime4K is unavailable throughout an active watch room, including local holds
+and reconnects. Leaving restores the episode's solo choice. Cast playback runs
+on the receiver and does not apply the phone's shaders.
+
 Smart starts at the highest compatible bundled preset for each episode. It keeps
 session-local performance and shader failure exclusions, then reduces quality
 only when rendering evidence indicates overload. Manual Maximum, Custom and Off

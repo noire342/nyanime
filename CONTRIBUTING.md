@@ -1,50 +1,137 @@
-Looking to report an issue/bug or make a feature request? Please refer to the [README file](https://github.com/aniyomiorg/aniyomi#issues-feature-requests-and-contributing).
+# Contribuire a Nyanime
 
----
+Nyanime è sviluppato in Kotlin e Jetpack Compose, mantenendo compatibilità e
+funzioni della base AniYomi. Le modifiche del fork, la documentazione e le segnalazioni
+vanno gestite in questo repository, secondo il [codice di condotta](CODE_OF_CONDUCT.md).
 
-Thanks for your interest in contributing to Aniyomi!
+## Segnalazioni e proposte
 
+Prima di aprire una segnalazione, consulta le [FAQ](docs/getting-started.md) e le
+[novità](CHANGELOG.md), poi cerca eventuali problemi già registrati nel repository.
 
-# Code contributions
+Per un bug indica versione completa di Nyanime, modello, versione Android,
+passaggi riproducibili, risultato atteso ed effettivo. Per player e stanze specifica:
 
-Pull requests are welcome!
+- avvio da zero, ripresa, seek o uscita dal player;
+- visione individuale, stanza come host/ospite oppure Cast;
+- modalità Anime4K, qualità e se compare buffering o si congela l'immagine;
+- frequenza del problema ed eventuale differenza tra le versioni provate.
 
-If you're interested in taking on [an open issue](https://github.com/aniyomiorg/aniyomi/issues), please comment on it so others are aware.
-You do not need to ask for permission nor an assignment.
+Condividi solo l'estratto diagnostico necessario. Codici delle stanze, token,
+cookie, URL firmati, dati personali, nomi e materiali delle integrazioni private
+restano fuori da issue, allegati e repository. Usa contenuti sintetici per i test.
+Un problema del parser di un'estensione va gestito nel suo progetto locale;
+qui interessa il comportamento generico dell'app e del contratto.
 
-## Prerequisites
+Per una proposta descrivi il bisogno concreto e il comportamento desiderato,
+incluse le interazioni con legacy, manga, incognito, offline, Cast o stanze se pertinenti.
+Non occorre indirizzare gli utenti al supporto AniYomi per funzioni di Nyanime.
 
-Before you start, please note that the ability to use following technologies is **required** and that existing contributors will not actively teach them to you.
+## Preparare l'ambiente
 
-- Basic [Android development](https://developer.android.com/)
-- [Kotlin](https://kotlinlang.org/)
+Usa Git, **JDK 17**, Android Studio o gli strumenti Android da riga di comando,
+e il wrapper Gradle incluso. Le versioni correnti sono definite in
+[AndroidConfig.kt](buildSrc/src/main/kotlin/mihon/buildlogic/AndroidConfig.kt):
 
-### Tools
+| Componente | Configurazione |
+| --- | --- |
+| Android minimo | API 26, Android 8.0 |
+| Compile/target SDK | API 36 |
+| Build Tools | 35.0.1 |
+| NDK dell'app | 27.1.12297006 |
+| Java/Kotlin JVM | 17 |
 
-- [Android Studio](https://developer.android.com/studio)
-- Emulator or phone with developer options enabled to test changes.
+Configura il percorso SDK in `local.properties` o tramite l'ambiente Android.
+Il file è ignorato da Git. Evita nomi di progetto o percorsi locali nei documenti condivisi.
 
-## Getting help
+Le dipendenze sono dichiarate nei [cataloghi Gradle](gradle).
+Il repository include un [mirror vincolato](vendor/README.md) e la manutenzione
+[nativa FFmpeg](tools/native/README.md). La ricompilazione del demuxer ha prerequisiti
+propri, distinti dal normale assemblaggio Android.
 
-- Join [the Discord server](https://discord.gg/F32UjdJZrR) for online help and to ask questions while developing.
+## Compilare
 
-# Translations
+Su Windows usa `.\gradlew.bat` al posto di `./gradlew`.
 
-Translations are done externally via Weblate. See [our website](https://aniyomi.org/docs/contribute#translation) for more details.
+```sh
+./gradlew :app:assembleDebug
+```
 
+Le varianti sono definite in [app/build.gradle.kts](app/build.gradle.kts):
 
-# Forks
+| Variante | Uso | Package |
+| --- | --- | --- |
+| debug | Sviluppo locale | `xyz.jmir.tachiyomi.mi.anime4k.dev` |
+| preview | Build ottimizzata di anteprima | `xyz.jmir.tachiyomi.mi.anime4k.debug` |
+| release | Build ottimizzata | `xyz.jmir.tachiyomi.mi.anime4k` |
+| benchmark | Misurazioni isolate | `xyz.jmir.tachiyomi.mi.anime4k.benchmark` |
 
-Forks are allowed so long as they abide by [the project's LICENSE](https://github.com/aniyomiorg/aniyomi/blob/main/LICENSE).
+Gli output sono in `app/build/outputs/apk/<variante>/`, con APK per ABI e universale.
+Il marchio Nyanime non richiede di rinominare namespace, chiavi di preferenza o
+identificativi Android esistenti: questi possono essere necessari alla compatibilità.
 
-When creating a fork, remember to:
+Per preparare la variante distribuita:
 
-- To avoid confusion with the main app:
-    - Change the app name
-    - Change the app icon
-    - Change or disable the [app update checker](https://github.com/aniyomiorg/aniyomi/blob/main/app/src/main/java/eu/kanade/tachiyomi/data/updater/AppUpdateChecker.kt)
-- To avoid installation conflicts:
-    - Change the `applicationId` in [`build.gradle.kts`](https://github.com/aniyomiorg/aniyomi/blob/main/app/build.gradle.kts)
-- To avoid having your data polluting the main app's analytics and crash report services:
-    - If you want to use Firebase analytics, replace [`google-services.json`](https://github.com/aniyomiorg/aniyomi/blob/main/app/src/standard/google-services.json) with your own
-    - If you want to use ACRA crash reporting, replace the `ACRA_URI` endpoint in [`build.gradle.kts`](https://github.com/aniyomiorg/aniyomi/blob/main/app/build.gradle.kts) with your own
+```sh
+./gradlew :app:assemblePreview
+```
+
+La firma debug prevista dalla build locale non è automaticamente la firma della
+copia distribuita. Firma, package e versione devono essere verificati prima della
+consegna; un APK compilato non è per questo aggiornabile sopra qualunque installazione.
+Le chiavi e le credenziali di firma non appartengono al repository.
+
+## Verificare una modifica
+
+Esegui verifiche proporzionate al comportamento cambiato. Per codice Android:
+
+```sh
+./gradlew :app:testDebugUnitTest spotlessCheck
+```
+
+Per la UI, i render Compose sul PC non richiedono emulatori:
+
+```sh
+./gradlew :app:updateDebugScreenshotTest
+```
+
+Esamina le immagini pertinenti: il solo completamento del renderer non dimostra
+che il layout sia corretto. Verifica dimensioni, testo grande, orientamenti,
+ModernUI/legacy e tema manga quando coinvolti. Le anteprime e l'artwork locale
+di prova sono descritti nella [guida UI](docs/nyanime-ui.md).
+
+- Per Anime4K: controlli JVM e Lua indicati nella [guida Smart](docs/anime4k-smart.md).
+- Per le stanze: protocollo, inviti, controlli, perdita rete e isolamento della
+  visione individuale; i [test di rete](docs/watch-together.md) sono opt-in.
+- Per Cast: controlli del protocollo e prove sui ricevitori pertinenti.
+- Per player/nativo: [regressioni](docs/stability-regressions.md), ingresso/uscita,
+  ripresa e seek sul dispositivo reale quando disponibile.
+- Per documentazione: collegamenti locali, immagini, formattazione, accuratezza
+  rispetto al codice e assenza di materiale privato. Non serve ricompilare l'APK.
+
+Le prove su emulatore non fanno parte della verifica ordinaria. Un test JVM o un
+render non sostituisce il dispositivo: dichiara separatamente build, test,
+ispezione visiva e prove reali eseguite, senza attribuire a una release verifiche storiche.
+
+## Confini da conservare
+
+- La logica delle fonti resta nelle estensioni; il codice dell'app usa contratti generici.
+- Fixture, screenshot e documenti versionati usano titoli e dati inventati.
+  Per materiali locali usa `.local/` o `private/`, già ignorate.
+- Librerie, avanzamento, copertine personalizzate e preferenze vanno preservati.
+- ModernUI è reversibile; manga mantiene un tema indipendente.
+- Stanze inattive non devono interferire con il player individuale.
+- Anime4K rimane disabilitato durante la permanenza in una stanza.
+- Pausa locale, timer, annullamento e scelta dell'episodio mantengono la propria
+  autorità nei flussi sincronizzati.
+- Conserva licenze, attribuzioni e provenienza delle dipendenze.
+
+## Preparare una modifica per la revisione
+
+Controlla il diff, includi solo i file pertinenti e aggiorna le guide quando cambia
+il comportamento. Nella descrizione spiega problema, risultato e verifiche,
+segnalando le prove non eseguite. Le modifiche visive richiedono immagini sintetiche
+o prive di materiale privato. Pubblicare APK, cambiare visibilità del repository o
+riscrivere la storia Git sono operazioni separate dalla preparazione di una modifica.
+
+Per le stringhe e le traduzioni consulta la [guida i18n](i18n/README.md).
