@@ -103,9 +103,18 @@ fun CastDevicesDialog(request: () -> CastRequest?, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.Cast, null, Modifier.size(32.dp)) },
-        title = { Text(if (pairing != null) "Collega ${pairing!!.name}" else "Trasmetti alla TV") },
+        title = {
+            Text(
+                if (pairing != null) "Collega ${pairing!!.name}" else "Trasmetti alla TV",
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 if (busy) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                     val code = pairing?.code.orEmpty()
