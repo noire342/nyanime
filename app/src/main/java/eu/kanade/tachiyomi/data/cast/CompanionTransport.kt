@@ -131,6 +131,8 @@ class CompanionTransport(private val context: Context, private val localAddress:
 
     suspend fun pair(device: CastDevice) = pairLock.withLock {
         if (active?.receiver?.device?.id == device.id && active?.approved == true) return@withLock
+        // Preflight may fail before load owns the transport; keep the TV's approved pairing reusable.
+        if (paired?.receiver?.device?.id == device.id && paired?.approved == true) return@withLock
         val receiver = receivers[device.id] ?: error("Cerca di nuovo la TV")
         val candidate = CompanionClient(receiver, http)
         mutablePairing.value = CompanionPairing(device.name)
