@@ -2,6 +2,7 @@ package eu.kanade.presentation.webview
 
 import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import androidx.compose.foundation.clickable
@@ -76,6 +77,9 @@ fun WebViewScreenContent(
 
             override fun onPageFinished(view: WebView, url: String?) {
                 super.onPageFinished(view, url)
+                // Keep cookies immediately visible to the shared OkHttp CookieJar. This is
+                // relevant for providers that authorize playback only after a WebView visit.
+                CookieManager.getInstance().flush()
                 scope.launch {
                     val html = view.getHtml()
                     showCloudflareHelp = "window._cf_chl_opt" in html || "Ray ID is" in html
@@ -220,7 +224,11 @@ fun WebViewScreenContent(
                     WebView.setWebContentsDebuggingEnabled(true)
                 }
 
-                headers["user-agent"]?.let {
+                // OkHttp headers are case-insensitive, while the map created by
+                // `Headers.toMultimap()` preserves the original spelling. Use the same
+                // source profile in WebView so provider cookies (including Cloudflare's
+                // clearance cookie) remain valid when the extension retries playback.
+                headers.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value?.let {
                     webView.settings.userAgentString = it
                 }
             },
