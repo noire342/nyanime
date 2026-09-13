@@ -60,6 +60,11 @@ selection. Its actual duration is still checked, and another local episode canno
 When the creator disappears, followers pause and reconnect; they do not elect competing creators.
 Leaving a room restores the original speed and keeps local playback paused.
 
+Unavailable native duration or position keeps the attachment unready. Opening and closing do not
+query native timing before the file is usable. Detachment preserves only an inactive cached sample;
+it never reads a released player, including in solo playback. Inactive room controls do not sample
+or modify the native player.
+
 ## Verification
 
 WatchRoomTest exercises clocks, shared commands, lost/reordered messages, readiness barriers,

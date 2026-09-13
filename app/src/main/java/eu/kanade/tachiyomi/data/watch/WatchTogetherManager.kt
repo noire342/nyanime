@@ -48,9 +48,9 @@ class WatchTogetherManager private constructor(private val application: Applicat
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var foreground = WeakReference<Activity>(null)
     private var playerOwner = WeakReference<Activity>(null)
-    private var delegate: WatchPlayer? = null
+    private val playback = WatchPlayerAttachment()
+    private val delegate: WatchPlayer? get() = playback.player
     private var openInPlayer: ((Long, Long) -> Unit)? = null
-    private var detached = WatchPlayback(null, 0.0, true, false, false, 1.0)
     private var pendingOpen: Triple<String, Long, Long>? = null
     private var selection: WatchSelection? = null
     private var resolutionGeneration = 0L
@@ -131,7 +131,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
                     mutableOpening.value = WatchOpeningState()
                     if (!room.active) {
                         resolutionGeneration++
-                        if (delegate == null) detached = WatchPlayback(null, 0.0, true, false, false, 1.0)
+                        playback.forgetDetached()
                         application.stopService(Intent(application, WatchSessionService::class.java))
                     } else {
                         if (foreground.get() != null) {
@@ -195,13 +195,13 @@ class WatchTogetherManager private constructor(private val application: Applicat
     }
 
     fun createRoom(name: String) {
-        if (delegate == null) detached = WatchPlayback(null, 0.0, true, false, false, 1.0)
+        playback.forgetDetached()
         controller.create(name)
     }
 
     fun attach(activity: Activity, player: WatchPlayer, open: (Long, Long) -> Unit) {
         playerOwner = WeakReference(activity)
-        delegate = player
+        playback.attach(player)
         openInPlayer = open
         controller.playerAttached()
         present(activity)
@@ -209,8 +209,8 @@ class WatchTogetherManager private constructor(private val application: Applicat
 
     fun detach(activity: Activity) {
         if (playerOwner.get() !== activity) return
-        detached = delegate?.sample()?.copy(paused = true, ready = false, buffering = false) ?: detached
-        delegate = null
+        playback.detach()
+        if (!controller.active) playback.forgetDetached()
         openInPlayer = null
         playerOwner.clear()
     }
@@ -232,7 +232,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
     }
 
     private fun currentPlayback(): WatchPlayback {
-        val sample = delegate?.sample() ?: detached.copy(canAdvance = false)
+        val sample = playback.sample()
         val mapped = selection?.applyTo(sample) ?: sample
         return mapped.copy(
             problem = if (opening.value.loading) {

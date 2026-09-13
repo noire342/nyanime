@@ -372,6 +372,7 @@ class WatchRoomController(
     }
 
     fun confirmSameVideo() {
+        if (!active) return
         val local = player.sample().media ?: return
         val remote = state.value.media ?: return
         if (local.compatibleDuration(remote)) {

@@ -86,11 +86,39 @@ fun SubtitleDelayPanel(
         val delayControlCard = createRef()
 
         var affectedSubtitle by remember { mutableStateOf(SubtitleDelayType.Primary) }
-        var delay by remember { mutableIntStateOf((MPVLib.getPropertyDouble("sub-delay") * 1000).roundToInt()) }
-        var secondaryDelay by remember {
-            mutableIntStateOf((MPVLib.getPropertyDouble("secondary-sub-delay") * 1000).roundToInt())
+        var delay by remember {
+            mutableIntStateOf(
+                (
+                    (
+                        MPVLib.getPropertyDouble("sub-delay")?.takeIf { it.isFinite() }
+                            ?: (preferences.subtitlesDelay().get() / 1000.0)
+                        ) *
+                        1000
+                    ).roundToInt(),
+            )
         }
-        var speed by remember { mutableFloatStateOf(MPVLib.getPropertyDouble("sub-speed").toFloat()) }
+        var secondaryDelay by remember {
+            mutableIntStateOf(
+                (
+                    (
+                        MPVLib.getPropertyDouble("secondary-sub-delay")?.takeIf { it.isFinite() }
+                            ?: (preferences.subtitlesSecondaryDelay().get() / 1000.0)
+                        ) *
+                        1000
+                    ).roundToInt(),
+            )
+        }
+        var speed by remember {
+            mutableFloatStateOf(
+                (
+                    MPVLib.getPropertyDouble("sub-speed")?.takeIf {
+                        it.isFinite() &&
+                            it > 0
+                    }?.toFloat()
+                        ?: preferences.subtitlesSpeed().get()
+                    ),
+            )
+        }
         LaunchedEffect(speed) {
             if (speed in 0.1f..1f) MPVLib.setPropertyDouble("sub-speed", speed.toDouble())
         }
@@ -107,12 +135,21 @@ fun SubtitleDelayPanel(
         }
         LaunchedEffect(affectedSubtitle) {
             secondaryDelay = (
-                MPVLib.getPropertyDouble(
-                    if (affectedSubtitle == SubtitleDelayType.Both) "sub-delay" else "secondary-sub-delay",
-                ) *
+                (
+                    MPVLib.getPropertyDouble(
+                        if (affectedSubtitle == SubtitleDelayType.Both) "sub-delay" else "secondary-sub-delay",
+                    )?.takeIf { it.isFinite() } ?: secondaryDelay / 1000.0
+                    ) *
                     1000
                 ).toInt()
-            delay = (MPVLib.getPropertyDouble("sub-delay") * 1000).toInt()
+            delay =
+                (
+                    (
+                        MPVLib.getPropertyDouble("sub-delay")?.takeIf { it.isFinite() }
+                            ?: (preferences.subtitlesDelay().get() / 1000.0)
+                        ) *
+                        1000
+                    ).toInt()
         }
         SubtitleDelayCard(
             delay = if (affectedSubtitle == SubtitleDelayType.Secondary) secondaryDelay else delay,

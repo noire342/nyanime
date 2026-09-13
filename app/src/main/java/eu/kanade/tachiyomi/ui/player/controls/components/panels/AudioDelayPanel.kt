@@ -61,7 +61,17 @@ fun AudioDelayPanel(
     ) {
         val delayControlCard = createRef()
 
-        var delay by remember { mutableIntStateOf((MPVLib.getPropertyDouble("audio-delay") * 1000).toInt()) }
+        var delay by remember {
+            mutableIntStateOf(
+                (
+                    (
+                        MPVLib.getPropertyDouble("audio-delay")?.takeIf { it.isFinite() }
+                            ?: (preferences.audioDelay().get() / 1000.0)
+                        ) *
+                        1000
+                    ).toInt(),
+            )
+        }
         LaunchedEffect(delay) {
             MPVLib.setPropertyDouble("audio-delay", delay / 1000.0)
         }

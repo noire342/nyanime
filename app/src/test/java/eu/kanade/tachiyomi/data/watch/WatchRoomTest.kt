@@ -124,6 +124,36 @@ class WatchRoomTest {
     }
 
     @Test
+    fun inactiveRoomControlsNeverReadOrModifyThePlayer() = runTest {
+        val player = object : WatchPlayer {
+            override fun sample(): WatchPlayback = error("Inactive room sampled the player")
+            override fun pause(paused: Boolean): Unit = error("Inactive room changed pause")
+            override fun seek(seconds: Double): Unit = error("Inactive room sought")
+            override fun speed(value: Double): Unit = error("Inactive room changed speed")
+            override fun userResumed(): Unit = error("Inactive room changed local safety")
+        }
+        val controller = WatchRoomController(backgroundScope, player, { testScheduler.currentTime })
+        controller.playerAttached()
+        controller.hold()
+        controller.resync()
+        controller.confirmSameVideo()
+        controller.offerSkip("unused", "Skip", 90.0)
+        controller.setSharedControls(false)
+        controller.setWaitForEveryone(false)
+        assertFalse(controller.requestPause(true))
+        assertFalse(controller.requestPause(false))
+        assertFalse(controller.requestSeek(30.0))
+        assertFalse(controller.requestSpeed(1.5))
+        assertFalse(controller.resumeByUser())
+        controller.cancelSkip()
+        controller.cancelNext()
+        controller.leave()
+        advanceTimeBy(10_000)
+        runCurrent()
+        assertFalse(controller.active)
+    }
+
+    @Test
     fun codeJoinsRoomAndCorrectsDifferentDeviceClocks() = runTest {
         val room = Pairing(this)
         room.join()

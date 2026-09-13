@@ -229,6 +229,14 @@ class PlayerViewModel @JvmOverloads constructor(
     val watchManager by lazy { WatchTogetherManager.get(activity) }
     val watchTogether get() = watchManager.controller
 
+    private fun readWatchTiming(): PlayerWatchTiming {
+        val load = playbackLoadState.value
+        return PlayerWatchTiming.read(
+            available = load.started && !load.opening && !isLoadingEpisode.value && !activity.player.isExiting,
+            readDouble = MPVLib::getPropertyDouble,
+        )
+    }
+
     fun bindWatchPlayer() {
         watchManager.attach(
             activity,
@@ -237,20 +245,15 @@ class PlayerViewModel @JvmOverloads constructor(
                     val anime = currentAnime.value
                     val episode = currentEpisode.value
                     val load = playbackLoadState.value
-                    val duration = if (load.started) {
-                        runCatching {
-                            MPVLib.getPropertyDouble("duration")
-                        }.getOrDefault(0.0)
-                    } else {
-                        0.0
-                    }
-                    val position = runCatching { MPVLib.getPropertyDouble("time-pos") }.getOrDefault(0.0)
+                    val timing = readWatchTiming()
+                    val duration = timing.duration
+                    val position = timing.position
                     val media = if (anime != null && episode != null) {
                         WatchMedia(
                             anime.title.take(240),
                             episode.name.take(240),
                             episode.episode_number.toDouble(),
-                            duration.takeIf { it.isFinite() }?.coerceIn(0.0, 86_400.0) ?: 0.0,
+                            duration,
                             anime.source,
                             anime.url,
                             episode.url,
@@ -260,9 +263,10 @@ class PlayerViewModel @JvmOverloads constructor(
                     }
                     return WatchPlayback(
                         media = media,
-                        position = position.takeIf { it.isFinite() }?.coerceIn(0.0, 86_400.0) ?: 0.0,
+                        position = position,
                         paused = paused.value,
-                        ready = load.started &&
+                        ready = timing.ready &&
+                            load.started &&
                             load.failure == null &&
                             !load.opening &&
                             !load.seeking &&
@@ -272,9 +276,10 @@ class PlayerViewModel @JvmOverloads constructor(
                         buffering = load.buffering || load.seeking || isSeeking.value,
                         speed = playbackSpeed.value.toDouble(),
                         problem = if (load.failure != null) WatchProblem.SourceError else WatchProblem.None,
-                        upcoming = if (duration > 0 && duration - position <= 90) watchNextMedia() else null,
-                        canAdvance = canWatchAdvance(),
-                        ended = runCatching { MPVLib.getPropertyBoolean("eof-reached") == true }.getOrDefault(false),
+                        upcoming = if (timing.ready && duration - position <= 90) watchNextMedia() else null,
+                        canAdvance = timing.ready && canWatchAdvance(),
+                        ended = timing.ready &&
+                            runCatching { MPVLib.getPropertyBoolean("eof-reached") == true }.getOrDefault(false),
                     )
                 }
                 override fun pause(paused: Boolean) {
@@ -713,10 +718,10 @@ class PlayerViewModel @JvmOverloads constructor(
 
     fun loadChapters() {
         val chapters = mutableListOf<IndexedSegment>()
-        val count = MPVLib.getPropertyInt("chapter-list/count")!!
+        val count = (MPVLib.getPropertyInt("chapter-list/count") ?: 0)
         for (i in 0 until count) {
             val title = MPVLib.getPropertyString("chapter-list/$i/title")
-            val time = MPVLib.getPropertyInt("chapter-list/$i/time")!!
+            val time = (MPVLib.getPropertyInt("chapter-list/$i/time") ?: continue)
             chapters.add(
                 IndexedSegment(
                     name = title,
@@ -733,7 +738,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun selectChapter(index: Int) {
-        val time = chapters.value[index].start
+        val time = chapters.value.getOrNull(index)?.start ?: return
         seekTo(time.toInt())
     }
 
@@ -1004,7 +1009,8 @@ class PlayerViewModel @JvmOverloads constructor(
 
     fun seekBy(offset: Int, precise: Boolean = false) {
         if (watchTogether.active) {
-            watchTogether.requestSeek(runCatching { MPVLib.getPropertyDouble("time-pos") }.getOrDefault(0.0) + offset)
+            val timing = readWatchTiming()
+            if (timing.ready) watchTogether.requestSeek(timing.position + offset)
             return
         }
         completion.playbackRestarted()
