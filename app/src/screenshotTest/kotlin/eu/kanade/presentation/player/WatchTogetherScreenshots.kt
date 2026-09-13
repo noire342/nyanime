@@ -23,6 +23,14 @@ import eu.kanade.tachiyomi.ui.watch.WatchTogetherContent
 fun WatchStartScreenshot() = WatchCuesPreview(WatchRoomState(active = true, resumeSeconds = 2))
 
 @PreviewTest
+@Preview(name = "TogetherPreparing", widthDp = 393, heightDp = 240, locale = "it")
+@Preview(name = "TogetherPreparingLarge", widthDp = 320, heightDp = 340, fontScale = 1.5f, locale = "it")
+@Composable
+fun WatchPreparingScreenshot() = WatchCuesPreview(
+    WatchRoomState(active = true, phase = WatchPhase.Paused, pendingPlaybackPaused = false),
+)
+
+@PreviewTest
 @Preview(name = "TogetherSkip", widthDp = 393, heightDp = 240, locale = "it")
 @Preview(name = "TogetherSkipLarge", widthDp = 320, heightDp = 400, fontScale = 1.5f, locale = "it")
 @Composable

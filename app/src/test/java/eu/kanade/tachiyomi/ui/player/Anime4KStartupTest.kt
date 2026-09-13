@@ -65,6 +65,67 @@ class Anime4KStartupTest {
         }
     }
 
+    @Test
+    fun `room suppresses automatic Smart without saving Off`() {
+        val preferences = AdvancedPlayerPreferences(store())
+        preferences.setAnime4kRoomActive(true)
+        assertEquals(Anime4KProfile.Smart, preferences.loadAnime4kEpisodeProfile(1, 1).profile)
+        assertEquals(Anime4KProfile.Off, preferences.anime4kActiveSelection().value.profile)
+        assertEquals(Anime4KMode.Off, preferences.anime4kEffectiveMode().value)
+        assertNull(preferences.anime4kEpisodeProfile(1, 1))
+        preferences.setAnime4kRoomActive(false)
+        assertEquals(Anime4KProfile.Smart, preferences.loadAnime4kEpisodeProfile(1, 1).profile)
+    }
+
+    @Test
+    fun `room preserves manual Smart even when automatic startup is disabled`() {
+        val preferences = AdvancedPlayerPreferences(store())
+        preferences.anime4kSmartAutoStart().set(false)
+        preferences.loadAnime4kEpisodeProfile(1, 1)
+        preferences.saveAnime4kEpisodeProfile(1, 1, Anime4KEpisodeProfile(Anime4KProfile.Smart))
+        preferences.setAnime4kEffectiveMode(Anime4KMode.ModeB)
+        preferences.setAnime4kRoomActive(true)
+        preferences.loadAnime4kEpisodeProfile(1, 1) // quality change while sharing
+        assertEquals(Anime4KProfile.Off, preferences.anime4kActiveSelection().value.profile)
+        preferences.setAnime4kRoomActive(false)
+        assertEquals(Anime4KProfile.Smart, preferences.loadAnime4kEpisodeProfile(1, 1).profile)
+        preferences.beginAnime4kSession()
+        assertEquals(Anime4KProfile.Off, preferences.loadAnime4kEpisodeProfile(1, 1).profile)
+    }
+
+    @Test
+    fun `room blocks stale callbacks and manual presets without changing saved choice`() {
+        val preferences = AdvancedPlayerPreferences(store())
+        val original = Anime4KEpisodeProfile(Anime4KProfile.Custom, Anime4KMode.ModeC)
+        preferences.saveAnime4kEpisodeProfile(1, 1, original)
+        preferences.loadAnime4kEpisodeProfile(1, 1)
+        preferences.setAnime4kRoomActive(true)
+        preferences.setAnime4kActiveSelection(Anime4KSelection(Anime4KProfile.Maximum, Anime4KMode.ModeAPlusHq))
+        preferences.setAnime4kEffectiveMode(Anime4KMode.ModeA)
+        preferences.saveAnime4kEpisodeProfile(1, 1, Anime4KEpisodeProfile(Anime4KProfile.Off))
+        preferences.setAnime4kDiagnostics(Anime4KSmartDiagnostics(profile = Anime4KProfile.Smart))
+        assertEquals(original, preferences.anime4kEpisodeProfile(1, 1))
+        assertEquals(Anime4KMode.Off, preferences.anime4kEffectiveMode().value)
+        assertEquals(Anime4KProfile.Off, preferences.anime4kDiagnostics().value.profile)
+        preferences.setAnime4kRoomActive(false)
+        assertEquals(original, preferences.loadAnime4kEpisodeProfile(1, 1))
+    }
+
+    @Test
+    fun `leaving room uses current episode rather than previous episode profile`() {
+        val preferences = AdvancedPlayerPreferences(store())
+        preferences.saveAnime4kEpisodeProfile(1, 1, Anime4KEpisodeProfile(Anime4KProfile.Maximum))
+        preferences.saveAnime4kEpisodeProfile(1, 2, Anime4KEpisodeProfile(Anime4KProfile.Off))
+        preferences.loadAnime4kEpisodeProfile(1, 1)
+        preferences.setAnime4kRoomActive(true)
+        preferences.beginAnime4kSession()
+        preferences.loadAnime4kEpisodeProfile(1, 2)
+        preferences.setAnime4kRoomActive(false)
+        assertEquals(Anime4KProfile.Off, preferences.loadAnime4kEpisodeProfile(1, 2).profile)
+        preferences.beginAnime4kSession()
+        assertEquals(Anime4KProfile.Maximum, preferences.loadAnime4kEpisodeProfile(1, 1).profile)
+    }
+
     private fun store(): PreferenceStore {
         val strings = mutableMapOf<String, InMemoryPreference<String>>()
         val booleans = mutableMapOf<String, InMemoryPreference<Boolean>>()

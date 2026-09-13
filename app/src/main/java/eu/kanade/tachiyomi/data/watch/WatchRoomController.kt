@@ -299,6 +299,14 @@ class WatchRoomController(
             pendingCommand = request
             pendingSince = now()
             lastRetry = now()
+            mutableState.value = state.value.copy(
+                pendingPlaybackPaused = when (action) {
+                    "play" -> false
+                    "pause" -> true
+                    else -> null
+                },
+                resumeSeconds = if (action == "pause") null else state.value.resumeSeconds,
+            )
             send(request)
             // Pausing is safe immediately. Play/seek wait for the creator's authoritative state.
             if (action == "pause") player.pause(true)
@@ -310,6 +318,7 @@ class WatchRoomController(
         when (request.command) {
             "pause" -> {
                 desiredPaused = true
+                mutableState.value = state.value.copy(playRequested = false, resumeSeconds = null)
                 pausedBy = actor
                 startGate.reset()
                 suppressedNext = player.sample().media?.key
@@ -318,6 +327,8 @@ class WatchRoomController(
             }
             "play" -> if (!state.value.localHold) {
                 desiredPaused = false
+                mutableState.value =
+                    state.value.copy(playRequested = true, message = "Preparazione della riproduzione…")
                 pausedBy = ""
             }
             "skip" -> {
@@ -458,6 +469,13 @@ class WatchRoomController(
                     sharedControls = incoming.sharedControls,
                     waitForEveryone = incoming.waitForEveryone,
                     playRequested = incoming.playRequested,
+                    pendingPlaybackPaused = pendingCommand?.command?.let {
+                        when (it) {
+                            "play" -> false
+                            "pause" -> true
+                            else -> null
+                        }
+                    },
                     skip = incoming.skip,
                     upcoming = incoming.upcoming,
                     next = incoming.next,
@@ -692,6 +710,7 @@ class WatchRoomController(
                     if (blocking.problem != WatchProblem.None) blocking.problem.description() else "in attesa"
             buffering -> problem.description()
             countdown != null -> "Si riparte insieme tra " + countdown
+            paused && !desiredPaused -> "Verifica che tutti siano pronti…"
             paused && pausedBy.isNotBlank() -> pausedBy + " ha messo in pausa."
             paused -> "Tutti pronti. Puoi avviare la riproduzione."
             else -> "State guardando insieme."
@@ -776,6 +795,7 @@ class WatchRoomController(
         pendingCommand?.let {
             if (time - pendingSince > 8000) {
                 pendingCommand = null
+                mutableState.value = state.value.copy(pendingPlaybackPaused = null)
                 closedMessage = "Comando non confermato. Controlla la connessione e riprova."
             } else if (time - lastRetry >= 1500) {
                 send(it)
@@ -788,7 +808,7 @@ class WatchRoomController(
             skipSeconds = remainingSeconds(remote?.skip?.deadline, hostTime).takeUnless { stale || !clock.ready },
             nextSeconds = remainingSeconds(remote?.next?.deadline, hostTime).takeUnless { stale || !clock.ready },
             resumeSeconds = remainingSeconds(remote?.resumeAt, hostTime)?.takeIf {
-                it > 0 && !stale && clock.ready && localReady && !sample.buffering
+                it > 0 && !stale && clock.ready && localReady && !sample.buffering && pendingCommand?.command != "pause"
             },
             skip = remote?.skip?.let { if (stale) it.copy(deadline = null) else it },
             next = remote?.next?.let { if (stale) it.copy(deadline = null) else it },

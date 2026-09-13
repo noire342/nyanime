@@ -124,6 +124,66 @@ class WatchRoomTest {
     }
 
     @Test
+    fun hostPlayShowsPreparationBeforeTheNextTickAndCanBeCancelled() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.resumeByUser()
+        assertTrue(room.host.state.value.preparingPlayback)
+        assertTrue(room.hostPlayer.paused)
+        assertEquals(null, room.host.state.value.resumeSeconds)
+        room.host.requestPause(true)
+        assertFalse(room.host.state.value.preparingPlayback)
+        room.advance()
+        assertTrue(room.hostPlayer.paused)
+        assertTrue(room.guestPlayer.paused)
+    }
+
+    @Test
+    fun guestPlayShowsPendingFeedbackUntilAcknowledgedWithoutStartingEarly() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.network.intercept = { _, message, deliver ->
+            if (message.type != WatchMessageType.Command) deliver()
+        }
+        room.guest.resumeByUser()
+        assertTrue(room.guest.state.value.preparingPlayback)
+        assertTrue(room.guest.state.value.wantsPlayback)
+        assertEquals(false, room.guest.state.value.pendingPlaybackPaused)
+        room.advance(1000)
+        assertTrue(room.guest.state.value.preparingPlayback)
+        assertTrue(room.guestPlayer.paused)
+        assertTrue(room.hostPlayer.paused)
+        room.network.intercept = null
+        room.advance(8000)
+        assertEquals(null, room.guest.state.value.pendingPlaybackPaused)
+        assertFalse(room.guest.state.value.preparingPlayback)
+        assertFalse(room.guestPlayer.paused)
+        assertTrue(abs(room.hostPlayer.sample().position - room.guestPlayer.sample().position) < 0.4)
+    }
+
+    @Test
+    fun pendingPlayCancellationAndTimeoutDoNotLeaveAnIndefinitePreparationCue() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.network.intercept = { _, message, deliver ->
+            if (message.type != WatchMessageType.Command) deliver()
+        }
+        room.guest.resumeByUser()
+        room.guest.requestPause(true)
+        assertFalse(room.guest.state.value.wantsPlayback)
+        assertFalse(room.guest.state.value.preparingPlayback)
+        room.guest.resumeByUser()
+        assertTrue(room.guest.state.value.preparingPlayback)
+        room.advance(9000)
+        assertFalse(room.guest.state.value.preparingPlayback)
+        assertEquals(null, room.guest.state.value.pendingPlaybackPaused)
+        assertTrue(room.guest.state.value.message.contains("non confermato"))
+        assertTrue(room.guestPlayer.paused)
+        room.guest.leave()
+        assertFalse(room.guest.state.value.preparingPlayback)
+    }
+
+    @Test
     fun inactiveRoomControlsNeverReadOrModifyThePlayer() = runTest {
         val player = object : WatchPlayer {
             override fun sample(): WatchPlayback = error("Inactive room sampled the player")

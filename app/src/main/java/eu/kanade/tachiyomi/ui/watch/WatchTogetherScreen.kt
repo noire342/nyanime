@@ -235,7 +235,7 @@ fun WatchTogetherPanel(
             context.startActivity(Intent.createChooser(intent, "Invita un amico"))
         },
         onTogglePlayback = {
-            if (room.playRequested &&
+            if (room.wantsPlayback &&
                 !room.localHold
             ) {
                 manager.controller.requestPause(true)
@@ -410,12 +410,17 @@ fun WatchTogetherContent(
                     )
                     room.media?.episode?.takeIf { it.isNotBlank() }?.let { Text(it, color = colors.onSurfaceVariant) }
                     if (opening.loading ||
+                        room.preparingPlayback ||
                         room.phase in listOf(WatchPhase.Connecting, WatchPhase.Reconnecting, WatchPhase.Buffering)
                     ) {
                         LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 4.dp))
                     }
                     Text(
-                        opening.error ?: if (opening.loading) "Apro l'episodio dalla tua estensione…" else room.message,
+                        opening.error ?: when {
+                            opening.loading -> "Apro l'episodio dalla tua estensione…"
+                            room.preparingPlayback -> room.playbackPreparationMessage
+                            else -> room.message
+                        },
                         color = if (opening.error != null) colors.error else colors.onSurfaceVariant,
                     )
                     if (opening.error != null) {
@@ -496,7 +501,7 @@ fun WatchTogetherContent(
                     }
                 }
             }
-            WatchRoomCues(room, onSkip, onCancelSkip, onNext, onCancelNext)
+            WatchRoomCues(room, onSkip, onCancelSkip, onNext, onCancelNext, onCancelResume = onTogglePlayback)
             if (preparation.error != null) {
                 Text("Prossimo episodio: " + preparation.error, color = colors.error)
                 TextButton(
@@ -532,7 +537,7 @@ fun WatchTogetherContent(
                     shape = RoundedCornerShape(14.dp),
                 ) {
                     Icon(
-                        if (room.playRequested &&
+                        if (room.wantsPlayback &&
                             !room.localHold
                         ) {
                             Icons.Default.Pause
@@ -544,7 +549,7 @@ fun WatchTogetherContent(
                     Text(
                         when {
                             !room.sharedControls && !room.host -> " Torna alla visione"
-                            room.playRequested && !room.localHold -> " Pausa per tutti"
+                            room.wantsPlayback && !room.localHold -> " Pausa per tutti"
                             else -> " Riprendi insieme"
                         },
                     )
@@ -597,12 +602,16 @@ fun WatchRoomChip(room: WatchRoomState, onClick: () -> Unit) {
             onClick = onClick,
             label = {
                 Text(
-                    if (room.phase ==
-                        WatchPhase.Playing
-                    ) {
-                        "Insieme · " + room.members.size
-                    } else {
-                        "Guarda insieme · In pausa"
+                    when {
+                        room.resumeSeconds != null -> "Ripartenza tra ${room.resumeSeconds}"
+                        room.preparingPlayback -> "Guarda insieme · Preparazione…"
+                        room.phase == WatchPhase.Playing -> "Insieme · " + room.members.size
+                        room.phase in listOf(
+                            WatchPhase.Connecting,
+                            WatchPhase.Reconnecting,
+                        ) -> "Guarda insieme · Connessione…"
+                        room.phase == WatchPhase.Buffering -> "Guarda insieme · Caricamento…"
+                        else -> "Guarda insieme · In pausa"
                     },
                 )
             },

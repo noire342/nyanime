@@ -183,6 +183,7 @@ fun PlayerControls(
     val currentChapter by viewModel.currentChapter.collectAsState()
     val indexedChapters by viewModel.chapters.collectAsState()
     val currentBrightness by viewModel.currentBrightness.collectAsState()
+    val playerRoom by viewModel.watchTogether.state.collectAsState()
     val anime4kSelection by advancedPlayerPreferences.anime4kActiveSelection().collectAsState()
     val anime4kDiagnosticsEnabled by advancedPlayerPreferences.anime4kDiagnosticsEnabled().collectAsState()
 
@@ -250,7 +251,7 @@ fun PlayerControls(
                 val (playerUpdates) = createRefs()
                 val anime4kDiagnosticsOverlay = createRef()
 
-                if (anime4kDiagnosticsEnabled) {
+                if (anime4kDiagnosticsEnabled && !playerRoom.active) {
                     val anime4kDiagnostics by advancedPlayerPreferences.anime4kDiagnostics().collectAsState()
                     Anime4KDiagnosticsOverlay(
                         diagnostics = anime4kDiagnostics,
@@ -435,7 +436,7 @@ fun PlayerControls(
                         controlsShown = controlsShown,
                         areControlsLocked = areControlsLocked,
                         showLoadingCircle = showLoadingCircle,
-                        paused = paused,
+                        paused = if (playerRoom.active) !playerRoom.wantsPlayback || playerRoom.localHold else paused,
                         gestureSeekAmount = gestureSeekAmount,
                         onPlayPauseClick = viewModel::pauseUnpause,
                         failure = playbackLoad.failure,
@@ -742,6 +743,7 @@ fun PlayerControls(
             reduceMotion = reduceMotion,
             buttons = customButtons.getButtons().toImmutableList(),
             onSelectAnime4KCustom = onSelectAnime4KCustom,
+            anime4kAvailable = !playerRoom.active,
 
             isLocalSource = currentSource?.id == LocalAnimeSource.ID,
             showSubtitles = showSubtitles,
@@ -784,7 +786,12 @@ fun PlayerControls(
                 (
                     nextEpisodePrompt != null ||
                         watchRoom.active &&
-                        (watchRoom.skip != null || watchRoom.next != null || watchRoom.resumeSeconds != null)
+                        (
+                            watchRoom.skip != null ||
+                                watchRoom.next != null ||
+                                watchRoom.resumeSeconds != null ||
+                                watchRoom.preparingPlayback
+                            )
                     ) &&
                     !areControlsLocked &&
                     !inPip &&
@@ -805,6 +812,7 @@ fun PlayerControls(
                         viewModel::playNextEpisodeNow,
                         viewModel::cancelNextEpisode,
                         reduceMotion = reduceMotion,
+                        onCancelResume = viewModel::pauseByUser,
                         artwork = { anime?.let { SourceHomeArtwork(it, Modifier.fillMaxSize()) } },
                     )
                 } else if (prompt != null && nextEpisode != null) {

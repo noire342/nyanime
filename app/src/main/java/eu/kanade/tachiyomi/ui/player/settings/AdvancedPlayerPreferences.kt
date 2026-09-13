@@ -26,6 +26,8 @@ class AdvancedPlayerPreferences(
     private val anime4kDiagnosticsFlow = MutableStateFlow(Anime4KSmartDiagnostics())
     private val anime4kDiagnosticsState = anime4kDiagnosticsFlow.asStateFlow()
     private var activeEpisodeKey: String? = null
+    private var anime4kRoomActive = false
+    private var anime4kSessionSelection = Anime4KSelection(Anime4KProfile.Off, Anime4KMode.Off)
 
     fun mpvUserFiles() = preferenceStore.getBoolean("mpv_scripts", false)
     fun mpvConf() = preferenceStore.getString("pref_mpv_conf", "")
@@ -41,13 +43,30 @@ class AdvancedPlayerPreferences(
     fun anime4kEffectiveMode(): StateFlow<Anime4KMode> = anime4kEffectiveModeState
 
     fun setAnime4kEffectiveMode(mode: Anime4KMode) {
-        anime4kEffectiveModeFlow.value = mode
-        anime4kActiveSelectionFlow.value = anime4kActiveSelectionFlow.value.copy(mode = mode)
+        setAnime4kActiveSelection(anime4kSessionSelection.copy(mode = mode))
     }
 
     fun anime4kActiveSelection(): StateFlow<Anime4KSelection> = anime4kActiveSelectionState
 
     fun setAnime4kActiveSelection(selection: Anime4KSelection) {
+        if (anime4kRoomActive) return
+        anime4kSessionSelection = selection
+        publishAnime4kSelection()
+    }
+
+    /** Temporarily disables rendering without replacing the episode's solo playback choice. */
+    fun setAnime4kRoomActive(active: Boolean) {
+        anime4kRoomActive = active
+        publishAnime4kSelection()
+        if (active) anime4kDiagnosticsFlow.value = Anime4KSmartDiagnostics()
+    }
+
+    private fun publishAnime4kSelection() {
+        val selection = if (anime4kRoomActive) {
+            Anime4KSelection(Anime4KProfile.Off, Anime4KMode.Off)
+        } else {
+            anime4kSessionSelection
+        }
         anime4kActiveSelectionFlow.value = selection
         anime4kEffectiveModeFlow.value = selection.mode
     }
@@ -57,7 +76,7 @@ class AdvancedPlayerPreferences(
     fun anime4kDiagnostics(): StateFlow<Anime4KSmartDiagnostics> = anime4kDiagnosticsState
 
     fun setAnime4kDiagnostics(diagnostics: Anime4KSmartDiagnostics) {
-        anime4kDiagnosticsFlow.value = diagnostics
+        anime4kDiagnosticsFlow.value = if (anime4kRoomActive) Anime4KSmartDiagnostics() else diagnostics
     }
 
     fun beginAnime4kSession() {
@@ -67,7 +86,7 @@ class AdvancedPlayerPreferences(
     fun loadAnime4kEpisodeProfile(animeId: Long?, episodeId: Long?): Anime4KEpisodeProfile {
         val key = episodeKey(animeId, episodeId)
         // A quality change or stream recovery keeps the choice made in the current player.
-        val active = anime4kActiveSelectionState.value.takeIf { key != null && key == activeEpisodeKey }
+        val active = anime4kSessionSelection.takeIf { key != null && key == activeEpisodeKey }
         activeEpisodeKey = key
         val stored = activeEpisodeKey
             ?.let { preferenceStore.getString(it, "").get() }
@@ -83,7 +102,8 @@ class AdvancedPlayerPreferences(
             else -> candidate
         }
         // Only an explicit player choice is saved; the default must follow future setting changes.
-        setAnime4kActiveSelection(profile.toSelection())
+        anime4kSessionSelection = profile.toSelection()
+        publishAnime4kSelection()
         setAnime4kDiagnostics(
             Anime4KSmartDiagnostics(
                 profile = profile.profile,
@@ -104,6 +124,7 @@ class AdvancedPlayerPreferences(
         episodeId: Long?,
         profile: Anime4KEpisodeProfile,
     ) {
+        if (anime4kRoomActive) return
         val key = episodeKey(animeId, episodeId) ?: return
         preferenceStore.getString(key, "").set(encodeEpisodeProfile(profile))
         if (key == activeEpisodeKey) {

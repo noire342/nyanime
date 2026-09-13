@@ -90,6 +90,15 @@ a two-second countdown in its monotonic clock domain. A new buffering event, man
 local hold or lost connection invalidates that deadline. Guests use their measured clock offset
 to start against the same deadline. Network delay still prevents a universal frame-exact guarantee.
 
+Play immediately shows preparation feedback while the request awaits acknowledgement or the
+readiness barrier. The same player card then shows the shared countdown. Cancel sends Pause;
+unconfirmed requests expire through the existing retry policy without starting playback early.
+
+Anime4K is unavailable for the entire time a room is active, including local holds and reconnects.
+Entering a room removes its shaders and stops Smart telemetry; quick presets, custom presets and
+diagnostics are hidden. Solo episode choices and the automatic Smart preference are preserved.
+Leaving the room restores the current episode's solo choice, with a fresh Smart measurement.
+
 Follower corrections filter timing error, use separate enter/exit thresholds and gradually vary
 speed within three percent. Brief jitter does not trigger seeking. Persistent large errors and
 explicit seeks retain bounded recovery paths. Native speed callbacks recognize recent managed

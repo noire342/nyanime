@@ -884,7 +884,7 @@ class PlayerViewModel @JvmOverloads constructor(
     fun pauseUnpause() {
         completion.cancel()
         if (watchTogether.active) {
-            if (watchTogether.state.value.playRequested &&
+            if (watchTogether.state.value.wantsPlayback &&
                 !watchTogether.state.value.localHold
             ) {
                 pauseByUser()

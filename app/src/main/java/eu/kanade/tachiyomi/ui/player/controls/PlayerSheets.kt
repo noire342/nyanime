@@ -93,6 +93,7 @@ fun PlayerSheets(
     reduceMotion: Boolean,
     buttons: ImmutableList<CustomButton>,
     onSelectAnime4KCustom: (Anime4KMode) -> Unit,
+    anime4kAvailable: Boolean,
 
     // Screenshot sheet
     isLocalSource: Boolean,
@@ -195,6 +196,7 @@ fun PlayerSheets(
                 onEnterFiltersPanel = { onOpenPanel(Panels.VideoFilters) },
                 customButtons = buttons,
                 onSelectAnime4KCustom = onSelectAnime4KCustom,
+                anime4kAvailable = anime4kAvailable,
             )
         }
 

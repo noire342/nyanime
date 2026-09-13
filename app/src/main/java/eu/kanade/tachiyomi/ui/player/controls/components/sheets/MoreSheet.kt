@@ -77,6 +77,7 @@ fun MoreSheet(
     customButtons: ImmutableList<CustomButton>,
     onSelectAnime4KCustom: (Anime4KMode) -> Unit,
     modifier: Modifier = Modifier,
+    anime4kAvailable: Boolean = true,
 ) {
     val advancedPreferences = remember { Injekt.get<AdvancedPlayerPreferences>() }
     val audioPreferences = remember { Injekt.get<AudioPreferences>() }
@@ -164,29 +165,31 @@ fun MoreSheet(
                 }
             }
 
-            Text(stringResource(AYMR.strings.pref_anime4k))
-            FlowRow(
-                verticalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
-                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
-            ) {
-                Anime4KMode.entries.forEach { mode ->
+            if (anime4kAvailable) {
+                Text(stringResource(AYMR.strings.pref_anime4k))
+                FlowRow(
+                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
+                ) {
+                    Anime4KMode.entries.forEach { mode ->
+                        FilterChip(
+                            selected = if (mode == Anime4KMode.Off) {
+                                anime4kSelection.profile == Anime4KProfile.Off
+                            } else {
+                                anime4kSelection.profile == Anime4KProfile.Custom && anime4kSelection.mode == mode
+                            },
+                            onClick = { onSelectAnime4KCustom(mode) },
+                            label = { Text(text = stringResource(mode.titleRes)) },
+                        )
+                    }
                     FilterChip(
-                        selected = if (mode == Anime4KMode.Off) {
-                            anime4kSelection.profile == Anime4KProfile.Off
-                        } else {
-                            anime4kSelection.profile == Anime4KProfile.Custom && anime4kSelection.mode == mode
+                        selected = anime4kDiagnosticsEnabled,
+                        onClick = {
+                            advancedPreferences.anime4kDiagnosticsEnabled().set(!anime4kDiagnosticsEnabled)
                         },
-                        onClick = { onSelectAnime4KCustom(mode) },
-                        label = { Text(text = stringResource(mode.titleRes)) },
+                        label = { Text(text = stringResource(AYMR.strings.pref_anime4k_debug_overlay)) },
                     )
                 }
-                FilterChip(
-                    selected = anime4kDiagnosticsEnabled,
-                    onClick = {
-                        advancedPreferences.anime4kDiagnosticsEnabled().set(!anime4kDiagnosticsEnabled)
-                    },
-                    label = { Text(text = stringResource(AYMR.strings.pref_anime4k_debug_overlay)) },
-                )
             }
 
             if (customButtons.isNotEmpty()) {

@@ -124,18 +124,20 @@ fun TopRightPlayerControls(
                     horizontalSpacing = MaterialTheme.padding.mediumSmall,
                 )
             }
-            ControlsButton(
-                text = anime4KSmartLabel,
-                onClick = onToggleAnime4KSmart,
-                color = if (isAnime4KSmartEnabled) MaterialTheme.colorScheme.active else Color.White,
-                horizontalSpacing = MaterialTheme.padding.mediumSmall,
-            )
-            ControlsButton(
-                text = "4K",
-                onClick = onToggleAnime4KMaximum,
-                color = if (isAnime4KMaximumEnabled) MaterialTheme.colorScheme.active else Color.White,
-                horizontalSpacing = MaterialTheme.padding.mediumSmall,
-            )
+            if (!watchRoom.active) {
+                ControlsButton(
+                    text = anime4KSmartLabel,
+                    onClick = onToggleAnime4KSmart,
+                    color = if (isAnime4KSmartEnabled) MaterialTheme.colorScheme.active else Color.White,
+                    horizontalSpacing = MaterialTheme.padding.mediumSmall,
+                )
+                ControlsButton(
+                    text = "4K",
+                    onClick = onToggleAnime4KMaximum,
+                    color = if (isAnime4KMaximumEnabled) MaterialTheme.colorScheme.active else Color.White,
+                    horizontalSpacing = MaterialTheme.padding.mediumSmall,
+                )
+            }
             ControlsButton(
                 icon = Icons.Default.MoreVert,
                 onClick = onMoreClick,

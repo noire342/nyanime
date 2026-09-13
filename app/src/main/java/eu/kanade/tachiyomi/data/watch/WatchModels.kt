@@ -133,6 +133,7 @@ data class WatchRoomState(
     val driftMs: Long? = null,
     val localHold: Boolean = false,
     val playRequested: Boolean = false,
+    val pendingPlaybackPaused: Boolean? = null,
     val message: String = "",
     val resumeSeconds: Int? = null,
     val skip: WatchSkip? = null,
@@ -140,7 +141,25 @@ data class WatchRoomState(
     val upcoming: WatchMedia? = null,
     val next: WatchNext? = null,
     val nextSeconds: Int? = null,
-)
+) {
+    val wantsPlayback: Boolean get() = pendingPlaybackPaused?.not() ?: playRequested
+    val preparingPlayback: Boolean get() = active &&
+        !localHold &&
+        wantsPlayback &&
+        phase != WatchPhase.Playing &&
+        resumeSeconds == null
+    val playbackPreparationMessage: String get() = when {
+        pendingPlaybackPaused == false -> "Richiesta di riproduzione inviata…"
+        phase in listOf(
+            WatchPhase.Connecting,
+            WatchPhase.Reconnecting,
+            WatchPhase.Buffering,
+            WatchPhase.DifferentVideo,
+        ) ->
+            message.ifBlank { "Preparazione della riproduzione…" }
+        else -> "Verifica che tutti siano pronti…"
+    }
+}
 
 @Serializable
 enum class WatchMessageType { Hello, Status, Ping, Pong, Command, Timeline, Leave, Closed }
