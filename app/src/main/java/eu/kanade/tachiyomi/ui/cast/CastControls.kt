@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,7 +40,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -49,15 +53,49 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.data.cast.CastController
+import eu.kanade.tachiyomi.data.cast.CastDevice
 import eu.kanade.tachiyomi.data.cast.CastProtocol
 import eu.kanade.tachiyomi.data.cast.CastRequest
 import eu.kanade.tachiyomi.ui.main.MainActivity
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.launch
 
 @Composable
 fun CastDevicesDialog(request: () -> CastRequest?, onDismiss: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val controller = remember { CastController.get(context) }
     val state by controller.state.collectAsState()
+    val pairing by controller.companionPairing.collectAsState()
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var manual by remember { mutableStateOf(false) }
+    var address by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    fun connect(device: CastDevice? = null) {
+        if (busy) return
+        busy = true
+        error = null
+        scope.launch {
+            try {
+                val target = device ?: controller.findCompanion(address)
+                if (target.protocol == CastProtocol.COMPANION) controller.pairCompanion(target)
+                val media = request() ?: error("Apri prima un video da trasmettere")
+                controller.play(media, target)
+                onDismiss()
+            } catch (e: Exception) {
+                if (e is CancellationException && e !is TimeoutCancellationException) throw e
+                error = when (e) {
+                    is TimeoutCancellationException -> "Conferma scaduta. Riprova e conferma il codice sulla TV."
+                    is java.io.IOException -> "La TV non risponde. Controlla che l’app sia aperta e sulla stessa rete."
+                    is IllegalArgumentException -> "Collegamento non valido. Controlla l’indirizzo e l’app sulla TV."
+                    else -> e.message ?: "Collegamento non riuscito. Riprova."
+                }
+            } finally {
+                busy = false
+            }
+        }
+    }
     DisposableEffect(controller) {
         controller.discover()
         onDispose { controller.stopDiscovery() }
@@ -65,97 +103,135 @@ fun CastDevicesDialog(request: () -> CastRequest?, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.Cast, null, Modifier.size(32.dp)) },
-        title = { Text("Trasmetti alla TV") },
+        title = { Text(if (pairing != null) "Collega ${pairing!!.name}" else "Trasmetti alla TV") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Scegli uno schermo sulla stessa rete Wi-Fi.", style = MaterialTheme.typography.bodyMedium)
-                if (state.discovering) LinearProgressIndicator(Modifier.fillMaxWidth())
-                Column(
-                    Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    state.devices.forEach { device ->
-                        Surface(
-                            onClick = {
-                                request()?.let { controller.play(it, device) }
-                                onDismiss()
-                            },
-                            enabled = !state.connecting,
-                            shape = RoundedCornerShape(18.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        ) {
-                            Row(
-                                Modifier.fillMaxWidth().padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                if (busy) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                    val code = pairing?.code.orEmpty()
+                    if (code.isNotBlank()) {
+                        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                            Text(
+                                code.chunked(3).joinToString(" "),
+                                Modifier.fillMaxWidth().padding(24.dp),
+                                style = MaterialTheme.typography.displayMedium,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            )
+                        }
+                        Text("Controlla che il codice sia uguale sui due schermi e conferma sulla TV.")
+                        Text(
+                            "Dopo la conferma il video partirà sulla TV e qui troverai il telecomando.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    } else {
+                        Text("Collegamento all’app sulla TV…")
+                    }
+                } else {
+                    Text("Scegli uno schermo sulla stessa rete Wi-Fi.", style = MaterialTheme.typography.bodyMedium)
+                    if (state.discovering) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Column(
+                        Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        state.devices.forEach { device ->
+                            Surface(
+                                onClick = { connect(device) },
+                                enabled = !state.connecting,
+                                shape = RoundedCornerShape(18.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            ) {
+                                Row(
+                                    Modifier.fillMaxWidth().padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                ) {
+                                    Icon(
+                                        if (device.protocol ==
+                                            CastProtocol.GOOGLE_CAST
+                                        ) {
+                                            Icons.Default.Cast
+                                        } else {
+                                            Icons.Default.Tv
+                                        },
+                                        null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Column(Modifier.weight(1f)) {
+                                        Text(device.name, style = MaterialTheme.typography.titleSmall)
+                                        Text(
+                                            device.protocol.label,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    Icon(Icons.Default.ChevronRight, null)
+                                }
+                            }
+                        }
+                        if (state.devices.isEmpty()) {
+                            Column(
+                                Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 Icon(
-                                    if (device.protocol ==
-                                        CastProtocol.GOOGLE_CAST
-                                    ) {
-                                        Icons.Default.Cast
-                                    } else {
-                                        Icons.Default.Tv
-                                    },
+                                    Icons.Default.Tv,
                                     null,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    Modifier.size(48.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                Column(Modifier.weight(1f)) {
-                                    Text(device.name, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    if (state.discovering) "Cerchiamo gli schermi vicini…" else "Nessuna TV trovata",
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                                if (!state.discovering) {
                                     Text(
-                                        device.protocol.label,
+                                        "Apri Nyanime sulla TV, oppure attiva Google Cast o DLNA. Le reti ospiti possono impedire il collegamento.",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Icon(Icons.Default.ChevronRight, null)
                             }
                         }
                     }
-                    if (state.devices.isEmpty()) {
-                        Column(
-                            Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.Tv,
-                                null,
-                                Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                if (state.discovering) "Cerchiamo gli schermi vicini…" else "Nessuna TV trovata",
-                                style = MaterialTheme.typography.titleSmall,
-                            )
-                            if (!state.discovering) {
-                                Text(
-                                    "Accendi la TV e attiva Google Cast o DLNA. Le reti ospiti possono impedire il collegamento.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                        }
+                    TextButton(onClick = { manual = !manual }) { Text("Collega app TV") }
+                    if (manual) {
+                        Text(
+                            "Apri “Collega telefono” nell’app Nyanime sulla TV e inserisci l’indirizzo mostrato.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        OutlinedTextField(
+                            value = address,
+                            onValueChange = { address = it.take(32) },
+                            label = { Text("Indirizzo della TV") },
+                            placeholder = { Text("192.168.1.10:38473") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        TextButton(onClick = { connect() }, enabled = address.isNotBlank()) { Text("Collega") }
+                    }
+                    if (!state.googleAvailable) {
+                        Text(
+                            "Per Google Cast servono Google Play Services aggiornati.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    state.error?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                if (!state.googleAvailable) {
-                    Text(
-                        "Per Google Cast servono Google Play Services aggiornati.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                state.error?.let {
+                error?.let {
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = controller::discover, enabled = !state.discovering) {
+            TextButton(onClick = controller::discover, enabled = !state.discovering && !busy) {
                 Icon(Icons.Default.Refresh, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Cerca di nuovo")
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Chiudi") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(if (busy) "Annulla collegamento" else "Chiudi") } },
     )
 }
 

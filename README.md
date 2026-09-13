@@ -22,7 +22,7 @@ disabilitare per tornare all'interfaccia legacy. Il tema manga resta indipendent
 | **Riprendi da dove eri** | Ritrova “Continua a guardare” e “Continua a leggere”, con avanzamento locale e accesso all'episodio o capitolo. |
 | **Anime4K Smart** | Applica shader nel player interno con qualità adattiva, avvio automatico configurabile e modalità manuali. |
 | **Guarda insieme** | Genera un codice, invita gli amici e sincronizza episodio, play, pausa, spostamenti e velocità, ognuno con il proprio streaming. |
-| **Cast con telecomando** | Trasmetti a Google Cast o UPnP/DLNA e continua a usare l'app dal telefono, con controlli e ripresa locale. |
+| **Cast con telecomando** | Trasmetti a Google Cast, UPnP/DLNA o alle app Nyanime TV compatibili e continua a usare l'app dal telefono, con controlli e ripresa locale. |
 | **Player curato** | Usa tracce audio e sottotitoli, gesti, PiP, AniSkip, timer di sospensione e passaggio al prossimo episodio. |
 | **Manga completo** | Mantieni libreria e lettore legacy, con Home opzionali, aggiornamenti dei capitoli e tutte le modalità di lettura. |
 
@@ -70,6 +70,8 @@ disabilitare per tornare all'interfaccia legacy. Il tema manga resta indipendent
 
 ### Guarda insieme e Cast
 
+Le app TV possono diventare ricevitori tramite [Nyanime Companion](docs/companion-protocol.md): ricerca automatica o indirizzo manuale, codice di conferma e comandi cifrati. L’app LG webOS conserva anche il funzionamento autonomo.
+
 - Stanze fino a **8 persone**, creazione o ingresso tramite codice, invito con link e QR.
 - L'host sceglie l'episodio; gli ospiti lo aprono con la propria estensione compatibile.
   Play, pausa, avanzamento e velocità sono condivisi; l'host può limitare i controlli.
@@ -81,7 +83,7 @@ disabilitare per tornare all'interfaccia legacy. Il tema manga resta indipendent
   protetta quando scade il timer o il telefono perde il focus audio.
 - Stanze cifrate tramite relay Nostr: nessun account Nyanime e nessuna apertura
   di porte; i video, i cookie e gli indirizzi degli streaming non sono condivisi.
-- Google Cast e UPnP/DLNA sulla rete locale, con play, pausa, avanzamento,
+- Google Cast, UPnP/DLNA e Nyanime Companion sulla rete locale, con play, pausa, avanzamento,
   episodio precedente/successivo, volume, notifica e telecomando persistente.
 - Cambio del video mentre si naviga nell'app, ripresa sul telefono e luminosità
   remota sui ricevitori DLNA che la espongono.

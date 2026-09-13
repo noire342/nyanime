@@ -52,6 +52,10 @@ class CastController private constructor(private val context: Context) {
     val state = mutableState.asStateFlow()
     private val google = GoogleCastTransport(context)
     private val dlna = DlnaTransport(context, ::localAddress)
+    private val companion = CompanionTransport(context, ::localAddress)
+    val companionPairing = companion.pairing
+    suspend fun pairCompanion(device: CastDevice) = companion.pair(device)
+    suspend fun findCompanion(address: String) = companion.find(address)
     private val commands = Mutex()
     private val progress = CastProgressWriter(context)
     private var transport: CastTransport? = null
@@ -71,7 +75,7 @@ class CastController private constructor(private val context: Context) {
     private var volumePump: Job? = null
 
     init {
-        combine(google.devices, dlna.devices) { cast, upnp -> cast + upnp }
+        combine(google.devices, dlna.devices, companion.devices) { cast, upnp, apps -> apps + cast + upnp }
             .onEach { devices -> mutableState.update { it.copy(devices = devices) } }.launchIn(scope)
     }
 
@@ -79,6 +83,7 @@ class CastController private constructor(private val context: Context) {
         val previousDiscovery = discovery
         previousDiscovery?.cancel()
         dlna.stopDiscovery()
+        companion.stopDiscovery()
         discovery = scope.launch {
             previousDiscovery?.join()
             mutableState.update { it.copy(discovering = true, error = null) }
@@ -91,9 +96,19 @@ class CastController private constructor(private val context: Context) {
                     mutableState.update { it.copy(googleAvailable = false) }
                 }
             }
+            val companionJob = launch {
+                try {
+                    withTimeout(12_000) { companion.discover() }
+                } catch (
+                    e: Exception,
+                ) {
+                    if (e is CancellationException && e !is TimeoutCancellationException) throw e
+                }
+            }
             try {
                 withTimeout(12_000) { dlna.discover() }
                 googleJob.join()
+                companionJob.join()
                 delay(2000)
             } catch (e: Exception) {
                 if (e is CancellationException && e !is TimeoutCancellationException) throw e
@@ -108,6 +123,7 @@ class CastController private constructor(private val context: Context) {
         discovery?.cancel()
         dlna.stopDiscovery()
         google.stopDiscovery()
+        companion.stopDiscovery()
     }
 
     fun play(input: CastRequest, device: CastDevice? = state.value.device) {
@@ -171,7 +187,11 @@ class CastController private constructor(private val context: Context) {
                 polling?.cancelAndJoin()
                 commands.withLock {
                     flush()
-                    val selected = if (device.protocol == CastProtocol.GOOGLE_CAST) google else dlna
+                    val selected = when (device.protocol) {
+                        CastProtocol.GOOGLE_CAST -> google
+                        CastProtocol.DLNA -> dlna
+                        CastProtocol.COMPANION -> companion
+                    }
                     attempted = selected
                     if (transport != null && transport !== selected) withTimeout(8000) { transport!!.stop() }
                     withTimeout(40_000) { selected.load(device, prepared) }
@@ -262,11 +282,13 @@ class CastController private constructor(private val context: Context) {
                         val current = CastHandoffPolicy.observation(state.value.playback, observed)
                         val now = SystemClock.elapsedRealtime()
                         bufferingSince = if (!current.buffering) 0L else bufferingSince.takeIf { it > 0 } ?: now
-                        val stalled = current.buffering && now - bufferingSince >= 60_000
+                        val stalled = current.remoteError != null || current.buffering && now - bufferingSince >= 60_000
                         mutableState.update {
                             it.copy(
                                 playback = current,
-                                error = if (stalled) "Il video è fermo in caricamento. Ricollega la TV." else null,
+                                error =
+                                current.remoteError
+                                    ?: if (stalled) "Il video è fermo in caricamento. Ricollega la TV." else null,
                                 needsReconnect = stalled,
                             )
                         }
@@ -274,6 +296,10 @@ class CastController private constructor(private val context: Context) {
                     }
                     failures = 0
                     failureSince = 0L
+                    if (state.value.playback.disconnected) {
+                        stop()
+                        break
+                    }
                     if (state.value.needsReconnect) break
                     if (state.value.playback.finished) {
                         if (request?.autoPlay == true && state.value.canNext) next()

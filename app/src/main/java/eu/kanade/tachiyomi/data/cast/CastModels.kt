@@ -17,7 +17,13 @@ data class CastRequest(
     val autoPlay: Boolean,
 )
 
-enum class CastProtocol(val label: String) { GOOGLE_CAST("Google Cast"), DLNA("DLNA / UPnP") }
+enum class CastProtocol(val label: String) {
+    GOOGLE_CAST(
+        "Google Cast",
+    ),
+    DLNA("DLNA / UPnP"),
+    COMPANION("App Nyanime TV"),
+}
 
 data class CastDevice(val id: String, val name: String, val protocol: CastProtocol)
 
@@ -49,6 +55,9 @@ data class CastPlayback(
     val volume: Float = 1f,
     val canSetBrightness: Boolean = false,
     val brightness: Float = 0.5f,
+    val disconnected: Boolean = false,
+    val remoteError: String? = null,
+    val canSetSubtitles: Boolean = false,
 )
 
 data class CastState(

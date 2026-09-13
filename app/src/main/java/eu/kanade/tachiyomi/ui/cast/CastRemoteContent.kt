@@ -441,7 +441,9 @@ private fun ReceiverControls(state: CastState, actions: CastRemoteActions) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (state.device?.protocol == CastProtocol.GOOGLE_CAST && state.media?.subtitles?.isNotEmpty() == true) {
+            if ((state.device?.protocol == CastProtocol.GOOGLE_CAST || state.playback.canSetSubtitles) &&
+                state.media?.subtitles?.isNotEmpty() == true
+            ) {
                 SubtitlePicker(state, actions, enabled)
             }
             actions.quality?.let { quality ->

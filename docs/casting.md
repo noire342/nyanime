@@ -1,6 +1,6 @@
 # Cast in Nyanime
 
-The player Cast button discovers Google Cast and UPnP/DLNA renderers on the same
+The player Cast button discovers Nyanime Companion apps, Google Cast and UPnP/DLNA renderers on the same
 Wi-Fi/Ethernet LAN. Fire TV is outside this implementation. This is original
 Nyanime code using the Google sender SDK and UPnP AV services.
 
@@ -15,7 +15,11 @@ controls and remote volume remain available while the phone screen is off.
 “Continua sul telefono” stops the remote session and
 reopens the selected episode at its last observed position.
 
-Brightness is shown only when a DLNA renderer advertises GetBrightness and
+Companion receivers advertise their controls; the webOS app offers video volume,
+WebVTT subtitles and dimming, with explicit TV pairing. See the
+[portable protocol](companion-protocol.md).
+
+For DLNA, brightness is shown only when a renderer advertises GetBrightness and
 SetBrightness with a valid range, and responds to its initial value query. Google
 Cast's default receiver does not offer brightness control. The slider affects the
 receiver's image, not the phone screen. Hardware volume keys in the remote and
@@ -60,7 +64,7 @@ Stopping revokes URLs, cancels upstream requests and closes streams and servers.
 - DASH manifests and HLS variable substitution are rejected explicitly; select an
   HLS/MP4 quality instead. Live playlists with over 30,000 distinct registered
   resources require a new session.
-- Google Cast exposes external WebVTT text tracks. DLNA subtitle selection stays
+- Google Cast and compatible companion apps expose external WebVTT text tracks. DLNA subtitle selection stays
   with the receiver; external audio tracks require receiver-specific support.
 - Device discovery requires multicast access; guest networks/client isolation
   can prevent discovery or access to the phone relay. IPv4 LAN is required.
