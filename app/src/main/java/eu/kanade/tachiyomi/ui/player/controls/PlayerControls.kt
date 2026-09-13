@@ -63,6 +63,7 @@ import androidx.constraintlayout.compose.Dimension
 import eu.kanade.presentation.discovery.SourceHomeArtwork
 import eu.kanade.presentation.more.settings.screen.player.custombutton.getButtons
 import eu.kanade.presentation.theme.playerRippleConfiguration
+import eu.kanade.tachiyomi.data.watch.WatchRoomState
 import eu.kanade.tachiyomi.ui.cast.CastDevicesDialog
 import eu.kanade.tachiyomi.ui.cast.CastRemoteScreen
 import eu.kanade.tachiyomi.ui.player.Anime4K
@@ -184,6 +185,19 @@ fun PlayerControls(
     val indexedChapters by viewModel.chapters.collectAsState()
     val currentBrightness by viewModel.currentBrightness.collectAsState()
     val playerRoom by viewModel.watchTogether.state.collectAsState()
+    val sheetShown by viewModel.sheetShown.collectAsState()
+    val panel by viewModel.panelShown.collectAsState()
+    val dialog by viewModel.dialogShown.collectAsState()
+    // Refresh when entering/leaving PiP, and stop the shared animation behind other screens.
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val inPip = remember(configuration) { playbackActivity.isInPictureInPictureMode }
+    val sharedPlaybackVisible = playerRoom.active &&
+        !inPip &&
+        sheetShown == Sheets.None &&
+        panel == Panels.None &&
+        dialog == Dialogs.None
+    val sharedPlaybackBusy = sharedPlaybackVisible &&
+        (playerRoom.preparingPlayback || playerRoom.resumeSeconds != null || isLoading || isLoadingEpisode)
     val anime4kSelection by advancedPlayerPreferences.anime4kActiveSelection().collectAsState()
     val anime4kDiagnosticsEnabled by advancedPlayerPreferences.anime4kDiagnosticsEnabled().collectAsState()
 
@@ -415,6 +429,7 @@ fun PlayerControls(
                     (controlsShown && !areControlsLocked || gestureSeekAmount != null) ||
                         isLoading ||
                         isLoadingEpisode ||
+                        sharedPlaybackBusy ||
                         playbackLoad.failure != null,
                     enter = fadeIn(playerControlsEnterAnimationSpec()),
                     exit = fadeOut(playerControlsExitAnimationSpec()),
@@ -439,6 +454,8 @@ fun PlayerControls(
                         paused = if (playerRoom.active) !playerRoom.wantsPlayback || playerRoom.localHold else paused,
                         gestureSeekAmount = gestureSeekAmount,
                         onPlayPauseClick = viewModel::pauseUnpause,
+                        watchRoom = if (sharedPlaybackVisible) playerRoom else WatchRoomState(),
+                        reduceMotion = reduceMotion,
                         failure = playbackLoad.failure,
                         onRetry = viewModel::retryPlayback,
                         onOpenSource = if (viewModel.isEpisodeOnline() ==
@@ -680,7 +697,6 @@ fun PlayerControls(
             }
         }
 
-        val sheetShown by viewModel.sheetShown.collectAsState()
         val dismissSheet by viewModel.dismissSheet.collectAsState()
         val subtitles by viewModel.subtitleTracks.collectAsState()
         val selectedSubtitles by viewModel.selectedSubtitles.collectAsState()
@@ -761,22 +777,17 @@ fun PlayerControls(
             onDismissRequest = { viewModel.showSheet(Sheets.None) },
             dismissSheet = dismissSheet,
         )
-        val panel by viewModel.panelShown.collectAsState()
         PlayerPanels(
             panelShown = panel,
             onDismissRequest = { viewModel.showPanel(Panels.None) },
         )
 
         val activity = LocalContext.current as PlayerActivity
-        val dialog by viewModel.dialogShown.collectAsState()
         val anime by viewModel.currentAnime.collectAsState()
         val playlist by viewModel.currentPlaylist.collectAsState()
         val nextEpisodePrompt by viewModel.nextEpisodePrompt.collectAsState()
         val watchRoom by viewModel.watchTogether.state.collectAsState()
 
-        // Reading configuration also refreshes visibility when entering or leaving PiP.
-        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-        val inPip = remember(configuration) { activity.isInPictureInPictureMode }
         Box(
             Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp),
             contentAlignment = Alignment.BottomEnd,
@@ -788,9 +799,7 @@ fun PlayerControls(
                         watchRoom.active &&
                         (
                             watchRoom.skip != null ||
-                                watchRoom.next != null ||
-                                watchRoom.resumeSeconds != null ||
-                                watchRoom.preparingPlayback
+                                watchRoom.next != null
                             )
                     ) &&
                     !areControlsLocked &&
@@ -812,7 +821,6 @@ fun PlayerControls(
                         viewModel::playNextEpisodeNow,
                         viewModel::cancelNextEpisode,
                         reduceMotion = reduceMotion,
-                        onCancelResume = viewModel::pauseByUser,
                         artwork = { anime?.let { SourceHomeArtwork(it, Modifier.fillMaxSize()) } },
                     )
                 } else if (prompt != null && nextEpisode != null) {

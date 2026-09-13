@@ -90,9 +90,13 @@ a two-second countdown in its monotonic clock domain. A new buffering event, man
 local hold or lost connection invalidates that deadline. Guests use their measured clock offset
 to start against the same deadline. Network delay still prevents a universal frame-exact guarantee.
 
-Play immediately shows preparation feedback while the request awaits acknowledgement or the
-readiness barrier. The same player card then shows the shared countdown. Cancel sends Pause;
-unconfirmed requests expire through the existing retry policy without starting playback early.
+Play immediately transforms into an animated play/heart/circle glyph while the request awaits
+acknowledgement or the readiness barrier. The same central control displays the room's countdown
+with a short caption over the video, without a separate preparation card. Tapping it again sends
+Pause when shared controls permit it. The button keeps its original footprint; animation runs in
+drawing only, stops outside preparation and respects reduced motion and control locking. Menus
+and picture-in-picture suppress the shared animation. Unconfirmed requests retain the existing
+retry policy; all countdown numbers come from room state, never an independent animation timer.
 
 Anime4K is unavailable for the entire time a room is active, including local holds and reconnects.
 Entering a room removes its shaders and stops Smart telemetry; quick presets, custom presets and

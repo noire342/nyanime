@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -75,26 +74,10 @@ fun WatchRoomCues(
     onCancelNext: () -> Unit,
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
-    onCancelResume: () -> Unit = {},
     artwork: @Composable () -> Unit = { ArtworkPlaceholder(Modifier.sizeIn(minWidth = 64.dp, minHeight = 88.dp)) },
 ) {
     val controls = room.host || room.sharedControls
     Column(modifier.widthIn(max = 440.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (room.preparingPlayback || room.resumeSeconds != null) {
-            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        room.resumeSeconds?.let { "Si riparte insieme tra $it" } ?: "Preparazione della riproduzione",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    if (room.preparingPlayback) {
-                        Text(room.playbackPreparationMessage, style = MaterialTheme.typography.bodyMedium)
-                        LinearProgressIndicator(Modifier.fillMaxWidth())
-                    }
-                    if (controls) TextButton(onClick = onCancelResume) { Text("Annulla") }
-                }
-            }
-        }
         room.skip?.let { skip ->
             Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

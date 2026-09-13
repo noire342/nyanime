@@ -32,9 +32,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.watch.WatchRoomState
 import eu.kanade.tachiyomi.ui.player.PlaybackFailure
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
 import eu.kanade.tachiyomi.ui.player.controls.components.PlaybackErrorControls
+import eu.kanade.tachiyomi.ui.player.controls.components.WatchPlaybackButton
 import `is`.xyz.mpv.Utils
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.padding
@@ -67,14 +69,18 @@ fun MiddlePlayerControls(
     failure: PlaybackFailure? = null,
     onRetry: () -> Unit = {},
     onOpenSource: (() -> Unit)? = null,
+    watchRoom: WatchRoomState = WatchRoomState(),
+    reduceMotion: Boolean = false,
 ) {
+    val sharedBusy = watchRoom.active &&
+        (watchRoom.preparingPlayback || watchRoom.resumeSeconds != null || isLoading || isLoadingEpisode)
     Row(
         modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.large),
     ) {
         AnimatedVisibility(
-            visible = controlsShown && !areControlsLocked,
+            visible = controlsShown && !areControlsLocked && !sharedBusy,
             enter = enter,
             exit = exit,
         ) {
@@ -108,6 +114,20 @@ fun MiddlePlayerControls(
                 )
             }
 
+            watchRoom.active -> AnimatedVisibility(
+                visible = controlsShown && !areControlsLocked || sharedBusy,
+                enter = enter,
+                exit = exit,
+            ) {
+                WatchPlaybackButton(
+                    room = watchRoom,
+                    loading = isLoading || isLoadingEpisode,
+                    paused = paused,
+                    enabled = !areControlsLocked && (watchRoom.host || watchRoom.sharedControls || watchRoom.localHold),
+                    reduceMotion = reduceMotion,
+                    onClick = onPlayPauseClick,
+                )
+            }
             (isLoading || isLoadingEpisode) && showLoadingCircle -> CircularProgressIndicator(Modifier.size(96.dp))
             else -> {
                 AnimatedVisibility(
@@ -133,7 +153,7 @@ fun MiddlePlayerControls(
         }
 
         AnimatedVisibility(
-            visible = controlsShown && !areControlsLocked,
+            visible = controlsShown && !areControlsLocked && !sharedBusy,
             enter = enter,
             exit = exit,
         ) {

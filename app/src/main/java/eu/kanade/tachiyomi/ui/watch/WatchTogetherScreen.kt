@@ -501,7 +501,7 @@ fun WatchTogetherContent(
                     }
                 }
             }
-            WatchRoomCues(room, onSkip, onCancelSkip, onNext, onCancelNext, onCancelResume = onTogglePlayback)
+            WatchRoomCues(room, onSkip, onCancelSkip, onNext, onCancelNext)
             if (preparation.error != null) {
                 Text("Prossimo episodio: " + preparation.error, color = colors.error)
                 TextButton(
