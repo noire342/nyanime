@@ -28,14 +28,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.watch.WatchRecovery
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
+import eu.kanade.tachiyomi.data.watch.recovery
+import eu.kanade.tachiyomi.data.watch.showPreparationFeedback
 import eu.kanade.tachiyomi.ui.player.PlaybackFailure
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
 import eu.kanade.tachiyomi.ui.player.controls.components.PlaybackErrorControls
+import eu.kanade.tachiyomi.ui.player.controls.components.TogetherLoadingGlyph
 import eu.kanade.tachiyomi.ui.player.controls.components.WatchPlaybackButton
 import `is`.xyz.mpv.Utils
 import tachiyomi.i18n.aniyomi.AYMR
@@ -71,9 +78,19 @@ fun MiddlePlayerControls(
     onOpenSource: (() -> Unit)? = null,
     watchRoom: WatchRoomState = WatchRoomState(),
     reduceMotion: Boolean = false,
+    onWatchRetry: () -> Unit = {},
 ) {
+    val roomActionOverlay = !controlsShown &&
+        watchRoom.activity?.let { it.actorId != watchRoom.localMemberId } == true
+    val compactLargeText = LocalConfiguration.current.screenHeightDp < 360 && LocalDensity.current.fontScale > 1.3f
     val sharedBusy = watchRoom.active &&
-        (watchRoom.preparingPlayback || watchRoom.resumeSeconds != null || isLoading || isLoadingEpisode)
+        (
+            watchRoom.showPreparationFeedback ||
+                watchRoom.resumeSeconds != null ||
+                isLoading ||
+                isLoadingEpisode ||
+                watchRoom.recovery != WatchRecovery.None
+            )
     Row(
         modifier,
         verticalAlignment = Alignment.CenterVertically,
@@ -123,12 +140,27 @@ fun MiddlePlayerControls(
                     room = watchRoom,
                     loading = isLoading || isLoadingEpisode,
                     paused = paused,
-                    enabled = !areControlsLocked && (watchRoom.host || watchRoom.sharedControls || watchRoom.localHold),
+                    enabled =
+                    !areControlsLocked &&
+                        (
+                            watchRoom.host ||
+                                watchRoom.sharedControls ||
+                                watchRoom.localHold ||
+                                watchRoom.recovery != WatchRecovery.None
+                            ),
                     reduceMotion = reduceMotion,
                     onClick = onPlayPauseClick,
+                    onRetry = onWatchRetry,
+                    showParticipants = !roomActionOverlay && (!controlsShown || !compactLargeText),
                 )
             }
-            (isLoading || isLoadingEpisode) && showLoadingCircle -> CircularProgressIndicator(Modifier.size(96.dp))
+            (isLoading || isLoadingEpisode) && showLoadingCircle -> {
+                if (LocalNyanimeStyle.current) {
+                    TogetherLoadingGlyph(reduceMotion, shared = false)
+                } else {
+                    CircularProgressIndicator(Modifier.size(96.dp))
+                }
+            }
             else -> {
                 AnimatedVisibility(
                     visible = controlsShown && !areControlsLocked,

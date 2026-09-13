@@ -1,8 +1,10 @@
 package eu.kanade.tachiyomi.ui.player.controls.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -26,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -55,16 +58,21 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import eu.kanade.tachiyomi.data.watch.WatchPhase
+import eu.kanade.tachiyomi.data.watch.WatchRecovery
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
+import eu.kanade.tachiyomi.data.watch.preparationCaption
+import eu.kanade.tachiyomi.data.watch.recovery
+import eu.kanade.tachiyomi.data.watch.showPreparationFeedback
+import eu.kanade.tachiyomi.ui.watch.WatchParticipantStrip
 import kotlin.math.PI
 import kotlin.math.floor
 import kotlin.math.sin
 
 private val TogetherAccent = Color(0xFFFF4767)
-private enum class PlaybackGlyph { Play, Pause, Preparing, Countdown }
+private enum class PlaybackGlyph { Play, Pause, Preparing, Countdown, Retry }
 
 /** A visual reflection of the room clock: animations never schedule or start playback. */
 @Composable
@@ -76,23 +84,28 @@ fun WatchPlaybackButton(
     reduceMotion: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onRetry: () -> Unit = {},
+    showParticipants: Boolean = true,
 ) {
     val seconds = room.resumeSeconds?.takeIf { it > 0 }
-    val preparing = room.preparingPlayback || loading
+    val preparing = room.showPreparationFeedback || loading
     val glyph = when {
+        room.recovery == WatchRecovery.Command || room.recovery == WatchRecovery.Connection -> PlaybackGlyph.Retry
         seconds != null -> PlaybackGlyph.Countdown
         preparing -> PlaybackGlyph.Preparing
         paused -> PlaybackGlyph.Play
         else -> PlaybackGlyph.Pause
     }
-    val busy = glyph == PlaybackGlyph.Countdown || glyph == PlaybackGlyph.Preparing
+    val details = room.recovery == WatchRecovery.Details
+    val busy = glyph != PlaybackGlyph.Play && glyph != PlaybackGlyph.Pause || details
     val caption = when {
-        seconds != null -> "Si parte insieme tra…"
-        room.phase == WatchPhase.Reconnecting -> "Ritroviamo il collegamento…"
-        loading -> "Prepariamo il video…"
-        else -> "Ci siamo quasi…"
+        glyph == PlaybackGlyph.Countdown -> "Si parte insieme tra…"
+        else -> room.preparationCaption(loading)
     }
-    val action = if (room.wantsPlayback && !room.localHold) "Metti in pausa per tutti" else "Riproduci per tutti"
+    val action = when (glyph) {
+        PlaybackGlyph.Retry -> "Riprova"
+        else -> if (room.wantsPlayback && !room.localHold) "Metti in pausa per tutti" else "Riproduci per tutti"
+    }
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale =
@@ -108,16 +121,20 @@ fun WatchPlaybackButton(
                 }
                 .clip(CircleShape)
                 .clickable(
-                    enabled = enabled,
+                    enabled =
+                    enabled && (glyph == PlaybackGlyph.Retry || room.host || room.sharedControls || room.localHold),
                     interactionSource = interaction,
                     indication = ripple(),
                     role = Role.Button,
                     onClickLabel = action,
-                    onClick = onClick,
+                    onClick = when (glyph) {
+                        PlaybackGlyph.Retry -> onRetry
+                        else -> onClick
+                    },
                 )
                 .semantics(mergeDescendants = true) {
                     stateDescription = when {
-                        seconds != null -> "Si parte insieme tra $seconds"
+                        glyph == PlaybackGlyph.Countdown -> "Si parte insieme tra $seconds"
                         busy -> caption
                         else -> action
                     }
@@ -145,12 +162,21 @@ fun WatchPlaybackButton(
                         PlaybackGlyph.Countdown -> TogetherCountdown(visibleSeconds ?: 1, reduceMotion)
                         PlaybackGlyph.Play -> Icon(Icons.Default.PlayArrow, action, Modifier.size(64.dp), Color.White)
                         PlaybackGlyph.Pause -> Icon(Icons.Default.Pause, action, Modifier.size(64.dp), Color.White)
+                        PlaybackGlyph.Retry -> Icon(Icons.Default.Refresh, action, Modifier.size(48.dp), TogetherAccent)
                     }
                 }
             }
         }
+        AnimatedVisibility(
+            visible = busy && showParticipants && room.members.isNotEmpty(),
+            modifier = Modifier.align(Alignment.TopCenter).offset(y = (-36).dp).wrapContentWidth(unbounded = true),
+            enter = fadeIn(tween(if (reduceMotion) 0 else 180)),
+            exit = fadeOut(tween(if (reduceMotion) 0 else 140)),
+        ) {
+            WatchParticipantStrip(room.members)
+        }
         AnimatedContent(
-            targetState = caption.takeIf { busy },
+            targetState = caption.takeIf { busy && !details },
             modifier = Modifier.align(Alignment.TopCenter).offset(y = 106.dp)
                 .wrapContentWidth(unbounded = true).widthIn(max = 264.dp),
             transitionSpec = {
@@ -168,6 +194,8 @@ fun WatchPlaybackButton(
                     color = Color.White,
                     style = MaterialTheme.typography.titleSmall.copy(shadow = Shadow(Color.Black, blurRadius = 12f)),
                     textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -225,13 +253,16 @@ private fun TogetherCountdown(seconds: Int, reduceMotion: Boolean) {
 }
 
 @Composable
-private fun TogetherLoadingGlyph(reduceMotion: Boolean) {
+internal fun TogetherLoadingGlyph(reduceMotion: Boolean, shared: Boolean = true) {
     val still = reduceMotion || LocalInspectionMode.current
     val motion = if (still) null else rememberInfiniteTransition(label = "togetherLoading")
     val phase = motion?.animateFloat(
-        0f,
+        if (shared) 0f else 2f,
         3f,
-        infiniteRepeatable(tween(4200, easing = LinearEasing)),
+        infiniteRepeatable(
+            tween(if (shared) 4200 else 1400, easing = LinearEasing),
+            repeatMode = if (shared) RepeatMode.Restart else RepeatMode.Reverse,
+        ),
         label = "togetherMorph",
     )
     val rotation = motion?.animateFloat(
@@ -240,7 +271,9 @@ private fun TogetherLoadingGlyph(reduceMotion: Boolean) {
         infiniteRepeatable(tween(2100, easing = LinearEasing)),
         label = "togetherOrbit",
     )
-    TogetherLoadingArtwork(phase = { phase?.value ?: 1f }, angle = { rotation?.value ?: 30f }, still = still)
+    TogetherLoadingArtwork(phase = {
+        phase?.value ?: if (shared) 1f else 2f
+    }, angle = { rotation?.value ?: 30f }, still = still)
 }
 
 @Composable
@@ -294,11 +327,11 @@ private class TogetherGlyphPaths {
         Path().apply {
             moveTo(29f, 82f)
             lineTo(29f, 18f)
-            quadraticBezierTo(29f, 14f, 33f, 17f)
+            quadraticTo(29f, 14f, 33f, 17f)
             lineTo(81f, 47f)
-            quadraticBezierTo(85f, 50f, 81f, 53f)
+            quadraticTo(85f, 50f, 81f, 53f)
             lineTo(33f, 83f)
-            quadraticBezierTo(29f, 86f, 29f, 82f)
+            quadraticTo(29f, 86f, 29f, 82f)
             close()
         },
         Path().apply {

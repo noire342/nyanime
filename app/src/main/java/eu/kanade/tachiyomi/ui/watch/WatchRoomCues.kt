@@ -28,9 +28,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.google.zxing.common.BitMatrix
 import eu.kanade.presentation.discovery.ArtworkPlaceholder
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.data.watch.WatchQr
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
 import eu.kanade.tachiyomi.ui.player.controls.components.NextEpisodeCard
+import eu.kanade.tachiyomi.ui.player.controls.components.PlayerSkipCue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -79,20 +81,30 @@ fun WatchRoomCues(
     val controls = room.host || room.sharedControls
     Column(modifier.widthIn(max = 440.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         room.skip?.let { skip ->
-            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        skip.label +
-                            (
-                                room.skipSeconds?.let {
-                                    " tra " + it + " s"
-                                } ?: ""
-                                ),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    if (controls) {
-                        Button(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Salta per tutti") }
-                        TextButton(onClick = onCancelSkip) { Text("Annulla il salto") }
+            if (LocalNyanimeStyle.current) {
+                PlayerSkipCue(
+                    label = if (controls) "Salta per tutti" else skip.label,
+                    detail = skip.label + (room.skipSeconds?.let { " · tra $it s" } ?: ""),
+                    onSkip = onSkip,
+                    onCancel = onCancelSkip,
+                    showActions = controls,
+                )
+            } else {
+                Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            skip.label +
+                                (
+                                    room.skipSeconds?.let {
+                                        " tra " + it + " s"
+                                    } ?: ""
+                                    ),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        if (controls) {
+                            Button(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Salta per tutti") }
+                            TextButton(onClick = onCancelSkip) { Text("Annulla il salto") }
+                        }
                     }
                 }
             }

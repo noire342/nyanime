@@ -166,6 +166,17 @@ class NostrWatchTransport(
         }
     }
 
+    override fun retryUnavailable() {
+        enqueue {
+            invite.relays.filter { it !in connected }.forEach { url ->
+                retryJobs.remove(url)?.cancel()
+                sockets.remove(url)?.cancel()
+                retries[url] = 0
+                connect(url)
+            }
+        }
+    }
+
     private fun enqueue(action: () -> Unit) {
         if (!closed) inbox.trySend(action)
     }

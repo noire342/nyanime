@@ -34,6 +34,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.Icons
@@ -63,7 +64,10 @@ import androidx.constraintlayout.compose.Dimension
 import eu.kanade.presentation.discovery.SourceHomeArtwork
 import eu.kanade.presentation.more.settings.screen.player.custombutton.getButtons
 import eu.kanade.presentation.theme.playerRippleConfiguration
+import eu.kanade.tachiyomi.data.watch.WatchRecovery
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
+import eu.kanade.tachiyomi.data.watch.recovery
+import eu.kanade.tachiyomi.data.watch.showPreparationFeedback
 import eu.kanade.tachiyomi.ui.cast.CastDevicesDialog
 import eu.kanade.tachiyomi.ui.cast.CastRemoteScreen
 import eu.kanade.tachiyomi.ui.player.Anime4K
@@ -92,6 +96,8 @@ import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.SubtitlePreferences
+import eu.kanade.tachiyomi.ui.watch.WatchActivityCaption
+import eu.kanade.tachiyomi.ui.watch.WatchRecoveryCaption
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
@@ -191,13 +197,19 @@ fun PlayerControls(
     // Refresh when entering/leaving PiP, and stop the shared animation behind other screens.
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val inPip = remember(configuration) { playbackActivity.isInPictureInPictureMode }
-    val sharedPlaybackVisible = playerRoom.active &&
-        !inPip &&
+    val playerOverlayVisible = !inPip &&
         sheetShown == Sheets.None &&
         panel == Panels.None &&
         dialog == Dialogs.None
+    val sharedPlaybackVisible = playerRoom.active && playerOverlayVisible
     val sharedPlaybackBusy = sharedPlaybackVisible &&
-        (playerRoom.preparingPlayback || playerRoom.resumeSeconds != null || isLoading || isLoadingEpisode)
+        (
+            playerRoom.showPreparationFeedback ||
+                playerRoom.resumeSeconds != null ||
+                isLoading ||
+                isLoadingEpisode ||
+                playerRoom.recovery != WatchRecovery.None
+            )
     val anime4kSelection by advancedPlayerPreferences.anime4kActiveSelection().collectAsState()
     val anime4kDiagnosticsEnabled by advancedPlayerPreferences.anime4kDiagnosticsEnabled().collectAsState()
 
@@ -455,9 +467,16 @@ fun PlayerControls(
                         gestureSeekAmount = gestureSeekAmount,
                         onPlayPauseClick = viewModel::pauseUnpause,
                         watchRoom = if (sharedPlaybackVisible) playerRoom else WatchRoomState(),
-                        reduceMotion = reduceMotion,
+                        reduceMotion = reduceMotion || !playerOverlayVisible,
                         failure = playbackLoad.failure,
                         onRetry = viewModel::retryPlayback,
+                        onWatchRetry = {
+                            when (playerRoom.recovery) {
+                                WatchRecovery.Command -> viewModel.watchTogether.retryFailedCommand()
+                                WatchRecovery.Connection -> viewModel.watchTogether.retryConnection()
+                                else -> viewModel.showSheet(Sheets.WatchTogether)
+                            }
+                        },
                         onOpenSource = if (viewModel.isEpisodeOnline() ==
                             true
                         ) {
@@ -540,6 +559,10 @@ fun PlayerControls(
                     TopLeftPlayerControls(
                         animeTitle = animeTitle,
                         mediaTitle = mediaTitle,
+                        activity = playerRoom.activity.takeIf {
+                            sharedPlaybackVisible && it?.actorId != playerRoom.localMemberId
+                        },
+                        reduceMotion = reduceMotion,
                         onTitleClick = { viewModel.showEpisodeListDialog() },
                         onBackClick = onBackPress,
                     )
@@ -787,6 +810,31 @@ fun PlayerControls(
         val playlist by viewModel.currentPlaylist.collectAsState()
         val nextEpisodePrompt by viewModel.nextEpisodePrompt.collectAsState()
         val watchRoom by viewModel.watchTogether.state.collectAsState()
+
+        Box(
+            Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            WatchActivityCaption(
+                activity = playerRoom.activity.takeIf {
+                    sharedPlaybackVisible &&
+                        !controlsShown &&
+                        !areControlsLocked &&
+                        playbackLoad.failure == null &&
+                        it?.actorId != playerRoom.localMemberId
+                },
+                reduceMotion = reduceMotion,
+                modifier = Modifier.offset(y = (-76).dp),
+            )
+            WatchRecoveryCaption(
+                room = playerRoom,
+                loading = isLoading || isLoadingEpisode,
+                visible = sharedPlaybackVisible && !areControlsLocked && playbackLoad.failure == null,
+                reduceMotion = reduceMotion,
+                onDetails = { viewModel.showSheet(Sheets.WatchTogether) },
+                modifier = Modifier.offset(y = 80.dp),
+            )
+        }
 
         Box(
             Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp),

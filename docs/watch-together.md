@@ -98,6 +98,25 @@ drawing only, stops outside preparation and respects reduced motion and control 
 and picture-in-picture suppress the shared animation. Unconfirmed requests retain the existing
 retry policy; all countdown numbers come from room state, never an independent animation timer.
 
+Preparation shows participant initials and readiness, with a caption naming the friend still loading.
+After fifteen seconds the caption opens room details while the central Play/Pause remains usable.
+Unconfirmed commands expire after eight seconds even when every relay is offline. An explicit retry
+uses a fresh command sequence, checks the original episode and preserves local safety holds.
+Late acknowledgements clear the error. A connection retry refreshes unavailable relay sockets only,
+is throttled to once every two seconds and leaves usable subscriptions intact.
+
+Optional activity metadata in the host's timeline attributes manual play, pause, seek and speed
+changes. It is presentation only, remains compatible with coordination version 2, expires after
+3.5 seconds using the measured clock offset and is not replayed by duplicate/reconnect snapshots.
+Automatic skips and drift corrections do not impersonate a participant's manual action.
+The caption never forces the playback controls open and stays hidden behind menus and in PiP.
+
+An active-room minibar on browsing and detail screens shows the selected episode and participant
+count. One tap opens that episode through the existing guarded resolver; the group button opens
+room details. It reads room snapshots only, never a detached native player. Modern player surfaces
+also use a compact skip cue, smaller next-episode card and animated solo loading glyph. Legacy
+styling, reduced motion, skip cancellation, autoplay and sleep-timer rules are preserved.
+
 Anime4K is unavailable for the entire time a room is active, including local holds and reconnects.
 Entering a room removes its shaders and stops Smart telemetry; quick presets, custom presets and
 diagnostics are hidden. Solo episode choices and the automatic Smart preference are preserved.

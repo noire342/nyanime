@@ -23,8 +23,10 @@ import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
 import eu.kanade.tachiyomi.ui.player.controls.components.FilledControlsButton
+import eu.kanade.tachiyomi.ui.player.controls.components.PlayerSkipCue
 import eu.kanade.tachiyomi.ui.player.execute
 import eu.kanade.tachiyomi.ui.player.executeLongPress
 import tachiyomi.domain.custombuttons.model.CustomButton
@@ -42,11 +44,15 @@ fun BottomRightPlayerControls(
 ) {
     Row(modifier) {
         if (skipIntroButton != null) {
-            FilledControlsButton(
-                text = skipIntroButton,
-                onClick = onPressSkipIntroButton,
-                onLongClick = {},
-            )
+            if (LocalNyanimeStyle.current) {
+                PlayerSkipCue(label = skipIntroButton, onSkip = onPressSkipIntroButton)
+            } else {
+                FilledControlsButton(
+                    text = skipIntroButton,
+                    onClick = onPressSkipIntroButton,
+                    onLongClick = {},
+                )
+            }
         } else if (customButton != null) {
             FilledControlsButton(
                 text = customButtonTitle,

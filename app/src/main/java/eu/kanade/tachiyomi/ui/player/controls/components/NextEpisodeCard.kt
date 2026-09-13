@@ -27,7 +27,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +35,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.discovery.ArtworkPlaceholder
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.ui.player.PlayerPlaybackCompletion
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
@@ -56,25 +56,33 @@ fun NextEpisodeCard(
     playEnabled: Boolean = true,
     artwork: @Composable () -> Unit = { ArtworkPlaceholder(Modifier.size(64.dp, 88.dp)) },
 ) {
+    val modern = LocalNyanimeStyle.current
     val colors = MaterialTheme.colorScheme
-    val progress by animateFloatAsState(
+    val progress = animateFloatAsState(
         targetValue = secondsRemaining.toFloat() / PlayerPlaybackCompletion.COUNTDOWN_SECONDS,
         animationSpec = tween(if (reduceMotion) 0 else 250),
         label = "next_episode_progress",
     )
     Surface(
-        modifier = modifier.widthIn(max = 480.dp).fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        modifier = modifier.widthIn(max = if (modern) 420.dp else 480.dp).fillMaxWidth(),
+        shape = RoundedCornerShape(if (modern) 8.dp else 24.dp),
         color = colors.surfaceContainer,
         border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.55f)),
         shadowElevation = 8.dp,
     ) {
         Column(
             Modifier
-                .background(Brush.linearGradient(listOf(colors.primary.copy(alpha = 0.09f), colors.surfaceContainer)))
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            if (modern) colors.surfaceContainerHigh else colors.primary.copy(alpha = 0.09f),
+                            colors.surfaceContainer,
+                        ),
+                    ),
+                )
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(if (modern) 14.dp else 20.dp),
+            verticalArrangement = Arrangement.spacedBy(if (modern) 10.dp else 16.dp),
         ) {
             val heading: @Composable (Modifier) -> Unit = { headingModifier ->
                 Text(
@@ -108,13 +116,20 @@ fun NextEpisodeCard(
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (modern) 12.dp else 16.dp),
             ) {
-                Box(Modifier.size(64.dp, 88.dp).clip(RoundedCornerShape(10.dp))) { artwork() }
+                Box(
+                    Modifier.size(if (modern) 52.dp else 64.dp, if (modern) 72.dp else 88.dp)
+                        .clip(RoundedCornerShape(if (modern) 5.dp else 10.dp)),
+                ) { artwork() }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         seriesTitle,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = if (modern) {
+                            MaterialTheme.typography.titleMedium
+                        } else {
+                            MaterialTheme.typography.titleLarge
+                        },
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -128,13 +143,18 @@ fun NextEpisodeCard(
                 }
             }
             LinearProgressIndicator(
-                progress = { if (statusText == null) progress.coerceIn(0f, 1f) else 0f },
-                modifier = Modifier.fillMaxWidth().height(3.dp),
+                progress = { if (statusText == null) progress.value.coerceIn(0f, 1f) else 0f },
+                modifier = Modifier.fillMaxWidth().height(if (modern) 2.dp else 3.dp),
                 trackColor = colors.surfaceContainerHighest,
                 drawStopIndicator = {},
             )
             val playButton: @Composable (Modifier) -> Unit = { buttonModifier ->
-                Button(onClick = onPlayNow, enabled = playEnabled, modifier = buttonModifier.heightIn(min = 48.dp)) {
+                Button(
+                    onClick = onPlayNow,
+                    enabled = playEnabled,
+                    modifier = buttonModifier.heightIn(min = 48.dp),
+                    shape = if (modern) RoundedCornerShape(6.dp) else androidx.compose.material3.ButtonDefaults.shape,
+                ) {
                     Icon(Icons.Default.PlayArrow, null, modifier = Modifier.padding(end = 6.dp).size(20.dp))
                     Text(stringResource(AYMR.strings.player_up_next_play_now))
                 }

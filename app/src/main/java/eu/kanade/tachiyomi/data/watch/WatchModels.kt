@@ -141,6 +141,10 @@ data class WatchRoomState(
     val upcoming: WatchMedia? = null,
     val next: WatchNext? = null,
     val nextSeconds: Int? = null,
+    val localMemberId: String = "",
+    val waitingSeconds: Int = 0,
+    val commandFailed: Boolean = false,
+    val activity: WatchActivity? = null,
 ) {
     val wantsPlayback: Boolean get() = pendingPlaybackPaused?.not() ?: playRequested
     val preparingPlayback: Boolean get() = active &&
@@ -209,6 +213,7 @@ data class WatchMessage(
     val canAdvance: Boolean = true,
     val preparedNextKey: String? = null,
     val nextProblem: WatchProblem = WatchProblem.None,
+    val activity: WatchActivity? = null,
 ) {
     fun valid(): Boolean = version == 1 &&
         sequence > 0 &&
@@ -240,6 +245,7 @@ data class WatchMessage(
             ) &&
         (next == null || (next.id > 0 && next.media.valid() && (next.deadline == null || next.deadline >= 0))) &&
         (media == null || media.valid()) &&
+        (activity == null || activity.valid()) &&
         peers.size <= 8 &&
         acknowledgements.size <= 8 &&
         peers.all { (key, value) ->
@@ -255,6 +261,7 @@ interface WatchTransport {
     val publicKey: String
     fun start(onMessage: (String, WatchMessage) -> Unit, onConnection: (Int) -> Unit)
     fun send(message: WatchMessage)
+    fun retryUnavailable() {}
     fun close()
 }
 

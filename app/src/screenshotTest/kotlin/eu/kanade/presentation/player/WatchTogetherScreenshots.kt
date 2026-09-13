@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,13 +23,18 @@ import com.android.tools.screenshot.PreviewTest
 import eu.kanade.domain.ui.model.AppTheme
 import eu.kanade.presentation.discovery.PreviewImages
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
+import eu.kanade.tachiyomi.data.watch.WatchActivity
 import eu.kanade.tachiyomi.data.watch.WatchMedia
 import eu.kanade.tachiyomi.data.watch.WatchMember
 import eu.kanade.tachiyomi.data.watch.WatchOpeningState
 import eu.kanade.tachiyomi.data.watch.WatchPhase
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
 import eu.kanade.tachiyomi.ui.player.controls.MiddlePlayerControls
+import eu.kanade.tachiyomi.ui.player.controls.TopLeftPlayerControls
 import eu.kanade.tachiyomi.ui.player.controls.components.TogetherLoadingArtwork
+import eu.kanade.tachiyomi.ui.watch.WatchActivityCaption
+import eu.kanade.tachiyomi.ui.watch.WatchMiniBar
+import eu.kanade.tachiyomi.ui.watch.WatchRecoveryCaption
 import eu.kanade.tachiyomi.ui.watch.WatchTogetherContent
 
 @PreviewTest
@@ -67,6 +74,116 @@ fun WatchLockedScreenshot() = WatchPlayerPreview(
 fun WatchSoloScreenshot() = WatchPlayerPreview(WatchRoomState())
 
 @PreviewTest
+@Preview(name = "SoloLoading", widthDp = 800, heightDp = 360, locale = "it")
+@Composable
+fun SoloLoadingScreenshot() = WatchPlayerPreview(WatchRoomState(), loading = true)
+
+@PreviewTest
+@Preview(name = "WaitingForFriend", widthDp = 800, heightDp = 360, locale = "it")
+@Preview(name = "WaitingForFriendLarge", widthDp = 320, heightDp = 320, fontScale = 1.5f, locale = "it")
+@Composable
+fun WatchWaitingFriendScreenshot() = WatchPlayerPreview(
+    WatchRoomState(
+        active = true,
+        phase = WatchPhase.Buffering,
+        playRequested = true,
+        localMemberId = "host",
+        relayCount = 2,
+        members = listOf(WatchMember("host", "Lorenzo", true, false), WatchMember("guest", "Marco", false, true)),
+    ),
+)
+
+@PreviewTest
+@Preview(name = "CommandRetry", widthDp = 800, heightDp = 360, locale = "it")
+@Preview(name = "CommandRetryLarge", widthDp = 320, heightDp = 360, fontScale = 1.5f, locale = "it")
+@Composable
+fun WatchCommandRetryScreenshot() = WatchPlayerPreview(
+    WatchRoomState(active = true, phase = WatchPhase.Paused, commandFailed = true, relayCount = 2),
+)
+
+@PreviewTest
+@Preview(name = "LongWait", widthDp = 800, heightDp = 360, locale = "it")
+@Preview(name = "LongWaitLarge", widthDp = 320, heightDp = 320, fontScale = 1.5f, locale = "it")
+@Composable
+fun WatchLongWaitScreenshot() = WatchPlayerPreview(
+    WatchRoomState(
+        active = true,
+        phase = WatchPhase.Buffering,
+        playRequested = true,
+        waitingSeconds = 20,
+        localMemberId = "host",
+        relayCount = 2,
+        members = listOf(WatchMember("host", "Lorenzo", true, false), WatchMember("guest", "Marco", false, true)),
+    ),
+)
+
+@PreviewTest
+@Preview(name = "ConnectionRetry", widthDp = 800, heightDp = 360, locale = "it")
+@Composable
+fun WatchConnectionRetryScreenshot() = WatchPlayerPreview(
+    WatchRoomState(active = true, phase = WatchPhase.Reconnecting, waitingSeconds = 15),
+)
+
+@PreviewTest
+@Preview(name = "RemoteAction", widthDp = 800, heightDp = 360, locale = "it")
+@Preview(name = "RemoteActionLarge", widthDp = 320, heightDp = 320, fontScale = 1.5f, locale = "it")
+@Composable
+fun WatchRemoteActionScreenshot() = WatchPlayerPreview(
+    WatchRoomState(
+        active = true,
+        phase = WatchPhase.Paused,
+        relayCount = 2,
+        activity = WatchActivity(1, 1000, "a".repeat(64), "Marco", "pause", "preview"),
+    ),
+)
+
+@PreviewTest
+@Preview(name = "RemoteActionHiddenControls", widthDp = 800, heightDp = 360, locale = "it")
+@Composable
+fun WatchRemoteActionHiddenScreenshot() = WatchPlayerPreview(
+    WatchRoomState(
+        active = true,
+        phase = WatchPhase.Playing,
+        relayCount = 2,
+        playRequested = true,
+        activity = WatchActivity(1, 1000, "a".repeat(64), "Marco", "seek", "preview", 135.0),
+    ),
+    controlsShown = false,
+)
+
+@PreviewTest
+@Preview(name = "RoomMiniBar", widthDp = 393, heightDp = 96, locale = "it")
+@Preview(name = "RoomMiniBarLarge", widthDp = 320, heightDp = 120, fontScale = 1.5f, locale = "it")
+@Composable
+fun WatchMiniBarScreenshot() {
+    TachiyomiPreviewTheme(appTheme = AppTheme.NYANIME, modernUi = true) {
+        Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.BottomCenter) {
+            WatchMiniBar(
+                room = WatchRoomState(
+                    active = true,
+                    media = WatchMedia("Una notte tra le stelle", "Episodio 4", 4.0, 1400.0),
+                    members = listOf(
+                        WatchMember("host", "Lorenzo", true, false),
+                        WatchMember("guest", "Marco", true, false),
+                    ),
+                ),
+                opening = WatchOpeningState(),
+                onOpenPlayer = {},
+                onOpenRoom = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "PausedReconnection", widthDp = 800, heightDp = 360, locale = "it")
+@Composable
+fun WatchPausedReconnectionScreenshot() = WatchPlayerPreview(
+    WatchRoomState(active = true, phase = WatchPhase.Reconnecting),
+    controlsShown = false,
+)
+
+@PreviewTest
 @Preview(name = "TogetherMorphFrames", widthDp = 620, heightDp = 128, locale = "it")
 @Composable
 fun WatchMorphScreenshot() {
@@ -87,12 +204,24 @@ private fun WatchPlayerPreview(
     locked: Boolean = false,
     loading: Boolean = false,
     reduceMotion: Boolean = false,
+    controlsShown: Boolean = true,
 ) {
     PreviewImages()
     TachiyomiPreviewTheme(appTheme = AppTheme.NYANIME, modernUi = true) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             AsyncImage("preview://1", null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)))
+            if (controlsShown && !locked) {
+                TopLeftPlayerControls(
+                    animeTitle = "Una notte tra le stelle",
+                    mediaTitle = "Episodio 4",
+                    onTitleClick = {},
+                    onBackClick = {},
+                    activity = room.activity,
+                    reduceMotion = reduceMotion,
+                    modifier = Modifier.align(Alignment.TopStart).padding(16.dp).widthIn(max = 340.dp),
+                )
+            }
             MiddlePlayerControls(
                 hasPrevious = true,
                 onSkipPrevious = {},
@@ -100,7 +229,7 @@ private fun WatchPlayerPreview(
                 onSkipNext = {},
                 isLoading = loading,
                 isLoadingEpisode = false,
-                controlsShown = !locked,
+                controlsShown = controlsShown && !locked,
                 areControlsLocked = locked,
                 showLoadingCircle = true,
                 paused = !room.wantsPlayback,
@@ -112,6 +241,14 @@ private fun WatchPlayerPreview(
                 reduceMotion = reduceMotion,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
+            WatchActivityCaption(
+                room.activity.takeUnless {
+                    controlsShown
+                },
+                reduceMotion,
+                Modifier.offset(y = (-76).dp),
+            )
+            WatchRecoveryCaption(room, loading, !locked, reduceMotion, {}, Modifier.offset(y = 80.dp))
         }
     }
 }

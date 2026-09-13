@@ -75,6 +75,7 @@ class WatchRoomTest {
             var connection: (Int) -> Unit = {}
             var online = true
             var closed = false
+            var retries = 0
             val sent = mutableListOf<WatchMessage>()
             override fun start(onMessage: (String, WatchMessage) -> Unit, onConnection: (Int) -> Unit) {
                 receiver = onMessage
@@ -92,6 +93,9 @@ class WatchRoomTest {
             }
             override fun close() {
                 closed = true
+            }
+            override fun retryUnavailable() {
+                retries++
             }
         }
     }
@@ -184,6 +188,178 @@ class WatchRoomTest {
     }
 
     @Test
+    fun sharedActionsKeepTheirAuthorAndExpireDespiteRepeatedTimelines() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.guest.requestSeek(135.0)
+        room.advance(1000)
+        val activity = room.host.state.value.activity!!
+        assertEquals("Friend", activity.name)
+        assertEquals(room.network.endpoints[1].publicKey, activity.actorId)
+        assertEquals("Friend è andato a 2:15", activity.label)
+        assertEquals(activity, room.guest.state.value.activity)
+        room.advance(3000)
+        assertEquals(null, room.host.state.value.activity)
+        assertEquals(null, room.guest.state.value.activity)
+        room.host.requestPause(true)
+        room.advance(500)
+        assertEquals("Host ha messo in pausa", room.guest.state.value.activity?.label)
+        assertTrue(room.guest.state.value.activity!!.id > activity.id)
+    }
+
+    @Test
+    fun reconnectSnapshotDoesNotReplayAnOldAction() = runTest {
+        val room = Pairing(this)
+        room.join()
+        val endpoint = room.network.endpoints[1]
+        endpoint.online = false
+        endpoint.connection(0)
+        room.advance(250)
+        room.host.requestPause(true)
+        room.advance(250)
+        endpoint.online = true
+        endpoint.connection(2)
+        room.advance(2500)
+        assertEquals(null, room.guest.state.value.activity)
+    }
+
+    @Test
+    fun changingEpisodeClearsActionFromThePreviousEpisode() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.requestPause(true)
+        room.advance(250)
+        assertNotNull(room.guest.state.value.activity)
+        room.hostPlayer.media = room.hostPlayer.media!!.copy(episodeUrl = "/2", number = 2.0)
+        room.advance(500)
+        assertEquals(null, room.host.state.value.activity)
+        assertEquals(null, room.guest.state.value.activity)
+    }
+
+    @Test
+    fun failedOfflineCommandExpiresAndAnExplicitRetryHasAFreshSequence() = runTest {
+        val room = Pairing(this)
+        room.join()
+        val endpoint = room.network.endpoints[1]
+        endpoint.online = false
+        endpoint.connection(0)
+        room.guest.resumeByUser()
+        val lost = endpoint.sent.last { it.type == WatchMessageType.Command }
+        room.advance(9000)
+        assertTrue(room.guest.state.value.commandFailed)
+        assertEquals(WatchRecovery.Command, room.guest.state.value.recovery)
+        assertFalse(room.guest.state.value.preparingPlayback)
+        endpoint.online = true
+        endpoint.connection(2)
+        room.guest.retryFailedCommand()
+        val retry = endpoint.sent.last { it.type == WatchMessageType.Command }
+        assertTrue(retry.sequence > lost.sequence)
+        assertEquals(lost.media?.key, retry.media?.key)
+        assertEquals(1, endpoint.retries)
+        room.advance(8000)
+        assertFalse(room.guest.state.value.commandFailed)
+        assertFalse(room.hostPlayer.paused)
+        assertFalse(room.guestPlayer.paused)
+    }
+
+    @Test
+    fun lateAcknowledgementClearsFailureWithoutSendingAnotherCommand() = runTest {
+        val room = Pairing(this)
+        room.join()
+        var deliverCommand: (() -> Unit)? = null
+        room.network.intercept = { _, message, deliver ->
+            if (message.type == WatchMessageType.Command) deliverCommand = deliver else deliver()
+        }
+        room.guest.requestSeek(100.0)
+        room.advance(9000)
+        assertTrue(room.guest.state.value.commandFailed)
+        val count = room.network.endpoints[1].sent.count { it.type == WatchMessageType.Command }
+        deliverCommand!!()
+        room.advance(500)
+        assertFalse(room.guest.state.value.commandFailed)
+        assertEquals(count, room.network.endpoints[1].sent.count { it.type == WatchMessageType.Command })
+        assertEquals(100.0, room.hostPlayer.sample().position, 0.2)
+    }
+
+    @Test
+    fun failedRetryCannotSeekAnotherEpisodeOrClearTheLocalHold() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.network.intercept = { _, message, deliver ->
+            if (message.type != WatchMessageType.Command) deliver()
+        }
+        room.guest.requestSeek(100.0)
+        room.advance(9000)
+        val endpoint = room.network.endpoints[1]
+        val count = endpoint.sent.size
+        room.guestPlayer.media = room.guestPlayer.media!!.copy(episodeUrl = "/2")
+        room.guest.retryFailedCommand()
+        assertEquals(count, endpoint.sent.size)
+        assertFalse(room.guest.state.value.commandFailed)
+        room.guest.hold()
+        room.advance(9000)
+        assertTrue(room.guest.state.value.localHold)
+        room.guest.retryFailedCommand()
+        assertTrue(room.guest.state.value.localHold)
+        assertTrue(room.guestPlayer.paused)
+    }
+
+    @Test
+    fun manualConnectionRecoveryIsThrottledAndShowsFreshProgress() = runTest {
+        val room = Pairing(this)
+        room.join()
+        val endpoint = room.network.endpoints[1]
+        endpoint.online = false
+        endpoint.connection(0)
+        room.advance(14_000)
+        assertEquals(WatchRecovery.Connection, room.guest.state.value.recovery)
+        room.guest.retryConnection()
+        room.guest.retryConnection()
+        assertEquals(1, endpoint.retries)
+        assertEquals(0, room.guest.state.value.waitingSeconds)
+        assertTrue(room.guest.state.value.showPreparationFeedback)
+        room.advance(2500)
+        room.guest.retryConnection()
+        assertEquals(2, endpoint.retries)
+        assertTrue(room.guestPlayer.paused)
+    }
+
+    @Test
+    fun retryCannotTargetOldLocalMediaAfterANewHostSelectionArrives() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.network.intercept = { _, message, deliver ->
+            if (message.type != WatchMessageType.Command) deliver()
+        }
+        room.guest.requestSeek(120.0)
+        room.advance(9000)
+        val host = room.network.endpoints[0]
+        val guest = room.network.endpoints[1]
+        val selected = room.hostPlayer.media!!.copy(episodeUrl = "/2")
+        val timeline = host.sent.last { it.type == WatchMessageType.Timeline }
+        guest.receiver(host.publicKey, timeline.copy(sequence = timeline.sequence + 1, media = selected))
+        runCurrent()
+        assertEquals(selected.key, room.guest.state.value.media?.key)
+        val count = guest.sent.size
+        room.guest.retryFailedCommand()
+        assertEquals(count, guest.sent.size)
+        assertFalse(room.guest.state.value.commandFailed)
+    }
+
+    @Test
+    fun automaticSkipDoesNotAnnounceAHumanSeek() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.offerSkip("opening", "Salta apertura", 120.0, 3)
+        room.host.resumeByUser()
+        room.advance(7000)
+        assertEquals(1, room.hostPlayer.seeks)
+        assertEquals(null, room.host.state.value.activity)
+        assertEquals(null, room.guest.state.value.activity)
+        assertFalse(room.network.endpoints[0].sent.any { it.activity?.command == "seek" })
+    }
+
+    @Test
     fun inactiveRoomControlsNeverReadOrModifyThePlayer() = runTest {
         val player = object : WatchPlayer {
             override fun sample(): WatchPlayback = error("Inactive room sampled the player")
@@ -196,6 +372,8 @@ class WatchRoomTest {
         controller.playerAttached()
         controller.hold()
         controller.resync()
+        controller.retryFailedCommand()
+        controller.retryConnection()
         controller.confirmSameVideo()
         controller.offerSkip("unused", "Skip", 90.0)
         controller.setSharedControls(false)

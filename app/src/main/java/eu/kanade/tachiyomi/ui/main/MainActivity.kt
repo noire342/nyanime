@@ -252,7 +252,14 @@ class MainActivity : BaseActivity() {
                             modifier = Modifier.windowInsetsPadding(scaffoldInsets),
                         )
                     },
-                    bottomBar = { if (navigator.lastItem != HomeScreen) CastMiniController() },
+                    bottomBar = {
+                        if (navigator.lastItem != HomeScreen) {
+                            androidx.compose.foundation.layout.Column {
+                                eu.kanade.tachiyomi.ui.watch.WatchMiniController()
+                                CastMiniController()
+                            }
+                        }
+                    },
                     contentWindowInsets = scaffoldInsets,
                 ) { contentPadding ->
                     // Consume insets already used by app state banners

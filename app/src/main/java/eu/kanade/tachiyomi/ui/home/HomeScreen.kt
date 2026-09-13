@@ -125,6 +125,9 @@ object HomeScreen : Screen() {
                                 bottomNavVisible &&
                                 tabNavigator.current !in navStyle.overflowTabs
                             Column(Modifier.posterForeground(zIndex = 3f)) {
+                                eu.kanade.tachiyomi.ui.watch.WatchMiniController(
+                                    includeNavigationInsets = !showNavigation,
+                                )
                                 CastMiniController(includeNavigationInsets = !showNavigation)
                                 AnimatedVisibility(
                                     visible = showNavigation,

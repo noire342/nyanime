@@ -60,6 +60,14 @@ class WatchRoomController(
     private var pendingSeekSince = 0L
     private var acceptedMedia: String? = null
     private var closedMessage = ""
+    private var failedCommand: WatchMessage? = null
+    private var waitingSince: Long? = null
+    private var feedbackMediaKey: String? = null
+    private var lastManualRetry = -10_000L
+    private var activitySequence = 0L
+    private var lastSeenActivity = 0L
+    private var activityUntil = 0L
+    private var publishedActivity: WatchActivity? = null
     private val startGate = WatchStartGate()
     private val driftCorrector = WatchDriftCorrector()
     private var pausedBy = ""
@@ -104,6 +112,7 @@ class WatchRoomController(
                 invite = room.encode(),
                 media = if (host) sample.media else null,
                 message = "Connessione alla stanza…",
+                localMemberId = network.publicKey,
             )
             player.pause(true)
             val token = ++generation
@@ -174,6 +183,14 @@ class WatchRoomController(
         seekRevision = 0
         appliedSeekRevision = -1
         closedMessage = ""
+        failedCommand = null
+        waitingSince = null
+        feedbackMediaKey = null
+        lastManualRetry = -10_000
+        activitySequence = 0
+        lastSeenActivity = 0
+        activityUntil = 0
+        publishedActivity = null
     }
 
     fun leave() {
@@ -280,6 +297,9 @@ class WatchRoomController(
             return true
         }
         val sample = player.sample()
+        failedCommand = null
+        closedMessage = ""
+        mutableState.value = state.value.copy(commandFailed = false)
         val request = message(WatchMessageType.Command).copy(
             command = action,
             cueId = cue,
@@ -314,7 +334,12 @@ class WatchRoomController(
         return true
     }
 
-    private fun applyCommand(request: WatchMessage, actor: String) {
+    private fun applyCommand(
+        request: WatchMessage,
+        actor: String,
+        actorId: String = transport?.publicKey.orEmpty(),
+        announce: Boolean = true,
+    ) {
         when (request.command) {
             "pause" -> {
                 desiredPaused = true
@@ -334,7 +359,7 @@ class WatchRoomController(
             "skip" -> {
                 val cue = skipCue?.takeIf { it.id == request.cueId } ?: return
                 dismissSkip()
-                applyCommand(request.copy(command = "seek", position = cue.target), actor)
+                applyCommand(request.copy(command = "seek", position = cue.target), actor, actorId, announce)
             }
             "cancel_skip" -> {
                 if (skipCue?.id != request.cueId) return
@@ -364,6 +389,22 @@ class WatchRoomController(
             }
             "speed" -> baseSpeed = request.speed
             else -> return
+        }
+        if (announce && request.command in listOf("pause", "play", "seek", "speed")) {
+            player.sample().media?.let { media ->
+                val activity = WatchActivity(
+                    ++activitySequence,
+                    now(),
+                    actorId,
+                    actor.ifBlank { "Spettatore" }.take(32),
+                    request.command,
+                    media.key,
+                    if (request.command == "speed") request.speed else request.position,
+                )
+                publishedActivity = activity
+                activityUntil = now() + 3500
+                mutableState.value = state.value.copy(activity = activity)
+            }
         }
         lastBroadcast = -10_000
     }
@@ -401,6 +442,32 @@ class WatchRoomController(
         lastPing = -10_000
         lastStatus = -10_000
         lastBroadcast = -10_000
+    }
+
+    /** Explicit retry keeps episode identity, command ordering and the existing local safety hold. */
+    fun retryFailedCommand() {
+        if (!active) return
+        val failed = failedCommand ?: return
+        if (failed.media?.key != state.value.media?.key || failed.media?.key != player.sample().media?.key) {
+            failedCommand = null
+            mutableState.value = state.value.copy(commandFailed = false)
+            return
+        }
+        if (now() - lastManualRetry < 2000) return
+        lastManualRetry = now()
+        transport?.retryUnavailable()
+        resync()
+        if (failed.command == "play" && state.value.localHold) return
+        command(failed.command, if (failed.command == "speed") failed.speed else failed.position, failed.cueId)
+    }
+
+    fun retryConnection() {
+        if (!active || now() - lastManualRetry < 2000) return
+        lastManualRetry = now()
+        waitingSince = now()
+        mutableState.value = state.value.copy(waitingSeconds = 0)
+        transport?.retryUnavailable()
+        resync()
     }
 
     fun isManagedSpeed(value: Double): Boolean = active && managedSpeeds.any { abs(value - it) < 0.0001 }
@@ -458,11 +525,36 @@ class WatchRoomController(
                     stop(WatchPhase.Failed, "La stanza è piena: possono partecipare fino a 8 persone.")
                     return
                 }
+                val alreadyConnected = timeline != null
                 timeline = incoming
                 baseSpeed = incoming.speed
                 val own = transport?.publicKey
                 pendingCommand?.let { pending ->
-                    if ((incoming.acknowledgements[own] ?: 0) >= pending.sequence) pendingCommand = null
+                    if ((incoming.acknowledgements[own] ?: 0) >= pending.sequence) {
+                        pendingCommand = null
+                        failedCommand = null
+                        closedMessage = ""
+                        mutableState.value = state.value.copy(commandFailed = false)
+                    }
+                }
+                failedCommand?.let { failed ->
+                    if ((incoming.acknowledgements[own] ?: 0) >= failed.sequence) {
+                        failedCommand = null
+                        closedMessage = ""
+                        mutableState.value = state.value.copy(commandFailed = false)
+                    }
+                }
+                incoming.activity?.takeIf { it.id > lastSeenActivity }?.let { activity ->
+                    lastSeenActivity = activity.id
+                    val age = now() + clock.offset - activity.at
+                    if (alreadyConnected &&
+                        clock.ready &&
+                        age in -500..3500 &&
+                        activity.mediaKey == incoming.media?.key
+                    ) {
+                        activityUntil = now() + (3500 - age.coerceAtLeast(0))
+                        mutableState.value = state.value.copy(activity = activity)
+                    }
                 }
                 mutableState.value = state.value.copy(
                     media = incoming.media,
@@ -492,7 +584,7 @@ class WatchRoomController(
                             (incoming.command == "cancel_next" && incoming.cueId == nextCue?.id) ||
                             incoming.media?.key == player.sample().media?.key
                         )
-                if (allowed) applyCommand(incoming, peers.getValue(sender).first.name)
+                if (allowed) applyCommand(incoming, peers.getValue(sender).first.name, sender)
                 acknowledgements[sender] = incoming.sequence
                 lastBroadcast = -10_000
             }
@@ -521,6 +613,13 @@ class WatchRoomController(
             stop(WatchPhase.Failed, "Questo contenuto non può essere condiviso nella stanza.")
             return
         }
+        // Expiry also runs when no relay is connected; a spinner must not conceal a lost command.
+        pendingCommand?.takeIf { time - pendingSince > 8000 }?.let {
+            failedCommand = it
+            pendingCommand = null
+            closedMessage = "Comando non confermato. Controlla la connessione e riprova."
+            mutableState.value = state.value.copy(pendingPlaybackPaused = null, commandFailed = true)
+        }
         if (state.value.relayCount == 0) {
             startGate.reset()
             driftCorrector.reset()
@@ -546,9 +645,33 @@ class WatchRoomController(
                     "Connessione assente. Riprovo automaticamente…"
                 },
             )
+            updateFeedback(time)
             return
         }
         if (state.value.host) tickHost(sample, time) else tickGuest(sample, time)
+        updateFeedback(time)
+    }
+
+    private fun updateFeedback(time: Long) {
+        val room = state.value
+        if (room.media?.key != feedbackMediaKey) {
+            feedbackMediaKey = room.media?.key
+            waitingSince = null
+            failedCommand = null
+            closedMessage = ""
+        }
+        val waiting = room.preparingPlayback ||
+            room.phase in listOf(WatchPhase.Connecting, WatchPhase.Reconnecting, WatchPhase.DifferentVideo)
+        if (!waiting) {
+            waitingSince = null
+        } else if (waitingSince == null) {
+            waitingSince = time
+        }
+        mutableState.value = room.copy(
+            waitingSeconds = waitingSince?.let { ((time - it) / 1000).toInt().coerceAtLeast(0) } ?: 0,
+            commandFailed = failedCommand != null,
+            activity = room.activity?.takeIf { time < activityUntil && it.mediaKey == room.media?.key },
+        )
     }
 
     private fun tickHost(sample: WatchPlayback, time: Long) {
@@ -603,7 +726,11 @@ class WatchRoomController(
                 skipCue = cue.copy(deadline = time + skipWait!!)
                 lastBroadcast = -10_000
             } else if (cue.deadline != null && time >= cue.deadline) {
-                applyCommand(message(WatchMessageType.Command).copy(command = "skip", cueId = cue.id), name)
+                applyCommand(
+                    message(WatchMessageType.Command).copy(command = "skip", cueId = cue.id),
+                    name,
+                    announce = false,
+                )
                 tickHost(player.sample(), time)
                 return
             }
@@ -736,6 +863,7 @@ class WatchRoomController(
                     peers = all.mapValues { it.value.copy(media = null, preparedNextKey = null) },
                     acknowledgements = acknowledgements.toMap(), pausedBy = pausedBy,
                     skip = skipCue, upcoming = upcoming, next = nextCue,
+                    activity = publishedActivity?.takeIf { time - it.at <= 3500 && it.mediaKey == media?.key },
                 ),
             )
             lastBroadcast = time
@@ -793,11 +921,7 @@ class WatchRoomController(
             lastPing = time
         }
         pendingCommand?.let {
-            if (time - pendingSince > 8000) {
-                pendingCommand = null
-                mutableState.value = state.value.copy(pendingPlaybackPaused = null)
-                closedMessage = "Comando non confermato. Controlla la connessione e riprova."
-            } else if (time - lastRetry >= 1500) {
+            if (time - lastRetry >= 1500) {
                 send(it)
                 lastRetry = time
             }
