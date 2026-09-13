@@ -12,6 +12,7 @@ spotless = "7.0.2"
 ktlint-core = "1.7.0"
 
 [libraries]
+watch-qr = "com.google.zxing:core:3.5.3"
 watch-secp256k1 = "fr.acinq.secp256k1:secp256k1-kmp:0.24.0"
 watch-secp256k1-android = "fr.acinq.secp256k1:secp256k1-kmp-jni-android:0.24.0"
 watch-secp256k1-jvm = "fr.acinq.secp256k1:secp256k1-kmp-jni-jvm:0.24.0"

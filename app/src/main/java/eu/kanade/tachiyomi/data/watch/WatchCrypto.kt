@@ -45,6 +45,8 @@ data class WatchInvite(
         "nyanime://watch/v1#" + watchBase64(watchJson.encodeToString(this).toByteArray())
     }
 
+    fun link(): String = encode().let { if (it.startsWith("NY1.")) "nyanime://watch/v1#" + it else it }
+
     fun validate(now: Long): WatchInvite {
         require(version == 1) { "Versione dell'invito non supportata. Aggiorna Nyanime." }
         require(secret.matches(Regex("[0-9a-f]{32}")) && owner.matches(Regex("[0-9a-f]{24}"))) { "Invito non valido." }
@@ -67,6 +69,22 @@ data class WatchInvite(
 
     companion object {
         val defaultRelays = listOf("wss://relay.damus.io", "wss://nos.lol")
+        fun codeFromLink(text: String, now: Long): String {
+            require(text.length <= 5000) { "Invito troppo lungo." }
+            val uri = URI(text)
+            require(
+                uri.scheme == "nyanime" &&
+                    uri.host == "watch" &&
+                    uri.path == "/v1" &&
+                    uri.rawUserInfo == null &&
+                    uri.port == -1 &&
+                    uri.rawQuery == null &&
+                    !uri.rawFragment.isNullOrBlank(),
+            ) {
+                "Link d'invito non valido."
+            }
+            return parse(text, now).encode()
+        }
         fun create(owner: String, now: Long, relays: List<String> = defaultRelays): WatchInvite =
             WatchInvite(
                 secret = watchRandom(16).watchHex(),
@@ -151,7 +169,7 @@ class WatchCrypto(private val invite: WatchInvite, private val identity: WatchId
         require(event.tags.count { it == listOf("x", topic) } == 1)
         require(event.created_at in (now / 1000 - 60)..(now / 1000 + 30))
         require(
-            event.content.length in 38..12_000 &&
+            event.content.length in 38..32_000 &&
                 event.id.length == 64 &&
                 event.pubkey.length == 64 &&
                 event.sig.length == 128,

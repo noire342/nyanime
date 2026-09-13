@@ -32,7 +32,13 @@ import uy.kohesive.injekt.api.get
 import java.lang.ref.WeakReference
 import java.net.URI
 
-data class WatchOpeningState(val loading: Boolean = false, val error: String? = null)
+data class WatchOpeningState(
+    val loading: Boolean = false,
+    val error: String? = null,
+    val problem: WatchProblem = WatchProblem.None,
+)
+
+private class WatchResolveFailure(val problem: WatchProblem, message: String) : IllegalArgumentException(message)
 
 /**
  * A room outlives individual player screens. The host selects catalog entries; every guest resolves
@@ -48,6 +54,10 @@ class WatchTogetherManager private constructor(private val application: Applicat
     private var pendingOpen: Triple<String, Long, Long>? = null
     private var selection: WatchSelection? = null
     private var resolutionGeneration = 0L
+    private var prepared: WatchSelection? = null
+    private var prepareJob: kotlinx.coroutines.Job? = null
+    private val mutablePreparation = MutableStateFlow(WatchOpeningState())
+    val preparation = mutablePreparation.asStateFlow()
     private val mutableOpening = MutableStateFlow(WatchOpeningState())
     val opening = mutableOpening.asStateFlow()
     private val preferences = application.getSharedPreferences("watch_together", Context.MODE_PRIVATE)
@@ -69,6 +79,9 @@ class WatchTogetherManager private constructor(private val application: Applicat
             }
             override fun speed(value: Double) {
                 delegate?.speed(value)
+            }
+            override fun advance(media: WatchMedia) {
+                delegate?.advance(media)
             }
             override fun userResumed() {
                 delegate?.userResumed()
@@ -130,6 +143,50 @@ class WatchTogetherManager private constructor(private val application: Applicat
                     }
                 }
         }
+        scope.launch {
+            controller.state.distinctUntilChanged { old, new ->
+                old.active == new.active && old.host == new.host && old.upcoming?.key == new.upcoming?.key
+            }.collectLatest { prepareUpcoming(it.upcoming.takeIf { _ -> it.active }) }
+        }
+    }
+
+    private fun prepareUpcoming(media: WatchMedia?) {
+        prepareJob?.cancel()
+        if (media != null ||
+            prepared?.remote?.key != controller.state.value.media?.key ||
+            !controller.active
+        ) {
+            prepared = null
+        }
+        mutablePreparation.value = WatchOpeningState()
+        if (media == null || controller.state.value.host || !controller.active) return
+        prepareJob = scope.launch {
+            mutablePreparation.value = WatchOpeningState(loading = true)
+            try {
+                val result = resolveCatalog(media)
+                if (controller.active &&
+                    !controller.state.value.host &&
+                    controller.state.value.upcoming?.key == media.key
+                ) {
+                    prepared = result
+                    mutablePreparation.value = WatchOpeningState()
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                mutablePreparation.value =
+                    WatchOpeningState(error = "La fonte non ha risposto in tempo.", problem = WatchProblem.SourceError)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                mutablePreparation.value = WatchOpeningState(
+                    error = e.message ?: "Impossibile preparare il prossimo episodio.",
+                    problem = (e as? WatchResolveFailure)?.problem ?: WatchProblem.SourceError,
+                )
+            }
+        }
+    }
+
+    fun retryPreparation() {
+        if (!preparation.value.loading) prepareUpcoming(controller.state.value.upcoming)
     }
 
     fun present(activity: Activity) {
@@ -175,8 +232,21 @@ class WatchTogetherManager private constructor(private val application: Applicat
     }
 
     private fun currentPlayback(): WatchPlayback {
-        val sample = delegate?.sample() ?: detached
-        return selection?.applyTo(sample) ?: sample
+        val sample = delegate?.sample() ?: detached.copy(canAdvance = false)
+        val mapped = selection?.applyTo(sample) ?: sample
+        return mapped.copy(
+            problem = if (opening.value.loading) {
+                WatchProblem.Opening
+            } else {
+                opening.value.problem.takeUnless {
+                    it ==
+                        WatchProblem.None
+                }
+                    ?: sample.problem
+            },
+            preparedNextKey = prepared?.remote?.key,
+            nextProblem = if (preparation.value.loading) WatchProblem.Opening else preparation.value.problem,
+        )
     }
 
     private suspend fun resolve(media: WatchMedia, openExisting: Boolean = false) {
@@ -188,50 +258,11 @@ class WatchTogetherManager private constructor(private val application: Applicat
         }
         mutableOpening.value = WatchOpeningState(loading = true)
         try {
-            val result = withTimeout(45_000) {
-                withContext(Dispatchers.IO) {
-                    val sourceManager = Injekt.get<AnimeSourceManager>()
-                    sourceManager.isInitialized.first { it }
-                    val source = sourceManager.get(media.sourceId)
-                        ?: throw IllegalArgumentException(
-                            "Serve la stessa estensione del tuo amico, installata e attendibile.",
-                        )
-                    require(media.animeUrl.isNotBlank() && media.episodeUrl.isNotBlank()) {
-                        "Questo contenuto non ha un riferimento condivisibile. L'host deve scegliere un titolo da un'estensione."
-                    }
-                    require(
-                        source is AnimeHttpSource && WatchCatalogReference.isAllowed(media.animeUrl, source.baseUrl),
-                    ) {
-                        "Il riferimento al titolo non è compatibile con la tua estensione. Aggiornala e riprova."
-                    }
-                    val entry = SAnime.create().apply {
-                        url = media.animeUrl
-                        title = media.title
-                    }
-                    val anime = Injekt.get<NetworkToLocalAnime>().await(entry.toDomainAnime(source.id))
-                    val getEpisodes = Injekt.get<GetEpisodesByAnimeId>()
-                    var episodes = getEpisodes.await(anime.id)
-                    var episode = episodes.singleOrNull { it.url == media.episodeUrl }
-                    if (episode == null) {
-                        Injekt.get<UpdateAnimeFromRemote>().awaitEpisodesUpdate(
-                            source = source,
-                            anime = anime,
-                            fetchDetails = !anime.initialized,
-                            fetchEpisodes = true,
-                        ).getOrThrow()
-                        episodes = getEpisodes.await(anime.id)
-                        episode = episodes.singleOrNull { it.url == media.episodeUrl }
-                            ?: episodes.singleOrNull {
-                                media.number > 0 &&
-                                    it.episodeNumber == media.number &&
-                                    WatchMedia.normalize(it.name) == WatchMedia.normalize(media.episode)
-                            }
-                    }
-                    requireNotNull(episode) { "Episodio non disponibile nella tua estensione. Aggiornala e riprova." }
-                    val local = media.copy(sourceId = source.id, animeUrl = anime.url, episodeUrl = episode.url)
-                    WatchSelection(media, local.key, anime.id, episode.id)
-                }
+            val cached = prepared?.takeIf {
+                it.remote.key == media.key &&
+                    Injekt.get<AnimeSourceManager>().get(media.sourceId) != null
             }
+            val result = cached ?: resolveCatalog(media)
             if (generation == resolutionGeneration &&
                 controller.active &&
                 controller.state.value.host == wasHost &&
@@ -248,7 +279,10 @@ class WatchTogetherManager private constructor(private val application: Applicat
                     resolutionGeneration
                 ) {
                     mutableOpening.value =
-                        WatchOpeningState(error = "La fonte non ha risposto in tempo. Riprova.")
+                        WatchOpeningState(
+                            error = "La fonte non ha risposto in tempo. Riprova.",
+                            problem = WatchProblem.SourceError,
+                        )
                 }
             } else {
                 throw e
@@ -259,8 +293,55 @@ class WatchTogetherManager private constructor(private val application: Applicat
                     error =
                     (e as? IllegalArgumentException)?.message
                         ?: "Non riesco a caricare l'episodio dalla tua fonte. Riprova.",
+                    problem = (e as? WatchResolveFailure)?.problem ?: WatchProblem.SourceError,
                 )
             }
+        }
+    }
+
+    private suspend fun resolveCatalog(media: WatchMedia): WatchSelection = withTimeout(45_000) {
+        withContext(Dispatchers.IO) {
+            val sourceManager = Injekt.get<AnimeSourceManager>()
+            sourceManager.isInitialized.first { it }
+            val source = sourceManager.get(media.sourceId)
+                ?: throw WatchResolveFailure(
+                    WatchProblem.MissingSource,
+                    "Serve la stessa estensione del tuo amico, installata e attendibile.",
+                )
+            require(media.animeUrl.isNotBlank() && media.episodeUrl.isNotBlank()) {
+                "Questo contenuto non ha un riferimento condivisibile. L'host deve scegliere un titolo da un'estensione."
+            }
+            require(
+                source is AnimeHttpSource && WatchCatalogReference.isAllowed(media.animeUrl, source.baseUrl),
+            ) {
+                "Il riferimento al titolo non è compatibile con la tua estensione. Aggiornala e riprova."
+            }
+            val entry = SAnime.create().apply {
+                url = media.animeUrl
+                title = media.title
+            }
+            val anime = Injekt.get<NetworkToLocalAnime>().await(entry.toDomainAnime(source.id))
+            val getEpisodes = Injekt.get<GetEpisodesByAnimeId>()
+            var episodes = getEpisodes.await(anime.id)
+            var episode = episodes.singleOrNull { it.url == media.episodeUrl }
+            if (episode == null) {
+                Injekt.get<UpdateAnimeFromRemote>().awaitEpisodesUpdate(
+                    source = source,
+                    anime = anime,
+                    fetchDetails = !anime.initialized,
+                    fetchEpisodes = true,
+                ).getOrThrow()
+                episodes = getEpisodes.await(anime.id)
+                episode = episodes.singleOrNull { it.url == media.episodeUrl }
+                    ?: episodes.singleOrNull {
+                        media.number > 0 &&
+                            it.episodeNumber == media.number &&
+                            WatchMedia.normalize(it.name) == WatchMedia.normalize(media.episode)
+                    }
+            }
+            requireNotNull(episode) { "Episodio non disponibile nella tua estensione. Aggiornala e riprova." }
+            val local = media.copy(sourceId = source.id, animeUrl = anime.url, episodeUrl = episode.url)
+            WatchSelection(media, local.key, anime.id, episode.id)
         }
     }
 

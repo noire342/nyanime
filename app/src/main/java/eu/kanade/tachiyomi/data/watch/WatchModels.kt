@@ -52,6 +52,11 @@ data class WatchPlayback(
     val buffering: Boolean,
     val speed: Double,
     val ended: Boolean = false,
+    val problem: WatchProblem = WatchProblem.None,
+    val upcoming: WatchMedia? = null,
+    val canAdvance: Boolean = true,
+    val preparedNextKey: String? = null,
+    val nextProblem: WatchProblem = WatchProblem.None,
 )
 
 /** A source may refresh an episode URL. Only the exact locally resolved entry inherits the room identity. */
@@ -70,6 +75,7 @@ interface WatchPlayer {
     fun seek(seconds: Double)
     fun speed(value: Double)
     fun userResumed() {}
+    fun advance(media: WatchMedia) {}
 }
 
 enum class WatchPhase {
@@ -79,13 +85,39 @@ enum class WatchPhase {
     Playing,
     Paused,
     Buffering,
+    Starting,
     Reconnecting,
     DifferentVideo,
     Closed,
     Failed,
 }
 
-data class WatchMember(val id: String, val name: String, val ready: Boolean, val buffering: Boolean)
+@Serializable
+enum class WatchProblem {
+    None,
+    Opening,
+    Buffering,
+    MissingSource,
+    SourceError,
+    DifferentEdition,
+    LocalPause,
+    Connection,
+}
+
+data class WatchMember(
+    val id: String,
+    val name: String,
+    val ready: Boolean,
+    val buffering: Boolean,
+    val problem: WatchProblem = WatchProblem.None,
+    val nextProblem: WatchProblem = WatchProblem.None,
+)
+
+@Serializable
+data class WatchSkip(val id: Long, val label: String, val target: Double, val deadline: Long? = null)
+
+@Serializable
+data class WatchNext(val id: Long, val media: WatchMedia, val deadline: Long? = null)
 
 data class WatchRoomState(
     val phase: WatchPhase = WatchPhase.Idle,
@@ -102,6 +134,12 @@ data class WatchRoomState(
     val localHold: Boolean = false,
     val playRequested: Boolean = false,
     val message: String = "",
+    val resumeSeconds: Int? = null,
+    val skip: WatchSkip? = null,
+    val skipSeconds: Int? = null,
+    val upcoming: WatchMedia? = null,
+    val next: WatchNext? = null,
+    val nextSeconds: Int? = null,
 )
 
 @Serializable
@@ -113,6 +151,10 @@ data class WatchPeerStatus(
     val ready: Boolean,
     val buffering: Boolean,
     val media: WatchMedia? = null,
+    val problem: WatchProblem = WatchProblem.None,
+    val canAdvance: Boolean = true,
+    val preparedNextKey: String? = null,
+    val nextProblem: WatchProblem = WatchProblem.None,
 )
 
 @Serializable
@@ -137,6 +179,17 @@ data class WatchMessage(
     val waitForEveryone: Boolean = true,
     val peers: Map<String, WatchPeerStatus> = emptyMap(),
     val acknowledgements: Map<String, Long> = emptyMap(),
+    val coordinationVersion: Int = 1,
+    val resumeAt: Long? = null,
+    val pausedBy: String = "",
+    val skip: WatchSkip? = null,
+    val upcoming: WatchMedia? = null,
+    val next: WatchNext? = null,
+    val cueId: Long = 0,
+    val problem: WatchProblem = WatchProblem.None,
+    val canAdvance: Boolean = true,
+    val preparedNextKey: String? = null,
+    val nextProblem: WatchProblem = WatchProblem.None,
 ) {
     fun valid(): Boolean = version == 1 &&
         sequence > 0 &&
@@ -150,12 +203,30 @@ data class WatchMessage(
         name.length <= 32 &&
         target.length <= 64 &&
         command.length <= 16 &&
+        coordinationVersion in 1..2 &&
+        (resumeAt == null || resumeAt >= 0) &&
+        pausedBy.length <= 32 &&
+        cueId >= 0 &&
+        (preparedNextKey == null || preparedNextKey.length <= 2200) &&
+        (upcoming == null || upcoming.valid()) &&
+        (
+            skip == null ||
+                (
+                    skip.id > 0 &&
+                        skip.label.length in 1..100 &&
+                        skip.target.isFinite() &&
+                        skip.target in 0.0..86_400.0 &&
+                        (skip.deadline == null || skip.deadline >= 0)
+                    )
+            ) &&
+        (next == null || (next.id > 0 && next.media.valid() && (next.deadline == null || next.deadline >= 0))) &&
         (media == null || media.valid()) &&
         peers.size <= 8 &&
         acknowledgements.size <= 8 &&
         peers.all { (key, value) ->
             key.matches(Regex("[0-9a-f]{64}")) &&
                 value.name.length <= 32 &&
+                (value.preparedNextKey == null || value.preparedNextKey.length <= 2200) &&
                 (value.media == null || value.media.valid())
         } &&
         acknowledgements.all { (key, value) -> key.matches(Regex("[0-9a-f]{64}")) && value >= 0 }
@@ -186,16 +257,3 @@ class WatchClock {
 }
 
 data class WatchCorrection(val seek: Double? = null, val speed: Double)
-
-object WatchSynchronizer {
-    fun correct(position: Double, target: Double, speed: Double, paused: Boolean, canSeek: Boolean): WatchCorrection {
-        val drift = target - position
-        if (canSeek && abs(drift) > if (paused) 0.18 else 1.5) return WatchCorrection(target, speed)
-        val factor = when {
-            paused || abs(drift) < 0.25 -> 1.0
-            drift > 0 -> 1.03
-            else -> 0.97
-        }
-        return WatchCorrection(speed = speed * factor)
-    }
-}

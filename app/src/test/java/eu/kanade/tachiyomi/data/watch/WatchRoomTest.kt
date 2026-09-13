@@ -20,13 +20,23 @@ class WatchRoomTest {
         var speed = 1.0
         var seeks = 0
         var resumed = 0
+        var ended = false
+        var upcoming: WatchMedia? = null
+        var canAdvance = true
+        var preparedNextKey: String? = null
+        var problem = WatchProblem.None
+        var nextProblem = WatchProblem.None
+        var advances = 0
         private var position = 40.0
         private var last = now()
         override fun sample(): WatchPlayback {
             val at = now()
             if (!paused && ready && !buffering) position += (at - last) / 1000.0 * speed
             last = at
-            return WatchPlayback(media, position, paused, ready, buffering, speed)
+            return WatchPlayback(
+                media, position, paused, ready, buffering, speed, ended, problem, upcoming,
+                canAdvance, preparedNextKey, nextProblem,
+            )
         }
         override fun pause(paused: Boolean) {
             sample()
@@ -43,6 +53,13 @@ class WatchRoomTest {
         }
         override fun userResumed() {
             resumed++
+        }
+        override fun advance(media: WatchMedia) {
+            advances++
+            this.media = media.copy(duration = 1400.0)
+            upcoming = null
+            ended = false
+            seek(0.0)
         }
     }
 
@@ -100,7 +117,7 @@ class WatchRoomTest {
             scope.advanceTimeBy(5000)
             scope.runCurrent()
         }
-        fun advance(ms: Long = 3000) {
+        fun advance(ms: Long = 5000) {
             scope.advanceTimeBy(ms)
             scope.runCurrent()
         }
@@ -302,15 +319,6 @@ class WatchRoomTest {
     }
 
     @Test
-    fun correctionDeadbandAndBoundedRates() {
-        assertEquals(1.0, WatchSynchronizer.correct(20.0, 20.1, 1.0, false, true).speed)
-        assertEquals(1.03, WatchSynchronizer.correct(20.0, 20.8, 1.0, false, true).speed)
-        assertEquals(0.97, WatchSynchronizer.correct(20.0, 19.2, 1.0, false, true).speed)
-        assertEquals(50.0, WatchSynchronizer.correct(20.0, 50.0, 1.0, false, true).seek)
-        assertEquals(null, WatchSynchronizer.correct(20.0, 50.0, 1.0, false, false).seek)
-    }
-
-    @Test
     fun delayedOlderSeekCannotUndoLatestSeek() = runTest {
         val room = Pairing(this)
         room.join()
@@ -381,5 +389,228 @@ class WatchRoomTest {
         assertEquals(8, room.host.state.value.members.size)
         assertFalse(guests.last().active)
         assertEquals(WatchPhase.Failed, guests.last().state.value.phase)
+    }
+
+    @Test
+    fun stableReadinessAndSharedCountdownAreCancelledByPause() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.resumeByUser()
+        room.advance(1500)
+        assertTrue(room.hostPlayer.paused)
+        assertEquals(WatchPhase.Starting, room.host.state.value.phase)
+        assertEquals(room.host.state.value.resumeSeconds, room.guest.state.value.resumeSeconds)
+        room.guest.requestPause(true)
+        room.advance()
+        assertTrue(room.hostPlayer.paused)
+        assertTrue(room.guestPlayer.paused)
+        assertEquals(null, room.host.state.value.resumeSeconds)
+        assertTrue(room.host.state.value.message.contains("Friend"))
+        assertTrue(room.guest.state.value.message.contains("Friend"))
+    }
+
+    @Test
+    fun readinessFlappingNeverProducesRepeatedStarts() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.resumeByUser()
+        repeat(4) {
+            room.guestPlayer.buffering = true
+            room.advance(500)
+            room.guestPlayer.buffering = false
+            room.advance(750)
+            assertTrue(room.hostPlayer.paused)
+        }
+        room.advance()
+        assertFalse(room.hostPlayer.paused)
+        assertFalse(room.guestPlayer.paused)
+    }
+
+    @Test
+    fun sharedSkipIsAppliedOnceAndLateDuplicateIsHarmless() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.offerSkip("opening-1", "Salta apertura", 120.0)
+        room.advance()
+        room.guest.requestSkip()
+        room.guest.requestSkip()
+        room.advance()
+        assertEquals(120.0, room.hostPlayer.sample().position, 0.2)
+        assertEquals(120.0, room.guestPlayer.sample().position, 0.2)
+        val seeks = room.hostPlayer.seeks
+        room.host.offerSkip("opening-1", "Salta apertura", 120.0)
+        room.advance()
+        assertEquals(null, room.host.state.value.skip)
+        assertEquals(seeks, room.hostPlayer.seeks)
+    }
+
+    @Test
+    fun automaticSkipWaitsForPlaybackAndGuestCanCancelItForEveryone() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.offerSkip("opening-1", "Salta apertura", 120.0, 3)
+        room.advance(8000)
+        assertEquals(40.0, room.hostPlayer.sample().position, 0.2)
+        room.host.resumeByUser()
+        room.advance(3750)
+        assertNotNull(room.guest.state.value.skipSeconds)
+        room.guest.cancelSkip()
+        room.advance(7000)
+        assertEquals(null, room.host.state.value.skip)
+        assertTrue(room.hostPlayer.sample().position < 60)
+    }
+
+    @Test
+    fun nextEpisodeWaitsForPreparationAndCancellationIsShared() = runTest {
+        val room = Pairing(this)
+        room.join()
+        val next = room.hostPlayer.media!!.copy(episodeUrl = "/2", episode = "Episode 2", number = 2.0, duration = 0.0)
+        room.hostPlayer.upcoming = next
+        room.hostPlayer.ended = true
+        room.advance()
+        assertEquals(next, room.guest.state.value.next?.media)
+        assertEquals(null, room.host.state.value.nextSeconds)
+        room.guestPlayer.preparedNextKey = next.key
+        room.advance(1000)
+        assertNotNull(room.host.state.value.nextSeconds)
+        room.guest.cancelNext()
+        room.advance(15_000)
+        assertEquals(0, room.hostPlayer.advances)
+        assertEquals(null, room.guest.state.value.next)
+    }
+
+    @Test
+    fun nextEpisodeRespectsTimerHoldAndAdvancesOnlyOnceAfterAllAreReady() = runTest {
+        val room = Pairing(this)
+        room.join()
+        val next = room.hostPlayer.media!!.copy(episodeUrl = "/2", episode = "Episode 2", number = 2.0, duration = 0.0)
+        room.hostPlayer.upcoming = next
+        room.hostPlayer.ended = true
+        room.guestPlayer.preparedNextKey = next.key
+        room.guestPlayer.canAdvance = false
+        room.advance(15_000)
+        assertEquals(0, room.hostPlayer.advances)
+        room.guestPlayer.canAdvance = true
+        room.advance(15_000)
+        assertEquals(1, room.hostPlayer.advances)
+        room.advance(15_000)
+        assertEquals(1, room.hostPlayer.advances)
+        assertTrue(room.hostPlayer.paused)
+    }
+
+    @Test
+    fun reconnectedGuestWaitsForFreshHostStateInsteadOfReusingPlayIntent() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.resumeByUser()
+        room.advance()
+        assertFalse(room.guestPlayer.paused)
+        val guestEndpoint = room.network.endpoints[1]
+        guestEndpoint.online = false
+        guestEndpoint.connection(0)
+        room.advance(1000)
+        assertTrue(room.guestPlayer.paused)
+        room.network.endpoints[0].online = false
+        guestEndpoint.online = true
+        guestEndpoint.connection(2)
+        room.advance(1000)
+        assertTrue(room.guestPlayer.paused)
+        assertEquals(WatchPhase.Waiting, room.guest.state.value.phase)
+        room.network.endpoints[0].online = true
+        room.advance(6000)
+        assertFalse(room.hostPlayer.paused)
+        assertFalse(room.guestPlayer.paused)
+    }
+
+    @Test
+    fun connectionLossDiscardsNextEpisodeDeadlineBeforeReconnecting() = runTest {
+        val room = Pairing(this)
+        room.join()
+        val next = room.hostPlayer.media!!.copy(episodeUrl = "/2", episode = "Episode 2", number = 2.0, duration = 0.0)
+        room.hostPlayer.upcoming = next
+        room.hostPlayer.ended = true
+        room.guestPlayer.preparedNextKey = next.key
+        room.advance(1000)
+        assertNotNull(room.host.state.value.nextSeconds)
+        val endpoint = room.network.endpoints[0]
+        endpoint.online = false
+        endpoint.connection(0)
+        room.advance(14_000)
+        assertEquals(0, room.hostPlayer.advances)
+        assertEquals(null, room.host.state.value.nextSeconds)
+        assertEquals(null, room.guest.state.value.nextSeconds)
+        assertEquals(null, room.guest.state.value.next?.deadline)
+        endpoint.online = true
+        endpoint.connection(2)
+        room.advance(4500)
+        assertEquals(0, room.hostPlayer.advances)
+        assertNotNull(room.host.state.value.nextSeconds)
+        room.advance(12_000)
+        assertEquals(1, room.hostPlayer.advances)
+    }
+
+    @Test
+    fun unresolvedGuestCanCancelTheSharedNextCue() = runTest {
+        val room = Pairing(this)
+        room.join()
+        val next = room.hostPlayer.media!!.copy(episodeUrl = "/2", episode = "Episode 2", number = 2.0, duration = 0.0)
+        room.hostPlayer.upcoming = next
+        room.hostPlayer.ended = true
+        room.guestPlayer.media = null
+        room.guestPlayer.ready = false
+        room.advance()
+        assertEquals(WatchPhase.DifferentVideo, room.guest.state.value.phase)
+        assertNotNull(room.guest.state.value.next)
+        room.guest.cancelNext()
+        room.advance()
+        assertEquals(null, room.host.state.value.next)
+        assertEquals(null, room.guest.state.value.next)
+        assertEquals(0, room.hostPlayer.advances)
+    }
+
+    @Test
+    fun silentlyLostGuestReadinessCannotAdvanceAnEpisode() = runTest {
+        val room = Pairing(this)
+        room.join()
+        val next = room.hostPlayer.media!!.copy(episodeUrl = "/2", episode = "Episode 2", number = 2.0, duration = 0.0)
+        room.hostPlayer.upcoming = next
+        room.hostPlayer.ended = true
+        room.guestPlayer.preparedNextKey = next.key
+        room.advance(1000)
+        assertNotNull(room.host.state.value.nextSeconds)
+        room.network.endpoints[1].online = false
+        room.advance(11_000)
+        assertEquals(0, room.hostPlayer.advances)
+        assertEquals(null, room.host.state.value.nextSeconds)
+        assertEquals(WatchProblem.Connection, room.host.state.value.members.last().problem)
+        assertTrue(room.host.state.value.message.contains("Friend"))
+        assertTrue(room.host.state.value.message.contains("Riconnessione"))
+    }
+
+    @Test
+    fun automaticSkipPublishesTheNewPositionAndSeeksOnlyOnce() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.offerSkip("opening-1", "Salta apertura", 120.0, 3)
+        room.host.resumeByUser()
+        room.advance(12_000)
+        assertEquals(1, room.hostPlayer.seeks)
+        assertEquals(null, room.host.state.value.skip)
+        assertTrue(room.hostPlayer.sample().position >= 120)
+        assertTrue(abs(room.hostPlayer.sample().position - room.guestPlayer.sample().position) < 0.4)
+        val timeline = room.network.endpoints[0].sent.last { it.type == WatchMessageType.Timeline }
+        assertTrue(timeline.position >= 120)
+    }
+
+    @Test
+    fun actionablePeerProblemsAreVisibleWithoutSharingSourceErrors() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.guestPlayer.ready = false
+        room.guestPlayer.problem = WatchProblem.MissingSource
+        room.advance()
+        assertTrue(room.host.state.value.message.contains("Friend"))
+        assertTrue(room.host.state.value.message.contains("Estensione"))
+        assertEquals(WatchProblem.MissingSource, room.host.state.value.members.last().problem)
     }
 }

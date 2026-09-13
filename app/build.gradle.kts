@@ -338,6 +338,7 @@ dependencies {
     implementation(libs.cast.framework)
     implementation(libs.media.router)
     implementation(libs.watch.secp256k1)
+    implementation(libs.watch.qr)
     implementation(libs.watch.secp256k1.android)
     testRuntimeOnly(libs.watch.secp256k1.jvm)
     // seeker seek bar

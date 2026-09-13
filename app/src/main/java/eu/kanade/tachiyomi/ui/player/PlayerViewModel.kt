@@ -75,6 +75,7 @@ import eu.kanade.tachiyomi.data.track.myanimelist.MyAnimeList
 import eu.kanade.tachiyomi.data.watch.WatchMedia
 import eu.kanade.tachiyomi.data.watch.WatchPlayback
 import eu.kanade.tachiyomi.data.watch.WatchPlayer
+import eu.kanade.tachiyomi.data.watch.WatchProblem
 import eu.kanade.tachiyomi.data.watch.WatchTogetherManager
 import eu.kanade.tachiyomi.ui.player.controls.components.IndexedSegment
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.HosterState
@@ -270,6 +271,9 @@ class PlayerViewModel @JvmOverloads constructor(
                             !activity.player.isExiting,
                         buffering = load.buffering || load.seeking || isSeeking.value,
                         speed = playbackSpeed.value.toDouble(),
+                        problem = if (load.failure != null) WatchProblem.SourceError else WatchProblem.None,
+                        upcoming = if (duration > 0 && duration - position <= 90) watchNextMedia() else null,
+                        canAdvance = canWatchAdvance(),
                         ended = runCatching { MPVLib.getPropertyBoolean("eof-reached") == true }.getOrDefault(false),
                     )
                 }
@@ -288,6 +292,16 @@ class PlayerViewModel @JvmOverloads constructor(
                 }
                 override fun userResumed() {
                     sleepTimer.acknowledgeUserPlayback()
+                }
+                override fun advance(media: WatchMedia) {
+                    val target = getAdjacentEpisodeId(previous = false)
+                    if (watchTogether.state.value.host &&
+                        canWatchAdvance() &&
+                        watchNextMedia()?.key == media.key &&
+                        target >= 0
+                    ) {
+                        activity.changeEpisode(target, autoPlay = true, fromWatchRoom = true)
+                    }
                 }
             },
         ) { animeId, episodeId ->
@@ -434,6 +448,36 @@ class PlayerViewModel @JvmOverloads constructor(
     val remainingTime = sleepTimer.remainingTime
     val sleepTimerEndEpisode = sleepTimer.endEpisodeId
 
+    private fun watchNextMedia(): WatchMedia? {
+        val anime = currentAnime.value ?: return null
+        val id = getAdjacentEpisodeId(previous = false)
+        val next = currentPlaylist.value.firstOrNull { it.id == id } ?: return null
+        return WatchMedia(
+            anime.title.take(240),
+            next.name.take(240),
+            next.episode_number.toDouble(),
+            0.0,
+            anime.source,
+            anime.url,
+            next.url,
+        )
+    }
+
+    private fun canWatchAdvance(): Boolean {
+        val currentId = currentEpisode.value?.id ?: return false
+        val cast = CastController.get(activity.applicationContext).state.value
+        return !activity.player.isExiting &&
+            !remoteProgressOwned &&
+            !cast.active &&
+            !cast.connecting &&
+            !isLoadingEpisode.value &&
+            sheetShown.value in listOf(Sheets.None, Sheets.WatchTogether) &&
+            panelShown.value == Panels.None &&
+            dialogShown.value == Dialogs.None &&
+            sleepTimer.allowsAutoPlay(currentId) &&
+            (!watchTogether.state.value.host || playerPreferences.autoplayEnabled().get())
+    }
+
     private fun canAutoAdvance(): Boolean {
         val currentId = currentEpisode.value?.id ?: return false
         val cast = CastController.get(activity.applicationContext).state.value
@@ -458,6 +502,11 @@ class PlayerViewModel @JvmOverloads constructor(
         val currentId = currentEpisode.value?.id ?: return
         if (isLoadingEpisode.value || remoteProgressOwned || !playbackLoadState.value.canSaveProgress) return
         sleepTimer.onEpisodeEnded(currentId)
+        if (watchTogether.active) {
+            completion.cancel()
+            hideControls()
+            return
+        }
         completion.onEnded(
             nextEpisodeId = getAdjacentEpisodeId(previous = false).takeIf { it >= 0 },
             autoPlay = playerPreferences.autoplayEnabled().get(),
@@ -465,9 +514,13 @@ class PlayerViewModel @JvmOverloads constructor(
         if (nextEpisodePrompt.value != null) hideControls()
     }
 
-    fun cancelNextEpisode() = completion.cancel()
+    fun cancelNextEpisode() {
+        if (watchTogether.active) watchTogether.cancelNext() else completion.cancel()
+    }
 
-    fun playNextEpisodeNow() = completion.playNow()
+    fun playNextEpisodeNow() {
+        if (watchTogether.active) watchTogether.playNextNow() else completion.playNow()
+    }
 
     fun prepareMediaChange(episodeId: Long?) {
         completion.playbackRestarted()
@@ -2295,6 +2348,31 @@ class PlayerViewModel @JvmOverloads constructor(
     var waitingSkipIntro = defaultWaitingTime
 
     fun setChapter(position: Float) {
+        if (watchTogether.active) {
+            _skipIntroText.value = null
+            if (watchTogether.state.value.host) {
+                val segment = getCurrentChapter(position)
+                if (introSkipEnabled && segment != null && segment.value.chapterType != ChapterType.Other) {
+                    val target = ChapterUtils.skipTarget(chapters.value, segment.index, pos.value, duration.value)
+                    val key = currentEpisode.value?.id.toString() + ":" + segment.value.start
+                    watchTogether.offerSkip(
+                        key,
+                        "Salta " + segment.value.name,
+                        target.toDouble(),
+                        if (netflixStyle) {
+                            defaultWaitingTime
+                        } else if (autoSkip) {
+                            3
+                        } else {
+                            null
+                        },
+                    )
+                } else {
+                    watchTogether.offerSkip(null)
+                }
+            }
+            return
+        }
         getCurrentChapter(position)?.let { (chapterIndex, chapter) ->
             if (currentChapter.value != chapter) {
                 _currentChapter.update { _ -> chapter }
@@ -2365,6 +2443,10 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun onSkipIntro() {
+        if (watchTogether.active) {
+            watchTogether.requestSkip()
+            return
+        }
         getCurrentChapter()?.let { (chapterIndex, chapter) ->
             // this stops the counter
             if (waitingSkipIntro > 0 && netflixStyle) {

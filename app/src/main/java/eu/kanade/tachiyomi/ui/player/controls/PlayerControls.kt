@@ -770,6 +770,7 @@ fun PlayerControls(
         val anime by viewModel.currentAnime.collectAsState()
         val playlist by viewModel.currentPlaylist.collectAsState()
         val nextEpisodePrompt by viewModel.nextEpisodePrompt.collectAsState()
+        val watchRoom by viewModel.watchTogether.state.collectAsState()
 
         // Reading configuration also refreshes visibility when entering or leaving PiP.
         val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -779,7 +780,12 @@ fun PlayerControls(
             contentAlignment = Alignment.BottomEnd,
         ) {
             AnimatedVisibility(
-                visible = nextEpisodePrompt != null &&
+                visible =
+                (
+                    nextEpisodePrompt != null ||
+                        watchRoom.active &&
+                        (watchRoom.skip != null || watchRoom.next != null || watchRoom.resumeSeconds != null)
+                    ) &&
                     !areControlsLocked &&
                     !inPip &&
                     sheetShown == Sheets.None &&
@@ -791,7 +797,17 @@ fun PlayerControls(
             ) {
                 val prompt = nextEpisodePrompt
                 val nextEpisode = playlist.firstOrNull { it.id == prompt?.episodeId }
-                if (prompt != null && nextEpisode != null) {
+                if (watchRoom.active) {
+                    eu.kanade.tachiyomi.ui.watch.WatchRoomCues(
+                        watchRoom,
+                        { viewModel.watchTogether.requestSkip() },
+                        { viewModel.watchTogether.cancelSkip() },
+                        viewModel::playNextEpisodeNow,
+                        viewModel::cancelNextEpisode,
+                        reduceMotion = reduceMotion,
+                        artwork = { anime?.let { SourceHomeArtwork(it, Modifier.fillMaxSize()) } },
+                    )
+                } else if (prompt != null && nextEpisode != null) {
                     NextEpisodeCard(
                         seriesTitle = anime?.title.orEmpty(),
                         episodeTitle = nextEpisode.name,

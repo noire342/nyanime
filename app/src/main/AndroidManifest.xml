@@ -65,8 +65,16 @@
             android:theme="@style/Theme.Tachiyomi" />
         <activity
             android:name=".ui.watch.WatchTogetherActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Tachiyomi" />
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.Tachiyomi">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="nyanime" android:host="watch" android:path="/v1" />
+            </intent-filter>
+        </activity>
         <service
             android:name=".data.watch.WatchSessionService"
             android:exported="false"

@@ -18,6 +18,54 @@ import eu.kanade.tachiyomi.data.watch.WatchRoomState
 import eu.kanade.tachiyomi.ui.watch.WatchTogetherContent
 
 @PreviewTest
+@Preview(name = "TogetherCountdown", widthDp = 393, heightDp = 180, locale = "it")
+@Composable
+fun WatchStartScreenshot() = WatchCuesPreview(WatchRoomState(active = true, resumeSeconds = 2))
+
+@PreviewTest
+@Preview(name = "TogetherSkip", widthDp = 393, heightDp = 240, locale = "it")
+@Preview(name = "TogetherSkipLarge", widthDp = 320, heightDp = 400, fontScale = 1.5f, locale = "it")
+@Composable
+fun WatchSkipScreenshot() = WatchCuesPreview(
+    WatchRoomState(
+        active = true,
+        skip = eu.kanade.tachiyomi.data.watch.WatchSkip(1, "Salta apertura", 90.0),
+        skipSeconds = 3,
+    ),
+)
+
+@PreviewTest
+@Preview(name = "TogetherNext", widthDp = 393, heightDp = 440, locale = "it")
+@Preview(name = "TogetherNextLarge", widthDp = 320, heightDp = 650, fontScale = 1.5f, locale = "it")
+@Preview(name = "TogetherNextLandscape", widthDp = 800, heightDp = 360, locale = "it")
+@Composable
+fun WatchNextScreenshot() = WatchCuesPreview(
+    WatchRoomState(
+        active = true,
+        next = eu.kanade.tachiyomi.data.watch.WatchNext(
+            1,
+            WatchMedia(
+                "Una notte tra le stelle",
+                "Episodio 4 · La promessa sotto la luna",
+                4.0,
+                0.0,
+            ),
+        ),
+    ),
+)
+
+@Composable
+private fun WatchCuesPreview(room: WatchRoomState) {
+    TachiyomiPreviewTheme(appTheme = AppTheme.NYANIME, modernUi = true) {
+        Surface {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
+                eu.kanade.tachiyomi.ui.watch.WatchRoomCues(room, {}, {}, {}, {})
+            }
+        }
+    }
+}
+
+@PreviewTest
 @Preview(name = "WatchEntry", widthDp = 393, heightDp = 800, locale = "it")
 @Preview(name = "WatchEntryLandscape", widthDp = 800, heightDp = 360, locale = "it")
 @Preview(name = "WatchEntryLargeText", widthDp = 320, heightDp = 800, fontScale = 1.5f, locale = "it")

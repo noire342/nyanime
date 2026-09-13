@@ -6,7 +6,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
@@ -68,22 +67,46 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.player.components.PlayerSheet
 import eu.kanade.presentation.theme.TachiyomiTheme
+import eu.kanade.tachiyomi.data.watch.WatchInvite
 import eu.kanade.tachiyomi.data.watch.WatchOpeningState
 import eu.kanade.tachiyomi.data.watch.WatchPhase
+import eu.kanade.tachiyomi.data.watch.WatchProblem
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
 import eu.kanade.tachiyomi.data.watch.WatchTogetherManager
+import eu.kanade.tachiyomi.data.watch.description
+import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
 
-class WatchTogetherActivity : ComponentActivity() {
+class WatchTogetherActivity : BaseActivity() {
+    private var incomingCode by mutableStateOf("")
+    private var inviteError by mutableStateOf<String?>(null)
+
+    private fun acceptIntent(intent: Intent) {
+        if (intent.action != Intent.ACTION_VIEW) return
+        val parsed = runCatching { WatchInvite.codeFromLink(intent.dataString.orEmpty(), System.currentTimeMillis()) }
+        incomingCode = parsed.getOrDefault("")
+        inviteError = parsed.exceptionOrNull()?.message
+        // Keep invitation secrets out of saved activity state and subsequent launches.
+        intent.data = null
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        acceptIntent(intent)
+    }
+
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        registerSecureActivity(this)
         enableEdgeToEdge()
+        acceptIntent(intent)
         WatchTogetherManager.get(this).present(this)
         setContent {
             TachiyomiTheme {
@@ -98,7 +121,25 @@ class WatchTogetherActivity : ComponentActivity() {
                     },
                 ) { padding ->
                     Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
-                        WatchTogetherPanel(onChooseVideo = ::finish)
+                        WatchTogetherPanel(
+                            onChooseVideo = {
+                                if (isTaskRoot) {
+                                    startActivity(
+                                        Intent(
+                                            this@WatchTogetherActivity,
+                                            eu.kanade.tachiyomi.ui.main.MainActivity::class.java,
+                                        ),
+                                    )
+                                }
+                                finish()
+                            },
+                            incomingCode = incomingCode,
+                            inviteError = inviteError,
+                            onInviteConsumed = {
+                                incomingCode = ""
+                                inviteError = null
+                            },
+                        )
                     }
                 }
             }
@@ -120,11 +161,24 @@ fun WatchTogetherButton() {
 }
 
 @Composable
-fun WatchTogetherPanel(onChooseVideo: () -> Unit) {
+fun WatchTogetherPanel(
+    onChooseVideo: () -> Unit,
+    incomingCode: String = "",
+    inviteError: String? = null,
+    onInviteConsumed: () -> Unit = {},
+) {
     val context = LocalContext.current
     val manager = remember { WatchTogetherManager.get(context) }
     val room by manager.controller.state.collectAsState()
     val opening by manager.opening.collectAsState()
+    val preparation by manager.preparation.collectAsState()
+    var showQr by remember { mutableStateOf(false) }
+    val invitationLink = remember(room.invite) {
+        runCatching { WatchInvite.parse(room.invite, System.currentTimeMillis()).link() }.getOrNull()
+    }
+    if (showQr && room.active && invitationLink != null) {
+        WatchQrDialog(invitationLink) { showQr = false }
+    }
     var name by rememberSaveable { mutableStateOf(manager.displayName) }
     var copied by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(copied) {
@@ -139,13 +193,26 @@ fun WatchTogetherPanel(onChooseVideo: () -> Unit) {
     }
     WatchTogetherContent(
         room = room, opening = opening, name = name, onName = { name = it.take(32) },
+        incomingCode = incomingCode, inviteError = inviteError, preparation = preparation,
+        onQr = { showQr = true },
+        onSkip = manager.controller::requestSkip, onCancelSkip = manager.controller::cancelSkip,
+        onNext = manager.controller::playNextNow, onCancelNext = manager.controller::cancelNext,
+        onExtensions = {
+            context.startActivity(
+                Intent(context, eu.kanade.tachiyomi.ui.main.MainActivity::class.java).apply {
+                    action = eu.kanade.tachiyomi.core.common.Constants.SHORTCUT_ANIMEEXTENSIONS
+                },
+            )
+        },
         onCreate = {
             manager.displayName = name
             manager.createRoom(name)
         },
         onJoin = { code ->
             manager.displayName = name
+            if (room.active) manager.controller.leave()
             manager.controller.join(code, name)
+            onInviteConsumed()
         },
         onCopy = {
             context.getSystemService(
@@ -159,7 +226,10 @@ fun WatchTogetherPanel(onChooseVideo: () -> Unit) {
                 type = "text/plain"
                 putExtra(
                     Intent.EXTRA_TEXT,
-                    "Guardiamo insieme su Nyanime!\nApri Guarda insieme → Inserisci codice:\n" + room.invite,
+                    "Guardiamo insieme su Nyanime!\n" +
+                        invitationLink.orEmpty() +
+                        "\n\nSe il link non si apre, usa Guarda insieme → Inserisci codice:\n" +
+                        room.invite,
                 )
             }
             context.startActivity(Intent.createChooser(intent, "Invita un amico"))
@@ -176,6 +246,7 @@ fun WatchTogetherPanel(onChooseVideo: () -> Unit) {
         onResync = {
             manager.controller.resync()
             manager.retryOpening()
+            manager.retryPreparation()
         },
         onLeave = manager.controller::leave,
         onSharedControls = manager.controller::setSharedControls,
@@ -208,9 +279,24 @@ fun WatchTogetherContent(
     onChooseVideo: () -> Unit,
     copied: Boolean = false,
     onOpenPlayer: (() -> Unit)? = null,
+    incomingCode: String = "",
+    inviteError: String? = null,
+    preparation: WatchOpeningState = WatchOpeningState(),
+    onQr: () -> Unit = {},
+    onSkip: () -> Unit = {},
+    onCancelSkip: () -> Unit = {},
+    onNext: () -> Unit = {},
+    onCancelNext: () -> Unit = {},
+    onExtensions: () -> Unit = {},
 ) {
     var joining by rememberSaveable { mutableStateOf(false) }
-    var code by rememberSaveable { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    LaunchedEffect(incomingCode) {
+        if (incomingCode.isNotBlank()) {
+            code = incomingCode
+            joining = true
+        }
+    }
     var options by rememberSaveable { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     val motionDuration = if (modernMotionEnabled()) 180 else 0
@@ -232,6 +318,15 @@ fun WatchTogetherContent(
                     if (room.active) "La vostra stanza" else "Un codice. Lo stesso momento.",
                     color = colors.onSurfaceVariant,
                 )
+            }
+        }
+        if (inviteError != null) Text(inviteError, color = colors.error)
+        if (room.active && incomingCode.isNotBlank() && incomingCode != room.invite) {
+            Card {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Hai ricevuto un altro invito. Per entrare devi lasciare questa stanza.")
+                    Button(onClick = { onJoin(incomingCode) }) { Text("Lascia questa stanza ed entra") }
+                }
             }
         }
         if (!room.active) {
@@ -323,7 +418,19 @@ fun WatchTogetherContent(
                         opening.error ?: if (opening.loading) "Apro l'episodio dalla tua estensione…" else room.message,
                         color = if (opening.error != null) colors.error else colors.onSurfaceVariant,
                     )
-                    if (opening.error != null) TextButton(onClick = onResync) { Text("Riprova") }
+                    if (opening.error != null) {
+                        TextButton(
+                            onClick = if (opening.problem ==
+                                WatchProblem.MissingSource
+                            ) {
+                                onExtensions
+                            } else {
+                                onResync
+                            },
+                        ) {
+                            Text(if (opening.problem == WatchProblem.MissingSource) "Apri estensioni" else "Riprova")
+                        }
+                    }
                     if (room.host &&
                         room.media == null
                     ) {
@@ -336,6 +443,7 @@ fun WatchTogetherContent(
             }
             if (room.invite.isNotBlank() && (room.host || room.members.size < 2)) {
                 Text("Codice d'invito", style = MaterialTheme.typography.titleSmall)
+                TextButton(onClick = onQr) { Text("Mostra QR d'invito") }
                 SelectionContainer {
                     Text(room.invite, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -357,10 +465,14 @@ fun WatchTogetherContent(
             if (room.members.isNotEmpty()) {
                 Text("Nella stanza · " + room.members.size + "/8", style = MaterialTheme.typography.titleSmall)
                 room.members.forEachIndexed { index, member ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(member.name + if (index == 0) " · Host" else "", Modifier.weight(1f))
+                    val participant: @Composable (Modifier) -> Unit = { nameModifier ->
+                        Text(member.name + if (index == 0) " · Host" else "", nameModifier)
+                    }
+                    val status: @Composable () -> Unit = {
                         Text(
-                            if (member.buffering) {
+                            if (member.problem != WatchProblem.None) {
+                                member.problem.description()
+                            } else if (member.buffering) {
                                 "Caricamento"
                             } else if (member.ready) {
                                 "Pronto"
@@ -371,6 +483,40 @@ fun WatchTogetherContent(
                             color = if (member.ready && !member.buffering) colors.primary else colors.onSurfaceVariant,
                         )
                     }
+                    if (member.problem != WatchProblem.None || LocalDensity.current.fontScale > 1.3f) {
+                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            participant(Modifier)
+                            status()
+                        }
+                    } else {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            participant(Modifier.weight(1f).padding(end = 12.dp))
+                            status()
+                        }
+                    }
+                }
+            }
+            WatchRoomCues(room, onSkip, onCancelSkip, onNext, onCancelNext)
+            if (preparation.error != null) {
+                Text("Prossimo episodio: " + preparation.error, color = colors.error)
+                TextButton(
+                    onClick = if (preparation.problem ==
+                        WatchProblem.MissingSource
+                    ) {
+                        onExtensions
+                    } else {
+                        onResync
+                    },
+                ) {
+                    Text(
+                        if (preparation.problem ==
+                            WatchProblem.MissingSource
+                        ) {
+                            "Apri estensioni"
+                        } else {
+                            "Riprova preparazione"
+                        },
+                    )
                 }
             }
             if (room.media != null && (room.sharedControls || room.host || room.localHold)) {

@@ -51,6 +51,9 @@ fun NextEpisodeCard(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
+    statusText: String? = null,
+    showActions: Boolean = true,
+    playEnabled: Boolean = true,
     artwork: @Composable () -> Unit = { ArtworkPlaceholder(Modifier.size(64.dp, 88.dp)) },
 ) {
     val colors = MaterialTheme.colorScheme
@@ -73,22 +76,35 @@ fun NextEpisodeCard(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            val heading: @Composable (Modifier) -> Unit = { headingModifier ->
                 Text(
                     stringResource(AYMR.strings.player_up_next),
-                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                    modifier = headingModifier,
                     color = colors.onSurfaceVariant,
                     style = MaterialTheme.typography.labelLarge,
                 )
+            }
+            val countdown: @Composable () -> Unit = {
                 Text(
-                    stringResource(AYMR.strings.player_up_next_countdown, secondsRemaining),
+                    statusText ?: stringResource(AYMR.strings.player_up_next_countdown, secondsRemaining),
                     style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
                     color = colors.primary,
                 )
+            }
+            if (statusText != null || LocalDensity.current.fontScale > 1.3f) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    heading(Modifier)
+                    countdown()
+                }
+            } else {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    heading(Modifier.weight(1f).padding(end = 12.dp))
+                    countdown()
+                }
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -112,13 +128,13 @@ fun NextEpisodeCard(
                 }
             }
             LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
+                progress = { if (statusText == null) progress.coerceIn(0f, 1f) else 0f },
                 modifier = Modifier.fillMaxWidth().height(3.dp),
                 trackColor = colors.surfaceContainerHighest,
                 drawStopIndicator = {},
             )
             val playButton: @Composable (Modifier) -> Unit = { buttonModifier ->
-                Button(onClick = onPlayNow, modifier = buttonModifier.heightIn(min = 48.dp)) {
+                Button(onClick = onPlayNow, enabled = playEnabled, modifier = buttonModifier.heightIn(min = 48.dp)) {
                     Icon(Icons.Default.PlayArrow, null, modifier = Modifier.padding(end = 6.dp).size(20.dp))
                     Text(stringResource(AYMR.strings.player_up_next_play_now))
                 }
@@ -128,6 +144,7 @@ fun NextEpisodeCard(
                     Text(stringResource(MR.strings.action_cancel))
                 }
             }
+            if (!showActions) return@Column
             if (LocalDensity.current.fontScale > 1.3f) {
                 playButton(Modifier.fillMaxWidth())
                 cancelButton(Modifier.fillMaxWidth())

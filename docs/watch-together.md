@@ -74,6 +74,39 @@ configured default relay. It does not send user content or credentials.
 Compose screenshots cover entry, active-room, error, portrait, landscape and large-text layouts.
 Host-side tests and renders do not replace two-phone playback validation.
 
+## Coordinated viewing
+
+Coordination version 2 adds shared start deadlines, skip cues and next-episode preparation.
+Both phones need this version; an older participant produces an explicit update message.
+The host remains authoritative and all commands retain episode identity, sequence and acknowledgement checks.
+
+After a pause or buffering, readiness must remain stable for one second before the host announces
+a two-second countdown in its monotonic clock domain. A new buffering event, manual pause,
+local hold or lost connection invalidates that deadline. Guests use their measured clock offset
+to start against the same deadline. Network delay still prevents a universal frame-exact guarantee.
+
+Follower corrections filter timing error, use separate enter/exit thresholds and gradually vary
+speed within three percent. Brief jitter does not trigger seeking. Persistent large errors and
+explicit seeks retain bounded recovery paths. Native speed callbacks recognize recent managed
+values so delayed callbacks do not overwrite the user's base speed or recalibrate rendering.
+
+Only the host offers automatic intro/ending skips. The shared cue has an identity, target and
+optional deadline. Guests can skip or cancel through shared controls; duplicate or obsolete cue
+commands cannot trigger a second skip. Pausing suspends the countdown and cancellation remains
+effective for that segment. Solo playback keeps its existing local skip behavior.
+
+Within the last ninety seconds the host announces the next catalogue entry. Guests prepare one
+bounded local catalogue reference, without resolving or downloading the stream. At EOF both
+phones show the same next-episode card. Preparation and local safety checks gate the shared
+ten-second countdown; cancellation applies to the whole room. The host alone changes episodes,
+after which the normal player loader and readiness barrier apply again. Sleep timers and local
+holds remain authoritative. Source failures expose retry or extension actions.
+
+Invites include an Android deep link and a locally generated QR using ZXing core (Apache-2.0):
+https://github.com/zxing/zxing . Opening a link validates the exact route and asks the user to enter;
+it never silently replaces an active room. The entry activity respects the existing app lock.
+The compact code remains available for messengers that do not make custom-scheme links clickable.
+
 Protocol reference: https://github.com/nostr-protocol/nips/blob/master/01.md
 
 Cryptography implementation: https://github.com/ACINQ/secp256k1-kmp

@@ -90,7 +90,7 @@ class NostrWatchTransport(
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
-                    if (text.length > 16_384) return
+                    if (text.length > 40_960) return
                     enqueue {
                         if (sockets[url] !== webSocket) return@enqueue
                         receive(url, text)
