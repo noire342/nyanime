@@ -27,6 +27,7 @@ class AdvancedPlayerPreferences(
     private val anime4kDiagnosticsState = anime4kDiagnosticsFlow.asStateFlow()
     private var activeEpisodeKey: String? = null
     private var anime4kRoomActive = false
+    private var anime4kUltraActive = false
     private var anime4kSessionSelection = Anime4KSelection(Anime4KProfile.Off, Anime4KMode.Off)
 
     fun mpvUserFiles() = preferenceStore.getBoolean("mpv_scripts", false)
@@ -49,7 +50,7 @@ class AdvancedPlayerPreferences(
     fun anime4kActiveSelection(): StateFlow<Anime4KSelection> = anime4kActiveSelectionState
 
     fun setAnime4kActiveSelection(selection: Anime4KSelection) {
-        if (anime4kRoomActive) return
+        if (anime4kRoomActive || anime4kUltraActive) return
         anime4kSessionSelection = selection
         publishAnime4kSelection()
     }
@@ -61,8 +62,14 @@ class AdvancedPlayerPreferences(
         if (active) anime4kDiagnosticsFlow.value = Anime4KSmartDiagnostics()
     }
 
+    fun setAnime4kUltraActive(active: Boolean) {
+        anime4kUltraActive = active
+        publishAnime4kSelection()
+        if (active) anime4kDiagnosticsFlow.value = Anime4KSmartDiagnostics()
+    }
+
     private fun publishAnime4kSelection() {
-        val selection = if (anime4kRoomActive) {
+        val selection = if (anime4kRoomActive || anime4kUltraActive) {
             Anime4KSelection(Anime4KProfile.Off, Anime4KMode.Off)
         } else {
             anime4kSessionSelection
@@ -76,7 +83,8 @@ class AdvancedPlayerPreferences(
     fun anime4kDiagnostics(): StateFlow<Anime4KSmartDiagnostics> = anime4kDiagnosticsState
 
     fun setAnime4kDiagnostics(diagnostics: Anime4KSmartDiagnostics) {
-        anime4kDiagnosticsFlow.value = if (anime4kRoomActive) Anime4KSmartDiagnostics() else diagnostics
+        anime4kDiagnosticsFlow.value =
+            if (anime4kRoomActive || anime4kUltraActive) Anime4KSmartDiagnostics() else diagnostics
     }
 
     fun beginAnime4kSession() {
@@ -124,7 +132,7 @@ class AdvancedPlayerPreferences(
         episodeId: Long?,
         profile: Anime4KEpisodeProfile,
     ) {
-        if (anime4kRoomActive) return
+        if (anime4kRoomActive || anime4kUltraActive) return
         val key = episodeKey(animeId, episodeId) ?: return
         preferenceStore.getString(key, "").set(encodeEpisodeProfile(profile))
         if (key == activeEpisodeKey) {

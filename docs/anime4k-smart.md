@@ -13,6 +13,10 @@ only when rendering evidence indicates overload. Manual Maximum, Custom and Off
 remain independent selections. Official Anime4K 4.0.1 shaders and weights are
 unchanged.
 
+The quick **SM** control remains; the separate 4K quick button is removed.
+[Ultra downloads](anime4k-ultra.md) contain the processed image and temporarily
+suppress all live Anime4K modes without changing stored episode preferences.
+
 ## Boundaries
 
 - `Anime4K`: pure preset, scale, FPS, rendering-budget and calibration-key rules.

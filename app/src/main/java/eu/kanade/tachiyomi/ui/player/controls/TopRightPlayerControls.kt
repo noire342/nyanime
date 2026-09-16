@@ -70,8 +70,6 @@ fun TopRightPlayerControls(
     isAnime4KSmartEnabled: Boolean,
     anime4KSmartLabel: String,
     onToggleAnime4KSmart: () -> Unit,
-    isAnime4KMaximumEnabled: Boolean,
-    onToggleAnime4KMaximum: () -> Unit,
 
     sleepTimerRemaining: Int,
     onSleepTimerClick: () -> Unit,
@@ -82,6 +80,7 @@ fun TopRightPlayerControls(
 
     modifier: Modifier = Modifier,
     sleepTimerAtEpisodeEnd: Boolean = false,
+    isUltraVideo: Boolean = false,
     watchRoom: eu.kanade.tachiyomi.data.watch.WatchRoomState = eu.kanade.tachiyomi.data.watch.WatchRoomState(),
     onWatchTogetherClick: () -> Unit = {},
 ) {
@@ -124,17 +123,18 @@ fun TopRightPlayerControls(
                     horizontalSpacing = MaterialTheme.padding.mediumSmall,
                 )
             }
-            if (!watchRoom.active) {
+            if (isUltraVideo) {
+                Text(
+                    "ULTRA",
+                    color = Color(0xFFE477FF),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = MaterialTheme.padding.mediumSmall),
+                )
+            } else if (!watchRoom.active) {
                 ControlsButton(
                     text = anime4KSmartLabel,
                     onClick = onToggleAnime4KSmart,
                     color = if (isAnime4KSmartEnabled) MaterialTheme.colorScheme.active else Color.White,
-                    horizontalSpacing = MaterialTheme.padding.mediumSmall,
-                )
-                ControlsButton(
-                    text = "4K",
-                    onClick = onToggleAnime4KMaximum,
-                    color = if (isAnime4KMaximumEnabled) MaterialTheme.colorScheme.active else Color.White,
                     horizontalSpacing = MaterialTheme.padding.mediumSmall,
                 )
             }

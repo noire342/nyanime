@@ -126,6 +126,26 @@ class Anime4KStartupTest {
         assertEquals(Anime4KProfile.Maximum, preferences.loadAnime4kEpisodeProfile(1, 1).profile)
     }
 
+    @Test
+    fun `Ultra blocks all live shaders without overwriting Smart or custom episode choices`() {
+        val preferences = AdvancedPlayerPreferences(store())
+        val original = Anime4KEpisodeProfile(Anime4KProfile.Custom, Anime4KMode.ModeC)
+        preferences.saveAnime4kEpisodeProfile(1, 1, original)
+        preferences.loadAnime4kEpisodeProfile(1, 1)
+        preferences.setAnime4kUltraActive(true)
+        preferences.setAnime4kActiveSelection(Anime4KSelection(Anime4KProfile.Maximum, Anime4KMode.ModeAPlusHq))
+        preferences.saveAnime4kEpisodeProfile(1, 1, Anime4KEpisodeProfile(Anime4KProfile.Off))
+        preferences.loadAnime4kEpisodeProfile(1, 1)
+        assertEquals(Anime4KMode.Off, preferences.anime4kEffectiveMode().value)
+        assertEquals(original, preferences.anime4kEpisodeProfile(1, 1))
+        preferences.setAnime4kRoomActive(true)
+        preferences.setAnime4kUltraActive(false)
+        assertEquals(Anime4KMode.Off, preferences.anime4kEffectiveMode().value)
+        preferences.setAnime4kRoomActive(false)
+        assertEquals(Anime4KMode.ModeC, preferences.anime4kEffectiveMode().value)
+        assertEquals(Anime4KProfile.Smart, preferences.loadAnime4kEpisodeProfile(1, 2).profile)
+    }
+
     private fun store(): PreferenceStore {
         val strings = mutableMapOf<String, InMemoryPreference<String>>()
         val booleans = mutableMapOf<String, InMemoryPreference<Boolean>>()

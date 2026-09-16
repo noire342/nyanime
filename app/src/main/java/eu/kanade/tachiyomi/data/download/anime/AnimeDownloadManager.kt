@@ -4,6 +4,7 @@ import android.content.Context
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
+import eu.kanade.tachiyomi.data.download.anime.ultra.UltraFiles
 import eu.kanade.tachiyomi.util.size
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -179,11 +180,14 @@ class AnimeDownloadManager(
             throw Exception(context.stringResource(AYMR.strings.video_list_empty_error))
         }
 
-        val file = files[0]
+        val ultra = episodeDir?.let { UltraFiles.completed(context, it) }
+        val file = ultra ?: files.firstOrNull { it.name != UltraFiles.VIDEO }
+            ?: throw Exception(context.stringResource(AYMR.strings.video_list_empty_error))
 
         return Video(
             videoUrl = file.uri.toString(),
             videoTitle = "download: " + file.uri.toString(),
+            memo = if (ultra != null) UltraFiles.memo else kotlinx.serialization.json.JsonObject(emptyMap()),
             initialized = true,
         ).apply { status = Video.State.READY }
     }

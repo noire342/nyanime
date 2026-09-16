@@ -75,6 +75,8 @@ import eu.kanade.tachiyomi.data.cast.CastController
 import eu.kanade.tachiyomi.data.cast.CastHandoffPolicy
 import eu.kanade.tachiyomi.data.cast.CastRequest
 import eu.kanade.tachiyomi.data.database.models.anime.toDomainEpisode
+import eu.kanade.tachiyomi.data.download.anime.ultra.UltraFiles
+import eu.kanade.tachiyomi.data.download.anime.ultra.UltraPlaybackGuard
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
@@ -266,6 +268,7 @@ class PlayerActivity : BaseActivity() {
             finish()
             return
         }
+        advancedPlayerPreferences.setAnime4kUltraActive(false)
         advancedPlayerPreferences.beginAnime4kSession()
         NotificationReceiver.dismissNotification(
             this,
@@ -309,6 +312,7 @@ class PlayerActivity : BaseActivity() {
         enableEdgeToEdge()
         registerSecureActivity(this)
         super.onCreate(savedInstanceState)
+        UltraPlaybackGuard.enterPlayer()
         setContentView(binding.root)
 
         setupPlayerMPV()
@@ -353,7 +357,6 @@ class PlayerActivity : BaseActivity() {
                         }
                     },
                     onToggleAnime4KSmart = ::toggleAnime4KSmart,
-                    onToggleAnime4KMaximum = ::toggleAnime4KMaximum,
                     onSelectAnime4KCustom = ::selectAnime4KCustom,
                     modifier = Modifier.onGloballyPositioned {
                         pipRect = run {
@@ -379,6 +382,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onDestroy() {
+        UltraPlaybackGuard.leavePlayer()
         viewModel.watchManager.detach(this)
         videoLoadJob?.cancel()
         viewModel.playbackLoad.cancel()
@@ -531,7 +535,7 @@ class PlayerActivity : BaseActivity() {
 
     internal fun onAnime4KShaderError(message: String? = null) {
         runOnUiThread {
-            if (player.isExiting || viewModel.watchTogether.active) return@runOnUiThread
+            if (player.isExiting || isAnime4KUnavailable()) return@runOnUiThread
 
             val now = SystemClock.elapsedRealtime()
 
@@ -566,7 +570,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     internal fun toggleAnime4KSmart() {
-        if (viewModel.watchTogether.active) return
+        if (isAnime4KUnavailable()) return
         val mediaInfo = resolveAnime4KMediaInfo()
         val current = currentAnime4KSelection()
         if (current.profile == Anime4KProfile.Smart && anime4kSmartController?.isSuspended == true) {
@@ -611,17 +615,14 @@ class PlayerActivity : BaseActivity() {
         }
     }
 
-    internal fun toggleAnime4KMaximum() {
-        if (viewModel.watchTogether.active) return
-        val target = Anime4KSelectionRules.toggleMaximum(currentAnime4KSelection())
-        applyAnime4KSelection(target.profile, target.mode)
-    }
-
     internal fun selectAnime4KCustom(mode: Anime4KMode) {
-        if (viewModel.watchTogether.active) return
+        if (isAnime4KUnavailable()) return
         val target = Anime4KSelectionRules.selectCustom(currentAnime4KSelection(), mode)
         applyAnime4KSelection(target.profile, target.mode)
     }
+
+    private fun isAnime4KUnavailable() =
+        viewModel.watchTogether.active || UltraFiles.isUltra(viewModel.currentVideo.value)
 
     private fun currentAnime4KSelection(): Anime4KSelection =
         advancedPlayerPreferences.anime4kActiveSelection().value
@@ -633,7 +634,7 @@ class PlayerActivity : BaseActivity() {
         persistEpisodeProfile: Boolean = true,
         fallbackToOffOnFailure: Boolean = true,
     ): Boolean {
-        if (viewModel.watchTogether.active) return false
+        if (isAnime4KUnavailable()) return false
         if (anime4kShaderPipeline.apply(mode)) {
             val selection = Anime4KSelection(profile, mode)
             advancedPlayerPreferences.setAnime4kActiveSelection(selection)
@@ -715,6 +716,7 @@ class PlayerActivity : BaseActivity() {
         val roomActive = viewModel.watchTogether.active
         anime4kAppliedRoomRestriction = roomActive
         advancedPlayerPreferences.setAnime4kRoomActive(roomActive)
+        advancedPlayerPreferences.setAnime4kUltraActive(false)
         advancedPlayerPreferences.beginAnime4kSession()
         // The episode profile is loaded after MPV has identified the current episode. Never
         // apply a previous episode's profile during MPV initialization.
@@ -728,6 +730,7 @@ class PlayerActivity : BaseActivity() {
 
     private fun loadAnime4KForCurrentEpisode() {
         advancedPlayerPreferences.setAnime4kRoomActive(viewModel.watchTogether.active)
+        advancedPlayerPreferences.setAnime4kUltraActive(UltraFiles.isUltra(viewModel.currentVideo.value))
         resetAnime4KRuntime()
 
         val ids = currentAnime4KEpisodeIds() ?: run {
@@ -740,7 +743,7 @@ class PlayerActivity : BaseActivity() {
         }
         val profile = advancedPlayerPreferences.loadAnime4kEpisodeProfile(ids.first, ids.second)
         anime4kRoomRestorePending = false
-        if (viewModel.watchTogether.active) {
+        if (isAnime4KUnavailable()) {
             anime4kShaderPipeline.apply(Anime4KMode.Off)
             return
         }
@@ -776,12 +779,12 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun requestAnime4KMediaRefresh() {
-        if (viewModel.watchTogether.active) return
+        if (isAnime4KUnavailable()) return
         if (currentAnime4KSelection().profile == Anime4KProfile.Smart) anime4kMediaRefresh.request()
     }
 
     private fun applySmartAnime4KForLoadedMedia() {
-        if (viewModel.watchTogether.active) return
+        if (isAnime4KUnavailable()) return
         if (currentAnime4KSelection().profile != Anime4KProfile.Smart) return
 
         val mediaInfo = resolveAnime4KMediaInfo() ?: run {
@@ -833,7 +836,7 @@ class PlayerActivity : BaseActivity() {
         mode: Anime4KMode,
         nowMillis: Long,
     ): Boolean {
-        if (viewModel.watchTogether.active) return false
+        if (isAnime4KUnavailable()) return false
         var candidate = mode
         // Every failure removes a candidate. Even a broken installation terminates at Off.
         repeat(Anime4KMode.entries.size) {
@@ -992,7 +995,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun sampleAnime4KSmart() {
-        if (viewModel.watchTogether.active) return
+        if (isAnime4KUnavailable()) return
         if (currentAnime4KSelection().profile != Anime4KProfile.Smart) return
         val controller = anime4kSmartController ?: return
         if (controller.isSuspended) return
@@ -1020,7 +1023,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun startAnime4KTelemetry() {
-        if (viewModel.watchTogether.active) return
+        if (isAnime4KUnavailable()) return
         if (anime4kSmartController?.isSuspended != false) {
             stopAnime4KTelemetry()
             return
@@ -1043,7 +1046,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun acceptAnime4KTelemetry(value: String) {
-        if (viewModel.watchTogether.active) return
+        if (isAnime4KUnavailable()) return
         if (currentAnime4KSelection().profile != Anime4KProfile.Smart) return
         val telemetry = Anime4KTelemetry.parse(value) ?: return
         val sample = anime4kTelemetrySession?.accept(telemetry, SystemClock.elapsedRealtime()) ?: return
@@ -1051,7 +1054,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun acceptAnime4KSample(sample: Anime4KPerformanceSample) {
-        if (viewModel.watchTogether.active) return
+        if (isAnime4KUnavailable()) return
         val controller = anime4kSmartController ?: return
         controller.onSample(sample)?.let { adjustment ->
             applySmartAdjustment(adjustment, sample.timestampMillis)
@@ -1796,6 +1799,9 @@ class PlayerActivity : BaseActivity() {
     fun setVideo(video: Video?, position: Long? = null) {
         if (player.isExiting) return
         if (video == null) return
+        advancedPlayerPreferences.setAnime4kUltraActive(UltraFiles.isUltra(video))
+        resetAnime4KRuntime()
+        anime4kShaderPipeline.apply(Anime4KMode.Off)
         if (castController.state.value.active || castController.state.value.connecting) {
             lifecycleScope.launch {
                 castRequest(video)?.let { castController.play(it) }

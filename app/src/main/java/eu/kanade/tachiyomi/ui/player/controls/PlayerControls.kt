@@ -64,6 +64,7 @@ import androidx.constraintlayout.compose.Dimension
 import eu.kanade.presentation.discovery.SourceHomeArtwork
 import eu.kanade.presentation.more.settings.screen.player.custombutton.getButtons
 import eu.kanade.presentation.theme.playerRippleConfiguration
+import eu.kanade.tachiyomi.data.download.anime.ultra.UltraFiles
 import eu.kanade.tachiyomi.data.watch.WatchRecovery
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
 import eu.kanade.tachiyomi.data.watch.recovery
@@ -117,7 +118,6 @@ fun PlayerControls(
     viewModel: PlayerViewModel,
     onBackPress: () -> Unit,
     onToggleAnime4KSmart: () -> Unit,
-    onToggleAnime4KMaximum: () -> Unit,
     onSelectAnime4KCustom: (Anime4KMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -191,6 +191,8 @@ fun PlayerControls(
     val indexedChapters by viewModel.chapters.collectAsState()
     val currentBrightness by viewModel.currentBrightness.collectAsState()
     val playerRoom by viewModel.watchTogether.state.collectAsState()
+    val currentVideo by viewModel.currentVideo.collectAsState()
+    val ultraVideo = UltraFiles.isUltra(currentVideo)
     val sheetShown by viewModel.sheetShown.collectAsState()
     val panel by viewModel.panelShown.collectAsState()
     val dialog by viewModel.dialogShown.collectAsState()
@@ -277,7 +279,7 @@ fun PlayerControls(
                 val (playerUpdates) = createRefs()
                 val anime4kDiagnosticsOverlay = createRef()
 
-                if (anime4kDiagnosticsEnabled && !playerRoom.active) {
+                if (anime4kDiagnosticsEnabled && !playerRoom.active && !ultraVideo) {
                     val anime4kDiagnostics by advancedPlayerPreferences.anime4kDiagnostics().collectAsState()
                     Anime4KDiagnosticsOverlay(
                         diagnostics = anime4kDiagnostics,
@@ -608,6 +610,7 @@ fun PlayerControls(
                         onAudioLongClick = { viewModel.showPanel(Panels.AudioDelay) },
                         onQualityClick = { viewModel.showSheet(Sheets.QualityTracks) },
                         isEpisodeOnline = isEpisodeOnline,
+                        isUltraVideo = ultraVideo,
                         isAnime4KSmartEnabled = anime4kSelection.profile == Anime4KProfile.Smart,
                         anime4KSmartLabel = if (anime4kSelection.profile == Anime4KProfile.Smart) {
                             Anime4K.smartButtonLabel(anime4kSelection.mode)
@@ -615,8 +618,6 @@ fun PlayerControls(
                             "SM"
                         },
                         onToggleAnime4KSmart = onToggleAnime4KSmart,
-                        isAnime4KMaximumEnabled = anime4kSelection.profile == Anime4KProfile.Maximum,
-                        onToggleAnime4KMaximum = onToggleAnime4KMaximum,
                         sleepTimerRemaining = sleepTimerTimeRemaining,
                         sleepTimerAtEpisodeEnd = sleepTimerEndEpisode != null,
                         onSleepTimerClick = { viewModel.showSheet(Sheets.SleepTimer) },
@@ -782,7 +783,7 @@ fun PlayerControls(
             reduceMotion = reduceMotion,
             buttons = customButtons.getButtons().toImmutableList(),
             onSelectAnime4KCustom = onSelectAnime4KCustom,
-            anime4kAvailable = !playerRoom.active,
+            anime4kAvailable = !playerRoom.active && !ultraVideo,
 
             isLocalSource = currentSource?.id == LocalAnimeSource.ID,
             showSubtitles = showSubtitles,

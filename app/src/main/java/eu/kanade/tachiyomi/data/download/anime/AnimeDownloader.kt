@@ -22,6 +22,7 @@ import eu.kanade.tachiyomi.animesource.model.Track
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
+import eu.kanade.tachiyomi.data.download.anime.ultra.UltraDownloadWorker
 import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateNotifier
 import eu.kanade.tachiyomi.data.notification.NotificationHandler
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
@@ -388,6 +389,20 @@ class AnimeDownloader(
             DiskUtil.createNoMediaFile(tmpDir, context)
 
             download.status = AnimeDownload.State.DOWNLOADED
+            if (preferences.ultraAfterDownload().get() &&
+                preferences.useExternalDownloader().get() == download.changeDownloader
+            ) {
+                // Scheduling Ultra must never turn a successful download into a download error.
+                runCatching {
+                    animeDir.findFile(episodeDirname)?.let { folder ->
+                        UltraDownloadWorker.enqueue(
+                            context,
+                            folder.uri,
+                            "${download.anime.title} · ${download.episode.name}",
+                        )
+                    }
+                }.onFailure { logcat(LogPriority.ERROR, it) }
+            }
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
             // If the video threw, it will resume here
