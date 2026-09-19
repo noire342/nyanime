@@ -209,21 +209,7 @@ private fun CommunityScreen(manager: CommunityManager, incoming: String, incomin
                             null
                         ) {
                             Text(
-                                if (state.publishing) {
-                                    "Preparo le immagini per la pubblicazione…"
-                                } else if (state.recovering > 0) {
-                                    "Recupero in corso · ${state.recovering} aggiornamenti in attesa"
-                                } else if (state.connected ==
-                                    0
-                                ) {
-                                    "Offline · tutto resta sul dispositivo"
-                                } else if (state.pending >
-                                    0
-                                ) {
-                                    "${state.pending} invii in attesa"
-                                } else {
-                                    "Connesso"
-                                },
+                                state.deliveryLabel(),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

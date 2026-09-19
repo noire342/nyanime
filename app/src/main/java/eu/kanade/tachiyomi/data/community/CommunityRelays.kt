@@ -34,6 +34,9 @@ internal class CommunityRelays(
     private val received: suspend (NostrEvent) -> Unit,
     private val accepted: suspend (String, String) -> Unit,
     private val status: (Int, String?) -> Unit,
+    private val next: suspend (String) -> NostrEvent? = { null },
+    private val rejected: suspend (String, String, RelayRejection) -> Unit = { _, _, _ -> },
+    private val authenticated: suspend (String) -> Unit = {},
     private val client: OkHttpClient = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS).pingInterval(25, TimeUnit.SECONDS).build(),
 ) : AutoCloseable {
@@ -56,6 +59,13 @@ internal class CommunityRelays(
     private val destinations = relays.toMutableSet()
     private val inboxes = mutableMapOf<String, List<String>>()
     private val queries = linkedMapOf<String, JsonObject>()
+    private val direct = linkedMapOf<String, NostrEvent>()
+    private val completedDirect = linkedSetOf<String>()
+    private val directReceipts = mutableMapOf<String, MutableSet<String>>()
+    private val directRetryAt = mutableMapOf<Pair<String, String>, Long>()
+    private val nextSendAt = mutableMapOf<String, Long>()
+    private val publishFailures = mutableMapOf<String, Int>()
+    private val problems = linkedMapOf<String, String>()
 
     @Volatile private var closed = false
 
@@ -71,6 +81,12 @@ internal class CommunityRelays(
             }
         }
         enqueue { relays.forEach(::connect) }
+        scope.launch {
+            while (!closed) {
+                delay(250)
+                enqueue { pump() }
+            }
+        }
     }
     private fun enqueue(action: suspend () -> Unit) {
         if (!closed && queue.trySend(action).isFailure && recovering.compareAndSet(false, true)) {
@@ -168,6 +184,10 @@ internal class CommunityRelays(
                 )
                 socket.send("[\"AUTH\"," + communityJson.encodeToString(auth) + "]")
                 authentication[url] = auth.id
+                scope.launch {
+                    delay(15_000)
+                    enqueue { if (authentication[url] == auth.id && sockets[url] === socket) lost(url) }
+                }
             }
             "EOSE" -> {
                 val subscription = message.getOrNull(1)?.jsonPrimitive?.content.orEmpty()
@@ -177,7 +197,7 @@ internal class CommunityRelays(
                 if (subscription.startsWith("live-")) {
                     ready.add(url)
                     retries[url] = 0
-                    status(ready.size, null)
+                    reportStatus()
                 }
                 if (subscription.startsWith("archive-")) {
                     val channel = subscription.removePrefix("archive-").substringBefore('-')
@@ -227,20 +247,39 @@ internal class CommunityRelays(
             }
             "OK" -> {
                 val id = message.getOrNull(1)?.jsonPrimitive?.content ?: return
-                if (message.getOrNull(2)?.jsonPrimitive?.booleanOrNull == true) {
-                    if (authentication[url] ==
-                        id
-                    ) {
-                        authentication.remove(url)
+                val success = message.getOrNull(2)?.jsonPrimitive?.booleanOrNull == true
+                val reason = RelayRejection.parse(message.getOrNull(3)?.jsonPrimitive?.content.orEmpty())
+                if (authentication[url] == id) {
+                    authentication.remove(url)
+                    if (success) {
+                        authenticated(url)
+                        nextSendAt.remove(url)
+                        directRetryAt.keys.removeAll { it.second == url }
+                        problems.remove(url)
                         subscribe(socket)
                         archive(url, socket, "private")
                         archive(url, socket, "sync")
                     } else {
-                        accepted(id, url)
+                        problems[url] = reason.describe(url)
+                        nextSendAt[url] = System.currentTimeMillis() + reason.retryDelay(1)
                     }
+                } else if (success) {
+                    directReceipts.getOrPut(id) { mutableSetOf() }.add(url)
+                    if (id !in direct) directReceipts.remove(id)
+                    directRetryAt.remove(id to url)
+                    accepted(id, url)
+                    problems.remove(url)
+                    if (System.currentTimeMillis() >= (nextSendAt[url] ?: 0)) publishFailures.remove(url)
                 } else {
-                    status(ready.size, "Un relay ha rifiutato l’invio. Il contenuto resta in attesa.")
+                    rejected(id, url, reason)
+                    problems[url] = reason.describe(url)
+                    val attempts = (publishFailures[url] ?: 0) + 1
+                    publishFailures[url] = attempts
+                    val retryAt = System.currentTimeMillis() + reason.retryDelay(attempts)
+                    if (id in direct) directRetryAt[id to url] = retryAt
+                    if (reason.pausesRelay) nextSendAt[url] = retryAt
                 }
+                reportStatus()
             }
             "CLOSED" -> {
                 status(ready.size, "Il relay ha chiuso la sottoscrizione")
@@ -251,7 +290,8 @@ internal class CommunityRelays(
     private fun lost(url: String) {
         sockets.remove(url)?.cancel()
         ready.remove(url)
-        status(ready.size, null)
+        authentication.remove(url)
+        reportStatus()
         pages.keys.removeAll { it.first == url }
         val attempt = (retries[url] ?: 0).coerceAtMost(5)
         retries[url] = attempt + 1
@@ -260,20 +300,49 @@ internal class CommunityRelays(
             enqueue { connect(url) }
         }
     }
+
+    /** Only pairing uses this small volatile queue. Ordinary app data comes from the durable outbox. */
     fun send(events: List<NostrEvent>) = enqueue {
         events.forEach { event ->
-            val payload = "[\"EVENT\"," + communityJson.encodeToString(event) + "]"
-            val recipient = event.takeIf { it.kind == 1059 }?.tag("p")
-            val targets = if (recipient != null &&
-                recipient != identity.publicKey
-            ) {
-                inboxes[recipient].orEmpty().ifEmpty { relays }
-            } else {
-                relays
-            }
-            targets.filter { it in ready }.forEach { url -> if (sockets[url]?.send(payload) != true) lost(url) }
+            if (event.id !in completedDirect && (event.id in direct || direct.size < 256)) direct[event.id] = event
+        }
+        pump()
+    }
+    private fun targets(event: NostrEvent): List<String> {
+        val recipient = event.takeIf { it.kind == 1059 }?.tag("p")
+        return if (recipient != null && recipient != identity.publicKey) {
+            inboxes[recipient].orEmpty().ifEmpty { relays }
+        } else {
+            relays
         }
     }
+    private suspend fun pump() {
+        val now = System.currentTimeMillis()
+        direct.values.filter { event ->
+            event.tag("expiration")?.toLongOrNull()?.let { it * 1000 <= now } == true ||
+                directReceipts[event.id].orEmpty().containsAll(targets(event))
+        }.map { it.id }.forEach { id ->
+            direct.remove(id)
+            completedDirect.add(id)
+            while (completedDirect.size > 512) completedDirect.remove(completedDirect.first())
+            directReceipts.remove(id)
+            directRetryAt.keys.removeAll { it.first == id }
+        }
+        for (url in ready.toList()) {
+            if (authentication.containsKey(url) || now < (nextSendAt[url] ?: 0)) continue
+            val event = direct.values.firstOrNull {
+                url in targets(it) &&
+                    url !in directReceipts[it.id].orEmpty() &&
+                    now >= (directRetryAt[it.id to url] ?: 0)
+            } ?: next(url) ?: continue
+            if (url !in targets(event)) continue
+            nextSendAt[url] = System.currentTimeMillis() + RelayRejection.SEND_INTERVAL
+            if (event.id in direct) directRetryAt[event.id to url] = now + RelayRejection.ACK_TIMEOUT
+            val payload = "[\"EVENT\"," + communityJson.encodeToString(event) + "]"
+            if (sockets[url]?.send(payload) != true) lost(url)
+        }
+    }
+    private fun reportStatus() = status(ready.size, problems.values.firstOrNull())
     fun addDestinations(values: List<String>, peer: String = "") = enqueue {
         val valid = values.filter(::validRelay).distinct().take(5)
         if (validKey(peer) && valid.isNotEmpty()) inboxes[peer] = valid

@@ -410,6 +410,21 @@ internal fun CommunityDialog(
             }
             HorizontalDivider()
             Text("Connessioni Nostr", style = MaterialTheme.typography.titleLarge)
+            Text(state.deliveryLabel(), style = MaterialTheme.typography.bodyMedium)
+            state.relayIssue?.let { issue ->
+                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(issue, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Gli aggiornamenti restano sul dispositivo. Il primo collegamento può includere molti episodi e capitoli della libreria.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = manager::retryDeliveries) { Text("Riprova ora") }
+                    }
+                }
+            }
+
             var relays by remember { mutableStateOf(manager.relays().joinToString("\n")) }
             OutlinedTextField(relays, {
                 relays = it.take(2000)

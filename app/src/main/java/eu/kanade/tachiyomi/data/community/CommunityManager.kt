@@ -4,6 +4,7 @@ package eu.kanade.tachiyomi.data.community
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import eu.kanade.domain.base.BasePreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +46,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
     private var identity: CommunityIdentity? = null
     private var transport: CommunityRelays? = null
     private var foreground = true
+    private var disconnectJob: kotlinx.coroutines.Job? = null
     private var device = ""
     private var revision = SyncRevision(0, 0, "")
     private var relayList = CommunityRelays.defaults
@@ -55,6 +57,10 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
     private var activityAt = 0L
     private var refreshedGeneration = -1L
     private var libraryAt = 0L
+
+    @Volatile private var relayWarning: String? = null
+    private val loggedRejections = mutableMapOf<String, Pair<RelayRejection, Long>>()
+    private var deliveryLogAt = 0L
     internal val handoff = DeviceHandoff(this)
 
     init {
@@ -103,12 +109,6 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                         if (identity == null || (!foreground && !state.value.background)) return@withLock
                         if (state.value.syncEnabled && !preferences.incognitoMode().get()) drain()
                         store.cleanExpired()
-                        transport?.send(
-                            store.pending(
-                                includeSync =
-                                state.value.syncEnabled && !preferences.incognitoMode().get(),
-                            ),
-                        )
                         if (state.value.syncEnabled && !preferences.incognitoMode().get()) handoff.tick()
                         ticks++
                         if (ticks % 30 == 0 &&
@@ -273,7 +273,13 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             )
         }
     }
-    private fun enqueuePublic(kind: Int, content: String, tags: List<List<String>>, address: String = ""): NostrEvent {
+    private fun enqueuePublic(
+        kind: Int,
+        content: String,
+        tags: List<List<String>>,
+        address: String = "",
+        priority: Int = 1,
+    ): NostrEvent {
         val id = requireNotNull(identity)
         // Addressable updates in the same second remain one queued draft. The published revision is monotonic.
         val at = if (address.isEmpty()) {
@@ -286,7 +292,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             }
         }
         val event = NostrEvent.create(id, kind, content, tags, at)
-        store.enqueue(event, address)
+        store.enqueue(event, address, priority)
         return event
     }
     private fun connect() {
@@ -324,17 +330,41 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         }, accepted = { event, relay ->
             mutex.withLock {
                 val recipient = store.recipient(event)
-                val targets = if (recipient != null &&
-                    recipient != id.publicKey
-                ) {
-                    store.read<List<String>>("inbox-relays", recipient).orEmpty().ifEmpty { relayList }
-                } else {
-                    relayList
-                }
-                store.acknowledge(event, relay, minOf(2, targets.size))
-                mutable.update { it.copy(pending = store.pendingCount()) }
+                store.acknowledge(event, relay, targetsFor(recipient))
+                updateDeliveryState()
             }
-        }, status = { count, error -> mutable.update { it.copy(connected = count, error = error ?: it.error) } })
+        }, status = { count, error ->
+            relayWarning = error
+            mutable.update { it.copy(connected = count, relayIssue = error) }
+        }, next = { relay ->
+            mutex.withLock {
+                if (identity == null) {
+                    null
+                } else {
+                    store.claimNext(
+                        relay,
+                        relay in relayList && state.value.syncEnabled && !preferences.incognitoMode().get(),
+                        accepts = { event -> relay in targetsFor(event.takeIf { it.kind == 1059 }?.tag("p")) },
+                    )
+                }
+            }
+        }, rejected = { event, relay, reason ->
+            mutex.withLock {
+                store.reject(event, relay, reason)
+                updateDeliveryState()
+                val now = System.currentTimeMillis()
+                val previous = loggedRejections[relay]
+                if (previous?.first != reason || now - previous.second >= 60_000) {
+                    Log.w(
+                        "NyanimeSync",
+                        "relay=${java.net.URI(
+                            relay,
+                        ).host} rejected=${reason.code} queued=${state.value.pending} replicated=${state.value.replicating}",
+                    )
+                    loggedRejections[relay] = reason to now
+                }
+            }
+        }, authenticated = { relay -> mutex.withLock { store.authenticated(relay) } })
         transport?.query(id.publicKey)
         if (state.value.syncEnabled && !preferences.incognitoMode().get()) {
             store.list<SyncCheckpoint>("sync-checkpoints").forEach { scheduleRecovery(it) }
@@ -346,6 +376,8 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
     }
     fun onForeground(value: Boolean) = action {
         foreground = value
+        disconnectJob?.cancel()
+        disconnectJob = null
         if (identity == null) return@action
         if (state.value.syncEnabled && !preferences.incognitoMode().get()) drain()
         if (value || state.value.background) {
@@ -356,11 +388,17 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             }
             connect()
         } else {
-            transport?.send(store.pending(includeSync = state.value.syncEnabled && !preferences.incognitoMode().get()))
-            delay(250)
-            transport?.close()
-            transport = null
-            mutable.update { it.copy(connected = 0) }
+            // Allow final pause/exit updates to drain without holding the manager mutex.
+            disconnectJob = scope.launch {
+                delay(2000)
+                mutex.withLock {
+                    if (!foreground && !state.value.background) {
+                        transport?.close()
+                        transport = null
+                        mutable.update { it.copy(connected = 0) }
+                    }
+                }
+            }
         }
     }
     fun setBackground(enabled: Boolean) = action {
@@ -404,11 +442,45 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         }
         relayList = values
         store.save("settings", "relays", values)
+        store.retryDeliveries()
         transport?.close()
         transport = null
         connect()
         if (identity != null) enqueuePublic(10050, "", values.map { listOf("relay", it) }, "inbox-relays")
     }
+    private fun targetsFor(recipient: String?): List<String> =
+        if (recipient != null && recipient != identity?.publicKey) {
+            store.read<List<String>>("inbox-relays", recipient).orEmpty().ifEmpty { relayList }
+        } else {
+            relayList
+        }
+
+    private fun updateDeliveryState() {
+        mutable.update {
+            it.copy(
+                pending = store.pendingCount(),
+                replicating = store.replicatingCount(),
+                relayIssue = store.deliveryIssue() ?: relayWarning,
+            )
+        }
+        val now = System.currentTimeMillis()
+        if (identity != null && now - deliveryLogAt >= 30_000) {
+            deliveryLogAt = now
+            Log.i(
+                "NyanimeSync",
+                "connected=${state.value.connected} queued=${state.value.pending} replicated=${state.value.replicating} enabled=${state.value.syncEnabled}",
+            )
+        }
+    }
+
+    fun retryDeliveries() = action {
+        store.retryDeliveries()
+        transport?.close()
+        transport = null
+        connect()
+        updateDeliveryState()
+    }
+
     fun relays() = relayList.toList()
     fun lookup(codeOrName: String) = action {
         val key = runCatching { ProfileCode.decode(codeOrName) }.getOrNull()
@@ -579,8 +651,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         peers.forEach { peer ->
             transport?.addDestinations(store.read<List<String>>("inbox-relays", peer).orEmpty(), peer)
         }
-        store.transaction { envelopes.forEach { store.enqueue(it) } }
-        transport?.send(envelopes)
+        store.transaction { envelopes.forEach { store.enqueue(it, priority = 3) } }
         return command
     }
     internal fun sendDeviceAction(
@@ -658,7 +729,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         val rumor = GiftWrap.rumor(id.publicKey, 14, text, tags)
         peers.forEach { transport?.addDestinations(store.read<List<String>>("inbox-relays", it).orEmpty(), it) }
         val envelopes = peers.distinct().map { GiftWrap.wrap(id, it, rumor) }
-        store.transaction { envelopes.forEach { store.enqueue(it) } }
+        store.transaction { envelopes.forEach { store.enqueue(it, priority = 2) } }
         ingestChat(rumor)
         refresh()
     }
@@ -820,6 +891,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                     Nip44.encrypt(id.conversationKey(id.publicKey), communityJson.encodeToString(merged)),
                     listOf(listOf("d", address)),
                     address,
+                    priority = if (record.edits.containsAll(SyncField.entries)) 0 else 2,
                 )
                 if (!store.contains("sync-addresses", address)) {
                     store.save("sync-addresses", address, true)
@@ -831,7 +903,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                 activityAt = System.currentTimeMillis()
             }
         }, revision = ::nextRevision)
-        mutable.update { it.copy(pending = store.pendingCount()) }
+        updateDeliveryState()
     }
     private fun publishCheckpoint() {
         if (store.read<Boolean>("settings", "checkpoint-dirty") != true) return
@@ -845,6 +917,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                         Nip44.encrypt(key, communityJson.encodeToString(node)),
                         listOf(listOf("d", address)),
                         address,
+                        priority = 0,
                     )
                     store.save("sync-nodes", address, node)
                 }
@@ -1268,6 +1341,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         store.markSeen(rumor.id)
     }
     private suspend fun refresh() {
+        updateDeliveryState()
         val now = android.os.SystemClock.elapsedRealtime()
         if (state.value.ready && now - refreshedAt < 250) return
         refreshedAt = now

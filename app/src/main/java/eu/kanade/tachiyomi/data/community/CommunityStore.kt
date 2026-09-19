@@ -11,7 +11,7 @@ internal class CommunityStore(context: Context, private val vault: IdentityVault
     context,
     "community-v1.db",
     null,
-    1,
+    2,
 ) {
     var generation: Long = 0
         private set
@@ -27,8 +27,11 @@ internal class CommunityStore(context: Context, private val vault: IdentityVault
         )
         db.execSQL("CREATE TABLE receipts (event TEXT NOT NULL, relay TEXT NOT NULL, PRIMARY KEY(event,relay))")
         db.execSQL("CREATE TABLE received (id TEXT PRIMARY KEY NOT NULL, at INTEGER NOT NULL)")
+        CommunityOutboxSql.upgrade.forEach(db::execSQL)
     }
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) CommunityOutboxSql.upgrade.forEach(db::execSQL)
+    }
     fun <T> transaction(block: () -> T): T {
         val db = writableDatabase
         db.beginTransaction()
@@ -116,7 +119,13 @@ internal class CommunityStore(context: Context, private val vault: IdentityVault
             SQLiteDatabase.CONFLICT_IGNORE,
         )
     }
-    fun enqueue(event: NostrEvent, address: String = "") = transaction {
+    fun enqueue(event: NostrEvent, address: String = "", priority: Int = 1) = transaction {
+        if (readableDatabase.rawQuery("SELECT 1 FROM outbox WHERE id=?", arrayOf(event.id)).use {
+                it.moveToFirst()
+            }
+        ) {
+            return@transaction
+        }
         if (address.isNotEmpty()) writableDatabase.delete("outbox", "address=? AND id!=?", arrayOf(address, event.id))
         writableDatabase.execSQL("DELETE FROM receipts WHERE event NOT IN (SELECT id FROM outbox)")
         val inserted = writableDatabase.insertWithOnConflict(
@@ -127,36 +136,116 @@ internal class CommunityStore(context: Context, private val vault: IdentityVault
                 put("event", vault.seal(communityJson.encodeToString(event).toByteArray()))
                 put("address", address)
                 put("created", event.created_at)
+                put("priority", priority)
                 put("expires", event.tag("expiration")?.toLongOrNull()?.times(1000) ?: 0)
             },
-            SQLiteDatabase.CONFLICT_REPLACE,
+            SQLiteDatabase.CONFLICT_IGNORE,
         )
         check(inserted != -1L) { "Impossibile salvare l’invio. La modifica resta nella coda locale." }
     }
-    fun pending(
-        limit: Int = 32,
-        includeSync: Boolean = true,
-    ): List<NostrEvent> = readableDatabase.rawQuery(
-        "SELECT event FROM outbox WHERE (expires=0 OR expires>?) AND (address NOT LIKE 'nyanime.sync.%' OR ?=1) ORDER BY attempted,created,id LIMIT ?",
-        arrayOf(System.currentTimeMillis().toString(), if (includeSync) "1" else "0", limit.toString()),
-    ).use { cursor ->
-        buildList {
+
+    /** Claim one eligible event for one relay. ACKs, attempts and cooldowns survive restarts. */
+    fun claimNext(
+        relay: String,
+        includeSync: Boolean,
+        accepts: (NostrEvent) -> Boolean,
+        now: Long = System.currentTimeMillis(),
+    ): NostrEvent? = transaction {
+        val blockedUntil = readableDatabase.rawQuery(
+            "SELECT retry_at FROM relay_limits WHERE relay=?",
+            arrayOf(relay),
+        ).use { if (it.moveToFirst()) it.getLong(0) else 0 }
+        if (blockedUntil > now) return@transaction null
+        val candidate = readableDatabase.rawQuery(
+            CommunityOutboxSql.DUE,
+            arrayOf(relay, now.toString(), if (includeSync) "1" else "0", now.toString(), relay),
+        ).use { cursor ->
+            var match: Pair<NostrEvent, Int>? = null
             while (cursor.moveToNext()) {
-                add(
-                    communityJson.decodeFromString<NostrEvent>(vault.open(cursor.getBlob(0)).decodeToString()),
-                )
+                val event = communityJson.decodeFromString<NostrEvent>(vault.open(cursor.getBlob(0)).decodeToString())
+                if (accepts(event)) {
+                    match = event to cursor.getInt(1)
+                    break
+                }
             }
-        }
-    }.also { events ->
-        transaction {
-            events.forEach { event ->
-                writableDatabase.execSQL(
-                    "UPDATE outbox SET attempted=? WHERE id=?",
-                    arrayOf<Any>(System.currentTimeMillis(), event.id),
-                )
-            }
+            match
+        } ?: return@transaction null
+        val (event, previousAttempts) = candidate
+        val attempts = previousAttempts + 1
+        val timeout = (RelayRejection.ACK_TIMEOUT * (1L shl previousAttempts.coerceIn(0, 5))).coerceAtMost(300_000)
+        writableDatabase.execSQL(
+            "INSERT OR IGNORE INTO delivery_attempts(event,relay) VALUES(?,?)",
+            arrayOf(event.id, relay),
+        )
+        writableDatabase.execSQL(
+            "UPDATE delivery_attempts SET attempted=?,retry_at=?,attempts=? WHERE event=? AND relay=?",
+            arrayOf<Any>(now, now + timeout, attempts, event.id, relay),
+        )
+        writableDatabase.execSQL("UPDATE outbox SET attempted=? WHERE id=?", arrayOf<Any>(now, event.id))
+        writableDatabase.execSQL("INSERT OR IGNORE INTO relay_limits(relay) VALUES(?)", arrayOf(relay))
+        writableDatabase.execSQL(
+            "UPDATE relay_limits SET retry_at=? WHERE relay=?",
+            arrayOf<Any>(now + RelayRejection.SEND_INTERVAL, relay),
+        )
+        event
+    }
+
+    fun reject(
+        id: String,
+        relay: String,
+        reason: RelayRejection,
+        now: Long = System.currentTimeMillis(),
+    ) = transaction {
+        val attempts = readableDatabase.rawQuery(
+            "SELECT attempts FROM delivery_attempts WHERE event=? AND relay=?",
+            arrayOf(id, relay),
+        ).use { if (it.moveToFirst()) it.getInt(0) else return@transaction }
+        writableDatabase.execSQL(
+            "UPDATE delivery_attempts SET retry_at=?,reason=? WHERE event=? AND relay=?",
+            arrayOf<Any>(now + reason.retryDelay(attempts), reason.code, id, relay),
+        )
+        if (reason.pausesRelay) {
+            val failures = readableDatabase.rawQuery(
+                "SELECT failures FROM relay_limits WHERE relay=?",
+                arrayOf(relay),
+            ).use { if (it.moveToFirst()) it.getInt(0) + 1 else 1 }
+            writableDatabase.execSQL(
+                "UPDATE relay_limits SET retry_at=?,failures=?,reason=? WHERE relay=?",
+                arrayOf<Any>(now + reason.retryDelay(failures), failures, reason.code, relay),
+            )
         }
     }
+
+    fun authenticated(relay: String) = transaction {
+        writableDatabase.execSQL(
+            "UPDATE relay_limits SET retry_at=0,reason='',failures=0 WHERE relay=? AND reason='auth-required'",
+            arrayOf(relay),
+        )
+        writableDatabase.execSQL(
+            "UPDATE delivery_attempts SET retry_at=0,reason='' WHERE relay=? AND reason='auth-required'",
+            arrayOf(relay),
+        )
+    }
+
+    fun retryDeliveries() = transaction {
+        // Explicit retry preserves both the data and the existing relay acknowledgements.
+        writableDatabase.execSQL("UPDATE relay_limits SET retry_at=0")
+        writableDatabase.execSQL("UPDATE delivery_attempts SET retry_at=0")
+    }
+
+    fun replicatingCount(): Int = readableDatabase.rawQuery(
+        "SELECT count(*) FROM outbox o WHERE EXISTS (SELECT 1 FROM receipts r WHERE r.event=o.id)",
+        null,
+    ).use {
+        it.moveToFirst()
+        it.getInt(0)
+    }
+
+    fun deliveryIssue(): String? = readableDatabase.rawQuery(
+        "SELECT d.relay,d.reason FROM delivery_attempts d WHERE d.reason!='' AND NOT EXISTS (SELECT 1 FROM receipts r WHERE r.event=d.event AND r.relay=d.relay) ORDER BY d.attempted DESC LIMIT 1",
+        null,
+    ).use { if (it.moveToFirst()) RelayRejection.parse(it.getString(1)).describe(it.getString(0)) else null }
+
     fun pendingCount(): Int = readableDatabase.rawQuery("SELECT count(*) FROM outbox", null).use {
         it.moveToFirst()
         it.getInt(0)
@@ -203,7 +292,8 @@ internal class CommunityStore(context: Context, private val vault: IdentityVault
                 .takeIf { event -> event.kind == 1059 }?.tag("p")
         }
     }
-    fun acknowledge(id: String, relay: String, quorum: Int) {
+    fun acknowledge(id: String, relay: String, targets: List<String>) {
+        if (relay !in targets) return
         transaction {
             if (!readableDatabase.rawQuery("SELECT 1 FROM outbox WHERE id=?", arrayOf(id)).use {
                     it.moveToFirst()
@@ -220,11 +310,22 @@ internal class CommunityStore(context: Context, private val vault: IdentityVault
                 },
                 SQLiteDatabase.CONFLICT_IGNORE,
             )
+            writableDatabase.delete("delivery_attempts", "event=? AND relay=?", arrayOf(id, relay))
+            writableDatabase.execSQL(
+                "UPDATE relay_limits SET failures=0,reason='' WHERE relay=? AND retry_at<=?",
+                arrayOf<Any>(relay, System.currentTimeMillis()),
+            )
+            val placeholders = targets.joinToString(",") { "?" }
+            writableDatabase.delete(
+                "receipts",
+                "event=? AND relay NOT IN ($placeholders)",
+                arrayOf(id, *targets.toTypedArray()),
+            )
             val count = readableDatabase.rawQuery("SELECT count(*) FROM receipts WHERE event=?", arrayOf(id)).use {
                 it.moveToFirst()
                 it.getInt(0)
             }
-            if (count >= quorum) {
+            if (count >= minOf(2, targets.size)) {
                 writableDatabase.delete("outbox", "id=?", arrayOf(id))
                 writableDatabase.delete("receipts", "event=?", arrayOf(id))
             }

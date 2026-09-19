@@ -253,6 +253,8 @@ data class CommunityState(
     val presence: Map<String, SocialPresence> = emptyMap(),
     val presenceAccess: PresenceAccess = PresenceAccess.Private,
     val pending: Int = 0,
+    val replicating: Int = 0,
+    val relayIssue: String? = null,
     val recovering: Int = 0,
     val connected: Int = 0,
     val error: String? = null,
@@ -264,6 +266,16 @@ data class CommunityState(
     val profileDraft: CommunityProfile? = null,
     val postDraft: SocialPost? = null,
 ) {
+    fun deliveryLabel(): String = when {
+        publishing -> "Preparo le immagini…"
+        !syncEnabled && pending > 0 -> "Sincronizzazione personale in pausa"
+        connected == 0 -> "Offline · dati salvati sul dispositivo"
+        recovering > 0 -> "Recupero · $recovering aggiornamenti"
+        pending > replicating -> "${pending - replicating} aggiornamenti da inviare"
+        replicating > 0 -> "Dati inviati · seconda copia in attesa"
+        else -> "Connesso"
+    }
+
     fun profile(key: String) = profiles[key] ?: CommunityProfile(key, key.take(8))
     fun isFriend(key: String) = friends.any { it.peer == key && it.accepted && !it.blocked }
 }
