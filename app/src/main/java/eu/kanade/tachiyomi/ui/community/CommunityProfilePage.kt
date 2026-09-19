@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Bookmarks
@@ -38,6 +39,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -85,6 +87,9 @@ internal fun ProfilePage(
     onProfile: (String) -> Unit,
     preview: Boolean = false,
     onWatch: (() -> Unit)? = null,
+    onEditFavorites: () -> Unit = onEdit,
+    onEditLists: () -> Unit = onEdit,
+    onEditWall: () -> Unit = onEdit,
 ) {
     var section by rememberSaveable(profile.key) { mutableIntStateOf(0) }
     var status by rememberSaveable(profile.key) { mutableStateOf(ShelfStatus.Watching) }
@@ -185,22 +190,49 @@ internal fun ProfilePage(
                         }
                     }
                     if (!mine && state.isFriend(profile.key) && onWatch != null) {
-                        OutlinedButton(onClick = onWatch) {
-                            Icon(Icons.Outlined.AutoAwesome, null)
-                            Text(" Guarda insieme")
+                        if (state.presence[profile.key]?.activity != null) {
+                            FriendActivityCard(
+                                profile,
+                                state.presence[profile.key],
+                                state.watchRequests.values.any {
+                                    it.host == profile.key &&
+                                        it.requester == state.me?.key &&
+                                        it.pending(System.currentTimeMillis())
+                                },
+                                onProfile = {},
+                                onChat = onChat,
+                                onWatch = onWatch,
+                            )
+                        } else {
+                            OutlinedButton(onClick = onWatch) {
+                                Icon(Icons.Outlined.AutoAwesome, null)
+                                Text(" Guarda insieme")
+                            }
                         }
                     }
                 }
             }
         }
-        if (profile.favorites.isNotEmpty()) {
+        if (profile.favorites.isNotEmpty() || mine && !preview) {
             item {
-                Text(
-                    "Le mie tre scelte",
-                    Modifier.padding(horizontal = 24.dp),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Le mie tre scelte",
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (mine &&
+                        !preview
+                    ) {
+                        IconButton(onClick = onEditFavorites) {
+                            Icon(Icons.Outlined.Edit, "Modifica i tre preferiti")
+                        }
+                    }
+                }
             }
             item {
                 LazyRow(
@@ -208,6 +240,27 @@ internal fun ProfilePage(
                     contentPadding = PaddingValues(horizontal = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                 ) {
+                    if (profile.favorites.isEmpty()) {
+                        items(3) { index ->
+                            Surface(
+                                onClick = onEditFavorites,
+                                modifier = Modifier.width(120.dp).height(168.dp),
+                                shape = RoundedCornerShape(20.dp),
+                                color = accent.copy(alpha = .12f),
+                            ) {
+                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                                    Text(
+                                        "0${index + 1}",
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        color = accent,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                    Icon(Icons.Outlined.Add, "Scegli un preferito")
+                                    Text("Una storia che ami", style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+                        }
+                    }
                     items(profile.favorites, key = { it.id }) { title ->
                         Column(Modifier.width(146.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Box(
@@ -255,6 +308,17 @@ internal fun ProfilePage(
         }
         when (section) {
             0 -> {
+                if (mine && !preview) {
+                    item {
+                        OutlinedButton(
+                            onClick = onEditLists,
+                            modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
+                        ) {
+                            Icon(Icons.Outlined.Add, null)
+                            Text(" Aggiungi e organizza titoli")
+                        }
+                    }
+                }
                 item {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 20.dp),
@@ -284,13 +348,21 @@ internal fun ProfilePage(
                         EmptyStory(
                             Icons.Outlined.Bookmarks,
                             "Ogni lista comincia con una storia",
-                            if (mine) "Scegli i titoli da mostrare da Personalizza. La tua libreria rimane privata." else "Nessun titolo pubblicato in questa lista.",
+                            if (mine) "Tocca Aggiungi e scegli le copertine da mostrare. La tua libreria resta privata." else "Nessun titolo pubblicato in questa lista.",
                         )
                     }
                 }
                 items(titles, key = { it.id }) { TitleTile(it, Modifier.fillMaxWidth().padding(horizontal = 20.dp)) }
             }
             1 -> {
+                if (mine && !preview) {
+                    item {
+                        TextButton(onClick = onEditWall, modifier = Modifier.padding(horizontal = 20.dp)) {
+                            Icon(Icons.Outlined.Edit, null, Modifier.size(18.dp))
+                            Text(" Chi può scrivere qui?")
+                        }
+                    }
+                }
                 if (!preview &&
                     (
                         mine ||
@@ -358,38 +430,62 @@ internal fun FavoritesEditor(favorites: List<PublicTitle>, onChange: (List<Publi
     val move = { id: String, delta: Int ->
         val list = current.toMutableList()
         val index = list.indexOfFirst { it.id == id }
-        val target = (index + delta).coerceIn(0, list.lastIndex)
+        val target = if (index >= 0) (index + delta).coerceIn(0, list.lastIndex) else -1
         if (index >= 0 && index != target) {
             val item = list.removeAt(index)
             list.add(target, item)
             onChange(list)
         }
     }
-    favorites.forEachIndexed { index, title ->
-        Row(
-            Modifier.fillMaxWidth().pointerInput(title.id) {
-                var distance = 0f
-                detectDragGesturesAfterLongPress(onDragStart = { distance = 0f }, onDrag = { change, amount ->
-                    change.consume()
-                    distance += amount.y
-                    if (kotlin.math.abs(distance) >=
-                        threshold
-                    ) {
-                        move(title.id, if (distance > 0) 1 else -1)
-                        distance = 0f
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        favorites.forEachIndexed { index, title ->
+            Column(
+                Modifier.fillMaxWidth().pointerInput(title.id) {
+                    var distance = 0f
+                    detectDragGesturesAfterLongPress(onDragStart = { distance = 0f }, onDrag = { change, amount ->
+                        change.consume()
+                        distance += amount.y
+                        if (kotlin.math.abs(distance) >=
+                            threshold
+                        ) {
+                            move(title.id, if (distance > 0) 1 else -1)
+                            distance = 0f
+                        }
+                    })
+                }.padding(vertical = 4.dp).clip(RoundedCornerShape(18.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CommunityImage(title.artwork, null, Modifier.size(40.dp, 58.dp).clip(RoundedCornerShape(8.dp)))
+                    Text(
+                        title.title,
+                        Modifier.weight(1f),
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.DragHandle, "Tieni premuto per riordinare")
+                    Text(
+                        "  ${index + 1} di 3",
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    IconButton(onClick = { move(title.id, -1) }, enabled = index > 0) {
+                        Icon(Icons.Outlined.ArrowUpward, "Sposta prima")
                     }
-                })
-            },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Outlined.DragHandle, "Tieni premuto per riordinare")
-            Text("${index + 1}. ${title.title}", Modifier.weight(1f).padding(8.dp), maxLines = 2)
-            IconButton(onClick = {
-                move(title.id, -1)
-            }, enabled = index > 0) { Icon(Icons.Outlined.ArrowUpward, "Sposta prima") }
-            IconButton(onClick = {
-                onChange(favorites - title)
-            }) { Icon(Icons.Outlined.Close, "Rimuovi dai preferiti pubblici") }
+                    IconButton(onClick = { onChange(favorites - title) }) {
+                        Icon(Icons.Outlined.Close, "Rimuovi dai preferiti pubblici")
+                    }
+                }
+            }
         }
     }
 }

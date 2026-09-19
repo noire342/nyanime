@@ -11,7 +11,7 @@ internal class CommunityStore(context: Context, private val vault: IdentityVault
     context,
     "community-v1.db",
     null,
-    2,
+    3,
 ) {
     var generation: Long = 0
         private set
@@ -28,9 +28,18 @@ internal class CommunityStore(context: Context, private val vault: IdentityVault
         db.execSQL("CREATE TABLE receipts (event TEXT NOT NULL, relay TEXT NOT NULL, PRIMARY KEY(event,relay))")
         db.execSQL("CREATE TABLE received (id TEXT PRIMARY KEY NOT NULL, at INTEGER NOT NULL)")
         CommunityOutboxSql.upgrade.forEach(db::execSQL)
+        db.execSQL(CommunityOutboxSql.PACING_UPGRADE)
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) CommunityOutboxSql.upgrade.forEach(db::execSQL)
+        if (oldVersion < 3) {
+            db.execSQL(CommunityOutboxSql.PACING_UPGRADE)
+            // Replace the old burst/backoff cycle with slower continuous replication.
+            db.execSQL(
+                "UPDATE relay_limits SET retry_at=min(retry_at,?),pace=2000 WHERE reason='rate-limited'",
+                arrayOf<Any>(System.currentTimeMillis() + 30_000),
+            )
+        }
     }
     fun <T> transaction(block: () -> T): T {
         val db = writableDatabase
@@ -184,8 +193,8 @@ internal class CommunityStore(context: Context, private val vault: IdentityVault
         writableDatabase.execSQL("UPDATE outbox SET attempted=? WHERE id=?", arrayOf<Any>(now, event.id))
         writableDatabase.execSQL("INSERT OR IGNORE INTO relay_limits(relay) VALUES(?)", arrayOf(relay))
         writableDatabase.execSQL(
-            "UPDATE relay_limits SET retry_at=? WHERE relay=?",
-            arrayOf<Any>(now + RelayRejection.SEND_INTERVAL, relay),
+            "UPDATE relay_limits SET retry_at=?+pace WHERE relay=?",
+            arrayOf<Any>(now, relay),
         )
         event
     }
@@ -205,13 +214,30 @@ internal class CommunityStore(context: Context, private val vault: IdentityVault
             arrayOf<Any>(now + reason.retryDelay(attempts), reason.code, id, relay),
         )
         if (reason.pausesRelay) {
+            if (reason == RelayRejection.RateLimited) {
+                writableDatabase.execSQL(CommunityOutboxSql.REDUCE_RATE, arrayOf(relay))
+            }
             val failures = readableDatabase.rawQuery(
                 "SELECT failures FROM relay_limits WHERE relay=?",
                 arrayOf(relay),
             ).use { if (it.moveToFirst()) it.getInt(0) + 1 else 1 }
             writableDatabase.execSQL(
                 "UPDATE relay_limits SET retry_at=?,failures=?,reason=? WHERE relay=?",
-                arrayOf<Any>(now + reason.retryDelay(failures), failures, reason.code, relay),
+                arrayOf<Any>(
+                    now +
+                        reason.retryDelay(
+                            if (reason ==
+                                RelayRejection.RateLimited
+                            ) {
+                                1
+                            } else {
+                                failures
+                            },
+                        ),
+                    failures,
+                    reason.code,
+                    relay,
+                ),
             )
         }
     }
@@ -311,6 +337,7 @@ internal class CommunityStore(context: Context, private val vault: IdentityVault
                 SQLiteDatabase.CONFLICT_IGNORE,
             )
             writableDatabase.delete("delivery_attempts", "event=? AND relay=?", arrayOf(id, relay))
+            writableDatabase.execSQL("UPDATE relay_limits SET failures=0 WHERE relay=?", arrayOf(relay))
             writableDatabase.execSQL(
                 "UPDATE relay_limits SET failures=0,reason='' WHERE relay=? AND retry_at<=?",
                 arrayOf<Any>(relay, System.currentTimeMillis()),

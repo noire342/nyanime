@@ -17,6 +17,18 @@ internal class LibrarySyncBridge(
         anime.await { communitySyncQueries.capture(if (enabled) 1 else 0) }
         manga.await { communitySyncQueries.capture(if (enabled) 1 else 0) }
     }
+    suspend fun videoIds(ref: SyncReference): Pair<Long, Long>? {
+        if (ref.manga || ref.itemUrl.isBlank()) return null
+        return anime.await {
+            val title = communitySyncQueries.findTitle(ref.source, ref.titleUrl).executeAsList().singleOrNull()
+            val episode = communitySyncQueries.findItem(
+                ref.source,
+                ref.titleUrl,
+                ref.itemUrl,
+            ).executeAsList().singleOrNull()
+            if (title != null && episode != null) title to episode else null
+        }
+    }
     suspend fun seed() {
         anime.await(true) {
             communitySyncQueries.seedCategories()
@@ -87,24 +99,24 @@ internal class LibrarySyncBridge(
     suspend fun library(): List<SyncRecord> {
         val revision = SyncRevision(0, 0, "0".repeat(32))
         return anime.await {
-            animesQueries.getFavorites().executeAsList().map {
+            communitySyncQueries.getCommunityTitles().executeAsList().map {
                 SyncRecord(
                     SyncReference(false, it.source, it.url),
                     revision,
                     title = it.title,
                     artwork = it.thumbnail_url.orEmpty(),
-                    favorite = true,
+                    favorite = it.favorite,
                 )
             }
         } +
             manga.await {
-                mangasQueries.getFavorites().executeAsList().map {
+                communitySyncQueries.getCommunityTitles().executeAsList().map {
                     SyncRecord(
                         SyncReference(true, it.source, it.url),
                         revision,
                         title = it.title,
                         artwork = it.thumbnail_url.orEmpty(),
-                        favorite = true,
+                        favorite = it.favorite,
                     )
                 }
             }

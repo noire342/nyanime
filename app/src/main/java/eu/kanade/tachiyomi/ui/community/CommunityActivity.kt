@@ -204,6 +204,8 @@ private fun CommunityScreen(manager: CommunityManager, incoming: String, incomin
                                 "Community"
                             },
                             fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                         if (state.me !=
                             null
@@ -212,6 +214,8 @@ private fun CommunityScreen(manager: CommunityManager, incoming: String, incomin
                                 state.deliveryLabel(),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
@@ -306,13 +310,20 @@ private fun CommunityScreen(manager: CommunityManager, incoming: String, incomin
                                 chat =
                                     owner
                             },
+                            onEditFavorites = { dialog = "profile:favorites" },
+                            onEditLists = { dialog = "profile:lists" },
+                            onEditWall = { dialog = "profile:wall" },
                             onPost = { dialog = "wall:$owner" }, onReply = { reply = it }, onProfile = {
                                 profile = it
                                 manager.openProfile(it)
                             },
                             onWatch = {
                                 chat = owner
-                                dialog = "chat-options"
+                                if (state.presence[owner]?.activity?.manga == false) {
+                                    manager.requestWatch(owner)
+                                } else {
+                                    dialog = "chat-options"
+                                }
                             },
                         )
                     }
@@ -329,7 +340,7 @@ private fun CommunityScreen(manager: CommunityManager, incoming: String, incomin
                     }, onChat = {
                         chat =
                             it
-                    })
+                    }, onSettings = { dialog = "settings" })
                     else -> ChatsPage(state, manager) { chat = it }
                 }
             }
@@ -686,6 +697,7 @@ private fun FriendsPage(
     manager: CommunityManager,
     onProfile: (String) -> Unit,
     onChat: (String) -> Unit,
+    onSettings: () -> Unit,
 ) {
     val requests = state.friends.filter { it.incoming.isNotEmpty() && !it.blocked && !it.accepted }
     val friends = state.friends.filter { !it.blocked && (it.accepted || it.outgoing.isNotEmpty()) }
@@ -694,6 +706,27 @@ private fun FriendsPage(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item { Text("Le tue persone", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+        item { CommunityNotificationCard(state.background, onSettings) }
+        item {
+            Surface(
+                onClick = onSettings,
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Cosa stai guardando?", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        when (state.presenceAccess) {
+                            eu.kanade.tachiyomi.data.community.PresenceAccess.Private -> "Attività nascosta · scegli tu quando condividerla"
+                            eu.kanade.tachiyomi.data.community.PresenceAccess.Friends -> "La tua attività è visibile solo agli amici"
+                            eu.kanade.tachiyomi.data.community.PresenceAccess.Public -> "La tua attività è pubblica"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
         if (requests.isNotEmpty()) item { Text("Richieste di amicizia", style = MaterialTheme.typography.titleMedium) }
         items(requests, key = { "request:${it.peer}" }) { friend ->
             PersonRow(state.profile(friend.peer), "Vorrebbe aggiungerti agli amici", { onProfile(friend.peer) }) {
@@ -711,20 +744,40 @@ private fun FriendsPage(
             }
         }
         items(friends, key = { it.peer }) { friend ->
-            PersonRow(
-                state.profile(friend.peer),
-                if (friend.accepted) {
-                    state.presence[friend.peer]?.text
-                        ?: "Amico"
-                } else {
-                    "Richiesta inviata"
-                },
-                { onProfile(friend.peer) },
-            ) {
-                if (friend.accepted) {
-                    IconButton(onClick = { onChat(friend.peer) }) { Icon(Icons.Outlined.ChatBubbleOutline, "Scrivi") }
-                } else {
-                    TextButton(onClick = { manager.removeFriend(friend.peer) }) { Text("Annulla") }
+            if (friend.accepted) {
+                FriendActivityCard(
+                    state.profile(friend.peer),
+                    state.presence[friend.peer],
+                    state.watchRequests.values.any {
+                        it.host == friend.peer &&
+                            it.requester == state.me?.key &&
+                            it.pending(System.currentTimeMillis())
+                    },
+                    onProfile = { onProfile(friend.peer) },
+                    onChat = { onChat(friend.peer) },
+                    onWatch = {
+                        manager.requestWatch(friend.peer)
+                        onChat(friend.peer)
+                    },
+                )
+            } else {
+                PersonRow(
+                    state.profile(friend.peer),
+                    if (friend.accepted) {
+                        state.presence[friend.peer]?.text
+                            ?: "Amico"
+                    } else {
+                        "Richiesta inviata"
+                    },
+                    { onProfile(friend.peer) },
+                ) {
+                    if (friend.accepted) {
+                        IconButton(onClick = {
+                            onChat(friend.peer)
+                        }) { Icon(Icons.Outlined.ChatBubbleOutline, "Scrivi") }
+                    } else {
+                        TextButton(onClick = { manager.removeFriend(friend.peer) }) { Text("Annulla") }
+                    }
                 }
             }
         }
@@ -840,6 +893,28 @@ private fun Conversation(state: CommunityState, id: String, manager: CommunityMa
     val context = LocalContext.current
     val messages = state.chats.filter { it.conversation == id }.sortedByDescending { it.at }
     Column(Modifier.fillMaxSize().imePadding()) {
+        state.groupInvites.firstOrNull { it.id == id }?.let { group ->
+            PersonRow(
+                eu.kanade.tachiyomi.data.community.CommunityProfile(group.id, group.name, avatar = group.image),
+                "${state.profile(group.owner).name} ti invita in questo gruppo",
+                {},
+            ) {
+                TextButton(onClick = { manager.declineGroup(id) }) { Text("Non ora") }
+                Button(onClick = { manager.acceptGroup(id) }) { Text("Entra nel gruppo") }
+            }
+        }
+        val incoming = state.friends.firstOrNull {
+            it.peer == id &&
+                !it.accepted &&
+                !it.blocked &&
+                it.incoming.isNotEmpty()
+        }
+        if (incoming != null) {
+            PersonRow(state.profile(id), "Vorrebbe aggiungerti agli amici", {}) {
+                TextButton(onClick = { manager.removeFriend(id) }) { Text("Non ora") }
+                Button(onClick = { manager.acceptFriend(id) }) { Text("Accetta amicizia") }
+            }
+        }
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), horizontalArrangement = Arrangement.End) {
             TextButton(onClick = { manager.mute(id) }) {
                 Icon(
@@ -871,60 +946,81 @@ private fun Conversation(state: CommunityState, id: String, manager: CommunityMa
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(messages, key = { it.id }) { message ->
-                val mine = message.author == state.me?.key
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
-                    Surface(
-                        Modifier.widthIn(max = 330.dp),
-                        shape = RoundedCornerShape(22.dp, 22.dp, if (mine) 5.dp else 22.dp, if (mine) 22.dp else 5.dp),
-                        color = if (mine) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                val watch = state.watchRequests[message.watchRequest]
+                if (watch != null) {
+                    SocialWatchCard(
+                        watch,
+                        state.me?.key.orEmpty(),
+                        state.profile(id).name,
+                        respond = { accept ->
+                            (context as? android.app.Activity)?.let { manager.respondWatch(watch.id, accept, it) }
+                        },
+                        enter = { (context as? android.app.Activity)?.let { manager.enterWatch(watch.id, it) } },
+                    )
+                } else {
+                    val mine = message.author == state.me?.key
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
                     ) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            if (!mine &&
-                                state.groups.any { it.id == id }
-                            ) {
-                                Text(
-                                    state.profile(message.author).name,
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
-                            }
-                            Text(message.text)
-                            if (message.invite.isNotEmpty()) {
-                                Button(
-                                    onClick = {
-                                        val invite = runCatching {
+                        Surface(
+                            Modifier.widthIn(max = 330.dp),
+                            shape = RoundedCornerShape(
+                                22.dp,
+                                22.dp,
+                                if (mine) 5.dp else 22.dp,
+                                if (mine) 22.dp else 5.dp,
+                            ),
+                            color = if (mine) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (!mine &&
+                                    state.groups.any { it.id == id }
+                                ) {
+                                    Text(
+                                        state.profile(message.author).name,
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                                Text(message.text)
+                                if (message.invite.isNotEmpty()) {
+                                    Button(
+                                        onClick = {
+                                            val invite = runCatching {
+                                                require(
+                                                    message.inviteExpires == 0L ||
+                                                        message.inviteExpires > System.currentTimeMillis(),
+                                                )
+                                                WatchInvite.parse(message.invite, System.currentTimeMillis())
+                                            }.getOrNull()
+                                            if (invite == null) {
+                                                android.widget.Toast.makeText(
+                                                    context,
+                                                    "L’invito è scaduto. Chiedine uno nuovo.",
+                                                    android.widget.Toast.LENGTH_LONG,
+                                                ).show()
+                                            } else {
+                                                context.startActivity(
+                                                    Intent(
+                                                        context,
+                                                        WatchTogetherActivity::class.java,
+                                                    ).setAction(
+                                                        Intent.ACTION_VIEW,
+                                                    ).setData(
+                                                        invite.link().toUri(),
+                                                    ),
+                                                )
+                                            }
+                                        },
+                                        enabled = runCatching {
                                             require(
                                                 message.inviteExpires == 0L ||
                                                     message.inviteExpires > System.currentTimeMillis(),
                                             )
                                             WatchInvite.parse(message.invite, System.currentTimeMillis())
-                                        }.getOrNull()
-                                        if (invite == null) {
-                                            android.widget.Toast.makeText(
-                                                context,
-                                                "L’invito è scaduto. Chiedine uno nuovo.",
-                                                android.widget.Toast.LENGTH_LONG,
-                                            ).show()
-                                        } else {
-                                            context.startActivity(
-                                                Intent(
-                                                    context,
-                                                    WatchTogetherActivity::class.java,
-                                                ).setAction(
-                                                    Intent.ACTION_VIEW,
-                                                ).setData(
-                                                    invite.link().toUri(),
-                                                ),
-                                            )
-                                        }
-                                    },
-                                    enabled = runCatching {
-                                        require(
-                                            message.inviteExpires == 0L ||
-                                                message.inviteExpires > System.currentTimeMillis(),
-                                        )
-                                        WatchInvite.parse(message.invite, System.currentTimeMillis())
-                                    }.isSuccess,
-                                ) { Text("Entriamo in stanza") }
+                                        }.isSuccess,
+                                    ) { Text("Entriamo in stanza") }
+                                }
                             }
                         }
                     }
@@ -941,10 +1037,19 @@ private fun Conversation(state: CommunityState, id: String, manager: CommunityMa
             }, placeholder = {
                 Text("Scrivi qualcosa…")
             }, modifier = Modifier.weight(1f), maxLines = 5, shape = RoundedCornerShape(26.dp))
-            FilledIconButton(onClick = {
-                manager.sendChat(id, text)
-                text = ""
-            }, enabled = text.isNotBlank()) { Icon(Icons.AutoMirrored.Outlined.Send, "Invia messaggio cifrato") }
+            FilledIconButton(
+                onClick = {
+                    manager.sendChat(id, text)
+                    text = ""
+                },
+                enabled = text.isNotBlank() &&
+                    (
+                        state.isFriend(id) ||
+                            state.groups.any {
+                                it.id == id
+                            }
+                        ),
+            ) { Icon(Icons.AutoMirrored.Outlined.Send, "Invia messaggio cifrato") }
         }
     }
 }

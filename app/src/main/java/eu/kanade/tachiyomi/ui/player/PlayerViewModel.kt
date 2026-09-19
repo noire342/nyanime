@@ -365,10 +365,23 @@ class PlayerViewModel @JvmOverloads constructor(
     fun onDevicePlaybackReady() {
         deviceResumeAllowed = true
         eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.attachPlayer(devicePlayer)
+        if (!incognitoMode) {
+            val anime = currentAnime.value
+            val episode = currentEpisode.value
+            if (anime != null && episode != null) {
+                eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.updateActivity(
+                    this,
+                    eu.kanade.tachiyomi.data.community.SyncReference(false, anime.source, anime.url, episode.url),
+                    anime.title,
+                    episode.name,
+                )
+            }
+        }
     }
     fun detachDevicePlayback() {
         deviceResumeAllowed = false
         eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.handoff?.detach(devicePlayer)
+        eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.clearActivity(this)
     }
 
     fun pauseByUser() {

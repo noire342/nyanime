@@ -124,7 +124,7 @@ internal fun PreviewImages() {
                             is AnimeCover -> it.animeId == index + 1L
                             is tachiyomi.domain.entries.manga.model.Manga -> it.id == index + 1L
                             is tachiyomi.domain.entries.manga.model.MangaCover -> it.mangaId == index + 1L
-                            else -> it == "preview://$index"
+                            else -> it == "preview://$index" || it == "https://preview.example/poster-$index.jpg"
                         }
                     }, image)
                 }

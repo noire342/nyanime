@@ -36,6 +36,8 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
     private val publicationMutex = Mutex()
+    private val imageDrafts = CommunityImageDrafts(context)
+    private var preferredImageHost = BlossomImages.hosts.first()
     private val mutable = MutableStateFlow(CommunityState())
     val state = mutable.asStateFlow()
     private val vault = IdentityVault(context)
@@ -53,8 +55,9 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
     private var ticks = 0
     private var refreshedAt = 0L
     private var postLimit = 1000
-    private var activityText = "Online"
-    private var activityAt = 0L
+    private data class LocalActivity(val ref: SyncReference, val public: SocialActivity, val at: Long)
+    private var activityOwner = java.lang.ref.WeakReference<Any>(null)
+    private var lastActivity: LocalActivity? = null
     private var refreshedGeneration = -1L
     private var libraryAt = 0L
 
@@ -91,6 +94,10 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         scope.launch {
             preferences.incognitoMode().changes().collect { incognito ->
                 mutex.withLock {
+                    if (incognito) {
+                        activityOwner.clear()
+                        lastActivity = null
+                    }
                     library.capture(identity != null && state.value.syncEnabled && !incognito)
                     if (!incognito && identity != null) {
                         store.list<NostrEvent>("deferred-sync", 2000).forEach { event ->
@@ -114,15 +121,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                         if (ticks % 30 == 0 &&
                             foreground
                         ) {
-                            publishPresence(
-                                if (System.currentTimeMillis() - activityAt <
-                                    30_000
-                                ) {
-                                    activityText
-                                } else {
-                                    "Online"
-                                },
-                            )
+                            publishPresence()
                         }
                         if (ticks % 5 == 0) {
                             if (state.value.syncEnabled && !preferences.incognitoMode().get()) {
@@ -209,11 +208,17 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         drain()
         refresh()
     }
+    fun saveProfileDraft(profile: CommunityProfile) = action {
+        require(profile.key == identity?.publicKey)
+        store.save("drafts", "profile", profile)
+        mutable.update { it.copy(profileDraft = profile) }
+    }
+
     fun publishProfile(profile: CommunityProfile) = scope.launch {
         publicationMutex.withLock {
             try {
                 mutex.withLock {
-                    require(profile.valid())
+                    require(profile.validDraft())
                     store.save("drafts", "profile", profile)
                     mutable.update { it.copy(publishing = true, profileDraft = profile) }
                 }
@@ -223,6 +228,8 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                         artwork.prepare(title, state.value.library, ::uploadPublicArtwork)
                 }
                 val prepared = profile.copy(
+                    avatar = prepareImage(profile.avatar),
+                    banner = prepareImage(profile.banner),
                     favorites = profile.favorites.map {
                         titles.getValue(it.id).copy(status = it.status)
                     },
@@ -235,11 +242,12 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
                 mutable.update {
                     it.copy(
                         loading = false,
-                        error = "Pubblicazione in attesa: non è stato possibile preparare le copertine. La bozza è conservata.",
+                        error = failure.takeIf { it is BlossomUploadException }?.message
+                            ?: "Non riesco a preparare le immagini. Le modifiche sono salvate in bozza: puoi riprovare.",
                     )
                 }
             } finally {
@@ -364,7 +372,9 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                     loggedRejections[relay] = reason to now
                 }
             }
-        }, authenticated = { relay -> mutex.withLock { store.authenticated(relay) } })
+        }, authenticated = { relay -> mutex.withLock { store.authenticated(relay) } }, diagnostic = {
+            Log.w("NyanimeSync", it)
+        })
         transport?.query(id.publicKey)
         if (state.value.syncEnabled && !preferences.incognitoMode().get()) {
             store.list<SyncCheckpoint>("sync-checkpoints").forEach { scheduleRecovery(it) }
@@ -379,6 +389,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         disconnectJob?.cancel()
         disconnectJob = null
         if (identity == null) return@action
+        publishPresence(clear = !value)
         if (state.value.syncEnabled && !preferences.incognitoMode().get()) drain()
         if (value || state.value.background) {
             if (value && state.value.background) {
@@ -544,11 +555,12 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         publicationMutex.withLock {
             try {
                 mutex.withLock {
-                    require(post.valid())
+                    require(post.validDraft())
                     store.save("drafts", "post", post)
                     mutable.update { it.copy(postDraft = post, publishing = true) }
                 }
                 val prepared = post.copy(
+                    image = prepareImage(post.image),
                     title = post.title?.let { title ->
                         PublicArtwork(context).prepare(title, state.value.library) {
                             uploadPublicArtwork(it)
@@ -824,13 +836,57 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         refresh()
     }
     fun setPresence(access: PresenceAccess) = action {
+        if (state.value.presenceAccess != access) publishPresence(clear = true)
         store.save("settings", "presence", access)
         mutable.update { it.copy(presenceAccess = access) }
-        publishPresence("Online")
+        publishPresence()
     }
-    private fun publishPresence(text: String) {
-        if (preferences.incognitoMode().get() || state.value.presenceAccess == PresenceAccess.Private) return
-        val presence = SocialPresence(text.take(240), System.currentTimeMillis() + 90_000)
+
+    /** Called with existing view-model data only. Never samples the released native player. */
+    fun updateActivity(owner: Any, ref: SyncReference, title: String, item: String) = action {
+        if (identity == null || preferences.incognitoMode().get() || !ref.valid()) return@action
+        val changed = lastActivity?.ref != ref || activityOwner.get() !== owner
+        val token = if (changed) {
+            UUID.randomUUID().toString().replace(
+                "-",
+                "",
+            )
+        } else {
+            requireNotNull(lastActivity).public.token
+        }
+        activityOwner = java.lang.ref.WeakReference(owner)
+        lastActivity =
+            LocalActivity(
+                ref,
+                SocialActivity(token, title.take(240), item.take(240), ref.manga),
+                System.currentTimeMillis(),
+            )
+        if (changed) publishPresence()
+    }
+    fun clearActivity(owner: Any) = action {
+        if (activityOwner.get() !== owner) return@action
+        activityOwner.clear()
+        lastActivity = lastActivity?.copy(at = System.currentTimeMillis())
+        publishPresence()
+    }
+    private fun publishPresence(clear: Boolean = false) {
+        if (identity == null ||
+            preferences.incognitoMode().get() ||
+            state.value.presenceAccess == PresenceAccess.Private
+        ) {
+            return
+        }
+        val activity = lastActivity?.takeIf { activityOwner.get() != null && foreground && !clear }?.let {
+            lastActivity = it.copy(at = System.currentTimeMillis())
+            it.public
+        }
+        val text = if (clear) {
+            ""
+        } else {
+            activity?.let { (if (it.manga) "Sta leggendo: " else "Sta guardando: ") + it.title }
+                ?: "Online"
+        }
+        val presence = SocialPresence(text.take(240), System.currentTimeMillis() + 90_000, activity)
         if (state.value.presenceAccess == PresenceAccess.Public) {
             enqueuePublic(
                 30315,
@@ -845,7 +901,14 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                                 1000
                             ).toString(),
                     ),
-                ),
+                ) +
+                    if (activity !=
+                        null
+                    ) {
+                        listOf(listOf("nyanime-activity", communityJson.encodeToString(activity)))
+                    } else {
+                        emptyList()
+                    },
                 "presence",
             )
         } else {
@@ -860,6 +923,150 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                     peers,
                 )
             }
+        }
+    }
+    fun requestWatch(peer: String) = action {
+        val me = requireNotNull(identity).publicKey
+        require(friend(peer).accepted && !friend(peer).blocked) { "Aggiungi prima questa persona agli amici" }
+        val now = System.currentTimeMillis()
+        val presence = requireNotNull(state.value.presence[peer]) { "Questa attività non è più disponibile" }
+        val activity = requireNotNull(presence.activity) { "Questo amico non sta guardando un episodio" }
+        require(presence.expires > now && activity.valid() && !activity.manga) {
+            "Questa attività non è più disponibile"
+        }
+        require(
+            store.list<SocialWatchRequest>("watch-requests").none {
+                it.requester == me && it.host == peer && it.pending(now)
+            },
+        ) { "Hai già inviato un invito: attendi la risposta" }
+        val request = SocialWatchRequest(
+            UUID.randomUUID().toString().replace("-", ""),
+            me,
+            peer,
+            activity,
+            now + 180_000,
+        )
+        store.transaction {
+            saveWatchRequest(request, now / 1000)
+            sendAction(
+                PrivateAction(
+                    type = "watch.request",
+                    peer = peer,
+                    body = communityJson.encodeToString(request),
+                    expires = request.expires,
+                ),
+                listOf(peer),
+            )
+        }
+        refresh()
+    }
+    fun respondWatch(id: String, accept: Boolean, activity: android.app.Activity) = action {
+        val request = requireNotNull(store.read<SocialWatchRequest>("watch-requests", id))
+        val me = requireNotNull(identity).publicKey
+        require(request.pending(System.currentTimeMillis()) && me in listOf(request.host, request.requester)) {
+            "Questo invito è scaduto"
+        }
+        val peer = if (me == request.host) request.requester else request.host
+        require(friend(peer).accepted && !friend(peer).blocked) { "Questa amicizia non è più disponibile" }
+        var code = ""
+        val status = if (me == request.requester) {
+            require(!accept)
+            WatchRequestStatus.Cancelled
+        } else if (!accept) {
+            WatchRequestStatus.Declined
+        } else {
+            require(!preferences.incognitoMode().get()) { "Esci dalla modalità incognito prima di entrare in stanza" }
+            val current = requireNotNull(lastActivity) { "Riapri l’episodio per creare una stanza" }
+            require(
+                current.public.token == request.activity.token &&
+                    System.currentTimeMillis() - current.at < 180_000 &&
+                    !current.ref.manga,
+            ) {
+                "L’episodio è cambiato. Apri quello desiderato e chiedi un nuovo invito."
+            }
+            val ids = requireNotNull(library.videoIds(current.ref)) { "L’episodio non è più presente sul dispositivo" }
+            code = withContext(Dispatchers.Main) {
+                require(!activity.isFinishing && !activity.isDestroyed) { "Riapri la chat per accettare" }
+                val cast = eu.kanade.tachiyomi.data.cast.CastController.get(context).state.value
+                require(!cast.active && !cast.connecting) { "Termina prima la trasmissione alla TV" }
+                val rooms = eu.kanade.tachiyomi.data.watch.WatchTogetherManager.get(context)
+                require(!rooms.controller.active) {
+                    "Sei già in una stanza. Puoi invitare l’amico dalle opzioni della chat."
+                }
+                rooms.present(activity)
+                rooms.createRoom(state.value.me?.name.orEmpty())
+                require(rooms.controller.active) { "Non riesco a creare la stanza. Riprova." }
+                try {
+                    activity.startActivity(
+                        eu.kanade.tachiyomi.ui.player.PlayerActivity.newIntent(activity, ids.first, ids.second),
+                    )
+                    rooms.controller.state.value.invite
+                } catch (error: Exception) {
+                    rooms.controller.leave()
+                    throw error
+                }
+            }
+            WatchRequestStatus.Accepted
+        }
+        val response = request.copy(status = status, invite = code)
+        store.transaction {
+            store.save("watch-requests", id, response)
+            sendAction(
+                PrivateAction(
+                    type = "watch.response",
+                    peer = peer,
+                    body = communityJson.encodeToString(response),
+                    expires = request.expires,
+                ),
+                listOf(peer),
+            )
+        }
+        refresh()
+    }
+    private fun saveWatchRequest(request: SocialWatchRequest, at: Long) {
+        val me = requireNotNull(identity).publicKey
+        val conversation = if (me == request.requester) request.host else request.requester
+        store.save("watch-requests", request.id, request)
+        store.save(
+            "chats",
+            "watch:${request.id}",
+            ChatItem(
+                "watch:${request.id}",
+                request.requester,
+                conversation,
+                "Guardiamo insieme ${request.activity.title}?",
+                at,
+                watchRequest = request.id,
+            ),
+            at * 1000,
+        )
+    }
+    fun enterWatch(id: String, activity: android.app.Activity) = action {
+        val request = requireNotNull(store.read<SocialWatchRequest>("watch-requests", id))
+        val me = requireNotNull(identity).publicKey
+        require(
+            request.status == WatchRequestStatus.Accepted &&
+                request.expires > System.currentTimeMillis() &&
+                me in listOf(request.requester, request.host),
+        ) { "Questo invito è scaduto" }
+        val peer = if (me == request.host) request.requester else request.host
+        require(friend(peer).accepted && !friend(peer).blocked) { "Questa amicizia non è più disponibile" }
+        eu.kanade.tachiyomi.data.watch.WatchInvite.parse(request.invite, System.currentTimeMillis())
+        withContext(Dispatchers.Main) {
+            require(!activity.isFinishing && !activity.isDestroyed) { "Riapri la chat per entrare" }
+            val cast = eu.kanade.tachiyomi.data.cast.CastController.get(context).state.value
+            require(!cast.active && !cast.connecting) { "Termina prima la trasmissione alla TV" }
+            val rooms = eu.kanade.tachiyomi.data.watch.WatchTogetherManager.get(context)
+            require(!rooms.controller.active || rooms.controller.state.value.invite == request.invite) {
+                "Sei già in un’altra stanza"
+            }
+            require(me != request.host || rooms.controller.active) {
+                "Questa stanza è stata chiusa. Create un nuovo invito."
+            }
+            rooms.present(activity)
+            if (!rooms.controller.active) rooms.controller.join(request.invite, state.value.me?.name.orEmpty())
+            require(rooms.controller.active) { "Non riesco a entrare. Riprova." }
+            activity.startActivity(Intent(activity, eu.kanade.tachiyomi.ui.watch.WatchTogetherActivity::class.java))
         }
     }
     private fun nextRevision(now: Long = System.currentTimeMillis()): SyncRevision {
@@ -897,10 +1104,6 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                     store.save("sync-addresses", address, true)
                     store.save("settings", "checkpoint-dirty", true)
                 }
-            }
-            if (record.ref.itemUrl.isNotEmpty() && SyncField.Progress in record.edits) {
-                activityText = (if (record.ref.manga) "Legge " else "Guarda ") + record.title
-                activityAt = System.currentTimeMillis()
             }
         }, revision = ::nextRevision)
         updateDeliveryState()
@@ -1155,9 +1358,15 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             30315 -> {
                 val expiry = event.tag("expiration")?.toLongOrNull()?.times(1000) ?: return
                 if (expiry in System.currentTimeMillis()..System.currentTimeMillis() + 120_000 &&
-                    event.content.length <= 240
+                    event.content.length <= 240 &&
+                    newer(event, "presence:${event.pubkey}")
                 ) {
-                    store.save("presence", event.pubkey, SocialPresence(event.content, expiry))
+                    val activity = event.tag("nyanime-activity")?.takeIf { it.length <= 2000 }?.let {
+                        runCatching {
+                            communityJson.decodeFromString<SocialActivity>(it)
+                        }.getOrNull()?.takeIf(SocialActivity::valid)
+                    }
+                    store.save("presence", event.pubkey, SocialPresence(event.content, expiry, activity))
                 }
             }
             1059 -> {
@@ -1249,6 +1458,19 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                 if (!validKey(peer) || peer == me || !self && action.peer != me) return
                 applyFriend(peer, action, self)
                 transport?.query(peer)
+                if (!self && action.type != "friend.remove") {
+                    notifyPrivate(
+                        rumor,
+                        peer,
+                        if (action.type ==
+                            "friend.request"
+                        ) {
+                            "Vorrebbe aggiungerti agli amici"
+                        } else {
+                            "Ha accettato la tua amicizia"
+                        },
+                    )
+                }
             }
             "group.update" -> {
                 val group = action.group ?: return
@@ -1274,6 +1496,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                         store.remove("group-invites", group.id)
                     } else {
                         store.save("group-invites", group.id, group)
+                        if (previous == null) notifyPrivate(rumor, group.id, "Ti invita in un gruppo privato")
                     }
                 } else {
                     store.remove("groups", group.id)
@@ -1322,11 +1545,57 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                         action.expires,
                     ),
                 )
+                if (!self) notifyPrivate(rumor, conversation, "Ti invita a guardare qualcosa insieme")
+            }
+            "watch.request" -> {
+                val request = communityJson.decodeFromString<SocialWatchRequest>(action.body)
+                if (!request.valid(System.currentTimeMillis()) ||
+                    request.requester != rumor.pubkey ||
+                    request.status != WatchRequestStatus.Pending ||
+                    request.invite.isNotEmpty() ||
+                    me !in listOf(request.requester, request.host)
+                ) {
+                    return
+                }
+                val other = if (self) request.host else request.requester
+                if (!friend(other).accepted ||
+                    friend(other).blocked ||
+                    store.contains("watch-requests", request.id)
+                ) {
+                    return
+                }
+                saveWatchRequest(request, rumor.created_at)
+                if (!self) notifyPrivate(rumor, other, "Vorrebbe guardare questo episodio insieme a te")
+            }
+            "watch.response" -> {
+                val response = communityJson.decodeFromString<SocialWatchRequest>(action.body)
+                val previous =
+                    store.read<SocialWatchRequest>("watch-requests", response.id) ?: run {
+                        defer(rumor)
+                        return
+                    }
+                if (!previous.acceptsResponse(response, rumor.pubkey, System.currentTimeMillis())) return
+                val other = if (me == response.host) response.requester else response.host
+                if (!friend(other).accepted || friend(other).blocked) return
+                store.save("watch-requests", response.id, response)
+                if (!self) {
+                    notifyPrivate(
+                        rumor,
+                        other,
+                        if (response.status == WatchRequestStatus.Accepted) {
+                            "Ha accettato: la vostra stanza è pronta"
+                        } else {
+                            "Ha risposto al tuo invito"
+                        },
+                    )
+                }
             }
             "presence" -> if (!self && friend(peer).accepted) {
                 val presence = communityJson.decodeFromString<SocialPresence>(action.body)
                 if (presence.text.length <= 240 &&
-                    presence.expires in System.currentTimeMillis()..System.currentTimeMillis() + 120_000
+                    presence.expires in System.currentTimeMillis()..System.currentTimeMillis() + 120_000 &&
+                    presence.activity?.valid() != false &&
+                    presence.expires > (store.read<SocialPresence>("presence", peer)?.expires ?: 0)
                 ) {
                     store.save("presence", peer, presence)
                 }
@@ -1421,14 +1690,16 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                 },
                 groups = store.list("groups"),
                 groupInvites = store.list("group-invites"),
+                watchRequests = store.list<SocialWatchRequest>("watch-requests", 1000).associateBy { it.id },
                 presence = store.entries("presence").mapNotNull { (key, value) ->
                     runCatching {
                         key to
                             communityJson.decodeFromString<SocialPresence>(value)
                     }.getOrNull()
                 }.filter {
-                    it.second.expires >
-                        System.currentTimeMillis()
+                    it.second.expires > System.currentTimeMillis() &&
+                        it.second.text.isNotBlank() &&
+                        it.first !in blocked
                 }.toMap(),
                 pending = store.pendingCount(),
                 muted = store.entries("muted").filter {
@@ -1439,6 +1710,15 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             )
         }
         refreshedGeneration = store.generation
+    }
+    private fun notifyPrivate(rumor: NostrEvent, conversation: String, detail: String) {
+        if (rumor.created_at < System.currentTimeMillis() / 1000 - 120 ||
+            store.read<Boolean>("muted", conversation) == true ||
+            preferences.incognitoMode().get()
+        ) {
+            return
+        }
+        notifications.message(conversation, state.value.profile(rumor.pubkey).name, detail)
     }
     suspend fun exportRecovery(password: CharArray): String = withContext(Dispatchers.IO) {
         mutex.withLock {
@@ -1475,11 +1755,19 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         refresh()
     }
     internal fun pairingSecret(): ByteArray = requireNotNull(identity).exportSecret()
-    private suspend fun uploadPublicArtwork(bytes: ByteArray): String {
+    internal suspend fun stageImage(bytes: ByteArray): String = withContext(Dispatchers.IO) { imageDrafts.save(bytes) }
+
+    private suspend fun prepareImage(value: String): String {
+        val file = imageDrafts.file(value) ?: return value
+        require(file.isFile) { "La foto della bozza non è più disponibile. Sceglila di nuovo." }
+        return uploadPublicArtwork(file.inputStream().use { it.readBounded(2_000_000) })
+    }
+
+    internal suspend fun uploadPublicArtwork(bytes: ByteArray): String {
         var failure: Exception? = null
-        for (host in BlossomImages.hosts) {
+        for (host in (listOf(preferredImageHost) + BlossomImages.hosts).distinct()) {
             try {
-                return uploadImage(bytes, host)
+                return uploadImage(bytes, host).also { preferredImageHost = host }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {

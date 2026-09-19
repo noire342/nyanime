@@ -12,13 +12,14 @@ import eu.kanade.tachiyomi.ui.community.CommunityActivity
 internal class CommunityNotifications(context: Context) {
     private val context = context.applicationContext
     private val manager = context.getSystemService(NotificationManager::class.java)
-    fun message(conversation: String, title: String) {
+    fun message(conversation: String, title: String, detail: String = "Hai un nuovo messaggio su Nyanime") {
         if (!manager.areNotificationsEnabled()) return
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Messaggi privati", NotificationManager.IMPORTANCE_DEFAULT),
+            NotificationChannel(CHANNEL, "Amici, chat e inviti", NotificationManager.IMPORTANCE_DEFAULT),
         )
         val id = conversation.hashCode()
         val intent = Intent(context, CommunityActivity::class.java).putExtra("conversation", conversation)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val open = PendingIntent.getActivity(
             context,
             id,
@@ -31,7 +32,7 @@ internal class CommunityNotifications(context: Context) {
                 Notification.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_play_arrow_24dp)
                     .setContentTitle(
                         title,
-                    ).setContentText("Hai un nuovo messaggio su Nyanime").setVisibility(Notification.VISIBILITY_PRIVATE)
+                    ).setContentText(detail).setVisibility(Notification.VISIBILITY_PRIVATE)
                     .setContentIntent(open).setAutoCancel(true).setGroup(CHANNEL).build(),
             )
         }

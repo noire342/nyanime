@@ -95,6 +95,7 @@ import eu.kanade.tachiyomi.data.community.hex
 import eu.kanade.tachiyomi.data.community.readBounded
 import eu.kanade.tachiyomi.data.community.safeImage
 import eu.kanade.tachiyomi.data.community.sha256
+import eu.kanade.tachiyomi.data.community.validDraft
 import eu.kanade.tachiyomi.data.watch.WatchTogetherManager
 import eu.kanade.tachiyomi.ui.watch.WatchTogetherActivity
 import kotlinx.coroutines.Dispatchers
@@ -115,7 +116,17 @@ internal fun CommunityDialog(
         if (granted) manager.setBackground(true)
     }
     when {
-        route == "profile" -> ProfileEditor(state, manager, close)
+        route == "profile" || route.startsWith("profile:") -> ProfileEditor(
+            state,
+            manager,
+            close,
+            when (route.substringAfter(':', "")) {
+                "favorites" -> 1
+                "lists" -> 2
+                "wall" -> 3
+                else -> 0
+            },
+        )
         route == "post" || route.startsWith("wall:") -> PostComposer(
             manager,
             state,
@@ -341,8 +352,8 @@ internal fun CommunityDialog(
                 manager::setSync,
             )
             SettingSwitch(
-                "Resta connesso in background",
-                "Mantiene chat e sincronizzazione attive con una notifica Android.",
+                "Ricevi messaggi anche fuori dall’app",
+                "Mantiene chat, inviti e sincronizzazione attivi con una notifica Android. Se disattivato, recuperi tutto quando riapri l’app.",
                 state.background,
                 { enabled ->
                     if (enabled &&
@@ -511,231 +522,158 @@ internal fun PostComposer(
     var sticker by remember { mutableStateOf(state.postDraft?.sticker.orEmpty()) }
     var title by remember { mutableStateOf(state.postDraft?.title) }
     var library by remember { mutableStateOf(false) }
-    SheetFrame(
-        if (reply.isNotEmpty()) {
-            "Rispondi"
-        } else if (wall.isNotEmpty()) {
-            "Un pensiero sulla bacheca"
-        } else {
-            "Una storia da condividere"
-        },
-        onClose,
-    ) {
-        Text("Questo contenuto sarà pubblico.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedTextField(text, {
-            text = it.take(4000)
-        }, placeholder = {
-            Text("Che cosa ti ha colpito?")
-        }, minLines = 4, maxLines = 10, modifier = Modifier.fillMaxWidth())
-        SettingSwitch(
-            "Proteggi dagli spoiler",
-            "Il contenuto resta nascosto finché chi legge sceglie di mostrarlo.",
-            spoiler,
-        ) {
-            spoiler =
-                it
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("heart", "star", "cat", "popcorn").forEach { name ->
-                FilterChip(sticker == name, {
-                    sticker = if (sticker ==
-                        name
-                    ) {
-                        ""
-                    } else {
-                        name
-                    }
-                }, label = {
-                    Icon(
-                        when (name) {
-                            "heart" -> Icons.Outlined.FavoriteBorder
-                            "star" -> Icons.Outlined.AutoAwesome
-                            "cat" -> Icons.Outlined.Pets
-                            else -> Icons.Outlined.LocalMovies
+    val post = SocialPost(text, image, title, spoiler, sticker)
+    AdaptiveSheet(onDismissRequest = onClose, enableSwipeDismiss = false) {
+        CommunityEditorFrame(
+            title = when {
+                library -> "Consiglia una storia"
+                reply.isNotEmpty() -> "Rispondi"
+                wall.isNotEmpty() -> "Lascia un pensiero"
+                else -> "Una storia da condividere"
+            },
+            detail = if (wall.isNotEmpty()) {
+                "Sulla bacheca di ${state.profile(
+                    wall,
+                ).name} · pubblico"
+            } else {
+                "Scegli cosa condividere con gli altri"
+            },
+            close = onClose,
+            footer = {
+                if (library) {
+                    TextButton(onClick = {
+                        library = false
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Torna al messaggio") }
+                } else {
+                    Button(
+                        onClick = {
+                            manager.post(post, wall, reply)
+                            onClose()
                         },
-                        name,
-                    )
-                })
-            }
-        }
-        PublicImageField("Immagine", image, manager) { image = it }
-        title?.let {
-            TitleTile(it)
-            TextButton(onClick = { title = null }) { Text("Rimuovi titolo") }
-        }
-        TextButton(onClick = { library = !library }) { Text("Consiglia un titolo della libreria") }
-        if (library) {
-            state.library.take(200).forEach { record ->
-                TextButton(onClick = {
-                    title = record.publicTitle()
+                        enabled =
+                        post.validDraft() && !state.publishing,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (reply.isNotEmpty()) "Pubblica risposta" else "Pubblica")
+                    }
+                }
+            },
+        ) {
+            if (library) {
+                CommunityTitlePicker(state.library.map { it.publicTitle() }, title?.let { setOf(it.id) }.orEmpty(), 1, {
                     library =
                         false
-                }) { Text(record.title) }
+                }, singleChoice = true) {
+                    title = it
+                    library = false
+                }
+            } else {
+                Column(
+                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    OutlinedTextField(text, {
+                        text = it.take(4000)
+                    }, placeholder = {
+                        Text(
+                            if (wall.isNotEmpty()) "Un saluto, un ricordo, una storia da consigliare…" else "Che cosa ti ha colpito?",
+                        )
+                    }, minLines = 4, maxLines = 10, modifier = Modifier.fillMaxWidth())
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        listOf("heart", "star", "cat", "popcorn").forEach { name ->
+                            Surface(
+                                onClick = {
+                                    sticker = if (sticker ==
+                                        name
+                                    ) {
+                                        ""
+                                    } else {
+                                        name
+                                    }
+                                },
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (sticker ==
+                                    name
+                                ) {
+                                    MaterialTheme.colorScheme.secondaryContainer
+                                } else {
+                                    Color.Transparent
+                                },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) { NyanimeSticker(name) }
+                            }
+                        }
+                    }
+                    title?.let {
+                        TitleTile(it)
+                        TextButton(onClick = { title = null }) { Text("Rimuovi il titolo") }
+                    }
+                    OutlinedButton(onClick = { library = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            if (title ==
+                                null
+                            ) {
+                                "Consiglia un titolo"
+                            } else {
+                                "Cambia titolo"
+                            },
+                        )
+                    }
+                    PublicImageField("Immagine", image, manager, stage = true) { image = it }
+                    SettingSwitch(
+                        "Proteggi dagli spoiler",
+                        "Il contenuto appare solo quando chi legge sceglie di mostrarlo.",
+                        spoiler,
+                    ) {
+                        spoiler =
+                            it
+                    }
+                    Text(
+                        "Verranno pubblicati soltanto il messaggio e gli allegati che hai scelto.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-        }
-        Button(onClick = {
-            manager.post(SocialPost(text, image, title, spoiler, sticker), wall, reply)
-            onClose()
-        }, enabled = SocialPost(text, image, title, spoiler, sticker).valid(), modifier = Modifier.fillMaxWidth()) {
-            Text("Pubblica")
         }
     }
 }
 
 @Composable
-internal fun ProfileEditor(state: CommunityState, manager: CommunityManager, close: () -> Unit) {
+internal fun ProfileEditor(
+    state: CommunityState,
+    manager: CommunityManager,
+    close: () -> Unit,
+    initialSection: Int = 0,
+) {
     var profile by remember { mutableStateOf(state.profileDraft ?: requireNotNull(state.me)) }
-    var preview by remember { mutableStateOf(false) }
-    var search by remember { mutableStateOf("") }
-    SheetFrame(if (preview) "Come mi vedono gli altri" else "Racconta chi sei", close) {
-        if (preview) {
-            Box(Modifier.height(540.dp).fillMaxWidth()) {
-                ProfilePage(state, profile, manager, {}, {}, {}, {}, {}, {}, true)
-            }
-            Button(onClick = {
+    LaunchedEffect(profile) {
+        kotlinx.coroutines.delay(350)
+        manager.saveProfileDraft(profile)
+    }
+    val dismiss = {
+        manager.saveProfileDraft(profile)
+        close()
+    }
+    AdaptiveSheet(onDismissRequest = dismiss, enableSwipeDismiss = false) {
+        ProfileStudio(
+            state,
+            profile,
+            manager,
+            initialSection,
+            change = { profile = it },
+            publish = {
                 manager.publishProfile(profile)
                 close()
-            }, modifier = Modifier.fillMaxWidth()) { Text("Pubblica il profilo") }
-            TextButton(onClick = { preview = false }) { Text("Torna alle modifiche") }
-        } else {
-            OutlinedTextField(profile.name, {
-                profile = profile.copy(name = it.take(40))
-            }, label = { Text("Il tuo nome") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(profile.bio, {
-                profile = profile.copy(bio = it.take(800))
-            }, label = { Text("Qualcosa di te") }, minLines = 3, modifier = Modifier.fillMaxWidth())
-            PublicImageField("Avatar", profile.avatar, manager) { profile = profile.copy(avatar = it) }
-            PublicImageField("Copertina", profile.banner, manager) { profile = profile.copy(banner = it) }
-            Text("Il tuo colore", style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf(0xFFE50934, 0xFFAC6CFF, 0xFFEC6EAD, 0xFF319C9A, 0xFFC98A39).forEach { accent ->
-                    FilledIconButton(onClick = {
-                        profile =
-                            profile.copy(accent = accent)
-                    }, colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(accent))) {
-                        if (profile.accent ==
-                            accent
-                        ) {
-                            Icon(Icons.Outlined.Check, "Colore selezionato", tint = Color.White)
-                        }
-                    }
-                }
-            }
-            Text("Le tue tre scelte", style = MaterialTheme.typography.titleMedium)
-            Text("Tieni premuto e trascina per cambiare l’ordine.", style = MaterialTheme.typography.bodySmall)
-            FavoritesEditor(profile.favorites) { profile = profile.copy(favorites = it) }
-            Text("Scegli cosa rendere pubblico", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Alla pubblicazione le copertine scelte vengono copiate su Blossom: gli indirizzi della tua estensione restano privati.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedTextField(search, {
-                search = it
-            }, label = { Text("Cerca nella tua libreria") }, modifier = Modifier.fillMaxWidth())
-            state.library.filter { it.title.contains(search, true) }.take(40).forEach { record ->
-                val title = record.publicTitle()
-                val published = profile.shelves.find { it.id == title.id }
-                Column {
-                    Text(title.title, fontWeight = FontWeight.SemiBold)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(published != null, { selected ->
-                            profile =
-                                profile.copy(
-                                    shelves = if (selected) {
-                                        profile.shelves + title
-                                    } else {
-                                        profile.shelves.filterNot {
-                                            it.id ==
-                                                title.id
-                                        }
-                                    },
-                                )
-                        })
-                        Text("Mostra nelle liste", Modifier.weight(1f))
-                        IconButton(
-                            onClick = {
-                                profile =
-                                    profile.copy(
-                                        favorites = if (profile.favorites.any { it.id == title.id }) {
-                                            profile.favorites.filterNot {
-                                                it.id ==
-                                                    title.id
-                                            }
-                                        } else {
-                                            (profile.favorites + title).take(3)
-                                        },
-                                    )
-                            },
-                            enabled =
-                            profile.favorites.size < 3 || profile.favorites.any { it.id == title.id },
-                        ) {
-                            Icon(
-                                if (profile.favorites.any {
-                                        it.id ==
-                                            title.id
-                                    }
-                                ) {
-                                    Icons.Outlined.Star
-                                } else {
-                                    Icons.Outlined.StarBorder
-                                },
-                                "Aggiungi alle tre scelte",
-                            )
-                        }
-                    }
-                    if (published !=
-                        null
-                    ) {
-                        var menu by remember { mutableStateOf(false) }
-                        Box {
-                            TextButton(onClick = { menu = true }) { Text(shelfNames.getValue(published.status)) }
-                            DropdownMenu(menu, {
-                                menu =
-                                    false
-                            }) {
-                                ShelfStatus.entries.forEach { status ->
-                                    DropdownMenuItem(text = { Text(shelfNames.getValue(status)) }, onClick = {
-                                        profile =
-                                            profile.copy(
-                                                shelves = profile.shelves.map {
-                                                    if (it.id ==
-                                                        title.id
-                                                    ) {
-                                                        it.copy(status = status)
-                                                    } else {
-                                                        it
-                                                    }
-                                                },
-                                            )
-                                        menu = false
-                                    })
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            Text("Chi può firmare la bacheca?", style = MaterialTheme.typography.titleMedium)
-            WallAccess.entries.forEach { access ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(profile.wall == access, { profile = profile.copy(wall = access) })
-                    Text(
-                        when (access) {
-                            WallAccess.Friends -> "Solo amici"
-                            WallAccess.Everyone -> "Tutti"
-                            WallAccess.Closed -> "Bacheca chiusa"
-                        },
-                    )
-                }
-            }
-            Button(onClick = {
-                preview = true
-            }, enabled = profile.valid(), modifier = Modifier.fillMaxWidth()) { Text("Anteprima pubblica") }
-        }
+            },
+            close = dismiss,
+            imageEditor = { label, image, change ->
+                PublicImageField(label, image, manager, stage = true, change = change)
+            },
+        )
     }
 }
-
 internal fun SyncRecord.publicTitle() = PublicTitle(
     sha256((title.lowercase(java.util.Locale.ROOT) + ref.manga).toByteArray()).hex(),
     title,
@@ -744,69 +682,130 @@ internal fun SyncRecord.publicTitle() = PublicTitle(
 )
 
 @Composable
-private fun PublicImageField(label: String, value: String, manager: CommunityManager, change: (String) -> Unit) {
+private fun PublicImageField(
+    label: String,
+    value: String,
+    manager: CommunityManager,
+    stage: Boolean = false,
+    change: (String) -> Unit,
+) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    var draft by remember { mutableStateOf<ByteArray?>(null) }
-    var host by remember { mutableStateOf(BlossomImages.hosts.first()) }
+    var pending by remember { mutableStateOf<ByteArray?>(null) }
+    var local by remember { mutableStateOf("") }
+    var link by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri !=
-            null
-        ) {
+        if (uri != null) {
             scope.launch {
                 busy = true
                 try {
-                    draft = BlossomImages.prepare(context, uri)
+                    val bytes = BlossomImages.prepare(context, uri)
+                    local = manager.stageImage(bytes)
+                    if (stage) change(local) else pending = bytes
                     error = ""
+                } catch (cancel: kotlinx.coroutines.CancellationException) {
+                    throw cancel
                 } catch (_: Exception) {
-                    error =
-                        "Non riesco ad aprire questa immagine."
+                    error = "Non riesco ad aprire questa immagine. Prova un’altra foto."
                 } finally {
                     busy = false
                 }
             }
         }
     }
-    OutlinedTextField(value, {
-        change(it.take(2048))
-    }, label = {
-        Text("$label · URL https")
-    }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
-    TextButton(onClick = { picker.launch("image/*") }, enabled = !busy) {
-        Icon(Icons.Outlined.AddPhotoAlternate, null)
-        Text(if (busy) " Elaboro l’immagine…" else " Scegli dal dispositivo")
-    }
-    if (draft != null) {
-        Text(
-            "L’immagine sarà pubblicata su un host Blossom senza un altro account. I metadati della foto vengono rimossi.",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        OutlinedTextField(host, { host = it }, label = { Text("Host immagini") }, modifier = Modifier.fillMaxWidth())
-        Row {
-            TextButton(onClick = { host = BlossomImages.hosts.last() }) { Text("Usa alternativa") }
-            Button(enabled = !busy, onClick = {
-                scope.launch {
-                    busy =
-                        true
-                    try {
-                        change(manager.uploadImage(requireNotNull(draft), host))
-                        draft = null
-                        error = ""
-                    } catch (
-                        failure: Exception,
-                    ) {
-                        error =
-                            failure.message.orEmpty()
-                    } finally {
-                        busy = false
+    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            val image = local.ifEmpty { value }
+            if (image.isNotEmpty()) {
+                CommunityImage(
+                    image,
+                    label,
+                    Modifier.fillMaxWidth().height(
+                        if (label ==
+                            "Foto profilo"
+                        ) {
+                            108.dp
+                        } else {
+                            136.dp
+                        },
+                    ),
+                )
+            }
+            OutlinedButton(onClick = {
+                picker.launch("image/*")
+            }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Outlined.AddPhotoAlternate, null)
+                Text(
+                    if (busy) {
+                        " Preparo la foto…"
+                    } else if (image.isEmpty()) {
+                        " Scegli una foto"
+                    } else {
+                        " Cambia foto"
+                    },
+                )
+            }
+            if (pending != null) {
+                Text(
+                    "La foto verrà caricata su un servizio pubblico di immagini. I metadati della foto vengono rimossi.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Button(onClick = {
+                    scope.launch {
+                        busy = true
+                        try {
+                            change(manager.uploadPublicArtwork(requireNotNull(pending)))
+                            pending = null
+                            local = ""
+                            error =
+                                ""
+                        } catch (cancel: kotlinx.coroutines.CancellationException) {
+                            throw cancel
+                        } catch (failure: Exception) {
+                            error =
+                                failure.message ?: "Caricamento non riuscito. La foto è ancora qui: riprova."
+                        } finally {
+                            busy = false
+                        }
                     }
+                }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (busy) "Carico la foto…" else "Usa questa foto")
                 }
-            }) { Text("Pubblica immagine") }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(onClick = { link = !link }) { Text("Usa un link") }
+                if (image.isNotEmpty()) {
+                    TextButton(onClick = {
+                        change("")
+                        local = ""
+                        pending = null
+                    }) { Text("Rimuovi") }
+                }
+            }
+            if (link) {
+                OutlinedTextField(
+                    value.takeUnless { it.startsWith("nyanime-image:") }.orEmpty(),
+                    {
+                        change(it.take(2048))
+                        local =
+                            ""
+                        pending = null
+                    },
+                    label = {
+                        Text("Indirizzo https dell’immagine")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Uri,
+                    ),
+                )
+            }
+            if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
         }
     }
-    if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
 }
 
 @Composable

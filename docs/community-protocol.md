@@ -30,6 +30,25 @@ reinviata ai nuovi membri. Gli inviti alle stanze scadono.
 
 La presenza è disattivata inizialmente. Può essere condivisa con gli amici o
 pubblicamente e scade dopo 90 secondi. La cronologia dettagliata rimane privata.
+Il player e il lettore comunicano l’attività aperta tramite dati già disponibili:
+il recupero della libreria non genera una falsa attività. Questo funziona anche
+con sincronizzazione personale disabilitata. Il payload opzionale `nyanime-activity`
+contiene solamente titolo, episodio/capitolo, tipo e un token casuale temporaneo.
+
+Dalla scheda di un amico che guarda un video si può proporre **Guarda insieme**.
+`watch.request` è un comando cifrato con scadenza di tre minuti. Solo il
+destinatario può accettare l’esatto contenuto richiesto; la sua accettazione
+apre una stanza e l’episodio locale. `watch.response` restituisce l’invito nella
+chat, dove il richiedente entra con un tocco. Rifiuto, annullamento, scadenza,
+episodio cambiato, amicizia rimossa, Cast o un’altra stanza non causano un ingresso
+automatico. Per i manga è disponibile la chat; le stanze rimangono per i video.
+
+L’editor del profilo separa Aspetto, Top 3, Liste e Bacheca. Il selettore visuale
+mostra libreria e titoli aperti di recente; nessuno di essi diventa pubblico senza
+selezione e anteprima. Le foto in bozza sono file locali finché non si pubblica.
+Chat, richieste di amicizia e inviti hanno notifiche private e rispettano il
+silenziamento. La ricezione fuori dall’app richiede la connessione continua
+facoltativa e l’autorizzazione alle notifiche di Android.
 
 ## Identità e dispositivi
 
@@ -65,7 +84,7 @@ crittograficamente con un semplice comando di disconnessione.
 | 30078, `nyanime.sync.index.v1:…` / `nyanime.sync.checkpoint.v1:…` | Indice di recupero cifrato |
 
 I comandi applicativi comprendono `friend.*`, `group.*`, `preference`,
-`presence`, `watch.invite`, `pair.*` e `device.*`. Non sono comandi di
+`presence`, `watch.invite`, `watch.request`, `watch.response`, `pair.*` e `device.*`. Non sono comandi di
 controllo delle stanze. I gruppi sono un protocollo Nyanime su NIP-59, non gruppi
 pubblici NIP-29.
 
@@ -74,6 +93,12 @@ autore e destinatario prima di essere applicati. Invii persistenti, ricevute dei
 relay, deduplicazione e riconnessione sono separati dalla UI. Una ricevuta indica
 accettazione da parte del relay, non lettura del messaggio da parte dell’amico.
 La coda ritenta anche gli invii successivi quando un relay non conferma i primi.
+Gli invii vengono selezionati per relay e priorità. Conferme e tentativi sono
+persistenti; un relay limitato rallenta il proprio ritmo senza bloccare gli altri.
+L’interfaccia distingue gli aggiornamenti senza conferme dalle copie aggiuntive
+in attesa. Gli errori di autenticazione della casella privata restano visibili
+anche quando il medesimo relay accetta altri eventi. Le richieste profilo usano
+identificatori inferiori al limite NIP-01 di 64 caratteri.
 
 ## Sincronizzazione privata
 
@@ -128,7 +153,10 @@ facoltativa e usa una notifica Android; non è necessaria per usare l’app.
 Le immagini scelte vengono ridimensionate e ricodificate in JPEG, senza metadati
 fotografici, poi inviate a un host Blossom con autorizzazione firmata. Vengono
 verificati descrittore e hash dei byte scaricati. I fallimenti conservano la
-bozza e l’editor permette di scegliere un altro host. Le copertine delle fonti
+bozza e l’app prova un host alternativo. L’autorizzazione usa Base64URL secondo
+BUD-11, con un solo tentativo compatibile per host che segnalano esplicitamente
+un decodificatore Base64 precedente. Nessuna autorizzazione viene inoltrata ai
+reindirizzamenti della verifica pubblica. Le copertine delle fonti
 vengono preparate tramite il caricatore dell’app prima della pubblicazione:
 URL e credenziali della fonte non entrano nelle schede pubbliche.
 

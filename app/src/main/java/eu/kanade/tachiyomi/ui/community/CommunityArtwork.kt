@@ -24,6 +24,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import eu.kanade.presentation.motion.modernMotionEnabled
+import eu.kanade.tachiyomi.data.community.CommunityImageDrafts
 
 /** The previous successful image survives refreshes; geometry is owned by the calling layout. */
 @Composable
@@ -37,7 +38,8 @@ internal fun CommunityImage(
     val context = LocalContext.current
     val motion = modernMotionEnabled()
     val request = remember(model, motion) {
-        ImageRequest.Builder(context).data(model).crossfade(if (motion) 220 else 0).build()
+        ImageRequest.Builder(context).data(CommunityImageDrafts(context).file(model) ?: model)
+            .crossfade(if (motion) 220 else 0).build()
     }
     AsyncImage(
         model = request,

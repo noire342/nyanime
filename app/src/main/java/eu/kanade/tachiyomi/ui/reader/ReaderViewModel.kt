@@ -243,6 +243,7 @@ class ReaderViewModel @JvmOverloads constructor(
     }
 
     override fun onCleared() {
+        eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.clearActivity(this)
         val currentChapters = state.value.viewerChapters
         if (currentChapters != null) {
             currentChapters.unref()
@@ -440,6 +441,21 @@ class ReaderViewModel @JvmOverloads constructor(
 
         val selectedChapter = page.chapter
         val pages = selectedChapter.pages ?: return
+        if (!incognitoMode) {
+            manga?.let { title ->
+                eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.updateActivity(
+                    this,
+                    eu.kanade.tachiyomi.data.community.SyncReference(
+                        true,
+                        title.source,
+                        title.url,
+                        selectedChapter.chapter.url,
+                    ),
+                    title.title,
+                    selectedChapter.chapter.name,
+                )
+            }
+        }
 
         // Save last page read and mark as read if needed
         viewModelScope.launchNonCancellable {

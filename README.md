@@ -30,6 +30,9 @@ disabilitare per tornare all'interfaccia legacy. Il tema manga resta indipendent
 | **I tuoi dispositivi** | Collega telefoni e tablet con QR e conferma reciproca; sincronizza privatamente librerie, categorie, segnalibri, cronologia e punti di ripresa tramite Nostr. |
 
 La nuova community si apre dall’avatar nella Home o da **Altro → Community**.
+Scegli i titoli dalle copertine e personalizza Top 3, liste e bacheca con un’anteprima.
+Gli amici possono condividere facoltativamente ciò che stanno leggendo o guardando:
+un invito dalla loro scheda apre la visione insieme dopo l’accettazione.
 La libreria resta privata finché non scegli cosa pubblicare. Download e credenziali
 restano locali. [Funzionamento, protocollo e limiti](docs/community-protocol.md).
 

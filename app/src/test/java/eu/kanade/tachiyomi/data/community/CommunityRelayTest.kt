@@ -130,6 +130,10 @@ class CommunityRelayTest {
                                 }
                                 "REQ" -> {
                                     val subscription = message[1].jsonPrimitive.content
+                                    if (subscription.length > 64) {
+                                        webSocket.send("[\"CLOSED\",${message[1]},\"invalid: subscription too long\"]")
+                                        return
+                                    }
                                     queries.add(subscription)
                                     if (subscription.startsWith("archive-sync-")) {
                                         val until =
@@ -183,8 +187,8 @@ class CommunityRelayTest {
                     )
                     socket.send("[\"EVENT\",\"live-1\",${communityJson.encodeToString(event)}]")
                     assertEquals(event, withTimeout(10_000) { received.receive() })
-                    assertTrue(queries.contains("profile-$first"))
-                    assertTrue(queries.contains("profile-$second"))
+                    assertTrue(queries.contains(CommunityRelays.profileSubscription(first)))
+                    assertTrue(queries.contains(CommunityRelays.profileSubscription(second)))
                     val restored = mutableSetOf<String>()
                     withTimeout(10_000) { while (restored.size < 3) restored.add(archived.receive().id) }
                     assertEquals(archiveEvents.map { it.id }.toSet(), restored)

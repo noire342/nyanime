@@ -139,3 +139,9 @@ removedCategoryIdentity:
 SELECT id FROM community_removed_categories WHERE id=:id;
 markRemovedCategoryIdentity:
 INSERT OR IGNORE INTO community_removed_categories(id) VALUES(:id);
+getCommunityTitles:
+SELECT source, url, title, thumbnail_url, favorite
+FROM mangas
+WHERE favorite = 1 OR initialized = 1
+ORDER BY favorite DESC, last_modified_at DESC, _id DESC
+LIMIT 2000;

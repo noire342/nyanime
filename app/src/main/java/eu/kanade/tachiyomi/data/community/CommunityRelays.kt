@@ -37,6 +37,7 @@ internal class CommunityRelays(
     private val next: suspend (String) -> NostrEvent? = { null },
     private val rejected: suspend (String, String, RelayRejection) -> Unit = { _, _, _ -> },
     private val authenticated: suspend (String) -> Unit = {},
+    private val diagnostic: (String) -> Unit = {},
     private val client: OkHttpClient = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS).pingInterval(25, TimeUnit.SECONDS).build(),
 ) : AutoCloseable {
@@ -66,6 +67,8 @@ internal class CommunityRelays(
     private val nextSendAt = mutableMapOf<String, Long>()
     private val publishFailures = mutableMapOf<String, Int>()
     private val problems = linkedMapOf<String, String>()
+    private val closedSubscriptions = linkedMapOf<Pair<String, String>, String>()
+    private val diagnosticAt = mutableMapOf<String, Long>()
 
     @Volatile private var closed = false
 
@@ -126,6 +129,7 @@ internal class CommunityRelays(
                     t: Throwable,
                     response: Response?,
                 ) = enqueue {
+                    reportDiagnostic(url, "connection", "${t.javaClass.simpleName} HTTP ${response?.code ?: 0}")
                     if (sockets[url] ===
                         webSocket
                     ) {
@@ -191,6 +195,7 @@ internal class CommunityRelays(
             }
             "EOSE" -> {
                 val subscription = message.getOrNull(1)?.jsonPrimitive?.content.orEmpty()
+                closedSubscriptions.remove(url to subscription)
                 if (subscription.startsWith("profile-") || subscription in listOf("search", "older", "sync-recovery")) {
                     socket.send(JsonArray(listOf(JsonPrimitive("CLOSE"), JsonPrimitive(subscription))).toString())
                 }
@@ -249,6 +254,7 @@ internal class CommunityRelays(
                 val id = message.getOrNull(1)?.jsonPrimitive?.content ?: return
                 val success = message.getOrNull(2)?.jsonPrimitive?.booleanOrNull == true
                 val reason = RelayRejection.parse(message.getOrNull(3)?.jsonPrimitive?.content.orEmpty())
+                if (!success) reportDiagnostic(url, "rejected", message.getOrNull(3)?.jsonPrimitive?.content.orEmpty())
                 if (authentication[url] == id) {
                     authentication.remove(url)
                     if (success) {
@@ -256,12 +262,17 @@ internal class CommunityRelays(
                         nextSendAt.remove(url)
                         directRetryAt.keys.removeAll { it.second == url }
                         problems.remove(url)
+                        closedSubscriptions.keys.removeAll { it.first == url }
                         subscribe(socket)
                         archive(url, socket, "private")
                         archive(url, socket, "sync")
                     } else {
-                        problems[url] = reason.describe(url)
-                        nextSendAt[url] = System.currentTimeMillis() + reason.retryDelay(1)
+                        // A relay with broken AUTH can still accept sync events. Keep writing,
+                        // but never report its private inbox as fully operational.
+                        closedSubscriptions[url to "authentication"] =
+                            "${URI(
+                                url,
+                            ).host}: autenticazione rifiutata; la ricezione privata su questo relay è limitata."
                     }
                 } else if (success) {
                     directReceipts.getOrPut(id) { mutableSetOf() }.add(url)
@@ -269,7 +280,7 @@ internal class CommunityRelays(
                     directRetryAt.remove(id to url)
                     accepted(id, url)
                     problems.remove(url)
-                    if (System.currentTimeMillis() >= (nextSendAt[url] ?: 0)) publishFailures.remove(url)
+                    publishFailures.remove(url)
                 } else {
                     rejected(id, url, reason)
                     problems[url] = reason.describe(url)
@@ -277,20 +288,44 @@ internal class CommunityRelays(
                     publishFailures[url] = attempts
                     val retryAt = System.currentTimeMillis() + reason.retryDelay(attempts)
                     if (id in direct) directRetryAt[id to url] = retryAt
-                    if (reason.pausesRelay) nextSendAt[url] = retryAt
+                    if (reason.pausesRelay) {
+                        nextSendAt[url] = if (reason == RelayRejection.RateLimited) {
+                            System.currentTimeMillis() + reason.baseDelay
+                        } else {
+                            retryAt
+                        }
+                    }
                 }
                 reportStatus()
             }
             "CLOSED" -> {
-                status(ready.size, "Il relay ha chiuso la sottoscrizione")
+                val subscription = message.getOrNull(1)?.jsonPrimitive?.content.orEmpty()
+                val detail = message.getOrNull(2)?.jsonPrimitive?.content.orEmpty()
+                reportDiagnostic(url, "closed", detail)
+                if (subscription.startsWith("live-") || subscription.startsWith("archive-")) {
+                    closedSubscriptions[url to subscription] =
+                        "${URI(
+                            url,
+                        ).host}: ricezione di alcuni aggiornamenti limitata. Verifica i relay nelle impostazioni."
+                }
+                reportStatus()
                 // A private inbox relay may reject public discovery. Other subscriptions remain usable.
             }
+            "NOTICE" -> reportDiagnostic(url, "notice", message.getOrNull(1)?.jsonPrimitive?.content.orEmpty())
         }
+    }
+    private fun reportDiagnostic(url: String, type: String, message: String) {
+        val now = System.currentTimeMillis()
+        val key = "$url:$type"
+        if (now - (diagnosticAt[key] ?: 0) < 30_000) return
+        diagnosticAt[key] = now
+        diagnostic("relay=${URI(url).host} $type=${relayDiagnostic(message)}")
     }
     private fun lost(url: String) {
         sockets.remove(url)?.cancel()
         ready.remove(url)
         authentication.remove(url)
+        closedSubscriptions.keys.removeAll { it.first == url }
         reportStatus()
         pages.keys.removeAll { it.first == url }
         val attempt = (retries[url] ?: 0).coerceAtMost(5)
@@ -342,7 +377,10 @@ internal class CommunityRelays(
             if (sockets[url]?.send(payload) != true) lost(url)
         }
     }
-    private fun reportStatus() = status(ready.size, problems.values.firstOrNull())
+    private fun reportStatus() = status(
+        ready.size,
+        closedSubscriptions.values.firstOrNull() ?: problems.values.firstOrNull(),
+    )
     fun addDestinations(values: List<String>, peer: String = "") = enqueue {
         val valid = values.filter(::validRelay).distinct().take(5)
         if (validKey(peer) && valid.isNotEmpty()) inboxes[peer] = valid
@@ -362,9 +400,14 @@ internal class CommunityRelays(
             put("kinds", JsonArray(listOf(0, 30078, 10002, 10050).map(::JsonPrimitive)))
             put("limit", 300)
         }
-        val subscription = "profile-$key"
+        val subscription = profileSubscription(key)
         queries[subscription] = filter
-        while (queries.size > 128) queries.remove(queries.keys.first())
+        // Leave room for live/archive requests on relays with a small subscription budget.
+        while (queries.size > 8) {
+            val removed = queries.keys.first()
+            queries.remove(removed)
+            sockets.values.forEach { it.send("[\"CLOSE\",\"$removed\"]") }
+        }
         sockets.values.forEach {
             it.send(JsonArray(listOf(JsonPrimitive("REQ"), JsonPrimitive(subscription), filter)).toString())
         }
@@ -409,6 +452,8 @@ internal class CommunityRelays(
         scope.cancel()
     }
     companion object {
+        // NIP-01 subscription IDs must fit in 64 characters, including our prefix.
+        internal fun profileSubscription(key: String) = "profile-${sha256(key.toByteArray()).hex().take(32)}"
         val defaults = listOf("wss://relay.damus.io", "wss://nos.lol")
         fun validRelay(value: String): Boolean = runCatching {
             val uri = URI(value)

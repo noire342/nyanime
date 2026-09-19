@@ -48,6 +48,8 @@ internal enum class RelayRejection(
 
 /** Shared SQL statements also exercised against SQLite in the queue regression tests. */
 internal object CommunityOutboxSql {
+    const val PACING_UPGRADE = "ALTER TABLE relay_limits ADD COLUMN pace INTEGER NOT NULL DEFAULT 500"
+    const val REDUCE_RATE = "UPDATE relay_limits SET pace=min(30000,max(2000,pace*2)) WHERE relay=?"
     val upgrade = listOf(
         "ALTER TABLE outbox ADD COLUMN priority INTEGER NOT NULL DEFAULT 1",
         "UPDATE outbox SET priority=0 WHERE address LIKE 'nyanime.sync.%'",

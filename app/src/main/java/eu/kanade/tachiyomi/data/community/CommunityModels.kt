@@ -115,7 +115,52 @@ data class PrivateAction(
 data class SocialPresence(
     val text: String,
     val expires: Long,
+    val activity: SocialActivity? = null,
 )
+
+/** Display-only activity: no source, streaming address, database ID or private progress. */
+@Serializable
+data class SocialActivity(val token: String, val title: String, val item: String, val manga: Boolean = false) {
+    fun valid() = token.matches(Regex("[0-9a-f]{32}")) && title.length in 1..240 && item.length <= 240
+}
+
+@Serializable
+enum class WatchRequestStatus { Pending, Accepted, Declined, Cancelled }
+
+@Serializable
+data class SocialWatchRequest(
+    val id: String,
+    val requester: String,
+    val host: String,
+    val activity: SocialActivity,
+    val expires: Long,
+    val status: WatchRequestStatus = WatchRequestStatus.Pending,
+    val invite: String = "",
+) {
+    fun valid(now: Long) = id.matches(Regex("[0-9a-f]{32}")) &&
+        validKey(requester) &&
+        validKey(host) &&
+        requester != host &&
+        activity.valid() &&
+        !activity.manga &&
+        expires in (now + 1)..(now + 180_000)
+
+    fun pending(now: Long) = status == WatchRequestStatus.Pending && expires > now
+
+    fun acceptsResponse(next: SocialWatchRequest, author: String, now: Long): Boolean =
+        pending(now) &&
+            next.copy(status = status, invite = invite) == this &&
+            when (next.status) {
+                WatchRequestStatus.Accepted ->
+                    author == host &&
+                        runCatching {
+                            eu.kanade.tachiyomi.data.watch.WatchInvite.parse(next.invite, now)
+                        }.isSuccess
+                WatchRequestStatus.Declined -> author == host && next.invite.isEmpty()
+                WatchRequestStatus.Cancelled -> author == requester && next.invite.isEmpty()
+                WatchRequestStatus.Pending -> false
+            }
+}
 
 @Serializable
 data class SyncReference(
@@ -237,6 +282,7 @@ data class ChatItem(
     val at: Long,
     val invite: String = "",
     val inviteExpires: Long = 0,
+    val watchRequest: String = "",
 )
 
 data class CommunityState(
@@ -265,6 +311,7 @@ data class CommunityState(
     val muted: Set<String> = emptySet(),
     val profileDraft: CommunityProfile? = null,
     val postDraft: SocialPost? = null,
+    val watchRequests: Map<String, SocialWatchRequest> = emptyMap(),
 ) {
     fun deliveryLabel(): String = when {
         publishing -> "Preparo le immagini…"

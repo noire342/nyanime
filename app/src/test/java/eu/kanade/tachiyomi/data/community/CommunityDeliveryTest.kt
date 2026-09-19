@@ -49,6 +49,49 @@ class CommunityDeliveryTest {
     private fun MockWebServer.wss() = url("/").toString().replace("https://", "wss://")
 
     @Test
+    fun `broken relay authentication does not stop accepted writes or hide inbox failure`() = runBlocking {
+        val ack = Channel<String>(Channel.UNLIMITED)
+        val issues = CopyOnWriteArrayList<String>()
+        var sent = 0
+        CommunityIdentity().use { identity ->
+            relay { socket, message ->
+                if (message[0].jsonPrimitive.content !in listOf("AUTH", "EVENT")) return@relay
+                val event = communityJson.decodeFromString<NostrEvent>(message[1].toString())
+                when (message[0].jsonPrimitive.content) {
+                    "AUTH" -> socket.send("[\"OK\",\"${event.id}\",false,\"error: relay configuration incomplete\"]")
+                    "EVENT" -> {
+                        if (sent++ == 0) {
+                            socket.send("[\"CLOSED\",\"live-1\",\"auth-required: private inbox\"]")
+                            socket.send("[\"AUTH\",\"fixture-challenge\"]")
+                        }
+                        socket.send("[\"OK\",\"${event.id}\",true,\"\"]")
+                    }
+                }
+            }.use { server ->
+                CommunityRelays(
+                    identity,
+                    listOf(server.wss()),
+                    filters = { listOf(buildJsonObject { put("limit", 1) }) },
+                    received = {},
+                    accepted = { id, _ -> ack.send(id) },
+                    status = { _, issue -> issue?.let(issues::add) },
+                    client = client,
+                ).use { transport ->
+                    val events = (1..2).map { NostrEvent.create(identity, 30078, "Encrypted fixture $it") }
+                    transport.send(events)
+                    assertEquals(
+                        events.map {
+                            it.id
+                        }.toSet(),
+                        withTimeout(10_000) { (1..2).map { ack.receive() }.toSet() },
+                    )
+                    assertTrue(issues.any { it.contains("ricezione") })
+                }
+            }
+        }
+    }
+
+    @Test
     fun `rate limited relay rests while healthy relay drains without duplicate resends`() = runBlocking {
         val blocked = CopyOnWriteArrayList<String>()
         val healthy = CopyOnWriteArrayList<Pair<String, Long>>()
