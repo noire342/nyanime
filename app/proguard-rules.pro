@@ -94,9 +94,3 @@
 
 # Loaded by the Google Cast framework from manifest metadata.
 -keep class eu.kanade.tachiyomi.data.cast.GoogleCastOptions { *; }
-
-# Older WorkManager databases can still refer to this retired worker by name.
-# Keep its inert entry point even though the app no longer enqueues conversions.
--keep,allowoptimization class eu.kanade.tachiyomi.data.download.anime.ultra.UltraDownloadWorker {
-    public <init>(android.content.Context, androidx.work.WorkerParameters);
-}

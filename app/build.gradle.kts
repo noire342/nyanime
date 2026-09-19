@@ -335,6 +335,8 @@ dependencies {
     implementation(aniyomilibs.aniyomi.mpv)
     // FFmpeg-kit
     implementation(aniyomilibs.ffmpeg.kit)
+    implementation("androidx.media3:media3-transformer:1.8.0")
+    implementation("androidx.media3:media3-effect:1.8.0")
     implementation(aniyomilibs.arthenica.smartexceptions)
     // TorrServer
     implementation(aniyomilibs.torrserver)

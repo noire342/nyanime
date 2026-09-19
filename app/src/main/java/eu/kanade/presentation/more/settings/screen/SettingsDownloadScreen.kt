@@ -25,6 +25,7 @@ import eu.kanade.domain.base.BasePreferences
 import eu.kanade.presentation.category.visualName
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.widget.TriStateListDialog
+import eu.kanade.presentation.more.settings.widget.UltraQueueDialog
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
@@ -58,6 +59,8 @@ object SettingsDownloadScreen : SearchableSettings {
         val getAnimeCategories = remember { Injekt.get<GetAnimeCategories>() }
         val allAnimeCategories by getAnimeCategories.subscribe().collectAsState(initial = emptyList())
         val downloadPreferences = remember { Injekt.get<DownloadPreferences>() }
+        var showUltraQueue by rememberSaveable { mutableStateOf(false) }
+        if (showUltraQueue) UltraQueueDialog { showUltraQueue = false }
         val basePreferences = remember { Injekt.get<BasePreferences>() }
         val speedLimit by downloadPreferences.downloadSpeedLimit().collectAsState()
         var currentSpeedLimit by remember { mutableIntStateOf(speedLimit) }
@@ -104,6 +107,29 @@ object SettingsDownloadScreen : SearchableSettings {
                 title = stringResource(AYMR.strings.pref_download_slots),
             ),
             Preference.PreferenceItem.InfoPreference(stringResource(AYMR.strings.download_slots_info)),
+            Preference.PreferenceGroup(
+                title = "Anime4K Ultra",
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = downloadPreferences.ultraAfterDownload(),
+                        title = "Ultra dopo il download",
+                        subtitle = "Crea una copia migliorata dei prossimi episodi scaricati",
+                    ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = downloadPreferences.ultraOnlyWhileCharging(),
+                        title = "Elabora solo sotto carica",
+                        subtitle = "Si applica alle nuove elaborazioni",
+                    ),
+                    Preference.PreferenceItem.TextPreference(
+                        title = "Elaborazioni Ultra",
+                        subtitle = "Avanzamento, annullamento e nuovi tentativi",
+                        onClick = { showUltraQueue = true },
+                    ),
+                    Preference.PreferenceItem.InfoPreference(
+                        "Usa Anime4K A+ HQ sul file, fino a 4× e al limite 4K, mantenendo le proporzioni. Richiede un dispositivo compatibile, tempo e spazio aggiuntivo: l'originale resta disponibile. Non modifica streaming, manga o download esterni.",
+                    ),
+                ),
+            ),
             getDeleteChaptersGroup(
                 downloadPreferences = downloadPreferences,
                 animeCategories = allAnimeCategories.toImmutableList(),

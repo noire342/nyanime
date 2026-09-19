@@ -20,6 +20,7 @@ disabilitare per tornare all'interfaccia legacy. Il tema manga resta indipendent
 | **ModernUI reversibile** | Sfoglia banner, locandine e caroselli; apri le schede con transizioni della copertina e torna alla UI legacy dalle impostazioni. |
 | **Home ricche di contenuti** | Esplora cataloghi, stagioni, classifiche e calendario; usa le Home anime e manga definite dalle estensioni compatibili. |
 | **Riprendi da dove eri** | Ritrova “Continua a guardare” e “Continua a leggere”, con avanzamento locale e accesso all'episodio o capitolo. |
+| **Anime4K Ultra offline** | Crea copie dei download elaborate con A+ HQ, con coda, avanzamento e badge ULTRA. [Dettagli e requisiti](docs/anime4k-ultra.md). |
 | **Anime4K Smart** | Applica shader nel player interno con qualità adattiva, avvio automatico configurabile e modalità manuali. |
 | **Guarda insieme** | Genera un codice, invita gli amici e sincronizza episodio, play, pausa, spostamenti e velocità, ognuno con il proprio streaming. |
 | **Cast con telecomando** | Trasmetti a Google Cast, UPnP/DLNA o alle app Nyanime TV compatibili e continua a usare l'app dal telefono, con controlli e ripresa locale. |

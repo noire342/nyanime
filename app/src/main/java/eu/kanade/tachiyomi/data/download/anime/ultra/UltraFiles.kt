@@ -9,10 +9,10 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import org.json.JSONObject
 
-/** Read-only compatibility for completed exports created by earlier releases. */
 internal object UltraFiles {
     const val VIDEO = "Nyanime-Ultra.mkv"
     const val MARKER = "nyanime-ultra.json"
+    const val PART = "nyanime-ultra.part"
     private const val FLAG = "nyanime_ultra_v1"
 
     val memo = JsonObject(mapOf(FLAG to JsonPrimitive(true)))
@@ -20,6 +20,10 @@ internal object UltraFiles {
     fun isUltra(video: Video?): Boolean = video != null &&
         Uri.parse(video.videoUrl).scheme in setOf("file", "content") &&
         (video.memo[FLAG] as? JsonPrimitive)?.booleanOrNull == true
+
+    fun original(folder: UniFile): UniFile? = folder.listFiles().orEmpty().firstOrNull {
+        it.isFile && "video" in it.type.orEmpty() && it.name != VIDEO && !it.name.orEmpty().endsWith(".part")
+    }
 
     /** A partial file or a failed export can never enable the Ultra badge. */
     fun completed(context: Context, folder: UniFile): UniFile? = runCatching {
@@ -39,4 +43,12 @@ internal object UltraFiles {
                 data.optLong("durationMs") > 0
         }
     }.getOrNull()
+
+    fun markComplete(context: Context, folder: UniFile, video: UniFile, media: UltraExporter.Media) {
+        val data = JSONObject().put("version", 1).put("preset", "A+HQ").put("bytes", video.length())
+            .put("width", media.width).put("height", media.height).put("durationMs", media.durationMs)
+        val marker = checkNotNull(folder.createFile(MARKER))
+        context.contentResolver.openOutputStream(marker.uri, "wt")!!.bufferedWriter().use { it.write(data.toString()) }
+        check(completed(context, folder) != null) { "Impossibile confermare il file Ultra" }
+    }
 }

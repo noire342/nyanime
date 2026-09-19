@@ -76,6 +76,7 @@ import eu.kanade.tachiyomi.data.cast.CastHandoffPolicy
 import eu.kanade.tachiyomi.data.cast.CastRequest
 import eu.kanade.tachiyomi.data.database.models.anime.toDomainEpisode
 import eu.kanade.tachiyomi.data.download.anime.ultra.UltraFiles
+import eu.kanade.tachiyomi.data.download.anime.ultra.UltraPlaybackGuard
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
@@ -311,6 +312,7 @@ class PlayerActivity : BaseActivity() {
         enableEdgeToEdge()
         registerSecureActivity(this)
         super.onCreate(savedInstanceState)
+        UltraPlaybackGuard.enterPlayer()
         setContentView(binding.root)
 
         setupPlayerMPV()
@@ -380,6 +382,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onDestroy() {
+        UltraPlaybackGuard.leavePlayer()
         viewModel.detachDevicePlayback()
         viewModel.watchManager.detach(this)
         videoLoadJob?.cancel()
