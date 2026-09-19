@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="nyanime_launcher_background">#080808</color>
+    <color name="nyanime_logo_light">#FFF3A1</color>
+    <color name="nyanime_logo_yellow">#FFD632</color>
+    <color name="nyanime_logo_gold">#E5AA00</color>
 </resources>
