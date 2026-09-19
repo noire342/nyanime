@@ -45,7 +45,6 @@ import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.ui.base.delegate.SecureActivityDelegate
 import eu.kanade.tachiyomi.util.system.DeviceUtil
 import eu.kanade.tachiyomi.util.system.GLUtil
-import eu.kanade.tachiyomi.util.system.NyanimeLogoManager
 import eu.kanade.tachiyomi.util.system.WebViewUtil
 import eu.kanade.tachiyomi.util.system.animatorDurationScale
 import eu.kanade.tachiyomi.util.system.cancelNotification
@@ -53,7 +52,6 @@ import eu.kanade.tachiyomi.util.system.notify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
 import logcat.AndroidLogcatLogger
 import logcat.LogPriority
 import logcat.LogcatLogger
@@ -152,13 +150,6 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         Injekt.get<UiPreferences>().let {
             it.installNyanimeThemeOnce()
             setAppCompatDelegateThemeMode(it.themeMode().get())
-            scope.launch(Dispatchers.IO) {
-                try {
-                    NyanimeLogoManager.reconcile(this@App, it)
-                } catch (error: Exception) {
-                    logcat(LogPriority.WARN, error) { "Unable to restore the selected launcher icon" }
-                }
-            }
         }
 
         // Updates widget update

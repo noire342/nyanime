@@ -136,8 +136,6 @@ Le app TV possono diventare ricevitori tramite [Nyanime Companion](docs/companio
   delle notifiche configurabile.
 - Temi, modalità chiara/scura, AMOLED, tema manga separato, navigazione
   personalizzabile, layout adattivi e opzioni per ridurre il movimento.
-- Logo e icona del telefono selezionabili in **Impostazioni → Aspetto → Colore del logo**:
-  rosso oppure gradiente Giallo sole, con anteprima e preferenza salvata.
 
 Le condizioni e le opzioni sono descritte nel [catalogo completo delle funzionalità](docs/features.md).
 

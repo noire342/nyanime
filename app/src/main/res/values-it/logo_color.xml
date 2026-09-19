@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="nyanime_logo_color_title">Colore del logo</string>
-    <string name="nyanime_logo_color_summary">Scegli il logo Nyanime e l’icona sulla schermata Home del telefono.</string>
-    <string name="nyanime_logo_color_red">Rosso</string>
-    <string name="nyanime_logo_color_yellow">Giallo sole</string>
-    <string name="nyanime_logo_color_hint">L’icona del telefono può impiegare qualche istante ad aggiornarsi. Le icone a tema seguono i colori di Android.</string>
-    <string name="nyanime_logo_color_error">Non è stato possibile cambiare l’icona. Il colore precedente è stato mantenuto. Riprova.</string>
-</resources>

@@ -21,8 +21,6 @@ import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.screen.appearance.AppLanguageScreen
 import eu.kanade.presentation.more.settings.widget.AppThemeModePreferenceWidget
 import eu.kanade.presentation.more.settings.widget.AppThemePreferenceWidget
-import eu.kanade.presentation.more.settings.widget.LogoColorPreferenceWidget
-import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.util.system.DeviceUtil
 import eu.kanade.tachiyomi.util.system.isDynamicColorAvailable
 import eu.kanade.tachiyomi.util.system.toast
@@ -88,11 +86,6 @@ object SettingsAppearanceScreen : SearchableSettings {
                     subtitle = "Usa il logo aggiornato fornito dall’estensione al posto di NYANIME. " +
                         "Se non è disponibile, resta il logo dell’app.",
                 ),
-                Preference.PreferenceItem.CustomPreference(
-                    title = androidx.compose.ui.res.stringResource(R.string.nyanime_logo_color_title),
-                ) {
-                    LogoColorPreferenceWidget(uiPreferences)
-                },
                 Preference.PreferenceItem.CustomPreference(
                     title = stringResource(MR.strings.pref_app_theme),
                 ) {

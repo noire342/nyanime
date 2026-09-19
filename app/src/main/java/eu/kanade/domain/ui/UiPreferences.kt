@@ -2,7 +2,6 @@ package eu.kanade.domain.ui
 
 import eu.kanade.domain.ui.model.AppTheme
 import eu.kanade.domain.ui.model.NavStyle
-import eu.kanade.domain.ui.model.NyanimeLogoColor
 import eu.kanade.domain.ui.model.StartScreen
 import eu.kanade.domain.ui.model.TabletUiMode
 import eu.kanade.domain.ui.model.ThemeMode
@@ -28,8 +27,6 @@ class UiPreferences(
     fun themeDarkAmoled() = preferenceStore.getBoolean("pref_theme_dark_amoled_key", false)
 
     fun sourceHomeLogo() = preferenceStore.getBoolean("source_home_logo", false)
-
-    fun logoColor() = preferenceStore.getEnum("nyanime_logo_color", NyanimeLogoColor.RED)
 
     fun modernUi() = preferenceStore.getBoolean("nyanime_modern_ui", true)
 

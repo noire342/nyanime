@@ -2,7 +2,6 @@ package eu.kanade.tachiyomi.ui
 
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.domain.ui.model.AppTheme
-import eu.kanade.domain.ui.model.NyanimeLogoColor
 import eu.kanade.domain.ui.model.ThemeMode
 import eu.kanade.tachiyomi.util.system.DeviceUtil
 import eu.kanade.tachiyomi.util.system.isDynamicColorAvailable
@@ -20,26 +19,6 @@ import tachiyomi.core.common.preference.InMemoryPreferenceStore.InMemoryPreferen
 import tachiyomi.core.common.preference.PreferenceStore
 
 class NyanimeThemeMigrationTest {
-    @Test
-    fun logoChoiceSurvivesRestartAndDoesNotChangeThemesOrSourceLogos() {
-        val store = store()
-        val preferences = UiPreferences(store)
-        preferences.installNyanimeThemeOnce()
-        assertEquals(NyanimeLogoColor.RED, preferences.logoColor().get())
-        preferences.legacyMangaTheme().set(AppTheme.LAVENDER)
-        preferences.sourceHomeLogo().set(true)
-        preferences.logoColor().set(NyanimeLogoColor.SUN_YELLOW)
-        preferences.modernUi().set(false)
-
-        val recreated = UiPreferences(store)
-        recreated.installNyanimeThemeOnce()
-        assertEquals(NyanimeLogoColor.SUN_YELLOW, recreated.logoColor().get())
-        assertEquals(AppTheme.NYANIME, recreated.appTheme().get())
-        assertEquals(AppTheme.LAVENDER, recreated.legacyMangaTheme().get())
-        assertTrue(recreated.sourceHomeLogo().get())
-        assertFalse(recreated.modernUi().get())
-    }
-
     @Test fun modernUiDefaultsOnAndTurningItOffSurvivesRestartWithoutChangingThemes() {
         val store = store()
         val preferences = UiPreferences(store)

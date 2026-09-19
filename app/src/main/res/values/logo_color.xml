@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="nyanime_logo_color_title">Logo colour</string>
-    <string name="nyanime_logo_color_summary">Choose the Nyanime logo and home screen icon.</string>
-    <string name="nyanime_logo_color_red">Red</string>
-    <string name="nyanime_logo_color_yellow">Sun yellow</string>
-    <string name="nyanime_logo_color_hint">The home screen icon may take a moment to update. Themed icons follow your Android colours.</string>
-    <string name="nyanime_logo_color_error">Could not change the icon. Your previous colour has been kept. Try again.</string>
-</resources>

@@ -9,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -18,7 +17,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.domain.ui.model.AppTheme
-import eu.kanade.domain.ui.model.NyanimeLogoColor
 import eu.kanade.presentation.theme.colorscheme.BaseColorScheme
 import eu.kanade.presentation.theme.colorscheme.CloudflareColorScheme
 import eu.kanade.presentation.theme.colorscheme.CottoncandyColorScheme
@@ -40,7 +38,6 @@ import eu.kanade.presentation.theme.colorscheme.TealTurqoiseColorScheme
 import eu.kanade.presentation.theme.colorscheme.TidalWaveColorScheme
 import eu.kanade.presentation.theme.colorscheme.YinYangColorScheme
 import eu.kanade.presentation.theme.colorscheme.YotsubaColorScheme
-import tachiyomi.presentation.core.util.collectAsState
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -75,15 +72,12 @@ fun TachiyomiTheme(
     content: @Composable () -> Unit,
 ) {
     val uiPreferences = Injekt.get<UiPreferences>()
-    val logoColor by uiPreferences.logoColor().collectAsState()
-    CompositionLocalProvider(LocalNyanimeLogoColor provides logoColor) {
-        BaseTachiyomiTheme(
-            appTheme = appTheme ?: uiPreferences.activeAppTheme(),
-            isAmoled = amoled ?: uiPreferences.themeDarkAmoled().get(),
-            modernUi = appTheme?.let { it == AppTheme.NYANIME } ?: uiPreferences.modernUi().get(),
-            content = content,
-        )
-    }
+    BaseTachiyomiTheme(
+        appTheme = appTheme ?: uiPreferences.activeAppTheme(),
+        isAmoled = amoled ?: uiPreferences.themeDarkAmoled().get(),
+        modernUi = appTheme?.let { it == AppTheme.NYANIME } ?: uiPreferences.modernUi().get(),
+        content = content,
+    )
 }
 
 @Composable
@@ -91,13 +85,8 @@ fun TachiyomiPreviewTheme(
     appTheme: AppTheme = AppTheme.NYANIME,
     isAmoled: Boolean = false,
     modernUi: Boolean = appTheme == AppTheme.NYANIME,
-    logoColor: NyanimeLogoColor = NyanimeLogoColor.RED,
     content: @Composable () -> Unit,
-) {
-    CompositionLocalProvider(LocalNyanimeLogoColor provides logoColor) {
-        BaseTachiyomiTheme(appTheme, isAmoled, modernUi, content)
-    }
-}
+) = BaseTachiyomiTheme(appTheme, isAmoled, modernUi, content)
 
 @Composable
 private fun BaseTachiyomiTheme(
