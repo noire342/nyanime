@@ -27,7 +27,7 @@ class WatchSessionService : Service() {
         super.onCreate()
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Guarda insieme", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL, "Insieme su Nyanime", NotificationManager.IMPORTANCE_LOW),
         )
         val notification = notification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -46,7 +46,7 @@ class WatchSessionService : Service() {
     }
     private fun notification(): Notification = Notification.Builder(this, CHANNEL)
         .setSmallIcon(R.drawable.ic_play_arrow_24dp)
-        .setContentTitle("Guarda insieme")
+        .setContentTitle("Insieme su Nyanime")
         .setContentText(WatchTogetherManager.get(this).controller.state.value.message)
         .setContentIntent(
             PendingIntent.getActivity(

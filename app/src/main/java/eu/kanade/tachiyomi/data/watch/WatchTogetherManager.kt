@@ -90,7 +90,15 @@ class WatchTogetherManager private constructor(private val application: Applicat
         SystemClock::elapsedRealtime,
     )
 
+    val reading = eu.kanade.tachiyomi.data.reading.ReadingRoomController(
+        scope,
+        SystemClock::elapsedRealtime,
+        controller::sendReading,
+    )
+
     init {
+        controller.onReadingMessage = reading::receive
+        scope.launch { controller.state.collect { reading.roomChanged(it) } }
         application.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityResumed(activity: Activity) {
                 present(activity)
@@ -139,7 +147,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
                                 application.startForegroundService(Intent(application, WatchSessionService::class.java))
                             }
                         }
-                        if (!room.host && room.media != null) resolve(room.media)
+                        if (!room.host && room.media != null && !controller.readingMode) resolve(room.media)
                     }
                 }
         }
@@ -159,7 +167,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
             prepared = null
         }
         mutablePreparation.value = WatchOpeningState()
-        if (media == null || controller.state.value.host || !controller.active) return
+        if (media == null || controller.state.value.host || !controller.active || controller.readingMode) return
         prepareJob = scope.launch {
             mutablePreparation.value = WatchOpeningState(loading = true)
             try {
@@ -200,6 +208,8 @@ class WatchTogetherManager private constructor(private val application: Applicat
     }
 
     fun attach(activity: Activity, player: WatchPlayer, open: (Long, Long) -> Unit) {
+        controller.setReadingMode(false)
+        reading.suspendReading()
         playerOwner = WeakReference(activity)
         playback.attach(player)
         openInPlayer = open
@@ -225,6 +235,8 @@ class WatchTogetherManager private constructor(private val application: Applicat
         val room = controller.state.value
         val media = room.media ?: return
         if (!room.active || opening.value.loading) return
+        controller.setReadingMode(false)
+        reading.suspendReading()
         val activity = foreground.get() ?: return
         val owner = playerOwner.get()
         if (owner === activity && currentPlayback().media?.key == media.key) return
@@ -351,6 +363,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
         if (activity.isFinishing ||
             activity.isDestroyed ||
             !controller.active ||
+            controller.readingMode ||
             controller.state.value.media?.key != target.first
         ) {
             return

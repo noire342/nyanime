@@ -145,6 +145,7 @@ data class WatchRoomState(
     val waitingSeconds: Int = 0,
     val commandFailed: Boolean = false,
     val activity: WatchActivity? = null,
+    val readingSupported: Boolean = false,
 ) {
     val wantsPlayback: Boolean get() = pendingPlaybackPaused?.not() ?: playRequested
     val preparingPlayback: Boolean get() = active &&
@@ -178,6 +179,7 @@ data class WatchPeerStatus(
     val canAdvance: Boolean = true,
     val preparedNextKey: String? = null,
     val nextProblem: WatchProblem = WatchProblem.None,
+    val reading: Boolean = false,
 )
 
 @Serializable
@@ -214,6 +216,9 @@ data class WatchMessage(
     val preparedNextKey: String? = null,
     val nextProblem: WatchProblem = WatchProblem.None,
     val activity: WatchActivity? = null,
+    val readingMode: Boolean = false,
+    val readingVersion: Int = 0,
+    val reading: eu.kanade.tachiyomi.data.reading.ReadingEnvelope? = null,
 ) {
     fun valid(): Boolean = version == 1 &&
         sequence > 0 &&
@@ -246,6 +251,7 @@ data class WatchMessage(
         (next == null || (next.id > 0 && next.media.valid() && (next.deadline == null || next.deadline >= 0))) &&
         (media == null || media.valid()) &&
         (activity == null || activity.valid()) &&
+        (reading == null || reading.valid()) &&
         peers.size <= 8 &&
         acknowledgements.size <= 8 &&
         peers.all { (key, value) ->

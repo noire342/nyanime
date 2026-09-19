@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.view.LayoutInflater
 import androidx.core.view.isVisible
+import eu.kanade.tachiyomi.data.reading.ReadingPageLayout
+import eu.kanade.tachiyomi.data.reading.ReadingTogetherManager
 import eu.kanade.tachiyomi.databinding.ReaderErrorBinding
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.ui.reader.model.InsertPage
@@ -60,6 +62,7 @@ class PagerPageHolder(
     private var loadJob: Job? = null
 
     init {
+        bindReadingPage(page, viewer.activity.viewModel.manga)
         loadJob = scope.launch { loadPageAndProcessStatus() }
     }
 
@@ -164,7 +167,9 @@ class PagerPageHolder(
                     Config(
                         zoomDuration = viewer.config.doubleTapAnimDuration,
                         minimumScaleType = viewer.config.imageScaleType,
-                        cropBorders = viewer.config.imageCropBorders,
+                        cropBorders =
+                        viewer.config.imageCropBorders &&
+                            ReadingTogetherManager.existing()?.controller?.state?.value?.active != true,
                         zoomStartPosition = viewer.config.imageZoomType,
                         landscapeZoom = viewer.config.landscapeZoom,
                     ),
@@ -183,6 +188,7 @@ class PagerPageHolder(
     }
 
     private fun process(page: ReaderPage, imageSource: BufferedSource): BufferedSource {
+        readingLayout = ReadingPageLayout.Full
         if (viewer.config.dualPageRotateToFit) {
             return rotateDualPage(imageSource)
         }
@@ -209,6 +215,7 @@ class PagerPageHolder(
         val isDoublePage = ImageUtil.isWideImage(imageSource)
         return if (isDoublePage) {
             val rotation = if (viewer.config.dualPageRotateToFitInvert) -90f else 90f
+            readingLayout = if (rotation > 0) ReadingPageLayout.Clockwise else ReadingPageLayout.CounterClockwise
             ImageUtil.rotateImage(imageSource, rotation)
         } else {
             imageSource
@@ -231,6 +238,7 @@ class PagerPageHolder(
             }
         }
 
+        readingLayout = if (side == ImageUtil.Side.LEFT) ReadingPageLayout.Left else ReadingPageLayout.Right
         return ImageUtil.splitInHalf(imageSource, side)
     }
 

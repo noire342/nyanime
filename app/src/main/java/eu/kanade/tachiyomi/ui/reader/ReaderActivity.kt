@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
@@ -58,6 +59,9 @@ import eu.kanade.tachiyomi.core.common.Constants
 import eu.kanade.tachiyomi.data.coil.TachiyomiImageDecoder
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
+import eu.kanade.tachiyomi.data.reading.ReadingBookmark
+import eu.kanade.tachiyomi.data.reading.ReadingPosition
+import eu.kanade.tachiyomi.data.reading.ReadingTogetherManager
 import eu.kanade.tachiyomi.databinding.ReaderActivityBinding
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
@@ -73,6 +77,8 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsScreenModel
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderProgressIndicator
+import eu.kanade.tachiyomi.ui.reading.ReadingReaderOverlay
+import eu.kanade.tachiyomi.ui.reading.ReadingRoomSheet
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.system.hasDisplayCutout
 import eu.kanade.tachiyomi.util.system.isNightMode
@@ -131,6 +137,8 @@ class ReaderActivity : BaseActivity() {
     private var menuToggleToast: Toast? = null
     private var readingModeToast: Toast? = null
     private val displayRefreshHost = DisplayRefreshHost()
+    private val readingTogether by lazy { ReadingTogetherManager.get(this) }
+    private var readingRoomVisible by androidx.compose.runtime.mutableStateOf(false)
 
     private val windowInsetsController by lazy { WindowInsetsControllerCompat(window, binding.root) }
 
@@ -242,6 +250,15 @@ class ReaderActivity : BaseActivity() {
                 }
             }
             .launchIn(lifecycleScope)
+
+        readingTogether.controller.state.map { it.active }.distinctUntilChanged().drop(1)
+            .onEach {
+                viewModel.state.value.viewerChapters?.let { chapters ->
+                    chapters.currChapter.requestedPage = (viewModel.state.value.currentPage - 1).coerceAtLeast(0)
+                    updateViewer()
+                    setChapters(chapters)
+                }
+            }.launchIn(lifecycleScope)
     }
 
     /**
@@ -256,6 +273,7 @@ class ReaderActivity : BaseActivity() {
     }
 
     override fun onPause() {
+        readingTogether.detach(this)
         viewModel.flushReadTimer()
         super.onPause()
     }
@@ -266,6 +284,10 @@ class ReaderActivity : BaseActivity() {
      */
     override fun onResume() {
         super.onResume()
+        readingTogether.attach(this)
+        viewModel.state.value.currentChapter?.pages
+            ?.firstOrNull { it.index == (viewModel.state.value.currentPage - 1).coerceAtLeast(0) }
+            ?.let(::shareReadingPage)
         viewModel.restartReadTimer()
         setMenuVisibility(viewModel.state.value.menuVisible)
     }
@@ -428,7 +450,30 @@ class ReaderActivity : BaseActivity() {
                     menuToggleToast = toast(if (enabled) MR.strings.on else MR.strings.off)
                 },
                 onClickSettings = viewModel::openSettingsDialog,
+                onReadingTogether = { readingRoomVisible = true },
             )
+
+            ReadingReaderOverlay(
+                manager = readingTogether,
+                menuVisible = state.menuVisible,
+                onOpenRoom = { readingRoomVisible = true },
+            )
+            if (readingRoomVisible) {
+                ReadingRoomSheet(
+                    readingTogether,
+                    onDismiss = { readingRoomVisible = false },
+                    onChooseManga = {
+                        readingRoomVisible = false
+                        startActivity(
+                            Intent(this, MainActivity::class.java).apply {
+                                action = Constants.SHORTCUT_LIBRARY
+                                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            },
+                        )
+                        finish()
+                    },
+                )
+            }
 
             if (flashOnPageChange) {
                 DisplayRefreshHost(
@@ -614,6 +659,15 @@ class ReaderActivity : BaseActivity() {
     private fun setChapters(viewerChapters: ViewerChapters) {
         binding.readerContainer.removeView(loadingIndicator)
         viewModel.state.value.viewer?.setChapters(viewerChapters)
+        val chapter = viewerChapters.currChapter
+        viewModel.manga?.let { manga ->
+            readingTogether.requested(manga.id, chapter.chapter.id!!)?.let { target ->
+                chapter.pages?.firstOrNull { it.index == target.position.page }?.let { page ->
+                    viewModel.state.value.viewer?.moveToPage(page)
+                    readingTogether.arrived(target)
+                }
+            }
+        }
 
         lifecycleScope.launchIO {
             viewModel.getChapterUrl()?.let { url ->
@@ -627,6 +681,7 @@ class ReaderActivity : BaseActivity() {
      * this case the activity is closed and a toast is shown to the user.
      */
     private fun setInitialChapterError(error: Throwable) {
+        readingTogether.fail(error.message ?: "Impossibile aprire il capitolo. Il tuo punto è conservato nella stanza.")
         logcat(LogPriority.ERROR, error)
         finish()
         toast(error.message)
@@ -685,6 +740,40 @@ class ReaderActivity : BaseActivity() {
      */
     fun onPageSelected(page: ReaderPage) {
         viewModel.onPageSelected(page)
+        shareReadingPage(page)
+    }
+
+    private fun shareReadingPage(page: ReaderPage) {
+        val manga = viewModel.manga ?: return
+        val chapter = page.chapter.chapter
+        val position = ReadingPosition(
+            manga.source,
+            manga.url,
+            chapter.url,
+            manga.title.take(240),
+            chapter.name.take(240),
+            page.index,
+            page.chapter.pages?.map { it.index }?.distinct()?.size ?: 0,
+        )
+        readingTogether.selected(
+            this,
+            ReadingBookmark(manga.id, chapter.id!!, position).takeIf { it.valid() },
+        )
+    }
+
+    fun openReadingPage(bookmark: ReadingBookmark) {
+        val chapter = viewModel.state.value.currentChapter
+        if (chapter?.chapter?.id == bookmark.chapterId) {
+            require(chapter.pages?.map { it.index }?.distinct()?.size == bookmark.position.pages) {
+                "Questa edizione ha un numero diverso di pagine. Il tuo punto resta invariato."
+            }
+            chapter.pages?.firstOrNull { it.index == bookmark.position.page }?.let {
+                viewModel.state.value.viewer?.moveToPage(it)
+                readingTogether.arrived(bookmark)
+            }
+        } else {
+            readingTogether.fail("Hai cambiato capitolo durante l'apertura. Riprova dalla stanza.")
+        }
     }
 
     /**

@@ -36,11 +36,14 @@ import com.github.chrisbanes.photoview.PhotoView
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.tachiyomi.data.coil.cropBorders
 import eu.kanade.tachiyomi.data.coil.customDecoder
+import eu.kanade.tachiyomi.data.reading.ReadingPageLayout
+import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonSubsamplingImageView
 import eu.kanade.tachiyomi.util.system.animatorDurationScale
 import eu.kanade.tachiyomi.util.view.isVisibleOnScreen
 import okio.BufferedSource
 import tachiyomi.core.common.util.system.ImageUtil
+import tachiyomi.domain.entries.manga.model.Manga
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -65,6 +68,35 @@ open class ReaderPageImageView @JvmOverloads constructor(
     }
 
     private var pageView: View? = null
+    private val readingInk = ReadingInkLayer(this) { pageView }
+    var readingLayout: ReadingPageLayout
+        get() = readingInk.layout
+        set(value) {
+            readingInk.layout = value
+        }
+
+    fun bindReadingPage(page: ReaderPage?, manga: Manga?) {
+        readingInk.bind(page, manga)
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        readingInk.attach()
+    }
+
+    override fun onDetachedFromWindow() {
+        readingInk.detach()
+        super.onDetachedFromWindow()
+    }
+
+    override fun dispatchDraw(canvas: android.graphics.Canvas) {
+        super.dispatchDraw(canvas)
+        readingInk.draw(canvas)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean = readingInk.touch(event) {
+        super.dispatchTouchEvent(it)
+    }
 
     private var config: Config? = null
 
@@ -183,6 +215,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
     }
 
     fun recycle() = pageView?.let {
+        readingInk.bind(null, null)
         when (it) {
             is SubsamplingScaleImageView -> it.recycle()
             is AppCompatImageView -> it.dispose()
@@ -261,10 +294,11 @@ open class ReaderPageImageView @JvmOverloads constructor(
                 object : SubsamplingScaleImageView.OnStateChangedListener {
                     override fun onScaleChanged(newScale: Float, origin: Int) {
                         this@ReaderPageImageView.onScaleChanged(newScale)
+                        this@ReaderPageImageView.invalidate()
                     }
 
                     override fun onCenterChanged(newCenter: PointF?, origin: Int) {
-                        // Not used
+                        this@ReaderPageImageView.invalidate()
                     }
                 },
             )
@@ -383,6 +417,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
                 setOnScaleChangeListener { _, _, _ ->
                     this@ReaderPageImageView.onScaleChanged(scale)
                 }
+                setOnMatrixChangeListener { this@ReaderPageImageView.invalidate() }
             }
         }
         addView(pageView, MATCH_PARENT, MATCH_PARENT)

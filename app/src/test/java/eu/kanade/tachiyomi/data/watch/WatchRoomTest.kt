@@ -871,6 +871,140 @@ class WatchRoomTest {
     }
 
     @Test
+    fun readingMessagesUseExistingRoomWithoutConsumingVideoStatus() = runTest {
+        val room = Pairing(this)
+        room.join()
+        val received = mutableListOf<eu.kanade.tachiyomi.data.reading.ReadingEnvelope>()
+        room.host.onReadingMessage = { _, message, _ -> received.add(message) }
+        val payload = eu.kanade.tachiyomi.data.reading.ReadingEnvelope(
+            kind = eu.kanade.tachiyomi.data.reading.ReadingKind.Presence,
+            peer = eu.kanade.tachiyomi.data.reading.ReadingPeer("Reader"),
+        )
+        room.guest.sendReading(payload)
+        room.advance(500)
+        assertEquals(listOf(payload), received)
+        assertEquals("Friend", room.host.state.value.members.last().name)
+        assertEquals(2, room.network.endpoints.size)
+        assertEquals(room.host.state.value.invite, room.guest.state.value.invite)
+    }
+
+    @Test
+    fun readingGuestDoesNotPauseOrBlockPeopleWatchingVideo() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.guest.setReadingMode(true)
+        room.advance()
+        room.host.resumeByUser()
+        room.advance(8000)
+        assertFalse(room.hostPlayer.paused)
+        assertTrue(room.guestPlayer.paused)
+        assertEquals(2, room.host.state.value.members.size)
+        assertFalse(room.guest.requestSeek(600.0))
+        assertEquals(0, room.hostPlayer.seeks)
+    }
+
+    @Test
+    fun readingGuestDoesNotBlockOrMislabelNextEpisodePreparation() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.guest.setReadingMode(true)
+        room.advance()
+        val next = room.hostPlayer.media!!.copy(episodeUrl = "/2", episode = "Episode 2", number = 2.0, duration = 0.0)
+        room.hostPlayer.upcoming = next
+        room.hostPlayer.ended = true
+        room.advance(1000)
+        assertNotNull(room.host.state.value.nextSeconds)
+        assertFalse(room.host.state.value.message.contains("Friend"))
+        room.advance(12000)
+        assertEquals(1, room.hostPlayer.advances)
+        assertTrue(room.guestPlayer.paused)
+        assertEquals(0, room.guestPlayer.advances)
+    }
+
+    @Test
+    fun returningFromReadingToVideoRetainsRoomAndResynchronizes() = runTest {
+        val room = Pairing(this)
+        room.join()
+        val identity = room.guest.state.value.localMemberId
+        room.guest.setReadingMode(true)
+        room.advance()
+        room.host.resumeByUser()
+        room.advance(15000)
+        room.guest.setReadingMode(false)
+        room.guest.playerAttached()
+        room.guest.resumeByUser()
+        room.advance(12000)
+        assertEquals(identity, room.guest.state.value.localMemberId)
+        assertFalse(room.guestPlayer.paused)
+        assertTrue(abs(room.hostPlayer.sample().position - room.guestPlayer.sample().position) < 0.5)
+    }
+
+    @Test
+    fun readingOnlyHostNeverCallsPlayerEvenForVideoCommandsAndClosure() = runTest {
+        val network = Network()
+        val player = object : WatchPlayer {
+            override fun sample(): WatchPlayback = error("Reader must not query player")
+            override fun pause(paused: Boolean) {
+                error("Reader must not pause player")
+            }
+            override fun seek(seconds: Double) {
+                error("Reader must not seek player")
+            }
+            override fun speed(value: Double) {
+                error("Reader must not change player speed")
+            }
+        }
+        val host =
+            WatchRoomController(backgroundScope, player, {
+                testScheduler.currentTime
+            }, { 1800000000000L }, network::factory)
+        host.setReadingMode(true)
+        host.create("Reader")
+        runCurrent()
+        assertTrue(host.active)
+        val guest =
+            WatchRoomController(
+                backgroundScope,
+                Player {
+                    testScheduler.currentTime
+                },
+                { testScheduler.currentTime },
+                { 1800000000000L },
+                network::factory,
+            )
+        guest.join(host.state.value.invite, "Friend")
+        advanceTimeBy(5000)
+        runCurrent()
+        guest.requestPause(true)
+        advanceTimeBy(1000)
+        runCurrent()
+        host.hold()
+        host.leave()
+        assertFalse(host.active)
+    }
+
+    @Test
+    fun oldHostNeverReceivesReadingPayloadAsVideoStatus() = runTest {
+        val room = Pairing(this)
+        room.join()
+        val endpoint = room.network.endpoints[0]
+        val previous = endpoint.sent.last { it.type == WatchMessageType.Timeline }
+        room.network.endpoints[1].receiver(
+            endpoint.publicKey,
+            previous.copy(sequence = previous.sequence + 1000, readingVersion = 0),
+        )
+        runCurrent()
+        val sent = room.network.endpoints[1].sent.size
+        room.guest.sendReading(
+            eu.kanade.tachiyomi.data.reading.ReadingEnvelope(
+                kind = eu.kanade.tachiyomi.data.reading.ReadingKind.Presence,
+                peer = eu.kanade.tachiyomi.data.reading.ReadingPeer("Reader"),
+            ),
+        )
+        assertEquals(sent, room.network.endpoints[1].sent.size)
+    }
+
+    @Test
     fun actionablePeerProblemsAreVisibleWithoutSharingSourceErrors() = runTest {
         val room = Pairing(this)
         room.join()

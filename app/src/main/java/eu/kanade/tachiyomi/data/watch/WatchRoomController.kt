@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.data.watch
 
+import eu.kanade.tachiyomi.data.reading.ReadingEnvelope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -79,6 +80,31 @@ class WatchRoomController(
     private var nextCue: WatchNext? = null
     private var suppressedNext: String? = null
     private var advancedFrom: String? = null
+    var readingMode: Boolean = false
+        private set
+    var onReadingMessage: ((String, ReadingEnvelope, Boolean) -> Unit)? = null
+
+    fun setReadingMode(enabled: Boolean) {
+        if (readingMode == enabled) return
+        if (enabled && active) {
+            if (state.value.host) {
+                hold()
+            } else {
+                player.pause(true)
+                pendingCommand = null
+                mutableState.value = state.value.copy(localHold = true, pendingPlaybackPaused = null)
+            }
+        }
+        readingMode = enabled
+        lastStatus = -10_000
+        lastBroadcast = -10_000
+    }
+
+    fun sendReading(value: ReadingEnvelope, target: String = "") {
+        if (active && (state.value.host || state.value.readingSupported) && value.valid()) {
+            send(message(WatchMessageType.Status).copy(reading = value, target = target))
+        }
+    }
     var expectsPaused: Boolean = true
         private set
 
@@ -92,7 +118,7 @@ class WatchRoomController(
         if (active) return
         var identity: WatchIdentity? = null
         try {
-            val sample = player.sample()
+            val sample = if (readingMode) WatchPlayback(null, 0.0, true, false, false, 1.0) else player.sample()
             identity = WatchIdentity()
             val room = makeInvite(identity)
             val network = transportFactory(room, identity)
@@ -113,8 +139,9 @@ class WatchRoomController(
                 media = if (host) sample.media else null,
                 message = "Connessione alla stanza…",
                 localMemberId = network.publicKey,
+                readingSupported = host,
             )
-            player.pause(true)
+            if (!readingMode) player.pause(true)
             val token = ++generation
             network.start(
                 onMessage = { sender, message -> scope.launch { if (token == generation) receive(sender, message) } },
@@ -210,15 +237,17 @@ class WatchRoomController(
         transport = null
         invite = null
         pendingCommand = null
-        player.pause(true)
-        player.speed(originalSpeed)
+        if (!readingMode) {
+            player.pause(true)
+            player.speed(originalSpeed)
+        }
         appliedSpeed = null
         mutableState.value = WatchRoomState(phase = phase, message = reason)
     }
 
     /** Timers, audio-focus loss and backgrounding can only be cleared by an explicit local Play. */
     fun hold() {
-        if (!active) return
+        if (!active || readingMode) return
         expectsPaused = true
         cancelNext()
         startGate.reset()
@@ -240,7 +269,7 @@ class WatchRoomController(
     }
 
     fun resumeByUser(): Boolean {
-        if (!active) return false
+        if (!active || readingMode) return false
         player.userResumed()
         mutableState.value = state.value.copy(localHold = false)
         lastStatus = -10_000
@@ -252,7 +281,7 @@ class WatchRoomController(
     fun requestSpeed(speed: Double): Boolean = command("speed", speed)
 
     fun offerSkip(key: String?, label: String = "", target: Double = 0.0, autoSeconds: Int? = null) {
-        if (!active || !state.value.host) return
+        if (!active || !state.value.host || readingMode) return
         if (player.sample().ended) {
             dismissSkip()
             return
@@ -284,7 +313,7 @@ class WatchRoomController(
     }
 
     private fun command(action: String, value: Double = 0.0, cue: Long = 0): Boolean {
-        if (!active) return false
+        if (!active || readingMode) return false
         if (!value.isFinite()) return true
         if (!state.value.host && !state.value.sharedControls) {
             mutableState.value = state.value.copy(message = "I comandi sono gestiti da chi ha creato la stanza.")
@@ -424,7 +453,7 @@ class WatchRoomController(
     }
 
     fun confirmSameVideo() {
-        if (!active) return
+        if (!active || readingMode) return
         val local = player.sample().media ?: return
         val remote = state.value.media ?: return
         if (local.compatibleDuration(remote)) {
@@ -446,7 +475,7 @@ class WatchRoomController(
 
     /** Explicit retry keeps episode identity, command ordering and the existing local safety hold. */
     fun retryFailedCommand() {
-        if (!active) return
+        if (!active || readingMode) return
         val failed = failedCommand ?: return
         if (failed.media?.key != state.value.media?.key || failed.media?.key != player.sample().media?.key) {
             failedCommand = null
@@ -477,6 +506,14 @@ class WatchRoomController(
         if (!active || sender == transport?.publicKey || !incoming.valid()) return
         val isOwner = invite?.owns(sender) == true
         if (!state.value.host && !isOwner) return
+        incoming.reading?.let {
+            if ((incoming.target.isEmpty() || incoming.target == transport?.publicKey) &&
+                (isOwner || sender in peers)
+            ) {
+                onReadingMessage?.invoke(sender, it, isOwner)
+            }
+            return
+        }
         if (incoming.coordinationVersion != 2) {
             stop(WatchPhase.Failed, "Per guardare insieme aggiornate Nyanime su entrambi i telefoni.")
             return
@@ -497,7 +534,7 @@ class WatchRoomController(
         if (isOwner && incoming.type == WatchMessageType.Timeline) lastHostMessage = now()
         when (incoming.type) {
             WatchMessageType.Hello, WatchMessageType.Status -> if (state.value.host) {
-                val same = incoming.media?.key == player.sample().media?.key
+                val same = !readingMode && incoming.media?.key == player.sample().media?.key
                 peers[sender] =
                     WatchPeerStatus(
                         incoming.name,
@@ -508,6 +545,7 @@ class WatchRoomController(
                         incoming.canAdvance,
                         incoming.preparedNextKey,
                         incoming.nextProblem,
+                        incoming.readingMode,
                     ) to now()
                 lastBroadcast = -10_000
             }
@@ -527,6 +565,7 @@ class WatchRoomController(
                 }
                 val alreadyConnected = timeline != null
                 timeline = incoming
+                mutableState.value = state.value.copy(readingSupported = incoming.readingVersion == 1)
                 baseSpeed = incoming.speed
                 val own = transport?.publicKey
                 pendingCommand?.let { pending ->
@@ -577,14 +616,15 @@ class WatchRoomController(
                 )
             }
             WatchMessageType.Command -> if (state.value.host && sender in peers) {
-                val allowed = state.value.sharedControls &&
+                val allowed = !readingMode &&
+                    state.value.sharedControls &&
                     (
                         incoming.command == "pause" ||
                             (incoming.command == "cancel_skip" && incoming.cueId == skipCue?.id) ||
                             (incoming.command == "cancel_next" && incoming.cueId == nextCue?.id) ||
                             incoming.media?.key == player.sample().media?.key
                         )
-                if (allowed) applyCommand(incoming, peers.getValue(sender).first.name, sender)
+                if (allowed && !readingMode) applyCommand(incoming, peers.getValue(sender).first.name, sender)
                 acknowledgements[sender] = incoming.sequence
                 lastBroadcast = -10_000
             }
@@ -596,7 +636,14 @@ class WatchRoomController(
                 lastBroadcast = -10_000
             }
             WatchMessageType.Closed -> if (isOwner) {
-                stop(WatchPhase.Closed, "Chi ha creato la stanza l'ha chiusa. Il video è in pausa.")
+                stop(
+                    WatchPhase.Closed,
+                    if (readingMode) {
+                        "Chi ha creato la stanza l'ha chiusa. Puoi continuare a leggere."
+                    } else {
+                        "Chi ha creato la stanza l'ha chiusa. Il video è in pausa."
+                    },
+                )
             }
         }
     }
@@ -608,6 +655,10 @@ class WatchRoomController(
             return
         }
         val time = now()
+        if (readingMode) {
+            tickReading(time)
+            return
+        }
         val sample = player.sample()
         if (sample.media?.valid() == false) {
             stop(WatchPhase.Failed, "Questo contenuto non può essere condiviso nella stanza.")
@@ -650,6 +701,45 @@ class WatchRoomController(
         }
         if (state.value.host) tickHost(sample, time) else tickGuest(sample, time)
         updateFeedback(time)
+    }
+
+    private fun tickReading(time: Long) {
+        expectsPaused = true
+        peers.filterValues { time - it.second > 20_000 }.keys.toList().forEach {
+            peers.remove(it)
+            acknowledgements.remove(it)
+        }
+        if (state.value.host) {
+            val all = linkedMapOf(transport!!.publicKey to WatchPeerStatus(name, false, false, reading = true))
+            peers.forEach { (id, peer) -> all[id] = peer.first }
+            mutableState.value = state.value.copy(
+                media = null,
+                playRequested = false,
+                phase = WatchPhase.Waiting,
+                members = all.map { (id, peer) -> WatchMember(id, peer.name, peer.ready, peer.buffering) },
+                message = "Stanza aperta · lettura libera",
+                upcoming = null,
+                skipSeconds = null,
+                nextSeconds = null,
+                resumeSeconds = null,
+                skip = null,
+                next = null,
+            )
+            if (time - lastBroadcast >= 2000) {
+                send(
+                    message(WatchMessageType.Timeline).copy(
+                        peers = all,
+                        readingMode = true,
+                        sharedControls = state.value.sharedControls,
+                        waitForEveryone = state.value.waitForEveryone,
+                    ),
+                )
+                lastBroadcast = time
+            }
+        } else if (time - lastStatus >= 2000) {
+            send(message(WatchMessageType.Status).copy(name = name, readingMode = true))
+            lastStatus = time
+        }
     }
 
     private fun updateFeedback(time: Long) {
@@ -704,7 +794,7 @@ class WatchRoomController(
         val position = (pendingSeek ?: sample.position).coerceIn(0.0, media?.duration ?: 0.0)
         val waiting = state.value.waitForEveryone &&
             peers.values.any {
-                !it.first.ready || it.first.buffering || time - it.second > 6000
+                !it.first.reading && (!it.first.ready || it.first.buffering || time - it.second > 6000)
             }
         val buffering = !sample.ready || sample.buffering || pendingSeek != null || waiting
         val previousDeadline = startGate.deadline
@@ -746,10 +836,13 @@ class WatchRoomController(
                 lastBroadcast = -10_000
             }
             val everyonePrepared = peers.values.all {
-                it.first.preparedNextKey == upcoming.key &&
-                    it.first.canAdvance &&
-                    it.first.nextProblem == WatchProblem.None &&
-                    time - it.second <= 6000
+                it.first.reading ||
+                    (
+                        it.first.preparedNextKey == upcoming.key &&
+                            it.first.canAdvance &&
+                            it.first.nextProblem == WatchProblem.None &&
+                            time - it.second <= 6000
+                        )
             }
             nextCue?.let { cue ->
                 if (!sample.canAdvance || state.value.localHold || !everyonePrepared) {
@@ -786,6 +879,7 @@ class WatchRoomController(
                 problem,
                 sample.canAdvance,
                 upcoming?.key,
+                reading = readingMode,
             ),
         )
         peers.forEach { (id, peer) ->
@@ -796,10 +890,11 @@ class WatchRoomController(
             }
         }
         val blocking = all.entries.firstOrNull {
-            it.key != transport!!.publicKey && (!it.value.ready || it.value.buffering)
+            it.key != transport!!.publicKey && !it.value.reading && (!it.value.ready || it.value.buffering)
         }?.value
         val nextBlocking = all.entries.firstOrNull {
             it.key != transport!!.publicKey &&
+                !it.value.reading &&
                 (
                     it.value.nextProblem != WatchProblem.None ||
                         it.value.preparedNextKey != upcoming?.key ||
@@ -897,6 +992,7 @@ class WatchRoomController(
             sample.canAdvance && !state.value.localHold,
             sample.preparedNextKey,
             sample.nextProblem,
+            readingMode,
         )
         if (status != lastStatusValue || time - lastStatus >= 4000) {
             send(
@@ -909,11 +1005,13 @@ class WatchRoomController(
                     canAdvance = status.canAdvance,
                     preparedNextKey = sample.preparedNextKey,
                     nextProblem = sample.nextProblem,
+                    readingMode = readingMode,
                 ),
             )
             lastStatusValue = status
             lastStatus = time
         }
+        if (readingMode) return
         if (time - lastPing >= if (clock.ready) 10_000 else 1500) {
             pings.add(time)
             if (pings.size > 8) pings.remove(pings.min())
@@ -1032,6 +1130,7 @@ class WatchRoomController(
     private fun message(type: WatchMessageType): WatchMessage = WatchMessage(
         type = type,
         coordinationVersion = 2,
+        readingVersion = 1,
         sequence = ++sequence,
         at = now(),
     )

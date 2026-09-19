@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
@@ -65,6 +66,7 @@ fun ReaderAppBars(
     cropEnabled: Boolean,
     onClickCropBorder: () -> Unit,
     onClickSettings: () -> Unit,
+    onReadingTogether: () -> Unit = {},
 ) {
     val isRtl = viewer is R2LPagerViewer
     val backgroundColor = MaterialTheme.colorScheme
@@ -103,6 +105,13 @@ fun ReaderAppBars(
                     AppBarActions(
                         actions = persistentListOf<AppBar.AppBarAction>().builder()
                             .apply {
+                                add(
+                                    AppBar.Action(
+                                        title = "Leggi insieme",
+                                        icon = Icons.Outlined.Group,
+                                        onClick = onReadingTogether,
+                                    ),
+                                )
                                 add(
                                     AppBar.Action(
                                         title = stringResource(

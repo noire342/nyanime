@@ -113,7 +113,7 @@ class WatchTogetherActivity : BaseActivity() {
                 Scaffold(
                     topBar = {
                         TopAppBar(
-                            title = { Text("Guarda insieme") },
+                            title = { Text("La nostra stanza") },
                             navigationIcon = {
                                 IconButton(onClick = ::finish) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Indietro") }
                             },
@@ -191,10 +191,27 @@ fun WatchTogetherPanel(
         (context as? Activity)?.let(manager::present)
         onDispose {}
     }
+    var readingPanel by rememberSaveable { mutableStateOf(false) }
+    if (readingPanel && room.active) {
+        eu.kanade.tachiyomi.ui.reading.ReadingRoomPanel(
+            manager = eu.kanade.tachiyomi.data.reading.ReadingTogetherManager.get(context),
+            onChooseManga = {
+                context.startActivity(
+                    Intent(context, eu.kanade.tachiyomi.ui.main.MainActivity::class.java).apply {
+                        action = eu.kanade.tachiyomi.core.common.Constants.SHORTCUT_LIBRARY
+                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    },
+                )
+            },
+            onVideo = { readingPanel = false },
+        )
+        return
+    }
     WatchTogetherContent(
         room = room, opening = opening, name = name, onName = { name = it.take(32) },
         incomingCode = incomingCode, inviteError = inviteError, preparation = preparation,
         onQr = { showQr = true },
+        onRead = { readingPanel = true },
         onSkip = manager.controller::requestSkip, onCancelSkip = manager.controller::cancelSkip,
         onNext = manager.controller::playNextNow, onCancelNext = manager.controller::cancelNext,
         onExtensions = {
@@ -288,6 +305,7 @@ fun WatchTogetherContent(
     onNext: () -> Unit = {},
     onCancelNext: () -> Unit = {},
     onExtensions: () -> Unit = {},
+    onRead: () -> Unit = {},
 ) {
     var joining by rememberSaveable { mutableStateOf(false) }
     var code by remember { mutableStateOf("") }
@@ -331,8 +349,8 @@ fun WatchTogetherContent(
         }
         if (!room.active) {
             Text(
-                "Chi crea la stanza sceglie cosa guardare. " +
-                    "L'episodio si apre anche sul telefono dell'amico, e i comandi sono condivisi.",
+                "Una stanza per video e manga. Chi crea la stanza sceglie l'episodio da guardare; " +
+                    "per i manga ciascuno legge al proprio ritmo e può raggiungere gli altri.",
             )
             OutlinedTextField(
                 value = name,
@@ -377,7 +395,7 @@ fun WatchTogetherContent(
                         enabled = code.isNotBlank(),
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape = RoundedCornerShape(14.dp),
-                    ) { Text("Entra e guarda") }
+                    ) { Text("Entra nella stanza") }
                 }
             }
             if (!joining) {
@@ -398,6 +416,9 @@ fun WatchTogetherContent(
                 color = colors.onSurfaceVariant,
             )
         } else {
+            OutlinedButton(onClick = onRead, modifier = Modifier.fillMaxWidth()) {
+                Text("Leggi insieme · manga, pagine e schizzi")
+            }
             Card(
                 colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh),
                 shape = RoundedCornerShape(20.dp),

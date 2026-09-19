@@ -23,6 +23,7 @@ disabilitare per tornare all'interfaccia legacy. Il tema manga resta indipendent
 | **Anime4K Ultra offline** | Copie A+ HQ con carico dosato, pause per temperatura e ripresa dei segmenti salvati. Stato, comandi ed esportazione direttamente dagli episodi; coda in Download → Ultra. [Dettagli e requisiti](docs/anime4k-ultra.md). |
 | **Anime4K Smart** | Applica shader nel player interno con qualità adattiva, avvio automatico configurabile e modalità manuali. |
 | **Guarda insieme** | Genera un codice, invita gli amici e sincronizza episodio, play, pausa, spostamenti e velocità, ognuno con il proprio streaming. |
+| **Leggi insieme** | Nella stessa stanza dei video, vedi manga, capitolo e pagina degli amici, raggiungili e torna al tuo punto. Schizzi condivisi, annulla e mostra/nascondi nel lettore. [Come funziona](docs/reading-together.md). |
 | **Cast con telecomando** | Trasmetti a Google Cast, UPnP/DLNA o alle app Nyanime TV compatibili e continua a usare l'app dal telefono, con controlli e ripresa locale. |
 | **Player curato** | Usa tracce audio e sottotitoli, gesti, PiP, AniSkip, timer di sospensione e passaggio al prossimo episodio. |
 | **Manga completo** | Mantieni libreria e lettore legacy, con Home opzionali, aggiornamenti dei capitoli e tutte le modalità di lettura. |
@@ -84,6 +85,8 @@ restano locali. [Funzionamento, protocollo e limiti](docs/community-protocol.md)
 Le app TV possono diventare ricevitori tramite [Nyanime Companion](docs/companion-protocol.md): ricerca automatica o indirizzo manuale, codice di conferma e comandi cifrati. L’app LG webOS conserva anche il funzionamento autonomo.
 
 - Stanze fino a **8 persone**, creazione o ingresso tramite codice, invito con link e QR.
+- La stessa stanza continua nel lettore manga: avanzamento indipendente, salto esplicito
+  alla pagina di un amico, segnalibro di ritorno locale e schizzi temporanei condivisi.
 - L'host sceglie l'episodio; gli ospiti lo aprono con la propria estensione compatibile.
   Play, pausa, avanzamento e velocità sono condivisi; l'host può limitare i controlli.
 - Attesa dei partecipanti pronti, ripartenza con conto alla rovescia, correzione

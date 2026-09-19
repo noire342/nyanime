@@ -82,6 +82,22 @@ fun MoreScreen(
 
             item {
                 TextPreferenceWidget(
+                    title = "Guarda e leggi insieme",
+                    subtitle = "Una stanza per video, manga e schizzi condivisi",
+                    icon = Icons.Outlined.PeopleOutline,
+                    onPreferenceClick = {
+                        context.startActivity(
+                            android.content.Intent(
+                                context,
+                                eu.kanade.tachiyomi.ui.watch.WatchTogetherActivity::class.java,
+                            ),
+                        )
+                    },
+                )
+            }
+
+            item {
+                TextPreferenceWidget(
                     title = "Community",
                     subtitle = "Profilo, amici e i tuoi dispositivi",
                     icon = Icons.Outlined.PeopleOutline,

@@ -10,6 +10,8 @@ import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.view.updateMargins
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
+import eu.kanade.tachiyomi.data.reading.ReadingPageLayout
+import eu.kanade.tachiyomi.data.reading.ReadingTogetherManager
 import eu.kanade.tachiyomi.databinding.ReaderErrorBinding
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
@@ -90,6 +92,7 @@ class WebtoonPageHolder(
      */
     fun bind(page: ReaderPage) {
         this.page = page
+        frame.bindReadingPage(page, viewer.activity.viewModel.manga)
         loadJob?.cancel()
         loadJob = scope.launch { loadPageAndProcessStatus() }
         refreshLayoutParams()
@@ -199,7 +202,9 @@ class WebtoonPageHolder(
                     ReaderPageImageView.Config(
                         zoomDuration = viewer.config.doubleTapAnimDuration,
                         minimumScaleType = SubsamplingScaleImageView.SCALE_TYPE_FIT_WIDTH,
-                        cropBorders = viewer.config.imageCropBorders,
+                        cropBorders =
+                        viewer.config.imageCropBorders &&
+                            ReadingTogetherManager.existing()?.controller?.state?.value?.active != true,
                     ),
                 )
                 removeErrorLayout()
@@ -213,6 +218,7 @@ class WebtoonPageHolder(
     }
 
     private fun process(imageSource: BufferedSource): BufferedSource {
+        frame.readingLayout = ReadingPageLayout.Full
         if (viewer.config.dualPageRotateToFit) {
             return rotateDualPage(imageSource)
         }
@@ -221,6 +227,14 @@ class WebtoonPageHolder(
             val isDoublePage = ImageUtil.isWideImage(imageSource)
             if (isDoublePage) {
                 val upperSide = if (viewer.config.dualPageInvert) ImageUtil.Side.LEFT else ImageUtil.Side.RIGHT
+                frame.readingLayout =
+                    if (upperSide ==
+                        ImageUtil.Side.LEFT
+                    ) {
+                        ReadingPageLayout.LeftAboveRight
+                    } else {
+                        ReadingPageLayout.RightAboveLeft
+                    }
                 return ImageUtil.splitAndMerge(imageSource, upperSide)
             }
         }
@@ -232,6 +246,7 @@ class WebtoonPageHolder(
         val isDoublePage = ImageUtil.isWideImage(imageSource)
         return if (isDoublePage) {
             val rotation = if (viewer.config.dualPageRotateToFitInvert) -90f else 90f
+            frame.readingLayout = if (rotation > 0) ReadingPageLayout.Clockwise else ReadingPageLayout.CounterClockwise
             ImageUtil.rotateImage(imageSource, rotation)
         } else {
             imageSource

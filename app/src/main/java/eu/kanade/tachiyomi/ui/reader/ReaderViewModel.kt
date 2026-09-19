@@ -20,6 +20,7 @@ import eu.kanade.tachiyomi.data.database.models.manga.toDomainChapter
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadProvider
 import eu.kanade.tachiyomi.data.download.manga.model.MangaDownload
+import eu.kanade.tachiyomi.data.reading.ReadingTogetherManager
 import eu.kanade.tachiyomi.data.saver.Image
 import eu.kanade.tachiyomi.data.saver.ImageSaver
 import eu.kanade.tachiyomi.data.saver.Location
@@ -310,6 +311,17 @@ class ReaderViewModel @JvmOverloads constructor(
         chapter: ReaderChapter,
     ): ViewerChapters {
         loader.loadChapter(chapter)
+
+        manga?.let { title ->
+            ReadingTogetherManager.existing()
+                ?.requested(title.id, chapter.chapter.id!!)?.let { target ->
+                    require(chapter.pages?.map { it.index }?.distinct()?.size == target.position.pages) {
+                        "Il numero di pagine è diverso su questo telefono. Non ti sposto su una pagina sbagliata."
+                    }
+                    chapterPageIndex = target.position.page
+                    chapter.requestedPage = target.position.page
+                }
+        }
 
         val chapterPos = chapterList.indexOf(chapter)
         val newChapters = ViewerChapters(
