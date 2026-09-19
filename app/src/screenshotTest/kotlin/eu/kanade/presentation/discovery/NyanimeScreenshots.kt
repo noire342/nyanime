@@ -50,7 +50,7 @@ import tachiyomi.presentation.core.components.material.PullRefresh
 @PreviewTest
 @Preview(name = "FourTabs", widthDp = 393, heightDp = 150, locale = "it")
 @Preview(name = "FourTabsWide", widthDp = 800, heightDp = 150, locale = "it")
-@Preview(name = "FourTabsLargeText", widthDp = 320, heightDp = 170, fontScale = 1.4f, locale = "it")
+@Preview(name = "FourTabsLargeText", widthDp = 320, heightDp = 230, fontScale = 1.4f, locale = "it")
 @Composable
 fun NyanimeCenteredTabsScreenshot() {
     TachiyomiPreviewTheme(appTheme = AppTheme.NYANIME) {

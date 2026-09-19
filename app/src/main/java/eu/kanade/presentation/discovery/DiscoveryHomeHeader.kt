@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -22,13 +23,10 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,13 +36,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,41 +77,67 @@ fun DiscoveryHomeHeader(
     }
     Surface(modifier = Modifier.posterForeground(zIndex = 3f), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.statusBarsPadding()) {
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (onBack != null) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
-                }
-                NyanimeWordmark(Modifier.weight(1f).padding(start = 4.dp))
-                eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
-                eu.kanade.tachiyomi.ui.community.CommunityAvatarButton()
-                if (onSearch != null) {
-                    IconButton(onClick = onSearch) {
-                        Icon(
-                            Icons.Outlined.Search,
-                            "Cerca " + (homes.firstOrNull { it.id == selectedHome }?.title ?: "anime"),
-                        )
+            BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                // Keep the wordmark and touch targets intact on narrow screens and with large text.
+                val stacked = maxWidth < 356.dp ||
+                    LocalDensity.current.fontScale > 1.15f ||
+                    (onBack != null && maxWidth < 416.dp)
+                Column {
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 60.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (onBack != null) {
+                            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
+                        }
+                        NyanimeWordmark(Modifier.weight(1f).padding(start = 4.dp))
+                        if (!stacked) HomeHeaderActions(onSearch, selectedHome, homes)
                     }
-                }
-                var menu by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "Opzioni Home") }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Aggiorna Home") },
-                            leadingIcon = { Icon(Icons.Outlined.Refresh, null) },
-                            onClick = {
-                                menu = false
-                                onRefresh()
-                            },
+                    if (stacked) {
+                        HomeHeaderActions(
+                            onSearch,
+                            selectedHome,
+                            homes,
+                            Modifier.align(Alignment.End).padding(bottom = 4.dp),
                         )
                     }
                 }
             }
             HomeContentSwitch(selectedHome, homes, onSelect)
         }
+    }
+}
+
+@Composable
+private fun HomeHeaderActions(
+    onSearch: (() -> Unit)?,
+    selectedHome: String?,
+    homes: List<SourceHomeGroup>,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
+        if (onSearch != null) {
+            Surface(
+                onClick = onSearch,
+                modifier = Modifier.widthIn(min = 96.dp).heightIn(min = 48.dp).semantics {
+                    role = Role.Button
+                    contentDescription = "Cerca " + (homes.firstOrNull { it.id == selectedHome }?.title ?: "anime")
+                },
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                ) {
+                    Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Text("Cerca", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                }
+            }
+        }
+        eu.kanade.tachiyomi.ui.community.CommunityAvatarButton()
     }
 }
 

@@ -60,6 +60,7 @@ import tachiyomi.domain.discovery.SectionState
 import tachiyomi.domain.discovery.SourceHomeGroup
 import tachiyomi.domain.entries.anime.model.asAnimeCover
 import tachiyomi.domain.source.anime.interactor.GetRemoteAnime
+import tachiyomi.presentation.core.components.material.PullRefresh
 import tachiyomi.presentation.core.screens.LoadingScreen
 
 data object DiscoveryTab : Tab {
@@ -123,157 +124,171 @@ data object DiscoveryTab : Tab {
             },
         ) { padding ->
             HomeContentReveal("catalog") {
-                LazyColumn(
-                    Modifier.padding(padding),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                PullRefresh(
+                    refreshing = state.catalog.values.any { it.loading } ||
+                        state.popular.loading ||
+                        state.latest.loading,
+                    enabled = !state.offline,
+                    onRefresh = model::refresh,
+                    indicatorOnGestureOnly = true,
+                    modifier = Modifier.padding(padding),
                 ) {
-                    item(key = "hero") {
-                        val featured = state.catalog[CatalogFeed.TRENDING] ?: SectionState()
-                        FeaturedCarousel(featured.data?.items.orEmpty(), openCatalog)
-                    }
-                    item(key = "resume") {
-                        SectionHeader("Continua a guardare") { navigator.push(HistoriesTab) }
-                        ContinueWatchingRow(state.resume, { navigator.push(AnimeScreen(it)) }) { item ->
-                            scope.launch {
-                                context.playDiscoveryEpisode(item.episode)
+                    LazyColumn(
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        item(key = "hero") {
+                            val featured = state.catalog[CatalogFeed.TRENDING] ?: SectionState()
+                            FeaturedCarousel(featured.data?.items.orEmpty(), openCatalog)
+                        }
+                        item(key = "resume") {
+                            SectionHeader("Continua a guardare") { navigator.push(HistoriesTab) }
+                            ContinueWatchingRow(state.resume, { navigator.push(AnimeScreen(it)) }) { item ->
+                                scope.launch {
+                                    context.playDiscoveryEpisode(item.episode)
+                                }
+                            }
+                            if (state.resume.data?.isEmpty() == true) {
+                                TextButton(onClick = {
+                                    navigator.push(CatalogListScreen(CatalogFeed.TRENDING))
+                                }) { Text("Scopri cosa guardare") }
                             }
                         }
-                        if (state.resume.data?.isEmpty() == true) {
-                            TextButton(onClick = {
-                                navigator.push(CatalogListScreen(CatalogFeed.TRENDING))
-                            }) { Text("Scopri cosa guardare") }
-                        }
-                    }
-                    item(key = "shortcuts") {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            TextButton(onClick = { navigator.push(UpdatesTab) }) { Text("Aggiornamenti") }
-                            TextButton(onClick = { navigator.push(HistoriesTab) }) { Text("Cronologia") }
-                        }
-                        if (state.offline) {
-                            Text("Solo download · catalogo salvato", Modifier.padding(horizontal = 16.dp))
-                        }
-                    }
-                    state.catalogueOutage?.let { message ->
-                        item(key = "catalogue-outage") {
-                            LoadNotice(false, message, false) {
-                                DiscoveryScreenModel.feeds.forEach { model.load(it, true) }
+                        item(key = "shortcuts") {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                TextButton(onClick = { navigator.push(UpdatesTab) }) { Text("Aggiornamenti") }
+                                TextButton(onClick = { navigator.push(HistoriesTab) }) { Text("Cronologia") }
+                            }
+                            if (state.offline) {
+                                Text("Solo download · catalogo salvato", Modifier.padding(horizontal = 16.dp))
                             }
                         }
-                    }
-                    if (state.catalog.values.any { it.data?.provider == "kitsu" }) {
-                        item(key = "catalogue-fallback") {
-                            Text(
-                                "Catalogo alternativo Kitsu attivo · nessuna selezione manuale necessaria",
-                                Modifier.padding(horizontal = 16.dp),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                    item(key = "updates") {
-                        SectionHeader("Nuovi episodi della tua libreria") { navigator.push(UpdatesTab) }
-                        LocalAnimeRow(state.updates, { navigator.push(AnimeScreen(it)) }) { item ->
-                            scope.launch {
-                                context.playDiscoveryEpisode(item.episode)
+                        state.catalogueOutage?.let { message ->
+                            item(key = "catalogue-outage") {
+                                LoadNotice(false, message, false) {
+                                    DiscoveryScreenModel.feeds.forEach { model.load(it, true) }
+                                }
                             }
                         }
-                    }
-                    items(
-                        DiscoveryScreenModel.feeds.filter { feed ->
-                            state.catalogueOutage == null || state.catalog[feed]?.data != null
-                        },
-                        key = { it.name },
-                    ) { feed ->
-                        val section = state.catalog[feed] ?: SectionState()
-                        Column {
-                            SectionHeader(feed.displayTitle()) { navigator.push(CatalogListScreen(feed)) }
-                            if (feed ==
-                                CatalogFeed.WEEK
-                            ) {
+                        if (state.catalog.values.any { it.data?.provider == "kitsu" }) {
+                            item(key = "catalogue-fallback") {
                                 Text(
-                                    "Messa in onda · la disponibilità nelle fonti può variare",
+                                    "Catalogo alternativo Kitsu attivo · nessuna selezione manuale necessaria",
                                     Modifier.padding(horizontal = 16.dp),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
-                            val error = section.error.takeUnless {
-                                section.failureReason == CatalogFailureReason.SERVICE_UNAVAILABLE
-                            }
-                            LoadNotice(section.loading, error, section.stale) { model.load(feed, true) }
-                            CatalogRow(section.data?.items.orEmpty(), openCatalog, feed == CatalogFeed.WEEK)
-                            if (feed == CatalogFeed.WEEK) {
-                                section.data?.notice?.let { Text(it, Modifier.padding(horizontal = 16.dp)) }
-                            }
-                            if (section.data?.items?.isEmpty() == true &&
-                                section.data?.notice == null &&
-                                !section.loading
-                            ) {
-                                Text("Nessun anime disponibile", Modifier.padding(horizontal = 16.dp))
+                        }
+                        item(key = "updates") {
+                            SectionHeader("Nuovi episodi della tua libreria") { navigator.push(UpdatesTab) }
+                            LocalAnimeRow(state.updates, { navigator.push(AnimeScreen(it)) }) { item ->
+                                scope.launch {
+                                    context.playDiscoveryEpisode(item.episode)
+                                }
                             }
                         }
-                    }
-                    item(key = "source-picker") {
-                        SectionHeader("Dalle tue fonti")
-                        Column {
-                            TextButton(onClick = { sourceMenu = true }, enabled = state.sources.isNotEmpty()) {
-                                val sourceLabel = selected?.let { "${it.name} (${it.language.uppercase()}) ▾" }
-                                Text(sourceLabel ?: "Nessuna fonte abilitata")
-                            }
-                            DropdownMenu(expanded = sourceMenu, onDismissRequest = { sourceMenu = false }) {
-                                state.sources.forEach { source ->
-                                    DropdownMenuItem(
-                                        text = { Text("${source.name} (${source.language.uppercase()})") },
-                                        onClick = {
-                                            sourceMenu = false
-                                            model.selectSource(source.id)
-                                        },
+                        items(
+                            DiscoveryScreenModel.feeds.filter { feed ->
+                                state.catalogueOutage == null || state.catalog[feed]?.data != null
+                            },
+                            key = { it.name },
+                        ) { feed ->
+                            val section = state.catalog[feed] ?: SectionState()
+                            Column {
+                                SectionHeader(feed.displayTitle()) { navigator.push(CatalogListScreen(feed)) }
+                                if (feed ==
+                                    CatalogFeed.WEEK
+                                ) {
+                                    Text(
+                                        "Messa in onda · la disponibilità nelle fonti può variare",
+                                        Modifier.padding(horizontal = 16.dp),
+                                        style = MaterialTheme.typography.bodySmall,
                                     )
                                 }
-                            }
-                        }
-                        if (state.sources.isEmpty()) {
-                            TextButton(onClick = {
-                                scope.launch {
-                                    HomeScreen.openTab(HomeScreen.Tab.Browse(toExtensions = true, anime = true))
+                                val error = section.error.takeUnless {
+                                    section.failureReason == CatalogFailureReason.SERVICE_UNAVAILABLE
                                 }
-                            }) { Text("Configura le estensioni") }
-                        }
-                    }
-                    if (selected != null && !state.offline) {
-                        items(if (selected.supportsLatest) listOf(false, true) else listOf(false), key = {
-                            "source:$it"
-                        }) { latest ->
-                            val section = if (latest) state.latest else state.popular
-                            Column {
-                                val title = if (latest) "Ultimi aggiornamenti" else "Popolari"
-                                SectionHeader("$title · ${selected.name}") {
-                                    val query = if (latest) {
-                                        GetRemoteAnime.QUERY_LATEST
-                                    } else {
-                                        GetRemoteAnime.QUERY_POPULAR
-                                    }
-                                    navigator.push(BrowseAnimeSourceScreen(selected.id, query))
+                                LoadNotice(section.loading, error, section.stale) { model.load(feed, true) }
+                                CatalogRow(section.data?.items.orEmpty(), openCatalog, feed == CatalogFeed.WEEK)
+                                if (feed == CatalogFeed.WEEK) {
+                                    section.data?.notice?.let { Text(it, Modifier.padding(horizontal = 16.dp)) }
                                 }
-                                LoadNotice(section.loading, section.error, section.stale) { model.loadSource(latest) }
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                if (section.data?.items?.isEmpty() == true &&
+                                    section.data?.notice == null &&
+                                    !section.loading
                                 ) {
-                                    items(section.data.orEmpty(), key = { it.id }) { anime ->
-                                        PosterCard(anime.title, anime.asAnimeCover(), selected.language.uppercase(), {
-                                            navigator.push(AnimeScreen(anime.id, true))
-                                        })
+                                    Text("Nessun anime disponibile", Modifier.padding(horizontal = 16.dp))
+                                }
+                            }
+                        }
+                        item(key = "source-picker") {
+                            SectionHeader("Dalle tue fonti")
+                            Column {
+                                TextButton(onClick = { sourceMenu = true }, enabled = state.sources.isNotEmpty()) {
+                                    val sourceLabel = selected?.let { "${it.name} (${it.language.uppercase()}) ▾" }
+                                    Text(sourceLabel ?: "Nessuna fonte abilitata")
+                                }
+                                DropdownMenu(expanded = sourceMenu, onDismissRequest = { sourceMenu = false }) {
+                                    state.sources.forEach { source ->
+                                        DropdownMenuItem(
+                                            text = { Text("${source.name} (${source.language.uppercase()})") },
+                                            onClick = {
+                                                sourceMenu = false
+                                                model.selectSource(source.id)
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                            if (state.sources.isEmpty()) {
+                                TextButton(onClick = {
+                                    scope.launch {
+                                        HomeScreen.openTab(HomeScreen.Tab.Browse(toExtensions = true, anime = true))
+                                    }
+                                }) { Text("Configura le estensioni") }
+                            }
+                        }
+                        if (selected != null && !state.offline) {
+                            items(if (selected.supportsLatest) listOf(false, true) else listOf(false), key = {
+                                "source:$it"
+                            }) { latest ->
+                                val section = if (latest) state.latest else state.popular
+                                Column {
+                                    val title = if (latest) "Ultimi aggiornamenti" else "Popolari"
+                                    SectionHeader("$title · ${selected.name}") {
+                                        val query = if (latest) {
+                                            GetRemoteAnime.QUERY_LATEST
+                                        } else {
+                                            GetRemoteAnime.QUERY_POPULAR
+                                        }
+                                        navigator.push(BrowseAnimeSourceScreen(selected.id, query))
+                                    }
+                                    LoadNotice(section.loading, section.error, section.stale) {
+                                        model.loadSource(latest)
+                                    }
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    ) {
+                                        items(section.data.orEmpty(), key = { it.id }) { anime ->
+                                            PosterCard(
+                                                anime.title,
+                                                anime.asAnimeCover(),
+                                                selected.language.uppercase(),
+                                                { navigator.push(AnimeScreen(anime.id, true)) },
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                    item {
-                        Text(
-                            "Informazioni del catalogo: AniList · alternativa automatica Kitsu",
-                            Modifier.padding(horizontal = 16.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                        )
+                        item {
+                            Text(
+                                "Informazioni del catalogo: AniList · alternativa automatica Kitsu",
+                                Modifier.padding(horizontal = 16.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
                     }
                 }
             }
