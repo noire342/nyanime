@@ -1,4 +1,5 @@
 """Run the production outbox migration and delivery query against SQLite, without an emulator."""
+from contextlib import closing
 from pathlib import Path
 import re
 import sqlite3
@@ -28,7 +29,8 @@ class OutboxTest(unittest.TestCase):
             db.execute(sql)
 
     def due(self, db, relay='relay-a', now=100, sync=True):
-        return [row[0] for row in db.execute(DUE, (relay, now, int(sync), now, relay))]
+        # Android SQLiteDatabase.rawQuery binds every selectionArg as TEXT.
+        return [row[0] for row in db.execute(DUE, (relay, str(now), str(int(sync)), str(now), relay))]
 
     def test_upgrade_preserves_ciphertext_and_existing_receipts(self):
         with self.connect() as db:
@@ -49,17 +51,15 @@ class OutboxTest(unittest.TestCase):
     def test_backoff_and_acknowledgements_survive_reopen(self):
         with tempfile.TemporaryDirectory() as folder:
             path = str(Path(folder) / 'queue.db')
-            with self.connect(path) as db:
+            with closing(self.connect(path)) as db, db:
                 self.seed(db)
                 db.execute("INSERT INTO delivery_attempts(event,relay,retry_at,attempts,reason) VALUES('old','relay-b',30000,1,'rate-limited')")
-            db.close()
-            with self.connect(path) as db:
+            with closing(self.connect(path)) as db, db:
                 self.assertEqual([], self.due(db, 'relay-b'))
                 self.assertEqual([], self.due(db, 'relay-a', now=30001))
                 self.assertEqual([b'\x00\x11\xff'], self.due(db, 'relay-b', now=30001))
                 db.execute("DELETE FROM outbox WHERE id='old'")
                 self.assertEqual(0, db.execute('SELECT count(*) FROM delivery_attempts').fetchone()[0])
-            db.close()
 
     def test_expired_events_are_not_replayed(self):
         with self.connect() as db:
@@ -70,3 +70,4 @@ class OutboxTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
