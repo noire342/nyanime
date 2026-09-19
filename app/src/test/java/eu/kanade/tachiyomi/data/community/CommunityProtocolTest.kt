@@ -9,6 +9,18 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class CommunityProtocolTest {
+    @Test fun `recovery authenticates the protected key and rejects wrong passwords or tampering`() {
+        val secret = ByteArray(32) { (it + 1).toByte() }
+        val password = "correct recovery password".toCharArray()
+        val exported = IdentityRecovery.export(secret, password)
+        assertTrue(secret.contentEquals(IdentityRecovery.restore(exported, password)))
+        assertTrue(runCatching { IdentityRecovery.restore(exported, "another password".toCharArray()) }.isFailure)
+        val bytes = java.util.Base64.getDecoder().decode(exported.removePrefix("NYR1."))
+        bytes[40] = (bytes[40].toInt() xor 1).toByte()
+        val altered = "NYR1." + java.util.Base64.getEncoder().encodeToString(bytes)
+        assertTrue(runCatching { IdentityRecovery.restore(altered, password) }.isFailure)
+    }
+
     @Test fun `encrypted recovery index spans relay limits without public title hashes`() {
         val key = ByteArray(32) { 7 }
         val ref = SyncReference(source = 4, titleUrl = "/a-private-title", itemUrl = "/part")

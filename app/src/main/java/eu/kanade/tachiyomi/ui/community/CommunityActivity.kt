@@ -324,6 +324,10 @@ private fun CommunityScreen(manager: CommunityManager, incoming: String, incomin
                                 profile = it
                                 manager.openProfile(it)
                             },
+                            onWatch = {
+                                chat = owner
+                                dialog = "chat-options"
+                            },
                         )
                     }
                     route == "tab:0" -> FeedPage(state, manager, onProfile = {
@@ -901,19 +905,31 @@ private fun Conversation(state: CommunityState, id: String, manager: CommunityMa
                             if (message.invite.isNotEmpty()) {
                                 Button(
                                     onClick = {
-                                        context.startActivity(
-                                            Intent(
+                                        val invite = runCatching {
+                                            require(
+                                                message.inviteExpires == 0L ||
+                                                    message.inviteExpires > System.currentTimeMillis(),
+                                            )
+                                            WatchInvite.parse(message.invite, System.currentTimeMillis())
+                                        }.getOrNull()
+                                        if (invite == null) {
+                                            android.widget.Toast.makeText(
                                                 context,
-                                                WatchTogetherActivity::class.java,
-                                            ).setAction(
-                                                Intent.ACTION_VIEW,
-                                            ).setData(
-                                                WatchInvite.parse(
-                                                    message.invite,
-                                                    System.currentTimeMillis(),
-                                                ).link().toUri(),
-                                            ),
-                                        )
+                                                "L’invito è scaduto. Chiedine uno nuovo.",
+                                                android.widget.Toast.LENGTH_LONG,
+                                            ).show()
+                                        } else {
+                                            context.startActivity(
+                                                Intent(
+                                                    context,
+                                                    WatchTogetherActivity::class.java,
+                                                ).setAction(
+                                                    Intent.ACTION_VIEW,
+                                                ).setData(
+                                                    invite.link().toUri(),
+                                                ),
+                                            )
+                                        }
                                     },
                                     enabled = runCatching {
                                         require(

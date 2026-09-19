@@ -220,7 +220,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                 val artwork = PublicArtwork(context)
                 val titles = (profile.favorites + profile.shelves).distinctBy { it.id }.associate { title ->
                     title.id to
-                        artwork.prepare(title, state.value.library) { uploadImage(it, BlossomImages.hosts.first()) }
+                        artwork.prepare(title, state.value.library, ::uploadPublicArtwork)
                 }
                 val prepared = profile.copy(
                     favorites = profile.favorites.map {
@@ -479,7 +479,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                 val prepared = post.copy(
                     title = post.title?.let { title ->
                         PublicArtwork(context).prepare(title, state.value.library) {
-                            uploadImage(it, BlossomImages.hosts.first())
+                            uploadPublicArtwork(it)
                         }
                     },
                 )
@@ -1401,6 +1401,19 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         refresh()
     }
     internal fun pairingSecret(): ByteArray = requireNotNull(identity).exportSecret()
+    private suspend fun uploadPublicArtwork(bytes: ByteArray): String {
+        var failure: Exception? = null
+        for (host in BlossomImages.hosts) {
+            try {
+                return uploadImage(bytes, host)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                failure = error
+            }
+        }
+        throw requireNotNull(failure)
+    }
     internal suspend fun uploadImage(bytes: ByteArray, host: String): String {
         val hash = sha256(bytes).hex()
         val cached = mutex.withLock { store.read<String>("uploaded-images", "$host:$hash") }

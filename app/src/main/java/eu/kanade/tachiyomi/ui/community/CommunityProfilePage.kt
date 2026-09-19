@@ -84,6 +84,7 @@ internal fun ProfilePage(
     onReply: (CommunityItem) -> Unit,
     onProfile: (String) -> Unit,
     preview: Boolean = false,
+    onWatch: (() -> Unit)? = null,
 ) {
     var section by rememberSaveable(profile.key) { mutableIntStateOf(0) }
     var status by rememberSaveable(profile.key) { mutableStateOf(ShelfStatus.Watching) }
@@ -181,6 +182,12 @@ internal fun ProfilePage(
                         }
                         OutlinedIconButton(onClick = onCode, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Outlined.QrCode2, "Codice profilo")
+                        }
+                    }
+                    if (!mine && state.isFriend(profile.key) && onWatch != null) {
+                        OutlinedButton(onClick = onWatch) {
+                            Icon(Icons.Outlined.AutoAwesome, null)
+                            Text(" Guarda insieme")
                         }
                     }
                 }
