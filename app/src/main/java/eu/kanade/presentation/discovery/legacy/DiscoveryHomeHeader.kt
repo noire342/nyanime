@@ -60,13 +60,14 @@ fun DiscoveryHomeHeader(
     onRefresh: () -> Unit,
     homes: List<SourceHomeGroup>,
     logo: SourceHomeLogo? = null,
+    artworkRefreshKey: Int = 0,
 ) {
     val branded = sourceHomeLogoEnabled() && logo != null
     Column {
         TopAppBar(
             title = {
                 if (branded) {
-                    SourceHomeWordmark(logo, Modifier.fillMaxWidth())
+                    SourceHomeWordmark(logo, Modifier.fillMaxWidth(), refreshKey = artworkRefreshKey)
                 } else if (homes.isNotEmpty()) {
                     HomeContentSwitch(selectedHome, homes, onSelect)
                 } else {

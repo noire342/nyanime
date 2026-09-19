@@ -87,6 +87,7 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                 null
             },
             onRefresh = model::refresh,
+            artworkRefreshKey = state.artworkRefreshKey,
             logo = source.providers.takeUnless { access.offline }
                 ?.distinctBy { it.id }?.singleOrNull()?.let { provider ->
                     state.sections.values.asSequence().flatMap { it.data?.items.orEmpty().asSequence() }
