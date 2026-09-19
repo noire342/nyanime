@@ -383,6 +383,7 @@ class PlayerActivity : BaseActivity() {
 
     override fun onDestroy() {
         UltraPlaybackGuard.leavePlayer()
+        viewModel.detachDevicePlayback()
         viewModel.watchManager.detach(this)
         videoLoadJob?.cancel()
         viewModel.playbackLoad.cancel()
@@ -2093,6 +2094,8 @@ class PlayerActivity : BaseActivity() {
         setupPlayerOrientation()
         setupChapters()
         setupTracks()
+
+        viewModel.onDevicePlaybackReady()
 
         viewModel.waitingSkipIntro = playerPreferences.waitingTimeIntroSkip().get()
         if (!viewModel.introSkipEnabled ||

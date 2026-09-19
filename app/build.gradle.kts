@@ -268,6 +268,8 @@ dependencies {
     implementation(libs.bundles.okhttp)
     implementation(libs.okio)
     implementation(libs.conscrypt.android) // TLS 1.3 support for Android < 10
+    implementation(libs.community.crypto)
+    implementation(libs.community.scanner)
 
     // Data serialization (JSON, protobuf, xml)
     implementation(kotlinx.bundles.serialization)
@@ -318,6 +320,8 @@ dependencies {
 
     // Tests
     testImplementation(libs.bundles.test)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.okhttp.tls)
     testImplementation(libs.sqldelight.jvm.driver)
 
     // For detecting memory leaks; see https://square.github.io/leakcanary/

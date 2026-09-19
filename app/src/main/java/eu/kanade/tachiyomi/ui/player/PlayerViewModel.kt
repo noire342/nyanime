@@ -324,7 +324,55 @@ class PlayerViewModel @JvmOverloads constructor(
         if (effective != paused) activity.player.paused = effective
     }
 
+    private var deviceResumeAllowed = true
+    private val devicePlayer = object : eu.kanade.tachiyomi.data.community.DeviceHandoff.Player {
+        override fun snapshot(): eu.kanade.tachiyomi.data.community.DevicePlayback? {
+            if (activity.player.isExiting ||
+                incognitoMode ||
+                watchTogether.active ||
+                isLoadingEpisode.value
+            ) {
+                return null
+            }
+            val cast = CastController.get(activity.applicationContext).state.value
+            if (cast.active || cast.connecting) return null
+            val anime = currentAnime.value ?: return null
+            val episode = currentEpisode.value ?: return null
+            val manager = eu.kanade.tachiyomi.data.community.CommunityManager.existing() ?: return null
+            return eu.kanade.tachiyomi.data.community.DevicePlayback(
+                manager.deviceId(),
+                eu.kanade.tachiyomi.data.community.SyncReference(false, anime.source, anime.url, episode.url),
+                (pos.value.toDouble() * 1000).toLong().coerceAtLeast(0),
+                !paused.value,
+            )
+        }
+        override fun pause(): Boolean {
+            if (snapshot() == null) return false
+            this@PlayerViewModel.pause()
+            return true
+        }
+        override fun resume(position: Long) {
+            if (!deviceResumeAllowed || snapshot() == null) return
+            seekTo((position / 1000).toInt())
+            unpause()
+        }
+        override fun message(
+            text: String,
+        ) {
+            if (!activity.player.isExiting) playerUpdate.update { PlayerUpdates.ShowText(text) }
+        }
+    }
+    fun onDevicePlaybackReady() {
+        deviceResumeAllowed = true
+        eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.attachPlayer(devicePlayer)
+    }
+    fun detachDevicePlayback() {
+        deviceResumeAllowed = false
+        eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.handoff?.detach(devicePlayer)
+    }
+
     fun pauseByUser() {
+        deviceResumeAllowed = false
         if (!watchTogether.requestPause(true)) pause()
     }
 
@@ -445,6 +493,7 @@ class PlayerViewModel @JvmOverloads constructor(
     val nextEpisodePrompt = completion.prompt
 
     private val sleepTimer = PlayerSleepTimer(viewModelScope, android.os.SystemClock::elapsedRealtime) {
+        deviceResumeAllowed = false
         completion.cancel()
         watchTogether.hold()
         pause()
@@ -905,6 +954,7 @@ class PlayerViewModel @JvmOverloads constructor(
         sleepTimer.acknowledgeUserPlayback()
         if (watchTogether.resumeByUser()) return
         unpause()
+        onDevicePlaybackReady()
     }
 
     fun pause() {
@@ -2074,6 +2124,7 @@ class PlayerViewModel @JvmOverloads constructor(
                     fillermark = episode.fillermark,
                     lastSecondSeen = episode.last_second_seen,
                     totalSeconds = episode.total_seconds,
+                    localOnly = incognitoMode,
                 ),
             )
         }

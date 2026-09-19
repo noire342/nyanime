@@ -21,6 +21,7 @@ data class EpisodeUpdate(
     val previewUrl: String? = null,
     val version: Long? = null,
     val memo: JsonObject? = null,
+    val localOnly: Boolean = false,
 )
 
 fun Episode.toEpisodeUpdate(): EpisodeUpdate {

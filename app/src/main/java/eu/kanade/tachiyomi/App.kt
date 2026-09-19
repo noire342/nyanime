@@ -222,10 +222,12 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
     override fun onStart(owner: LifecycleOwner) {
         SecureActivityDelegate.onApplicationStart()
+        eu.kanade.tachiyomi.data.community.CommunityManager.lifecycle(this, true)
     }
 
     override fun onStop(owner: LifecycleOwner) {
         SecureActivityDelegate.onApplicationStopped()
+        eu.kanade.tachiyomi.data.community.CommunityManager.lifecycle(this, false)
     }
 
     override fun getPackageName(): String {

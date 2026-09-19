@@ -73,7 +73,7 @@ class EpisodeRepositoryImpl(
                     dateUpload = episodeUpdate.dateUpload,
                     episodeId = episodeUpdate.id,
                     version = episodeUpdate.version,
-                    isSyncing = 0,
+                    isSyncing = if (episodeUpdate.localOnly) 1 else 0,
                     summary = episodeUpdate.summary,
                     previewUrl = episodeUpdate.previewUrl,
                     fillermark = episodeUpdate.fillermark,

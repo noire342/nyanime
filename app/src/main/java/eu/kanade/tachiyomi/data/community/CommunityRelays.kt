@@ -1,0 +1,354 @@
+package eu.kanade.tachiyomi.data.community
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import java.net.URI
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.random.Random
+
+/** Bounded actor; an overloaded socket reconnects and recovers stored events, rather than losing them. */
+internal class CommunityRelays(
+    private val identity: CommunityIdentity,
+    private val relays: List<String>,
+    private val filters: () -> List<JsonObject>,
+    private val received: suspend (NostrEvent) -> Unit,
+    private val accepted: suspend (String, String) -> Unit,
+    private val status: (Int, String?) -> Unit,
+    private val client: OkHttpClient = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(0, TimeUnit.SECONDS).pingInterval(25, TimeUnit.SECONDS).build(),
+) : AutoCloseable {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val queue = Channel<suspend () -> Unit>(256)
+    private val sockets = ConcurrentHashMap<String, WebSocket>()
+    private val recovering = AtomicBoolean(false)
+    private val authentication = mutableMapOf<String, String>()
+    private data class Page(
+        var until: Long? = null,
+        var oldest: Long = Long.MAX_VALUE,
+        val ids: MutableSet<String> = mutableSetOf(),
+        var limit: Int = 500,
+        var subscription: String = "",
+    )
+    private val pages = mutableMapOf<Pair<String, String>, Page>()
+    private var pageSequence = 0L
+    private val ready = mutableSetOf<String>()
+    private val retries = mutableMapOf<String, Int>()
+    private val destinations = relays.toMutableSet()
+    private val inboxes = mutableMapOf<String, List<String>>()
+    private val queries = linkedMapOf<String, JsonObject>()
+
+    @Volatile private var closed = false
+
+    init {
+        require(relays.size in 1..5 && relays.all(::validRelay))
+        scope.launch {
+            for (action in queue) {
+                if (!closed) {
+                    runCatching {
+                        action()
+                    }.onFailure { status(ready.size, "Risposta del relay non valida") }
+                }
+            }
+        }
+        enqueue { relays.forEach(::connect) }
+    }
+    private fun enqueue(action: suspend () -> Unit) {
+        if (!closed && queue.trySend(action).isFailure && recovering.compareAndSet(false, true)) {
+            // Recover via stored-event subscriptions; do not keep growing memory under untrusted traffic.
+            scope.launch {
+                queue.send {
+                    sockets.values.forEach { it.cancel() }
+                    sockets.clear()
+                    ready.clear()
+                    pages.clear()
+                    recovering.set(false)
+                    destinations.forEach(::connect)
+                }
+            }
+        }
+    }
+    private fun connect(url: String) {
+        if (closed || sockets.containsKey(url)) return
+        val socket = client.newWebSocket(
+            Request.Builder().url(url).build(),
+            object : WebSocketListener() {
+                override fun onOpen(webSocket: WebSocket, response: Response) = enqueue {
+                    if (sockets[url] ===
+                        webSocket
+                    ) {
+                        subscribe(webSocket)
+                        archive(url, webSocket, "private")
+                        archive(url, webSocket, "sync")
+                    }
+                }
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    if (text.length > 250_000) return
+                    enqueue { if (sockets[url] === webSocket) receive(url, webSocket, text) }
+                }
+                override fun onFailure(
+                    webSocket: WebSocket,
+                    t: Throwable,
+                    response: Response?,
+                ) = enqueue {
+                    if (sockets[url] ===
+                        webSocket
+                    ) {
+                        lost(url)
+                    }
+                }
+                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                    webSocket.close(code, null)
+                    enqueue { if (sockets[url] === webSocket) lost(url) }
+                }
+            },
+        )
+        sockets[url] = socket
+        scope.launch {
+            delay(15_000)
+            enqueue { if (sockets[url] === socket && url !in ready) lost(url) }
+        }
+    }
+    private fun subscribe(socket: WebSocket) {
+        filters().forEachIndexed { index, filter ->
+            socket.send(JsonArray(listOf(JsonPrimitive("REQ"), JsonPrimitive("live-$index"), filter)).toString())
+        }
+        queries.forEach { (key, filter) ->
+            socket.send(JsonArray(listOf(JsonPrimitive("REQ"), JsonPrimitive(key), filter)).toString())
+        }
+    }
+    private fun archive(url: String, socket: WebSocket, channel: String) {
+        val page = pages.getOrPut(url to channel) { Page() }
+        if (page.subscription.isNotEmpty()) {
+            socket.send(
+                JsonArray(listOf(JsonPrimitive("CLOSE"), JsonPrimitive(page.subscription))).toString(),
+            )
+        }
+        page.subscription = "archive-$channel-${++pageSequence}"
+        page.ids.clear()
+        page.oldest = Long.MAX_VALUE
+        val filter = buildJsonObject {
+            put("kinds", JsonArray(listOf(JsonPrimitive(if (channel == "private") 1059 else 30078))))
+            put(if (channel == "private") "#p" else "authors", JsonArray(listOf(JsonPrimitive(identity.publicKey))))
+            put("limit", page.limit)
+            page.until?.let { put("until", it) }
+        }
+        socket.send(JsonArray(listOf(JsonPrimitive("REQ"), JsonPrimitive(page.subscription), filter)).toString())
+    }
+    private suspend fun receive(url: String, socket: WebSocket, text: String) {
+        val message = communityJson.parseToJsonElement(text) as? JsonArray ?: return
+        when (message.firstOrNull()?.jsonPrimitive?.content) {
+            "AUTH" -> {
+                val challenge = message.getOrNull(1)?.jsonPrimitive?.content ?: return
+                if (challenge.length > 1024) return
+                val auth = NostrEvent.create(
+                    identity,
+                    22242,
+                    "",
+                    listOf(listOf("relay", url), listOf("challenge", challenge)),
+                )
+                socket.send("[\"AUTH\"," + communityJson.encodeToString(auth) + "]")
+                authentication[url] = auth.id
+            }
+            "EOSE" -> {
+                val subscription = message.getOrNull(1)?.jsonPrimitive?.content.orEmpty()
+                if (subscription.startsWith("profile-") || subscription in listOf("search", "older", "sync-recovery")) {
+                    socket.send(JsonArray(listOf(JsonPrimitive("CLOSE"), JsonPrimitive(subscription))).toString())
+                }
+                if (subscription.startsWith("live-")) {
+                    ready.add(url)
+                    retries[url] = 0
+                    status(ready.size, null)
+                }
+                if (subscription.startsWith("archive-")) {
+                    val channel = subscription.removePrefix("archive-").substringBefore('-')
+                    val page = pages[url to channel] ?: return
+                    if (page.subscription != subscription) return
+                    if (page.ids.isNotEmpty()) {
+                        if (page.oldest == page.until) {
+                            if (page.ids.size >= page.limit && page.limit < 4000) {
+                                page.limit *= 2
+                            } else {
+                                if (channel == "private" && page.ids.size >= 20) {
+                                    status(
+                                        ready.size,
+                                        "Il relay limita un intervallo dell’archivio. Aggiungi un altro relay per completare il recupero.",
+                                    )
+                                }
+                                page.until = page.oldest - 1
+                            }
+                        } else {
+                            page.until = page.oldest
+                        }
+                        if (requireNotNull(page.until) < 0) {
+                            socket.send("[\"CLOSE\",\"$subscription\"]")
+                            return
+                        }
+                        page.ids.clear()
+                        page.oldest = Long.MAX_VALUE
+                        archive(url, socket, channel)
+                    } else {
+                        socket.send("[\"CLOSE\",\"$subscription\"]")
+                    }
+                }
+            }
+            "EVENT" -> if (message.size == 3) {
+                val event = communityJson.decodeFromString<NostrEvent>(message[2].toString())
+                if (event.valid()) {
+                    val subscription = message[1].jsonPrimitive.content
+                    if (subscription.startsWith("archive-")) {
+                        val channel = subscription.removePrefix("archive-").substringBefore('-')
+                        val page = pages[url to channel] ?: return
+                        if (page.subscription != subscription) return
+                        page.ids.add(event.id)
+                        page.oldest = minOf(page.oldest, event.created_at)
+                    }
+                    received(event)
+                }
+            }
+            "OK" -> {
+                val id = message.getOrNull(1)?.jsonPrimitive?.content ?: return
+                if (message.getOrNull(2)?.jsonPrimitive?.booleanOrNull == true) {
+                    if (authentication[url] ==
+                        id
+                    ) {
+                        authentication.remove(url)
+                        subscribe(socket)
+                        archive(url, socket, "private")
+                        archive(url, socket, "sync")
+                    } else {
+                        accepted(id, url)
+                    }
+                } else {
+                    status(ready.size, "Un relay ha rifiutato l’invio. Il contenuto resta in attesa.")
+                }
+            }
+            "CLOSED" -> {
+                status(ready.size, "Il relay ha chiuso la sottoscrizione")
+                // A private inbox relay may reject public discovery. Other subscriptions remain usable.
+            }
+        }
+    }
+    private fun lost(url: String) {
+        sockets.remove(url)?.cancel()
+        ready.remove(url)
+        status(ready.size, null)
+        pages.keys.removeAll { it.first == url }
+        val attempt = (retries[url] ?: 0).coerceAtMost(5)
+        retries[url] = attempt + 1
+        scope.launch {
+            delay(minOf(30_000L, 1000L shl attempt) + Random.nextLong(500))
+            enqueue { connect(url) }
+        }
+    }
+    fun send(events: List<NostrEvent>) = enqueue {
+        events.forEach { event ->
+            val payload = "[\"EVENT\"," + communityJson.encodeToString(event) + "]"
+            val recipient = event.takeIf { it.kind == 1059 }?.tag("p")
+            val targets = if (recipient != null &&
+                recipient != identity.publicKey
+            ) {
+                inboxes[recipient].orEmpty().ifEmpty { relays }
+            } else {
+                relays
+            }
+            targets.filter { it in ready }.forEach { url -> if (sockets[url]?.send(payload) != true) lost(url) }
+        }
+    }
+    fun addDestinations(values: List<String>, peer: String = "") = enqueue {
+        val valid = values.filter(::validRelay).distinct().take(5)
+        if (validKey(peer) && valid.isNotEmpty()) inboxes[peer] = valid
+        valid.forEach { url ->
+            if (destinations.size < 64 || url in destinations) {
+                destinations.add(url)
+                connect(url)
+            } else {
+                status(ready.size, "Troppi relay diversi: aggiungi tra i tuoi relay quello del destinatario.")
+            }
+        }
+    }
+    fun query(key: String) = enqueue {
+        require(validKey(key))
+        val filter = buildJsonObject {
+            put("authors", JsonArray(listOf(JsonPrimitive(key))))
+            put("kinds", JsonArray(listOf(0, 30078, 10002, 10050).map(::JsonPrimitive)))
+            put("limit", 300)
+        }
+        val subscription = "profile-$key"
+        queries[subscription] = filter
+        while (queries.size > 128) queries.remove(queries.keys.first())
+        sockets.values.forEach {
+            it.send(JsonArray(listOf(JsonPrimitive("REQ"), JsonPrimitive(subscription), filter)).toString())
+        }
+    }
+    fun search(name: String) = enqueue {
+        val filter =
+            buildJsonObject {
+                put("kinds", JsonArray(listOf(JsonPrimitive(0))))
+                put("search", name.take(60))
+                put("limit", 30)
+            }
+        sockets.values.forEach {
+            it.send(JsonArray(listOf(JsonPrimitive("REQ"), JsonPrimitive("search"), filter)).toString())
+        }
+    }
+    fun recover(addresses: List<String>) = enqueue {
+        if (addresses.isEmpty()) return@enqueue
+        val filter = buildJsonObject {
+            put("authors", JsonArray(listOf(JsonPrimitive(identity.publicKey))))
+            put("kinds", JsonArray(listOf(JsonPrimitive(30078))))
+            put("#d", JsonArray(addresses.take(40).map(::JsonPrimitive)))
+            put("limit", 40)
+        }
+        queries["sync-recovery"] = filter
+        sockets.values.forEach {
+            it.send(JsonArray(listOf(JsonPrimitive("REQ"), JsonPrimitive("sync-recovery"), filter)).toString())
+        }
+    }
+    fun older(until: Long) = enqueue {
+        val history = filters().map { JsonObject(it + ("until" to JsonPrimitive(until))) }
+        sockets.values.forEach {
+            it.send(JsonArray(listOf(JsonPrimitive("REQ"), JsonPrimitive("older")) + history).toString())
+        }
+    }
+    override fun close() {
+        closed = true
+        sockets.values.forEach { it.cancel() }
+        sockets.clear()
+        client.dispatcher.cancelAll()
+        client.connectionPool.evictAll()
+        queue.close()
+        scope.cancel()
+    }
+    companion object {
+        val defaults = listOf("wss://relay.damus.io", "wss://nos.lol")
+        fun validRelay(value: String): Boolean = runCatching {
+            val uri = URI(value)
+            uri.scheme == "wss" &&
+                uri.host != null &&
+                uri.rawUserInfo == null &&
+                uri.rawFragment == null &&
+                (uri.port == -1 || uri.port in 1..65535) &&
+                value.length <= 256
+        }.getOrDefault(false)
+    }
+}

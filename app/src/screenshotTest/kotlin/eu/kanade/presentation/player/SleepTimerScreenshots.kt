@@ -98,7 +98,6 @@ fun SleepTimerControlsScreenshot() {
                 onSubtitlesClick = {}, onSubtitlesLongClick = {}, onAudioClick = {}, onAudioLongClick = {},
                 onQualityClick = {}, isEpisodeOnline = true,
                 isAnime4KSmartEnabled = true, anime4KSmartLabel = "SM", onToggleAnime4KSmart = {},
-                isAnime4KMaximumEnabled = false, onToggleAnime4KMaximum = {},
                 sleepTimerRemaining = 1742, onSleepTimerClick = {}, onMoreClick = {}, onMoreLongClick = {},
             )
         }

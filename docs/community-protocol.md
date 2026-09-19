@@ -1,0 +1,159 @@
+# Community e sincronizzazione personale
+
+La community è facoltativa. Si apre dall’avatar nella Home o da **Altro → Community**.
+L’app continua a funzionare senza un profilo; l’identità sociale non sostituisce
+le chiavi temporanee delle stanze Guarda insieme.
+
+## Profili e contenuti pubblici
+
+Il profilo comprende nome, biografia, avatar, copertina, accento e tre preferiti
+ordinabili. Le liste pubbliche distinguono video e manga e cinque stati.
+La libreria privata non viene pubblicata automaticamente: l’editor consente di
+scegliere i titoli e mostra un’anteprima prima della pubblicazione.
+
+Feed Amici ed Esplora sono separati. Post, consigli, immagini, risposte, reazioni
+e sticker originali sono pubblici; gli spoiler richiedono un’apertura esplicita.
+La bacheca è inizialmente riservata agli amici. Il proprietario può aprirla,
+chiuderla, fissare o nascondere messaggi e bloccare profili. L’ammissione dei
+messaggi in bacheca è firmata dal proprietario, non dichiarata dal visitatore.
+
+Le amicizie richiedono richiesta e accettazione: due richieste incrociate o un
+follow Nostr non bastano. Codice e QR identificano una chiave precisa. La ricerca
+per nome usa cache e relay compatibili e non costituisce un elenco completo
+della rete. L’elenco amici è privato.
+
+Chat e gruppi usano cifratura per destinatario. I gruppi ammettono fino a dieci
+persone, con invito esplicito, proprietario, nome, immagine, gestione membri,
+uscita e silenziamento. Ogni messaggio di gruppo indica la revisione e l’hash
+dell’elenco membri firmato dal proprietario. La cronologia precedente non viene
+reinviata ai nuovi membri. Gli inviti alle stanze scadono.
+
+La presenza è disattivata inizialmente. Può essere condivisa con gli amici o
+pubblicamente e scade dopo 90 secondi. La cronologia dettagliata rimane privata.
+
+## Identità e dispositivi
+
+La chiave secp256k1 è generata sul dispositivo e conservata cifrata tramite
+Android Keystore. Non servono email o password di accesso. Il codice pubblico
+`NYU1` contiene solamente la chiave pubblica e un checksum.
+
+Il nuovo dispositivo genera un codice temporaneo `NYD1` con chiave effimera,
+nonce, relay e scadenza di tre minuti. Entrambi i dispositivi devono confermare
+lo stesso codice di verifica; soltanto allora la chiave permanente viene
+trasferita in un involucro cifrato monouso. Non occorre collegare entrambi i
+telefoni via USB: il collegamento usa Internet.
+
+Il file di recupero `NYR1` è protetto da password con PBKDF2-HMAC-SHA256
+(600.000 iterazioni, sale casuale) e AES-GCM. File e password vanno conservati.
+Una chiave già copiata su un altro dispositivo non può essere revocata
+crittograficamente con un semplice comando di disconnessione.
+
+## Eventi e versionamento
+
+| Tipo | Scopo |
+| --- | --- |
+| 0 | Nome, bio e immagini del profilo secondo i metadati Nostr |
+| 1 / 7 | Post pubblici, risposte e reazioni |
+| 10002 / 10050 | Relay del profilo e casella privata |
+| 30315, `d=general` | Presenza pubblica con scadenza |
+| 30078, `nyanime.profile.v1` | Vetrina, liste e impostazioni pubbliche della bacheca |
+| 30078, `nyanime.wall.admit.v1:…` | Ammissione di un intervento da parte del proprietario |
+| 30078, `nyanime.pinned.v1` / `nyanime.hidden.v1` | Moderazione firmata della bacheca |
+| 1059 → 13 → 14 | Involucro NIP-59, sigillo e messaggio privato NIP-17 |
+| 1059 → 13 → 30079 | Comandi applicativi privati versionati |
+| 30078, `nyanime.sync.v1:…` | Record personale cifrato con NIP-44 |
+| 30078, `nyanime.sync.index.v1:…` / `nyanime.sync.checkpoint.v1:…` | Indice di recupero cifrato |
+
+I comandi applicativi comprendono `friend.*`, `group.*`, `preference`,
+`presence`, `watch.invite`, `pair.*` e `device.*`. Non sono comandi di
+controllo delle stanze. I gruppi sono un protocollo Nyanime su NIP-59, non gruppi
+pubblici NIP-29.
+
+Gli eventi ricevuti sono limitati in dimensione e verificati per ID, firma,
+autore e destinatario prima di essere applicati. Invii persistenti, ricevute dei
+relay, deduplicazione e riconnessione sono separati dalla UI. Una ricevuta indica
+accettazione da parte del relay, non lettura del messaggio da parte dell’amico.
+La coda ritenta anche gli invii successivi quando un relay non conferma i primi.
+
+## Sincronizzazione privata
+
+Le transazioni ordinarie delle librerie alimentano un registro SQLite nello
+stesso commit locale. Il player continua a salvare nel database esistente:
+crittografia, rete e recupero lavorano su coroutine I/O indipendenti.
+
+I riferimenti comprendono tipo di contenuto, ID stabile della fonte, URL del
+titolo e URL dell’episodio/capitolo, solamente nel testo cifrato. Gli ID numerici
+del database non viaggiano tra dispositivi. Gli indirizzi pubblici dei record
+usano HMAC con una chiave privata, non hash indovinabili dei titoli o degli URL.
+
+Progressi, completamento, segnalibri, cronologia e appartenenza alla libreria
+hanno revisioni indipendenti. Riavvolgere è una modifica valida; il secondo più
+alto raggiunto non prevale automaticamente. Revisioni ibride e ID del dispositivo
+ordinano i conflitti; i marcatori di rimozione impediscono il ritorno di vecchie
+categorie eliminate. Le categorie hanno identità indipendenti dagli ID SQLite.
+
+L’indice di recupero contiene pagine cifrate indirizzate per contenuto, con un
+massimo di 200 riferimenti per nodo. Consente richieste mirate dei record anche
+quando un relay tronca una pagina generica di cronologia. Il recupero incompleto
+rimane visibile; i relay restano servizi esterni con proprie politiche di
+conservazione e disponibilità.
+
+Una fonte mancante o una corrispondenza ambigua rimane in attesa. Dalle
+impostazioni Community si sceglie esplicitamente il titolo e, quando necessario,
+l’episodio o capitolo nella libreria locale. La corrispondenza non viene dedotta
+dal primo risultato di ricerca.
+
+Sono esclusi download, file Ultra, credenziali delle estensioni, cookie, URL di
+streaming e impostazioni hardware. Incognito non produce progresso sincronizzato
+o presenza. I ripristini manuali dei backup vengono raccolti in blocco senza
+generare post o pubblicazioni della libreria.
+
+## Trasferimento della visione
+
+Un video deve essere pronto prima di iniziare il trasferimento. B propone il
+passaggio, A risponde senza fermarsi, B conferma; A mette in pausa e conferma
+il punto aggiornato, poi B riprende. Comandi e presenze dei dispositivi scadono;
+le conferme duplicate non producono altre pause.
+
+Gli aggiornamenti ordinari del database non invocano il player. Cast, stanze,
+incognito, caricamento e player in chiusura escludono l’adattatore. Se il
+trasferimento scade, B indica che sta usando il progresso locale disponibile.
+Una risposta tardiva non deve riattivare il player dopo l’uscita.
+
+L’app si connette quando è aperta. La connessione continua in background è
+facoltativa e usa una notifica Android; non è necessaria per usare l’app.
+
+## Immagini e limiti di privacy
+
+Le immagini scelte vengono ridimensionate e ricodificate in JPEG, senza metadati
+fotografici, poi inviate a un host Blossom con autorizzazione firmata. Vengono
+verificati descrittore e hash dei byte scaricati. I fallimenti conservano la
+bozza e l’editor permette di scegliere un altro host. Le copertine delle fonti
+vengono preparate tramite il caricatore dell’app prima della pubblicazione:
+URL e credenziali della fonte non entrano nelle schede pubbliche.
+
+Un’immagine su Blossom è un file accessibile a chi ne conosce l’indirizzo;
+la cifratura delle chat non rende privati i byte di un’immagine pubblicata.
+Nascondere un contenuto nell’app non garantisce la cancellazione delle copie
+conservate da altri relay o utenti.
+
+## Verifiche
+
+- Test crittografici con vettori NIP-44 indipendenti, autenticazione degli
+  involucri, destinatario errato e payload alterati.
+- Convergenza di amicizie, revisioni, riavvolgimenti, segnalibri e rimozioni.
+- Elenchi membri esatti e recupero di un indice con oltre 40.000 record.
+- Relay TLS locale con autenticazione, ricevute, richieste simultanee,
+  eventi alterati e recupero paginato.
+- Trigger SQLite reali per video e manga: rollback, cronologia, categorie,
+  importazioni e assenza di repliche delle scritture remote.
+- Test dell’adattatore di trasferimento e anteprime grafiche senza emulatori.
+
+Le prove Android su due dispositivi e le misure dei target di 2 secondi per gli
+aggiornamenti finali e 5 secondi per il progresso continuo devono essere
+registrate separatamente: i test sul PC non dimostrano questi tempi reali.
+
+Riferimenti: [NIP-17](https://github.com/nostr-protocol/nips/blob/master/17.md),
+[NIP-44](https://github.com/nostr-protocol/nips/blob/master/44.md),
+[NIP-59](https://github.com/nostr-protocol/nips/blob/master/59.md),
+[Blossom](https://github.com/hzrd149/blossom).

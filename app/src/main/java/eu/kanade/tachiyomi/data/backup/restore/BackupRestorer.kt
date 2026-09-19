@@ -64,7 +64,12 @@ class BackupRestorer(
     suspend fun restore(uri: Uri, options: RestoreOptions) {
         val startTime = System.currentTimeMillis()
 
-        restoreFromFile(uri, options)
+        val community = eu.kanade.tachiyomi.data.community.CommunityManager.existing()
+        if (community != null && !isSync) {
+            community.withLibraryImport { restoreFromFile(uri, options) }
+        } else {
+            restoreFromFile(uri, options)
+        }
 
         val time = System.currentTimeMillis() - startTime
 

@@ -88,6 +88,7 @@ fun DiscoveryHomeHeader(
                 }
                 NyanimeWordmark(Modifier.weight(1f).padding(start = 4.dp))
                 eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
+                eu.kanade.tachiyomi.ui.community.CommunityAvatarButton()
                 if (onSearch != null) {
                     IconButton(onClick = onSearch) {
                         Icon(
