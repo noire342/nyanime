@@ -14,8 +14,9 @@ remain independent selections. Official Anime4K 4.0.1 shaders and weights are
 unchanged.
 
 The quick **SM** control remains; the separate 4K quick button is removed.
-[Ultra downloads](anime4k-ultra.md) contain the processed image and temporarily
+Previously created [Ultra downloads](anime4k-ultra.md) remain playable and temporarily
 suppress all live Anime4K modes without changing stored episode preferences.
+New background Ultra conversions are no longer available.
 
 ## Boundaries
 
