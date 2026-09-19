@@ -120,13 +120,19 @@ object SettingsDownloadScreen : SearchableSettings {
                         title = "Elabora solo sotto carica",
                         subtitle = "Si applica alle nuove elaborazioni",
                     ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = downloadPreferences.ultraOnlyWhileScreenOff(),
+                        title = "Elabora solo a schermo spento",
+                        subtitle = "Consigliato: lascia il telefono libero mentre lo usi. " +
+                            "I segmenti completati vengono conservati.",
+                    ),
                     Preference.PreferenceItem.TextPreference(
                         title = "Elaborazioni Ultra",
-                        subtitle = "Avanzamento, annullamento e nuovi tentativi",
+                        subtitle = "Video pronti, avanzamento, pause e ripresa",
                         onClick = { showUltraQueue = true },
                     ),
                     Preference.PreferenceItem.InfoPreference(
-                        "Usa Anime4K A+ HQ sul file, fino a 4× e al limite 4K, mantenendo le proporzioni. Richiede un dispositivo compatibile, tempo e spazio aggiuntivo: l'originale resta disponibile. Non modifica streaming, manga o download esterni.",
+                        "Qualità Anime4K A+ HQ, fino a 4× e al limite 4K. Carico GPU dosato e pause automatiche per il calore: può richiedere molto tempo. Trovi avanzamento e video nella scheda del titolo e in Download → Ultra. L'originale resta disponibile.",
                     ),
                 ),
             ),

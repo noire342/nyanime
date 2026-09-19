@@ -4,53 +4,54 @@ import android.content.Context
 import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Build
-import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.util.UnstableApi
-import androidx.work.BackoffPolicy
-import androidx.work.Constraints
 import androidx.work.CoroutineWorker
-import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.hippo.unifile.UniFile
+import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import tachiyomi.domain.download.service.DownloadPreferences
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
-import java.security.MessageDigest
-import java.util.concurrent.TimeUnit
 
-/** Independent from playback and normal downloads; failures leave the original available. */
+/** Isolated from the player. Only a verified completed copy can replace the original at playback. */
 @UnstableApi
 class UltraDownloadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     private val title = inputData.getString(TITLE).orEmpty()
+    private val folderUri = inputData.getString(FOLDER).orEmpty()
+    private val key = UltraTask.key(folderUri)
+    private val store = UltraTaskStore.get(context)
     private var stage = "Preparazione Ultra"
     private var percent = 0
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
-        val notification = NotificationCompat.Builder(applicationContext, Notifications.CHANNEL_DOWNLOADER_PROGRESS)
+        val builder = NotificationCompat.Builder(applicationContext, Notifications.CHANNEL_DOWNLOADER_PROGRESS)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("Anime4K Ultra · $title")
+            .setContentTitle("Ultra · $title")
             .setContentText(stage)
             .setProgress(100, percent, percent == 0)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .addAction(0, "Annulla", WorkManager.getInstance(applicationContext).createCancelPendingIntent(id))
-            .build()
+        val animeId = store.tasks.value[key]?.animeId ?: -1
+        if (animeId > 0) {
+            builder.setContentIntent(NotificationReceiver.openAnimeEntryPendingActivity(applicationContext, animeId))
+        }
         return ForegroundInfo(
             NOTIFICATION_ID,
-            notification,
+            builder.build(),
             if (Build.VERSION.SDK_INT >= 35) {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING
             } else {
@@ -59,89 +60,199 @@ class UltraDownloadWorker(context: Context, params: WorkerParameters) : Coroutin
         )
     }
 
-    override suspend fun doWork(): Result {
-        // Unique jobs allow cancelling one conversion without cancelling the rest of the queue.
-        if (UltraPlaybackGuard.playerActive || !gpu.tryLock()) return Result.retry()
-        val scratch = File(applicationContext.cacheDir, "ultra/$id")
+    override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        store.load()
+        store.change(key) {
+            when {
+                it == null -> UltraTask(folderUri, title, phase = UltraPhase.QUEUED, workId = id.toString())
+                it.workId.isEmpty() && it.phase == UltraPhase.AVAILABLE -> it.copy(
+                    phase = UltraPhase.QUEUED,
+                    workId = id.toString(),
+                )
+                else -> it
+            }
+        }
+        val task = store.tasks.value.getValue(key)
+        if (!task.active || task.workId != id.toString()) return@withContext Result.success()
+        percent = task.progress
+        val control = UltraProcessingControl(
+            applicationContext,
+            Injekt.get<DownloadPreferences>(),
+            cooling = task.coolingRequired,
+        )
+        val waiting = control.sample()
+        if (waiting != null || task.coolingUntil > System.currentTimeMillis()) {
+            waitFor(waiting ?: UltraProcessingPolicy.COOLING)
+            return@withContext Result.retry()
+        }
+        store.updateWorker(key, id.toString()) { it.copy(coolingRequired = false, coolingUntil = 0) }
+        if (!gpu.tryLock()) {
+            waitFor("In coda · un altro episodio è in elaborazione")
+            return@withContext Result.retry()
+        }
+        activeKey = key
+        if (store.tasks.value[key]?.let { it.active && it.workId == id.toString() } != true) {
+            activeKey = null
+            gpu.unlock()
+            return@withContext Result.success()
+        }
+        val scratch = UltraDownloads.scratch(applicationContext, key)
+        val video = File(scratch, "video.mp4")
+        var segments: UltraSegments? = null
         var folder: UniFile? = null
         var published = false
+        var preserveCheckpoint = false
+        var originalDuration = 0L
         try {
-            folder = UniFile.fromUri(applicationContext, Uri.parse(requireNotNull(inputData.getString(FOLDER))))
+            folder = UniFile.fromUri(applicationContext, Uri.parse(folderUri))
             require(folder?.exists() == true) { "Il download originale non è più disponibile" }
-            if (UltraFiles.completed(applicationContext, folder) != null) return Result.success(output("Completato"))
-            val original = requireNotNull(UltraFiles.original(folder)) { "Il download originale non è più disponibile" }
-            setForeground(getForegroundInfo())
-            withContext(Dispatchers.IO) {
-                scratch.parentFile?.listFiles()?.forEach { it.deleteRecursively() }
-                check(scratch.mkdirs()) { "Impossibile preparare lo spazio Ultra" }
+            if (UltraFiles.completed(applicationContext, folder) != null) {
+                update("Ultra pronto · riproducibile dalla scheda del titolo", 100, UltraPhase.READY)
+                published = true
+                return@withContext Result.success()
             }
-            val video = File(scratch, "video.mp4")
-            val muxed = File(scratch, "complete.mkv")
-            val originalMedia = withContext(Dispatchers.IO) { UltraExporter.inspect(applicationContext, original.uri) }
+            val original = requireNotNull(UltraFiles.original(folder)) { "Il download originale non è più disponibile" }
+            stage = "Preparazione a basso consumo"
+            setForeground(getForegroundInfo())
+            File(applicationContext.cacheDir, "ultra").deleteRecursively()
+            check(scratch.isDirectory || scratch.mkdirs()) { "Impossibile preparare lo spazio Ultra" }
+            val originalMedia = UltraExporter.inspect(applicationContext, original.uri)
+            originalDuration = originalMedia.durationMs
+            val identity = "${original.uri}|${original.length()}|${original.lastModified()}|" +
+                "$originalMedia|A+HQ-segments-v1"
+            val identityFile = File(scratch, "input.txt")
+            if (!identityFile.exists() || identityFile.readText() != identity) {
+                scratch.listFiles().orEmpty().forEach { it.delete() }
+                video.delete()
+                identityFile.writeText(identity)
+                percent = 0
+            }
+            video.delete()
             val (w, h) = UltraShaderGraph.target(originalMedia.width, originalMedia.height)
             val estimatedBytes = originalMedia.durationMs * (w.toLong() * h * 6).coerceIn(8_000_000, 60_000_000) / 8000
             require(scratch.usableSpace > estimatedBytes * 2 + 256L * 1024 * 1024) {
                 "Spazio insufficiente per preparare Ultra; l'originale è conservato"
             }
-            val media = UltraExporter.export(applicationContext, original.uri, video) { value ->
-                if (UltraPlaybackGuard.playerActive) throw UltraPlaybackGuard.YieldToPlayer()
-                val power = applicationContext.getSystemService(PowerManager::class.java)
-                check(Build.VERSION.SDK_INT < 29 || power.currentThermalStatus < PowerManager.THERMAL_STATUS_SEVERE) {
-                    "Elaborazione interrotta per temperatura elevata. Lascia raffreddare il telefono e riprova."
+            val planFile = File(scratch, "timeline.json")
+            val plan = runCatching { Json.decodeFromString<List<Long>>(planFile.readText()) }.getOrNull()
+                ?: UltraExporter.segmentPlan(applicationContext, original.uri, originalDuration).also {
+                    planFile.writeText(Json.encodeToString(it))
                 }
-                update("Elaborazione Anime4K · $value%", value * 9 / 10)
-            }
-            update("Conservazione di audio e sottotitoli", 92)
-            UltraMuxer.remux(applicationContext, video, original.uri, muxed)
-            withContext(Dispatchers.IO) {
-                val verified = UltraExporter.inspect(applicationContext, Uri.fromFile(muxed))
-                check(
-                    verified.width == media.width &&
-                        verified.height == media.height &&
-                        kotlin.math.abs(verified.durationMs - originalMedia.durationMs) <=
-                        (originalMedia.durationMs / 100).coerceIn(100L, 1500L),
-                ) {
-                    "Verifica del file Ultra fallita"
-                }
-                currentCoroutineContext().ensureActive()
-                update("Salvataggio del video Ultra", 97)
-                folder.findFile(UltraFiles.MARKER)?.delete()
-                folder.findFile(UltraFiles.PART)?.delete()
-                val temporary = checkNotNull(folder.createFile(UltraFiles.PART))
-                applicationContext.contentResolver.openOutputStream(temporary.uri, "wt")!!.use { destination ->
-                    muxed.inputStream().use { source ->
-                        val buffer = ByteArray(256 * 1024)
-                        while (true) {
-                            currentCoroutineContext().ensureActive()
-                            val read = source.read(buffer)
-                            if (read == -1) break
-                            destination.write(buffer, 0, read)
-                        }
+            val clips = UltraSegments(scratch, plan).also { segments = it }
+            val completed = clips.completed()
+            percent = (plan[completed] * 90 / plan.last()).toInt()
+            update(if (completed > 0) "Ripresa dei segmenti salvati" else "Preparazione a basso consumo", percent)
+            val started = android.os.SystemClock.elapsedRealtime()
+            for (index in completed until clips.count) {
+                control.sample()?.let { throw Deferred(it) }
+                val start = plan[index]
+                val end = plan[index + 1]
+                UltraExporter.export(applicationContext, original.uri, video, start, end, control) { value ->
+                    currentCoroutineContext().ensureActive()
+                    control.sample()?.let { throw Deferred(it) }
+                    if (value >= 0) {
+                        val processed = start + (end - start) * value / 100
+                        val label = "A+ HQ · ${time(processed)} di ${time(plan.last())}"
+                        update(label, (processed * 90 / plan.last()).toInt())
                     }
                 }
-                check(temporary.length() == muxed.length()) { "Copia Ultra incompleta" }
                 currentCoroutineContext().ensureActive()
-                folder.findFile(UltraFiles.VIDEO)?.delete()
-                check(temporary.renameTo(UltraFiles.VIDEO)) { "Impossibile salvare Ultra" }
-                val ready = checkNotNull(folder.findFile(UltraFiles.VIDEO))
-                UltraFiles.markComplete(applicationContext, folder, ready, media)
-                published = true
+                clips.commit(index, video)
+                if (index < clips.count - 1 && android.os.SystemClock.elapsedRealtime() - started > 20 * 60_000) {
+                    throw Deferred("Pausa breve · ripresa automatica dai segmenti salvati")
+                }
             }
-            return Result.success(output("Completato"))
-        } catch (_: UltraPlaybackGuard.YieldToPlayer) {
-            return Result.retry()
+            val media = UltraExporter.Media(w, h, originalDuration)
+            update("Conservazione di audio e sottotitoli", 92)
+            val muxed = File(scratch, "complete.mkv")
+            UltraWorkMonitor.run(check = { control.sample()?.let { throw Deferred(it) } }) {
+                UltraMuxer.remux(applicationContext, clips.concatFile(), original.uri, muxed)
+            }
+            val verified = UltraExporter.inspect(applicationContext, Uri.fromFile(muxed))
+            check(
+                verified.width == media.width &&
+                    verified.height == media.height &&
+                    kotlin.math.abs(verified.durationMs - originalMedia.durationMs) <=
+                    (originalMedia.durationMs / 100).coerceIn(100L, 1500L),
+            ) { "Verifica del file Ultra fallita" }
+            currentCoroutineContext().ensureActive()
+            update("Salvataggio nella cartella dell'episodio", 97)
+            folder.findFile(UltraFiles.PART)?.delete()
+            val temporary = checkNotNull(folder.createFile(UltraFiles.PART))
+            applicationContext.contentResolver.openOutputStream(temporary.uri, "wt")!!.use { destination ->
+                muxed.inputStream().use { source ->
+                    val buffer = ByteArray(256 * 1024)
+                    var lastResourceCheck = 0L
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        if (now - lastResourceCheck >= 500) {
+                            control.sample()?.let { throw Deferred(it) }
+                            lastResourceCheck = now
+                        }
+                        val read = source.read(buffer)
+                        if (read == -1) break
+                        destination.write(buffer, 0, read)
+                    }
+                }
+            }
+            check(temporary.length() == muxed.length()) { "Copia Ultra incompleta" }
+            currentCoroutineContext().ensureActive()
+            folder.findFile(UltraFiles.MARKER)?.delete()
+            folder.findFile(UltraFiles.VIDEO)?.delete()
+            check(temporary.renameTo(UltraFiles.VIDEO)) { "Impossibile salvare Ultra" }
+            UltraFiles.markComplete(applicationContext, folder, checkNotNull(folder.findFile(UltraFiles.VIDEO)), media)
+            published = true
+            update("Ultra pronto · riproducibile dalla scheda del titolo", 100, UltraPhase.READY)
+            Result.success()
         } catch (cancelled: CancellationException) {
+            preserveCheckpoint = true
             throw cancelled
-        } catch (error: Throwable) {
-            if (error is VirtualMachineError || error is ThreadDeath) throw error
-            // This is a handled conversion failure, not a failed download or a broken work chain.
-            val reason = generateSequence(error) { it.cause }.last().message
-                ?.take(240) ?: "Il dispositivo non supporta questa conversione"
-            return Result.success(output("Non completato", reason))
+        } catch (error: Exception) {
+            val reason = (error as? Deferred)?.reason ?: control.sample()
+            preserveCheckpoint = true
+            if (reason != null) {
+                waitFor(reason)
+                Result.retry()
+            } else {
+                val message = generateSequence<Throwable>(error) { it.cause }.last().message?.take(240)
+                    ?: "Il dispositivo non supporta questa conversione"
+                update(message, percent, UltraPhase.FAILED)
+                Result.success(workDataOf(ERROR to message))
+            }
         } finally {
+            control.stop()
             try {
-                withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
-                    scratch.deleteRecursively()
+                withContext(NonCancellable + Dispatchers.IO) {
+                    if (published) store.recordPublished(key, id.toString())
+                    val current = store.tasks.value[key]
+                    val discarded = current == null || current.phase == UltraPhase.CANCELLED
+                    if (preserveCheckpoint && !discarded && originalDuration > 0) {
+                        video.delete()
+                        File(scratch, "complete.mkv").delete()
+                        val saved = segments?.let {
+                            (it.boundariesUs[it.completed()] * 90 / it.boundariesUs.last()).toInt()
+                        } ?: 0
+                        store.change(key) {
+                            if (it?.workId != id.toString()) {
+                                it
+                            } else {
+                                it.copy(
+                                    progress = saved,
+                                    phase = if (it.phase == UltraPhase.RUNNING) UltraPhase.WAITING else it.phase,
+                                    message = if (it.phase ==
+                                        UltraPhase.RUNNING
+                                    ) {
+                                        "In attesa · ripresa dal punto salvato"
+                                    } else {
+                                        it.message
+                                    },
+                                )
+                            }
+                        }
+                    } else if (published || discarded) {
+                        scratch.deleteRecursively()
+                    }
                     if (!published && folder?.let { UltraFiles.completed(applicationContext, it) } == null) {
                         folder?.findFile(UltraFiles.PART)?.delete()
                         folder?.findFile(UltraFiles.MARKER)?.delete()
@@ -149,25 +260,50 @@ class UltraDownloadWorker(context: Context, params: WorkerParameters) : Coroutin
                     }
                 }
             } finally {
+                activeKey = null
                 gpu.unlock()
             }
         }
     }
 
-    private suspend fun update(message: String, progress: Int) {
-        if (stage == message && percent == progress) return
+    private fun time(microseconds: Long): String =
+        "%d:%02d".format(microseconds / 60_000_000, microseconds / 1_000_000 % 60)
+
+    private suspend fun waitFor(reason: String) {
+        store.updateWorker(key, id.toString()) {
+            it.copy(
+                phase = UltraPhase.WAITING,
+                message = reason,
+                coolingRequired = it.coolingRequired || reason == UltraProcessingPolicy.COOLING,
+                coolingUntil = if (reason == UltraProcessingPolicy.COOLING &&
+                    (it.coolingUntil == 0L || it.message != UltraProcessingPolicy.COOLING)
+                ) {
+                    maxOf(it.coolingUntil, System.currentTimeMillis() + 60_000)
+                } else {
+                    it.coolingUntil
+                },
+            )
+        }
+    }
+
+    private suspend fun update(message: String, progress: Int, phase: UltraPhase = UltraPhase.RUNNING) {
+        if (stage == message &&
+            percent == progress &&
+            phase == UltraPhase.RUNNING &&
+            store.tasks.value[key]?.phase == UltraPhase.RUNNING
+        ) {
+            return
+        }
         stage = message
         percent = progress
+        store.updateWorker(key, id.toString()) {
+            it.copy(phase = phase, progress = progress, message = message, updatedAt = System.currentTimeMillis())
+        }
         setProgress(workDataOf(TITLE to title, STAGE to stage, PROGRESS to percent))
         setForeground(getForegroundInfo())
     }
 
-    private fun output(message: String, error: String = "") = workDataOf(
-        TITLE to title,
-        FOLDER to inputData.getString(FOLDER),
-        STAGE to message,
-        ERROR to error,
-    )
+    private class Deferred(val reason: String) : Exception(reason)
 
     companion object {
         const val TAG = "Anime4KUltra"
@@ -177,24 +313,11 @@ class UltraDownloadWorker(context: Context, params: WorkerParameters) : Coroutin
         const val PROGRESS = "progress"
         const val ERROR = "error"
         private const val NOTIFICATION_ID = -230
-        private val gpu = Mutex()
+        internal val gpu = Mutex()
 
-        fun enqueue(context: Context, folder: Uri, title: String) {
-            val preferences = Injekt.get<DownloadPreferences>()
-            val key = MessageDigest.getInstance("SHA-256").digest(folder.toString().toByteArray())
-                .joinToString("") { "%02x".format(it) }
-            val work = OneTimeWorkRequestBuilder<UltraDownloadWorker>()
-                .addTag(TAG)
-                .addTag("ultra-title:$title")
-                .addTag("ultra-folder:$folder")
-                .setInputData(workDataOf(FOLDER to folder.toString(), TITLE to title))
-                .setConstraints(
-                    Constraints.Builder().setRequiresCharging(preferences.ultraOnlyWhileCharging().get())
-                        .setRequiresBatteryNotLow(true).setRequiresStorageNotLow(true).build(),
-                )
-                .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.SECONDS)
-                .build()
-            WorkManager.getInstance(context).enqueueUniqueWork("$TAG:$key", ExistingWorkPolicy.KEEP, work)
-        }
+        @Volatile internal var activeKey: String? = null
+
+        suspend fun enqueue(context: Context, folder: Uri, title: String, animeId: Long = -1, episodeId: Long = -1) =
+            UltraDownloads.enqueue(context, UltraTask(folder.toString(), title, animeId, episodeId))
     }
 }

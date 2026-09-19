@@ -13,16 +13,19 @@ import androidx.media3.effect.GlShaderProgram
 
 /** Executes the original Maximum/A+ HQ shader graph using signed half-float intermediate textures. */
 @UnstableApi
-internal class UltraGlEffect : GlEffect {
+internal class UltraGlEffect(private val control: UltraProcessingControl) : GlEffect {
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram {
         if (useHdr) throw VideoFrameProcessingException("Ultra richiede un video SDR; l'originale è stato conservato")
         val shaders = UltraShaderGraph.assets.map {
             context.assets.open("anime4k/$it").bufferedReader().use { it.readText() }
         }
-        return Program(shaders)
+        return Program(shaders, control)
     }
 
-    private class Program(private val shaders: List<String>) : BaseGlShaderProgram(false, 1) {
+    private class Program(
+        private val shaders: List<String>,
+        private val control: UltraProcessingControl,
+    ) : BaseGlShaderProgram(false, 1) {
         private data class Texture(val id: Int, val fbo: Int, val width: Int, val height: Int)
         private val programs = mutableListOf<GlProgram>()
         private val textures = mutableListOf<Texture>()
@@ -30,6 +33,8 @@ internal class UltraGlEffect : GlEffect {
         private lateinit var graph: UltraShaderGraph.Graph
 
         override fun configure(inputWidth: Int, inputHeight: Int): Size = guarded {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
+            control.checkRunning()
             clear()
             graph = UltraShaderGraph.compile(shaders, inputWidth, inputHeight)
             val maxTexture = IntArray(1)
@@ -39,6 +44,7 @@ internal class UltraGlEffect : GlEffect {
             val occupiedUntil = mutableListOf<Int>()
             var allocatedBytes = 0L
             for ((index, node) in graph.nodes.withIndex()) {
+                control.checkRunning()
                 val program = GlProgram(VERTEX, node.fragment)
                 programs += program
                 program.setBufferAttribute("aPosition", floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f), 2)
@@ -77,9 +83,14 @@ internal class UltraGlEffect : GlEffect {
 
         override fun drawFrame(inputTexId: Int, presentationTimeUs: Long) = guarded {
             val target = IntArray(1)
+            val scissor = IntArray(4)
+            val scissorEnabled = GLES20.glIsEnabled(GLES20.GL_SCISSOR_TEST)
             GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, target, 0)
+            GLES20.glGetIntegerv(GLES20.GL_SCISSOR_BOX, scissor, 0)
             try {
+                GLES20.glEnable(GLES20.GL_SCISSOR_TEST)
                 graph.nodes.forEachIndexed { index, node ->
+                    control.checkRunning()
                     val framebuffer = if (index ==
                         graph.nodes.lastIndex
                     ) {
@@ -95,10 +106,22 @@ internal class UltraGlEffect : GlEffect {
                         program.setSamplerTexIdUniform("uTexture$unit", tex, unit)
                     }
                     program.bindAttributesAndUniforms()
-                    GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
-                    GlUtil.checkGlError()
+                    // Keep the full viewport/texture coordinates. Scissoring changes work submission,
+                    // never the CNN's neighbourhood, pixels, preset, frame rate or output size.
+                    val stripHeight = UltraProcessingPolicy.stripHeight(node.output.width)
+                    for (y in 0 until node.output.height step stripHeight) {
+                        control.checkRunning()
+                        GLES20.glScissor(0, y, node.output.width, minOf(stripHeight, node.output.height - y))
+                        val start = System.nanoTime()
+                        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+                        GLES20.glFinish()
+                        GlUtil.checkGlError()
+                        control.rest(System.nanoTime() - start)
+                    }
                 }
             } finally {
+                GLES20.glScissor(scissor[0], scissor[1], scissor[2], scissor[3])
+                if (!scissorEnabled) GLES20.glDisable(GLES20.GL_SCISSOR_TEST)
                 GlUtil.focusFramebufferUsingCurrentContext(target[0], graph.output.width, graph.output.height)
             }
         }

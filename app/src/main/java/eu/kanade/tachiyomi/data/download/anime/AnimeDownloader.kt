@@ -399,6 +399,8 @@ class AnimeDownloader(
                             context,
                             folder.uri,
                             "${download.anime.title} · ${download.episode.name}",
+                            download.anime.id,
+                            download.episode.id,
                         )
                     }
                 }.onFailure { logcat(LogPriority.ERROR, it) }

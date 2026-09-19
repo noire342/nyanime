@@ -192,6 +192,24 @@ class AnimeDownloadManager(
         ).apply { status = Video.State.READY }
     }
 
+    /** File discovery stays off the UI thread; progress itself comes from the durable Ultra journal. */
+    internal suspend fun describeUltra(
+        anime: Anime,
+        episode: Episode,
+    ): eu.kanade.tachiyomi.data.download.anime.ultra.UltraTask? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val source = sourceManager.getOrStub(anime.source)
+            val folder = provider.findEpisodeDir(episode.name, episode.scanlator, anime.title, source)
+                ?: return@withContext null
+            eu.kanade.tachiyomi.data.download.anime.ultra.UltraDownloads.describe(
+                context,
+                folder,
+                "${anime.title} · ${episode.name}",
+                anime.id,
+                episode.id,
+            )
+        }
+
     /**
      * Returns true if the episode is downloaded.
      *
@@ -283,7 +301,10 @@ class AnimeDownloadManager(
                 anime,
                 source,
             )
-            episodeDirs.forEach { it.delete() }
+            episodeDirs.forEach {
+                eu.kanade.tachiyomi.data.download.anime.ultra.UltraDownloads.removeFolder(context, it.uri)
+                it.delete()
+            }
             cache.removeEpisodes(filteredEpisodes, anime)
 
             // Delete anime directory if empty
@@ -305,7 +326,12 @@ class AnimeDownloadManager(
             if (removeQueued) {
                 downloader.removeFromQueue(anime)
             }
-            provider.findAnimeDir(anime.title, source)?.delete()
+            provider.findAnimeDir(anime.title, source)?.let { directory ->
+                directory.listFiles().orEmpty().filter { it.isDirectory }.forEach {
+                    eu.kanade.tachiyomi.data.download.anime.ultra.UltraDownloads.removeFolder(context, it.uri)
+                }
+                directory.delete()
+            }
             cache.removeAnime(anime)
             // Delete source directory if empty
             val sourceDir = provider.findSourceDir(source)

@@ -12,7 +12,7 @@ import kotlin.coroutines.resumeWithException
 internal object UltraMuxer {
     suspend fun remux(
         context: android.content.Context,
-        video: File,
+        segments: File,
         original: Uri,
         destination: File,
     ): Unit = suspendCancellableCoroutine { continuation ->
@@ -23,7 +23,7 @@ internal object UltraMuxer {
         }
         val session = FFmpegKit.executeWithArgumentsAsync(
             arrayOf(
-                "-y", "-nostdin", "-i", video.absolutePath, "-i", source,
+                "-y", "-nostdin", "-f", "concat", "-safe", "1", "-i", segments.absolutePath, "-i", source,
                 "-map", "0:v:0", "-map", "1:a?", "-map", "1:s?", "-map", "1:t?",
                 "-map_metadata", "1", "-map_chapters", "1", "-c", "copy", destination.absolutePath,
             ),

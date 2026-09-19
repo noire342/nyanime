@@ -1078,6 +1078,14 @@ private fun LazyGridScope.sharedEpisodeItems(
     onEpisodeSwipe: (EpisodeList.Item, LibraryPreferences.EpisodeSwipeAction) -> Unit,
     itemModifier: Modifier = Modifier,
 ) {
+    if (!anime.isLocal()) {
+        item(key = "local-downloads-summary", span = { GridItemSpan(maxLineSpan) }) {
+            eu.kanade.presentation.entries.anime.components.UltraTitleSummary(
+                anime.id,
+                episodes.filterIsInstance<EpisodeList.Item>().count { it.isDownloaded },
+            )
+        }
+    }
     items(
         items = episodes,
         key = { episodeItem ->
@@ -1099,60 +1107,71 @@ private fun LazyGridScope.sharedEpisodeItems(
                 )
             }
             is EpisodeList.Item -> {
-                AnimeEpisodeListItem(
-                    title = if (anime.displayMode == Anime.EPISODE_DISPLAY_NUMBER) {
-                        stringResource(
-                            AYMR.strings.display_mode_episode,
-                            formatEpisodeNumber(episodeItem.episode.episodeNumber),
-                        )
-                    } else {
-                        episodeItem.episode.name
-                    },
-                    date = relativeDateTimeText(episodeItem.episode.dateUpload),
-                    watchProgress = episodeItem.episode.lastSecondSeen
-                        .takeIf { !episodeItem.episode.seen && it > 0L }
-                        ?.let {
+                Column(modifier = itemModifier) {
+                    AnimeEpisodeListItem(
+                        title = if (anime.displayMode == Anime.EPISODE_DISPLAY_NUMBER) {
                             stringResource(
-                                AYMR.strings.episode_progress,
-                                formatTime(it),
-                                formatTime(episodeItem.episode.totalSeconds),
+                                AYMR.strings.display_mode_episode,
+                                formatEpisodeNumber(episodeItem.episode.episodeNumber),
+                            )
+                        } else {
+                            episodeItem.episode.name
+                        },
+                        date = relativeDateTimeText(episodeItem.episode.dateUpload),
+                        watchProgress = episodeItem.episode.lastSecondSeen
+                            .takeIf { !episodeItem.episode.seen && it > 0L }
+                            ?.let {
+                                stringResource(
+                                    AYMR.strings.episode_progress,
+                                    formatTime(it),
+                                    formatTime(episodeItem.episode.totalSeconds),
+                                )
+                            },
+                        scanlator = episodeItem.episode.scanlator.takeIf { !it.isNullOrBlank() },
+                        summary = episodeItem.episode.summary.takeIf { !it.isNullOrBlank() && showSummaries },
+                        previewUrl = episodeItem.episode.previewUrl.takeIf { !it.isNullOrBlank() && showPreviews },
+                        seen = episodeItem.episode.seen,
+                        bookmark = episodeItem.episode.bookmark,
+                        fillermark = episodeItem.episode.fillermark,
+                        selected = episodeItem.selected,
+                        isAnyEpisodeSelected = isAnyEpisodeSelected,
+                        downloadIndicatorEnabled = !isAnyEpisodeSelected && !anime.isLocal(),
+                        downloadStateProvider = { episodeItem.downloadState },
+                        downloadProgressProvider = { episodeItem.downloadProgress },
+                        episodeSwipeStartAction = episodeSwipeStartAction,
+                        episodeSwipeEndAction = episodeSwipeEndAction,
+                        onLongClick = {
+                            onEpisodeSelected(episodeItem, !episodeItem.selected, true, true)
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        },
+                        onClick = {
+                            onEpisodeItemClick(
+                                episodeItem = episodeItem,
+                                isAnyEpisodeSelected = isAnyEpisodeSelected,
+                                onToggleSelection = {
+                                    onEpisodeSelected(episodeItem, !episodeItem.selected, true, false)
+                                },
+                                onEpisodeClicked = onEpisodeClicked,
                             )
                         },
-                    scanlator = episodeItem.episode.scanlator.takeIf { !it.isNullOrBlank() },
-                    summary = episodeItem.episode.summary.takeIf { !it.isNullOrBlank() && showSummaries },
-                    previewUrl = episodeItem.episode.previewUrl.takeIf { !it.isNullOrBlank() && showPreviews },
-                    seen = episodeItem.episode.seen,
-                    bookmark = episodeItem.episode.bookmark,
-                    fillermark = episodeItem.episode.fillermark,
-                    selected = episodeItem.selected,
-                    isAnyEpisodeSelected = isAnyEpisodeSelected,
-                    downloadIndicatorEnabled = !isAnyEpisodeSelected && !anime.isLocal(),
-                    downloadStateProvider = { episodeItem.downloadState },
-                    downloadProgressProvider = { episodeItem.downloadProgress },
-                    episodeSwipeStartAction = episodeSwipeStartAction,
-                    episodeSwipeEndAction = episodeSwipeEndAction,
-                    onLongClick = {
-                        onEpisodeSelected(episodeItem, !episodeItem.selected, true, true)
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    },
-                    onClick = {
-                        onEpisodeItemClick(
-                            episodeItem = episodeItem,
-                            isAnyEpisodeSelected = isAnyEpisodeSelected,
-                            onToggleSelection = { onEpisodeSelected(episodeItem, !episodeItem.selected, true, false) },
-                            onEpisodeClicked = onEpisodeClicked,
+                        onDownloadClick = if (onDownloadEpisode != null) {
+                            { onDownloadEpisode(listOf(episodeItem), it) }
+                        } else {
+                            null
+                        },
+                        onEpisodeSwipe = {
+                            onEpisodeSwipe(episodeItem, it)
+                        },
+                        modifier = Modifier,
+                    )
+                    if (episodeItem.isDownloaded && !anime.isLocal() && !isAnyEpisodeSelected) {
+                        eu.kanade.presentation.entries.anime.components.UltraEpisodeDownload(
+                            anime,
+                            episodeItem.episode,
+                            onPlay = { onEpisodeClicked(episodeItem.episode, false) },
                         )
-                    },
-                    onDownloadClick = if (onDownloadEpisode != null) {
-                        { onDownloadEpisode(listOf(episodeItem), it) }
-                    } else {
-                        null
-                    },
-                    onEpisodeSwipe = {
-                        onEpisodeSwipe(episodeItem, it)
-                    },
-                    modifier = itemModifier,
-                )
+                    }
+                }
             }
         }
     }
