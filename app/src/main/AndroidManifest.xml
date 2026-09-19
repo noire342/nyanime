@@ -72,6 +72,7 @@
         <activity
             android:name=".ui.cast.CastRemoteActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.Tachiyomi" />
         <activity
             android:name=".ui.watch.WatchTogetherActivity"

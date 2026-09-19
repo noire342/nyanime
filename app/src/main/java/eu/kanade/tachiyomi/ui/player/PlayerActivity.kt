@@ -321,6 +321,7 @@ class PlayerActivity : BaseActivity() {
         setupPlayerOrientation()
 
         castController.state.distinctUntilChangedBy { it.active || it.connecting }.onEach { cast ->
+            setupPlayerOrientation()
             if (cast.active || cast.connecting) {
                 viewModel.remoteProgressOwned = true
                 mediaSession?.isActive = false
@@ -1558,6 +1559,11 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun setupPlayerOrientation() {
+        val cast = castController.state.value
+        if (cast.active || cast.connecting) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            return
+        }
         if (player.isExiting) return
         requestedOrientation = when (playerPreferences.defaultPlayerOrientationType().get()) {
             PlayerOrientation.Free -> ActivityInfo.SCREEN_ORIENTATION_SENSOR

@@ -1215,6 +1215,11 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun cycleScreenRotations() {
+        val cast = activity.castController.state.value
+        if (cast.active || cast.connecting) {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            return
+        }
         activity.requestedOrientation = when (activity.requestedOrientation) {
             ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE,
             ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE,
