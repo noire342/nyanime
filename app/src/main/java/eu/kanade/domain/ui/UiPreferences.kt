@@ -26,6 +26,8 @@ class UiPreferences(
 
     fun themeDarkAmoled() = preferenceStore.getBoolean("pref_theme_dark_amoled_key", false)
 
+    fun sourceHomeLogo() = preferenceStore.getBoolean("source_home_logo", false)
+
     fun modernUi() = preferenceStore.getBoolean("nyanime_modern_ui", true)
 
     fun legacyAppTheme() = preferenceStore.getEnum("nyanime_legacy_app_theme", legacyMangaTheme().get())

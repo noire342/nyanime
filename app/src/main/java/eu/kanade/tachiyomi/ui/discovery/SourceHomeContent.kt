@@ -36,6 +36,7 @@ import eu.kanade.presentation.discovery.SectionHeader
 import eu.kanade.presentation.discovery.SourceFeaturedCarousel
 import eu.kanade.presentation.discovery.SourceFeaturedSection
 import eu.kanade.presentation.discovery.SourceHomeDateSelector
+import eu.kanade.presentation.discovery.SourceHomeLogo
 import eu.kanade.presentation.discovery.SourceHomePosterCard
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
@@ -45,6 +46,7 @@ import tachiyomi.domain.discovery.SectionState
 import tachiyomi.domain.discovery.SourceHomeGroup
 import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.discovery.homeItemKey
+import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.presentation.core.components.material.PullRefresh
 
 @Composable
@@ -85,6 +87,22 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                 null
             },
             onRefresh = model::refresh,
+            logo = source.providers.takeUnless { access.offline }
+                ?.distinctBy { it.id }?.singleOrNull()?.let { provider ->
+                    state.sections.values.asSequence().flatMap { it.data?.items.orEmpty().asSequence() }
+                        .filter { it.source == provider.id }
+                        .mapNotNull { it.homePresentation }
+                        .firstOrNull { it.logoUrl != null }
+                        ?.let {
+                            SourceHomeLogo(
+                                provider.id,
+                                provider.sourceName,
+                                requireNotNull(it.logoUrl),
+                                it.logoName,
+                                it.logoBackground,
+                            )
+                        }
+                },
         )
     }) { padding ->
         HomeContentReveal(homeKey) {
@@ -99,6 +117,23 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                     contentPadding = PaddingValues(bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    if (!access.offline && source.searchable) {
+                        item(key = "explore:" + source.id) {
+                            eu.kanade.presentation.discovery.SourceHomeExploreBar(
+                                source.categories,
+                                onBrowse = {
+                                    navigator.push(
+                                        SourceHomeListScreen(
+                                            homeKey,
+                                            SourceHomeRequest.SEARCH,
+                                            "Esplora ${source.title}",
+                                        ),
+                                    )
+                                },
+                                onCategory = { navigator.push(SourceHomeListScreen(homeKey, it.id, it.title)) },
+                            )
+                        }
+                    }
                     if (!access.offline && heroSection != null) {
                         item(key = "hero:" + source.id) {
                             LaunchedEffect(access, heroSection.id) { model.load(heroSection.id) }
@@ -190,26 +225,6 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                                                 )
                                             }
                                         }
-                                    }
-                                }
-                            }
-                        }
-                        if (source.categories.isNotEmpty()) {
-                            item(key = "categories") {
-                                SectionHeader("Esplora le categorie")
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    items(source.categories, key = { it.id }) { category ->
-                                        AssistChip(
-                                            onClick = {
-                                                navigator.push(
-                                                    SourceHomeListScreen(homeKey, category.id, category.title),
-                                                )
-                                            },
-                                            label = { Text(category.title) },
-                                        )
                                     }
                                 }
                             }

@@ -4,7 +4,9 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -42,6 +44,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.discovery.SourceHomeArtwork
+import eu.kanade.presentation.discovery.SourceHomeLogo
+import eu.kanade.presentation.discovery.SourceHomeWordmark
+import eu.kanade.presentation.discovery.sourceHomeLogoEnabled
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import tachiyomi.domain.discovery.SourceHomeGroup
 
@@ -54,34 +59,41 @@ fun DiscoveryHomeHeader(
     onSearch: (() -> Unit)?,
     onRefresh: () -> Unit,
     homes: List<SourceHomeGroup>,
+    logo: SourceHomeLogo? = null,
 ) {
-    TopAppBar(
-        title = {
-            if (homes.isNotEmpty()) {
-                HomeContentSwitch(selectedHome, homes, onSelect)
-            } else {
-                Text("Home", style = MaterialTheme.typography.headlineMedium)
-            }
-        },
-        navigationIcon = {
-            if (onBack != null) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
-            }
-        },
-        actions = {
-            eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
-            eu.kanade.tachiyomi.ui.community.CommunityAvatarButton()
-            if (onSearch != null) {
-                IconButton(onClick = onSearch) {
-                    Icon(
-                        Icons.Outlined.Search,
-                        homes.firstOrNull { it.id == selectedHome }?.let { "Cerca ${it.title}" } ?: "Cerca anime",
-                    )
+    val branded = sourceHomeLogoEnabled() && logo != null
+    Column {
+        TopAppBar(
+            title = {
+                if (branded) {
+                    SourceHomeWordmark(logo, Modifier.fillMaxWidth())
+                } else if (homes.isNotEmpty()) {
+                    HomeContentSwitch(selectedHome, homes, onSelect)
+                } else {
+                    Text("Home", style = MaterialTheme.typography.headlineMedium)
                 }
-            }
-            IconButton(onClick = onRefresh) { Icon(Icons.Outlined.Refresh, "Aggiorna Home") }
-        },
-    )
+            },
+            navigationIcon = {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
+                }
+            },
+            actions = {
+                eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
+                eu.kanade.tachiyomi.ui.community.CommunityAvatarButton()
+                if (onSearch != null) {
+                    IconButton(onClick = onSearch) {
+                        Icon(
+                            Icons.Outlined.Search,
+                            homes.firstOrNull { it.id == selectedHome }?.let { "Cerca ${it.title}" } ?: "Cerca anime",
+                        )
+                    }
+                }
+                IconButton(onClick = onRefresh) { Icon(Icons.Outlined.Refresh, "Aggiorna Home") }
+            },
+        )
+        if (branded) HomeContentSwitch(selectedHome, homes, onSelect)
+    }
 }
 
 /** Compact, single-tap navigation. State remains owned by the Home, not this visual control. */

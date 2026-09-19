@@ -28,6 +28,26 @@ import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
 
 class MergedSourceHomeRepositoryTest {
+    @Test fun browseAndFilterCursorsCannotInheritTheEndOfAnotherCatalogue() = runBlocking {
+        val calls = mutableListOf<SourceHomeRequest>()
+        val merged = MergedSourceHomeRepository({
+            provider { request ->
+                calls += request
+                flowOf(page())
+            }
+        }, { access })
+        val initial = SourceHomeRequest("popular")
+        merged.observe(access, initial).last()
+        calls.clear()
+        merged.observe(access, initial.copy(page = 2)).last()
+        assertTrue(calls.isEmpty())
+        merged.observe(access, initial.copy(page = 2, browse = true)).last()
+        assertTrue(calls.isNotEmpty())
+        calls.clear()
+        merged.observe(access, initial.copy(page = 2, filters = mapOf("Category" to listOf("Adventure")))).last()
+        assertTrue(calls.isNotEmpty())
+    }
+
     @Test fun selectedDateOnlyQueriesCapableProvidersAndKeepsItsOwnPagination() = runBlocking {
         val dated = second.copy(sections = listOf(shelf.copy(dateFilter = "Date")))
         val current = access.copy(

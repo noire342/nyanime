@@ -1,16 +1,24 @@
 package eu.kanade.tachiyomi.ui.discovery
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -25,12 +33,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.discovery.LoadNotice
+import eu.kanade.presentation.discovery.SourceHomeActiveFilters
+import eu.kanade.presentation.discovery.SourceHomeFilterSheet
 import eu.kanade.presentation.discovery.SourceHomePosterCard
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
@@ -51,6 +62,8 @@ class SourceHomeListScreen(
         val state by model.state.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
         var query by rememberSaveable { mutableStateOf("") }
+        var showFilters by rememberSaveable { mutableStateOf(false) }
+        val isCatalogue = sectionId == SourceHomeRequest.SEARCH || sectionId.startsWith("category:")
         val availability = DiscoveryHomeAvailability.from(state.access)
         val leaveSourcePage = availability.shouldLeaveSourcePage(navigator.lastItem == this)
         LaunchedEffect(leaveSourcePage) {
@@ -64,12 +77,69 @@ class SourceHomeListScreen(
             }
             return
         }
-        LaunchedEffect(query) { if (sectionId == SourceHomeRequest.SEARCH) model.search(query) }
+        LaunchedEffect(query) { if (isCatalogue) model.search(query) }
         LaunchedEffect(selectedDate) { model.selectDate(selectedDate) }
+        if (showFilters) {
+            SourceHomeFilterSheet(
+                source.browseFilters,
+                state.filters,
+                onDismiss = { showFilters = false },
+                onApply = model::applyFilters,
+            )
+        }
         Scaffold(topBar = {
-            TopAppBar(title = { Text(state.title ?: title) }, navigationIcon = {
-                IconButton(onClick = { navigator.pop() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
-            })
+            Column {
+                TopAppBar(title = {
+                    Text(if (isCatalogue) "Esplora ${source.title}" else state.title ?: title)
+                }, navigationIcon = {
+                    IconButton(onClick = { navigator.pop() }) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro")
+                    }
+                })
+                if (isCatalogue) {
+                    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        OutlinedTextField(
+                            query,
+                            { query = it },
+                            Modifier.fillMaxWidth(),
+                            placeholder = { Text("Titolo, parola chiave…") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(24.dp),
+                            leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                            trailingIcon = {
+                                if (query.isNotEmpty()) {
+                                    IconButton(onClick = { query = "" }) {
+                                        Icon(Icons.Outlined.Close, "Cancella ricerca")
+                                    }
+                                }
+                            },
+                        )
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                if (state.filters.isEmpty()) {
+                                    "Tutto il catalogo"
+                                } else {
+                                    "${state.filters.size} filtri attivi"
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (source.browseFilters.isNotEmpty()) {
+                                FilledTonalButton(onClick = { showFilters = true }) {
+                                    Icon(Icons.Outlined.Tune, null)
+                                    Text("Filtri", Modifier.padding(start = 8.dp))
+                                }
+                            }
+                        }
+                        SourceHomeActiveFilters(state.filters) {
+                            model.applyFilters(state.filters - it)
+                        }
+                    }
+                }
+            }
         }) { padding ->
             LazyVerticalGrid(
                 GridCells.Adaptive(148.dp),
@@ -78,18 +148,9 @@ class SourceHomeListScreen(
             ) {
                 if (source.sections.firstOrNull { it.id == sectionId }?.supportsDate == true) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        eu.kanade.presentation.discovery.SourceHomeDateSelector(selectedDate) { selectedDate = it }
-                    }
-                }
-                if (sectionId == SourceHomeRequest.SEARCH) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        OutlinedTextField(
-                            query,
-                            { query = it },
-                            Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                            label = { Text("Cerca in ${source.title}") },
-                            singleLine = true,
-                        )
+                        eu.kanade.presentation.discovery.SourceHomeDateSelector(selectedDate) {
+                            selectedDate = it
+                        }
                     }
                 }
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -117,8 +178,8 @@ class SourceHomeListScreen(
                 ) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Text(
-                            if (sectionId == SourceHomeRequest.SEARCH && query.isBlank()) {
-                                "Cerca per titolo"
+                            if (isCatalogue && query.isBlank() && state.filters.isEmpty()) {
+                                "Nessun titolo disponibile"
                             } else {
                                 "Nessun risultato"
                             },
@@ -128,7 +189,12 @@ class SourceHomeListScreen(
                 }
                 if (state.hasNext && state.items.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        TextButton(onClick = { model.load() }, enabled = !state.loading) { Text("Carica altri") }
+                        LaunchedEffect(state.items.size, state.error) {
+                            if (!state.loading && state.error == null) model.load()
+                        }
+                        TextButton(onClick = { model.load() }, enabled = !state.loading) {
+                            Text("Carica altri")
+                        }
                     }
                 }
             }

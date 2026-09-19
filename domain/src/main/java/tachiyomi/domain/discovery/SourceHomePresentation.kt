@@ -14,12 +14,24 @@ data class SourceHomePresentation(
     val badges: List<String> = emptyList(),
     val details: List<String> = emptyList(),
     val sectionTitle: String? = null,
+    val logoUrl: String? = null,
+    val logoName: String? = null,
+    val logoBackground: String? = null,
 ) {
     fun bounded() = copy(
         id = id?.takeIf { valid(it, 512) },
         badges = badges.filter { valid(it, 80) }.distinct().take(8),
         details = details.filter { valid(it, 300) }.distinct().take(8),
         sectionTitle = sectionTitle?.takeIf { valid(it, 100) },
+        logoName = logoName?.takeIf { valid(it, 80) },
+        logoBackground = logoBackground?.takeIf { it in listOf("light", "dark") },
+        logoUrl = logoUrl?.takeIf { value ->
+            valid(value, 2048) &&
+                runCatching {
+                    val uri = java.net.URI(value)
+                    uri.scheme in listOf("https", "http") && !uri.host.isNullOrBlank() && uri.userInfo == null
+                }.getOrDefault(false)
+        },
     )
 
     fun attachTo(memo: JsonObject) = JsonObject(without(memo) + (KEY to json.encodeToJsonElement(bounded())))

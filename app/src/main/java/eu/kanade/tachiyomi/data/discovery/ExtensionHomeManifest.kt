@@ -19,6 +19,7 @@ data class ExtensionHomeManifest(
     val search: Section? = null,
     val categories: Categories? = null,
     val primary: Boolean = false,
+    val browseFilters: List<String> = emptyList(),
 ) {
     @Serializable
     data class Source(val name: String, val lang: String)
@@ -45,6 +46,9 @@ data class ExtensionHomeManifest(
         text(source.name) &&
         text(source.lang) &&
         selections(defaults) &&
+        browseFilters.size <= 24 &&
+        browseFilters.distinct().size == browseFilters.size &&
+        browseFilters.all(::text) &&
         sections.size in 1..16 &&
         sections.map { it.id }.distinct().size == sections.size &&
         sections.all { it.id.matches(ID) && it.id != "search" && text(it.title) && selections(it.filters) } &&

@@ -38,7 +38,14 @@ class ExtensionHomeGateway(
                 (definition.sections + definition.categories).firstOrNull { it.id == request.sectionId }
                     ?: error("La sezione non è più supportata: aggiorna la Home")
             }
-            val filters = ExtensionHomeFilters.apply(source.getFilterList(), section, request.date)
+            val requestedSection = if (request.browse && section.moreSelections != null) {
+                section.copy(selections = requireNotNull(section.moreSelections))
+            } else {
+                section
+            }
+            val filters = ExtensionHomeFilters.apply(source.getFilterList(), requestedSection, request.date)
+            require(request.filters.isEmpty() || request.sectionId == SourceHomeRequest.SEARCH)
+            ExtensionHomeFilters.applyBrowse(filters, definition.browseFilters, section.browseValues + request.filters)
             try {
                 withTimeout(30_000) {
                     val page = source.getSearchAnime(request.page, request.query.trim(), filters)

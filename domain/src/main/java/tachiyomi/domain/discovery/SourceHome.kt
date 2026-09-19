@@ -12,6 +12,7 @@ data class SourceHomeSection(
     val group: SourceHomeSectionGroup? = null,
     val dateFilter: String? = null,
     val moreSelections: Map<String, String>? = null,
+    val browseValues: Map<String, List<String>> = emptyMap(),
 )
 
 /** Optional presentation only; requests and caches still use the concrete section ID. */
@@ -29,6 +30,7 @@ data class SourceHomeSource(
     val search: SourceHomeSection? = null,
     val homeId: String = key,
     val primary: Boolean = false,
+    val browseFilters: List<SourceHomeFilter> = emptyList(),
 )
 
 data class SourceHomeListing(val loading: Boolean = true, val homes: List<SourceHomeSource> = emptyList()) {
@@ -73,7 +75,19 @@ data class SourceHomeGroup(val id: String, val title: String, val providers: Lis
             val first = variants.first()
             Row(id, first.group?.title?.takeIf { variants.size > 1 } ?: first.title, variants)
         }
-    val categories get() = providers.flatMap { it.categories }.distinctBy { it.id }.map { Section(it.id, it.title) }
+    val categories get() = providers.flatMap { it.categories }.distinctBy { it.id }.filter { category ->
+        category.browseValues.all { (name, values) ->
+            browseFilters.any { it.name == name && it.accepts(values) }
+        }
+    }.map { Section(it.id, it.title) }
+
+    // Only controls understood by every searchable provider are offered for a merged catalogue.
+    val browseFilters get(): List<SourceHomeFilter> {
+        val searchable = providers.filter { it.search != null }
+        return searchable.firstOrNull()?.browseFilters.orEmpty().filter { filter ->
+            searchable.all { source -> source.browseFilters.any { it == filter } }
+        }
+    }
     val searchable get() = providers.any { it.search != null }
     val sourceIds get() = providers.map { it.id }.toSet()
     fun sourceLabel(sourceId: Long) = providers.firstOrNull { it.id == sourceId }?.let {
@@ -109,9 +123,17 @@ data class SourceHomeRequest(
     val page: Int = 1,
     val query: String = "",
     val date: String? = null,
+    val filters: Map<String, List<String>> = emptyMap(),
+    val browse: Boolean = false,
 ) {
     init {
         require(page > 0)
+        require(
+            filters.size <= 24 &&
+                filters.all { (label, values) ->
+                    label.length in 1..100 && values.size <= 200 && values.all { it.length <= 300 }
+                },
+        )
         require(
             date == null ||
                 (

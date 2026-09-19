@@ -171,6 +171,55 @@ locali filtrando l'insieme delle fonti del gruppo.
 
 ## Compatibilità degli aggiornamenti
 
+### Esplorazione e filtri combinabili
+
+Ogni Home può dichiarare `browseFilters`, una lista di massimo 24 nomi dei suoi
+filtri pubblici. Il gateway supporta select a scelta singola, gruppi di checkbox
+e campi di testo. Opzioni e valori iniziali vengono letti dall'estensione;
+`defaults` e i filtri della sezione `search` determinano i valori iniziali effettivi.
+Esempio neutro: `"browseFilters": ["Categoria", "Anno", "Ordine"]`.
+
+La ricerca funziona anche con testo vuoto. I filtri vengono combinati con il testo,
+si applicano solo dopo la conferma e restano visibili come chip rimovibili.
+Un cambio di ricerca o filtri annulla la richiesta precedente e riparte dalla prima
+pagina. I cursori di paginazione includono tutti i filtri; ricerche e pagine complete
+non vengono persistite nella cache delle anteprime pubbliche.
+
+`categories.filter` può indicare anche un gruppo di checkbox. L'app ricava le
+categorie da quel controllo e apre la ricerca con l'opzione già selezionata.
+Il controllo delle categorie rimane disponibile anche senza `browseFilters`, per
+compatibilità con i manifest precedenti. Nei cataloghi con più produttori vengono
+esposti solo controlli identici per tutte le fonti ricercabili. Nessun filtro interno
+non dichiarato può essere modificato dalla ricerca.
+
+`moreFilters` su una sezione sostituisce i filtri dell'anteprima, mantenendo i
+`defaults`, quando si apre la pagina completa. La Home continua a usare i filtri
+ordinari della sezione. L'estensione decide il percorso e la paginazione corretti.
+
+### Logo dinamico della fonte
+
+La presentazione `aniyomi.home.v1` può contenere `logoUrl`, URL HTTP(S) pubblico del
+marchio orizzontale corrente. L'estensione lo estrae dalla pagina o dai suoi asset
+di stile durante il caricamento della Home. Non deve inviare cookie, credenziali,
+URL locali o immagini inventate. Il campo è facoltativo e limitato a 2048 caratteri.
+Nessun parsing del sito viene effettuato dall'app.
+
+`logoBackground` può indicare `light` o `dark` quando la trasparenza del marchio
+richiede un contrasto preciso. `logoName`, testo semplice fino a 80 caratteri,
+può accompagnare un marchio compatto: l'app dispone icona e nome in orizzontale,
+senza deformare l'immagine. Entrambi i campi sono facoltativi. Con animazioni
+ridotte il logo GIF viene mostrato come immagine statica.
+
+In Impostazioni → Aspetto, **Logo della fonte nella Home** abilita questa resa
+sia per ModernUI sia per la UI legacy. Inizialmente resta il marchio NYANIME.
+Il logo viene proporzionato senza ritaglio, con supporto PNG, GIF, WebP e SVG,
+tramite il client immagini della fonte, conservando intestazioni e cache.
+Caricamenti falliti mostrano il marchio dell'app; durante un aggiornamento viene
+conservata l'immagine precedente della stessa fonte. Le Home che aggregano più
+identità mantengono il marchio dell'app, senza attribuire il catalogo a una sola.
+Le URL del logo vengono conservate soltanto nella presentazione e nella cache Home,
+mai come copertine della libreria.
+
 I vecchi collegamenti serializzati hanno un piccolo ponte verso la Home neutra. La vecchia selezione booleana non viene convertita con un cast nel nuovo identificatore testuale. Anime4K, package dell'app, firma e identità delle opere locali rimangono invariati.
 
 La fiducia automatica è una preferenza separata, attiva per default in questo fork, comune ad anime e manga. Non modifica i consensi espliciti né i controlli di firma Android o versione API; disattivandola e riavviando si ripristina la conferma manuale.

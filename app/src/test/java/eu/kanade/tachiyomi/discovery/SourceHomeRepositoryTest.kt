@@ -31,6 +31,22 @@ import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicInteger
 
 class SourceHomeRepositoryTest {
+    @Test fun filteredSearchAndFullPagesNeverReuseThePublicPreviewDiskCache() = runBlocking {
+        val gateway = Gateway()
+        val disk = Disk()
+        val repository = CachedSourceHomeRepository(gateway, TestClock(), persistent = disk)
+        val requests = listOf(
+            SourceHomeRequest("search", filters = mapOf("Category" to listOf("Adventure"))),
+            SourceHomeRequest("popular", browse = true),
+            SourceHomeRequest("popular", filters = mapOf("Category" to listOf("Drama"))),
+        )
+        requests.forEach { repository.observe(gateway.currentAccess(), it).toList() }
+        repository.observe(gateway.currentAccess(), requests.first()).toList()
+        assertEquals(3, gateway.calls.get())
+        assertEquals(0, disk.reads)
+        assertEquals(0, disk.writes)
+    }
+
     @Test fun datesRemainSeparateInMemoryAndAcrossProcessRestarts() = runBlocking {
         val gateway = Gateway()
         val disk = Disk()

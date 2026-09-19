@@ -80,6 +80,12 @@ object SettingsAppearanceScreen : SearchableSettings {
                         true
                     },
                 ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = uiPreferences.sourceHomeLogo(),
+                    title = "Logo della fonte nella Home",
+                    subtitle = "Usa il logo aggiornato fornito dall’estensione al posto di NYANIME. " +
+                        "Se non è disponibile, resta il logo dell’app.",
+                ),
                 Preference.PreferenceItem.CustomPreference(
                     title = stringResource(MR.strings.pref_app_theme),
                 ) {

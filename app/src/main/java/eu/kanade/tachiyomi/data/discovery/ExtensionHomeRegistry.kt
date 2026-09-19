@@ -80,6 +80,7 @@ class ExtensionHomeRegistry(
                         search = ExtensionHomeFilters.search(manifest, filters),
                         homeId = manifest.id,
                         primary = manifest.primary,
+                        browseFilters = ExtensionHomeFilters.browseFilters(manifest, filters),
                     )
                 }
             } catch (e: CancellationException) {

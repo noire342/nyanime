@@ -64,6 +64,7 @@ fun DiscoveryHomeHeader(
     onSearch: (() -> Unit)?,
     onRefresh: () -> Unit,
     homes: List<SourceHomeGroup>,
+    logo: SourceHomeLogo? = null,
 ) {
     if (!LocalNyanimeStyle.current) {
         return eu.kanade.presentation.discovery.legacy.DiscoveryHomeHeader(
@@ -73,6 +74,7 @@ fun DiscoveryHomeHeader(
             onSearch,
             onRefresh,
             homes,
+            logo,
         )
     }
     Surface(modifier = Modifier.posterForeground(zIndex = 3f), color = MaterialTheme.colorScheme.background) {
@@ -90,7 +92,7 @@ fun DiscoveryHomeHeader(
                         if (onBack != null) {
                             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
                         }
-                        NyanimeWordmark(Modifier.weight(1f).padding(start = 4.dp))
+                        SourceHomeWordmark(logo, Modifier.weight(1f).padding(start = 4.dp))
                         if (!stacked) HomeHeaderActions(onSearch, selectedHome, homes)
                     }
                     if (stacked) {

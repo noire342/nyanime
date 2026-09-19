@@ -24,7 +24,7 @@ class MergedSourceHomeRepository(
     private val repositoryFor: (SourceHomeSource) -> SourceHomeRepository,
     private val currentAccess: (String) -> SourceHomeGroupAccess,
 ) : SourceHomeGroupRepository {
-    private data class Cursor(val key: String, val revision: String, val section: String, val query: String)
+    private data class Cursor(val key: String, val revision: String, val request: SourceHomeRequest)
     private val finishedAt = LinkedHashMap<Cursor, Int>()
 
     override fun observe(access: SourceHomeGroupAccess, request: SourceHomeRequest, refresh: Boolean) = flow {
@@ -54,7 +54,7 @@ class MergedSourceHomeRepository(
         }
         val feeds = providers.map { provider ->
             val source = requireNotNull(provider.source)
-            val cursor = Cursor(source.key, source.revision, request.cacheSection, request.query.trim())
+            val cursor = Cursor(source.key, source.revision, request.copy(page = 1, query = request.query.trim()))
             val finished = synchronized(finishedAt) {
                 if (provider.isPrivate) finishedAt.clear()
                 if (refresh || request.page == 1) finishedAt.remove(cursor)
