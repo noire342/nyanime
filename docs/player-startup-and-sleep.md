@@ -1,5 +1,29 @@
 # Avvio di Smart e timer di sospensione
 
+## Pressione prolungata nel player
+
+Durante la riproduzione individuale, tieni premuto sul video per passare
+temporaneamente a **2×**. L'indicatore compare finché il gesto è attivo; al rilascio
+si ripristina la velocità precedente, anche se diversa da 1×. La preferenza di
+velocità non viene modificata.
+
+Il ripristino avviene anche se il gesto viene annullato, metti in pausa, cambi
+episodio o esci dal player. I controlli bloccati e il video già in pausa non
+attivano il gesto. Nelle stanze il 2× temporaneo è disabilitato per mantenere la
+sincronizzazione; il telecomando Cast conserva i suoi controlli. Gli screenshot
+restano disponibili nei controlli del player, senza aprirsi tenendo premuto.
+
+## Comandi essenziali
+
+La nota musicale e il tasto **HQ** sono nascosti dalla barra per impostazione
+predefinita. **Altro > Audio / Qualità video** apre direttamente le rispettive
+funzioni; **Altro > Personalizza comandi** permette di riabilitare separatamente
+i due tasti, con scelta conservata anche alla riapertura dell'app. La qualità
+video è disponibile per gli episodi online. **SM** resta sulla barra.
+
+**Altro > Fotogramma** mette in pausa e apre le azioni per salvare, condividere
+o usare l'immagine come copertina. Chiudendo il pannello il video resta in pausa.
+
 ## Avvio automatico di Anime4K Smart
 
 In **Impostazioni > Lettore interno > Anime4K > Avvia Smart automaticamente**

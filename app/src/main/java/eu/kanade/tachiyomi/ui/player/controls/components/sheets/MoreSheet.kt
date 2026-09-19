@@ -29,20 +29,32 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.HighQuality
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.player.components.PlayerSheet
 import eu.kanade.tachiyomi.ui.player.Anime4KMode
@@ -54,6 +66,7 @@ import eu.kanade.tachiyomi.ui.player.executeLongPress
 import eu.kanade.tachiyomi.ui.player.settings.AdvancedPlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.AudioChannels
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
+import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.ImmutableList
 import tachiyomi.domain.custombuttons.model.CustomButton
@@ -66,6 +79,10 @@ import tachiyomi.presentation.core.util.collectAsState as collectPreferenceAsSta
 
 @Composable
 fun MoreSheet(
+    onOpenAudio: () -> Unit,
+    onOpenQuality: () -> Unit,
+    onOpenScreenshot: () -> Unit,
+    qualityAvailable: Boolean,
     selectedDecoder: Decoder,
     onSelectDecoder: (Decoder) -> Unit,
     remainingTime: Int,
@@ -81,6 +98,10 @@ fun MoreSheet(
 ) {
     val advancedPreferences = remember { Injekt.get<AdvancedPlayerPreferences>() }
     val audioPreferences = remember { Injekt.get<AudioPreferences>() }
+    val playerPreferences = remember { Injekt.get<PlayerPreferences>() }
+    val showAudioShortcut by playerPreferences.showAudioShortcut().collectPreferenceAsState()
+    val showQualityShortcut by playerPreferences.showQualityShortcut().collectPreferenceAsState()
+    var customizeControls by rememberSaveable { mutableStateOf(false) }
     val statisticsPage by advancedPreferences.playerStatisticsPage().collectPreferenceAsState()
     val anime4kSelection by advancedPreferences.anime4kActiveSelection().collectAsState()
     val anime4kDiagnosticsEnabled by advancedPreferences.anime4kDiagnosticsEnabled().collectPreferenceAsState()
@@ -114,6 +135,38 @@ fun MoreSheet(
                 }
             }
             SleepTimerEntry(remainingTime, onOpenSleepTimer, timerAtEpisodeEnd)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onOpenAudio) {
+                    Icon(Icons.Default.Audiotrack, null)
+                    Text("Audio", Modifier.padding(start = 8.dp))
+                }
+                if (qualityAvailable) {
+                    OutlinedButton(onClick = onOpenQuality) {
+                        Icon(Icons.Default.HighQuality, null)
+                        Text("Qualità video", Modifier.padding(start = 8.dp))
+                    }
+                }
+                OutlinedButton(onClick = onOpenScreenshot) {
+                    Icon(Icons.Default.PhotoCamera, null)
+                    Text("Fotogramma", Modifier.padding(start = 8.dp))
+                }
+            }
+            TextButton(onClick = { customizeControls = !customizeControls }) {
+                Text("Personalizza comandi")
+                Icon(if (customizeControls) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null)
+            }
+            if (customizeControls) {
+                ShortcutPreference(
+                    "Mostra il tasto audio",
+                    showAudioShortcut,
+                    playerPreferences.showAudioShortcut()::set,
+                )
+                ShortcutPreference(
+                    "Mostra il tasto HQ",
+                    showQualityShortcut,
+                    playerPreferences.showQualityShortcut()::set,
+                )
+            }
             TextButton(onClick = onOpenWatchTogether, modifier = Modifier.fillMaxWidth()) {
                 Text("Guarda insieme", style = MaterialTheme.typography.titleMedium)
             }
@@ -241,5 +294,19 @@ fun MoreSheet(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ShortcutPreference(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .toggleable(checked, role = Role.Switch, onValueChange = onCheckedChange)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(label, Modifier.weight(1f))
+        Switch(checked, onCheckedChange = null)
     }
 }

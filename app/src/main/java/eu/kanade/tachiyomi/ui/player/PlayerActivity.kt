@@ -374,6 +374,7 @@ class PlayerActivity : BaseActivity() {
         }
 
         viewModel.watchTogether.state.distinctUntilChangedBy { it.active }.onEach {
+            if (it.active) viewModel.endHoldSpeed()
             updateAnime4KRoomRestriction()
         }.launchIn(lifecycleScope)
 
@@ -382,6 +383,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onDestroy() {
+        viewModel.endHoldSpeed()
         UltraPlaybackGuard.leavePlayer()
         viewModel.detachDevicePlayback()
         viewModel.watchManager.detach(this)
@@ -421,6 +423,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onPause() {
+        viewModel.endHoldSpeed()
         viewModel.saveCurrentEpisodeWatchingProgress()
 
         if (isInPictureInPictureMode) {
@@ -1450,7 +1453,10 @@ class PlayerActivity : BaseActivity() {
     internal fun event(eventId: Int) {
         if (player.isExiting) return
         when (eventId) {
-            MPVLib.mpvEventId.MPV_EVENT_START_FILE -> fileLoadedJob?.cancel()
+            MPVLib.mpvEventId.MPV_EVENT_START_FILE -> {
+                viewModel.endHoldSpeed()
+                fileLoadedJob?.cancel()
+            }
             MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED -> {
                 if (viewModel.playbackLoadState.value.failure != null) return
                 loadAnime4KForCurrentEpisode()
@@ -1725,6 +1731,7 @@ class PlayerActivity : BaseActivity() {
      * @param autoPlay whether the episode is switching due to auto play
      */
     internal fun changeEpisode(episodeId: Long?, autoPlay: Boolean = false, fromWatchRoom: Boolean = false) {
+        viewModel.endHoldSpeed()
         if (viewModel.watchTogether.active && !viewModel.watchTogether.state.value.host && !fromWatchRoom) {
             showToast("L'episodio viene scelto da chi ha creato la stanza")
             return

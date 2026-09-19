@@ -79,6 +79,8 @@ fun TopRightPlayerControls(
     onMoreLongClick: () -> Unit,
 
     modifier: Modifier = Modifier,
+    showAudioShortcut: Boolean = false,
+    showQualityShortcut: Boolean = false,
     sleepTimerAtEpisodeEnd: Boolean = false,
     isUltraVideo: Boolean = false,
     watchRoom: eu.kanade.tachiyomi.data.watch.WatchRoomState = eu.kanade.tachiyomi.data.watch.WatchRoomState(),
@@ -109,15 +111,19 @@ fun TopRightPlayerControls(
                 onLongClick = onSubtitlesLongClick,
                 horizontalSpacing = MaterialTheme.padding.mediumSmall,
             )
-            ControlsButton(
-                icon = Icons.Default.Audiotrack,
-                onClick = onAudioClick,
-                onLongClick = onAudioLongClick,
-                horizontalSpacing = MaterialTheme.padding.mediumSmall,
-            )
-            if (isEpisodeOnline == true) {
+            if (showAudioShortcut) {
+                ControlsButton(
+                    icon = Icons.Default.Audiotrack,
+                    title = "Tracce audio",
+                    onClick = onAudioClick,
+                    onLongClick = onAudioLongClick,
+                    horizontalSpacing = MaterialTheme.padding.mediumSmall,
+                )
+            }
+            if (showQualityShortcut && isEpisodeOnline == true) {
                 ControlsButton(
                     icon = Icons.Default.HighQuality,
+                    title = "Qualità video",
                     onClick = onQualityClick,
                     onLongClick = onQualityClick,
                     horizontalSpacing = MaterialTheme.padding.mediumSmall,
@@ -140,6 +146,7 @@ fun TopRightPlayerControls(
             }
             ControlsButton(
                 icon = Icons.Default.MoreVert,
+                title = "Altro",
                 onClick = onMoreClick,
                 onLongClick = onMoreLongClick,
                 horizontalSpacing = MaterialTheme.padding.mediumSmall,

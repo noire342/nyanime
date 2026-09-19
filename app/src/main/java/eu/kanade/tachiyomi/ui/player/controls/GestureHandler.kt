@@ -57,9 +57,7 @@ import eu.kanade.presentation.player.components.LeftSideOvalShape
 import eu.kanade.presentation.player.components.RightSideOvalShape
 import eu.kanade.presentation.theme.playerRippleConfiguration
 import eu.kanade.tachiyomi.ui.player.Panels
-import eu.kanade.tachiyomi.ui.player.PlayerUpdates
 import eu.kanade.tachiyomi.ui.player.PlayerViewModel
-import eu.kanade.tachiyomi.ui.player.Sheets
 import eu.kanade.tachiyomi.ui.player.controls.components.DoubleTapSeekTriangles
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
@@ -107,7 +105,9 @@ fun GestureHandler(
     val seekGesture by gesturePreferences.gestureHorizontalSeek().collectAsState()
     val preciseSeeking by gesturePreferences.playerSmoothSeek().collectAsState()
     val showSeekbar by gesturePreferences.showSeekBar().collectAsState()
-    var isLongPressing by remember { mutableStateOf(false) }
+    val room by viewModel.watchTogether.state.collectAsState()
+    val sheetShown by viewModel.sheetShown.collectAsState()
+    val episode by viewModel.currentEpisode.collectAsState()
     val currentVolume by viewModel.currentVolume.collectAsState()
     val currentMPVVolume by viewModel.currentMPVVolume.collectAsState()
     val currentBrightness by viewModel.currentBrightness.collectAsState()
@@ -118,8 +118,7 @@ fun GestureHandler(
         modifier = modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeGestures)
-            .pointerInput(Unit) {
-                val originalSpeed = viewModel.playbackSpeed.value
+            .pointerInput(viewModel, areControlsLocked, room.active, sheetShown, episode?.id) {
                 detectTapGestures(
                     onTap = {
                         if (controlsShown) viewModel.hideControls() else viewModel.showControls()
@@ -158,22 +157,21 @@ fun GestureHandler(
                         } else {
                             isDoubleTapSeeking = false
                         }
-                        interactionSource.emit(press)
-                        tryAwaitRelease()
-                        if (isLongPressing) {
-                            isLongPressing = false
-                            viewModel.setPlaybackSpeedByUser(originalSpeed.toDouble())
-                            viewModel.playerUpdate.update { PlayerUpdates.None }
+                        var released = false
+                        try {
+                            interactionSource.emit(press)
+                            released = tryAwaitRelease()
+                        } finally {
+                            viewModel.endHoldSpeed()
+                            interactionSource.tryEmit(
+                                if (released) PressInteraction.Release(press) else PressInteraction.Cancel(press),
+                            )
                         }
-                        interactionSource.emit(PressInteraction.Release(press))
                     },
                     onLongPress = {
                         if (areControlsLocked) return@detectTapGestures
-                        if (!isLongPressing) {
+                        if (viewModel.beginHoldSpeed()) {
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            isLongPressing = true
-                            viewModel.pause()
-                            viewModel.sheetShown.update { Sheets.Screenshot }
                         }
                     },
                 )

@@ -20,6 +20,9 @@ class PlayerPreferences(
 
     // Controls
 
+    fun showAudioShortcut() = preferenceStore.getBoolean("player_show_audio_shortcut", false)
+    fun showQualityShortcut() = preferenceStore.getBoolean("player_show_quality_shortcut", false)
+
     fun allowGestures() = preferenceStore.getBoolean("pref_allow_gestures_in_panels", false)
     fun showLoadingCircle() = preferenceStore.getBoolean("pref_show_loading", true)
     fun showCurrentChapter() = preferenceStore.getBoolean("pref_show_current_chapter", true)

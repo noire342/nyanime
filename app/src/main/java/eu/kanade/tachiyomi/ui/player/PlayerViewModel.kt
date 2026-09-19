@@ -226,6 +226,12 @@ class PlayerViewModel @JvmOverloads constructor(
     val playbackLoadState = playbackLoad.state
     val playbackSpeed = MutableStateFlow(playerPreferences.playerSpeed().get())
 
+    private val holdSpeed = PlayerHoldSpeed(
+        available = { !activity.player.isExiting && !activity.isDestroyed },
+        readSpeed = { MPVLib.getPropertyDouble("speed") ?: playbackSpeed.value.toDouble() },
+        writeSpeed = { MPVLib.setPropertyDouble("speed", it) },
+    )
+
     val watchManager by lazy { WatchTogetherManager.get(activity) }
     val watchTogether get() = watchManager.controller
 
@@ -274,7 +280,7 @@ class PlayerViewModel @JvmOverloads constructor(
                             !isSeeking.value &&
                             !activity.player.isExiting,
                         buffering = load.buffering || load.seeking || isSeeking.value,
-                        speed = playbackSpeed.value.toDouble(),
+                        speed = holdSpeed.originalSpeed ?: playbackSpeed.value.toDouble(),
                         problem = if (load.failure != null) WatchProblem.SourceError else WatchProblem.None,
                         upcoming = if (timing.ready && duration - position <= 90) watchNextMedia() else null,
                         canAdvance = timing.ready && canWatchAdvance(),
@@ -320,6 +326,7 @@ class PlayerViewModel @JvmOverloads constructor(
 
     fun onNativePause(paused: Boolean) {
         val effective = paused || watchTogether.active && watchTogether.expectsPaused
+        if (effective) endHoldSpeed()
         _paused.value = effective
         if (effective != paused) activity.player.paused = effective
     }
@@ -390,7 +397,37 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun setPlaybackSpeedByUser(speed: Double) {
+        endHoldSpeed()
         if (!watchTogether.requestSpeed(speed)) MPVLib.setPropertyDouble("speed", speed)
+    }
+
+    fun beginHoldSpeed(): Boolean {
+        if (watchTogether.active) {
+            playerUpdate.value = PlayerUpdates.ShowText("Il 2× temporaneo non è disponibile nelle stanze")
+            return false
+        }
+        val cast = activity.castController.state.value
+        if (paused.value ||
+            isLoading.value ||
+            isLoadingEpisode.value ||
+            areControlsLocked.value ||
+            cast.active ||
+            cast.connecting ||
+            sheetShown.value != Sheets.None ||
+            dialogShown.value != Dialogs.None ||
+            panelShown.value != Panels.None
+        ) {
+            return false
+        }
+        if (!holdSpeed.start()) return false
+        hideControls()
+        playerUpdate.value = PlayerUpdates.DoubleSpeed
+        return true
+    }
+
+    fun endHoldSpeed() {
+        holdSpeed.finish()
+        playerUpdate.update { if (it is PlayerUpdates.DoubleSpeed) PlayerUpdates.None else it }
     }
 
     private val _subtitleTracks = MutableStateFlow<List<VideoTrack>>(emptyList())
@@ -666,6 +703,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun onPlaybackFailed(reason: PlaybackFailure) {
+        endHoldSpeed()
         playbackLoad.fail(reason)
         isLoading.value = false
         updateIsLoadingEpisode(false)
@@ -971,6 +1009,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun pause() {
+        endHoldSpeed()
         activity.player.paused = true
         _paused.update { true }
         runCatching {

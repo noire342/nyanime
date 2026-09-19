@@ -85,6 +85,7 @@ import eu.kanade.tachiyomi.ui.player.controls.components.Anime4KDiagnosticsOverl
 import eu.kanade.tachiyomi.ui.player.controls.components.BrightnessOverlay
 import eu.kanade.tachiyomi.ui.player.controls.components.BrightnessSlider
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
+import eu.kanade.tachiyomi.ui.player.controls.components.DoubleSpeedPlayerUpdate
 import eu.kanade.tachiyomi.ui.player.controls.components.NextEpisodeCard
 import eu.kanade.tachiyomi.ui.player.controls.components.SeekbarWithTimers
 import eu.kanade.tachiyomi.ui.player.controls.components.TextPlayerUpdate
@@ -177,6 +178,7 @@ fun PlayerControls(
     val seekBarShown by viewModel.seekBarShown.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isLoadingEpisode by viewModel.isLoadingEpisode.collectAsState()
+    val isEpisodeOnline by viewModel.isEpisodeOnline.collectAsState()
     val playbackLoad by viewModel.playbackLoadState.collectAsState()
     val playbackActivity = LocalContext.current as PlayerActivity
     val duration by viewModel.duration.collectAsState()
@@ -412,7 +414,7 @@ fun PlayerControls(
                     },
                 ) {
                     when (currentPlayerUpdate) {
-                        // is PlayerUpdates.DoubleSpeed -> DoubleSpeedPlayerUpdate()
+                        is PlayerUpdates.DoubleSpeed -> DoubleSpeedPlayerUpdate()
                         is PlayerUpdates.AspectRatio -> TextPlayerUpdate(stringResource(aspectRatio.titleRes))
                         is PlayerUpdates.ShowText -> TextPlayerUpdate(
                             (currentPlayerUpdate as PlayerUpdates.ShowText).value,
@@ -571,7 +573,6 @@ fun PlayerControls(
                 }
                 // Top right controls
                 val autoPlayEnabled by playerPreferences.autoplayEnabled().collectAsState()
-                val isEpisodeOnline by viewModel.isEpisodeOnline.collectAsState()
                 AnimatedVisibility(
                     controlsShown && !areControlsLocked,
                     enter = if (!reduceMotion) {
@@ -594,6 +595,8 @@ fun PlayerControls(
                     val sleepTimerTimeRemaining by viewModel.remainingTime.collectAsState()
                     val sleepTimerEndEpisode by viewModel.sleepTimerEndEpisode.collectAsState()
                     val watchRoom by viewModel.watchTogether.state.collectAsState()
+                    val showAudioShortcut by playerPreferences.showAudioShortcut().collectAsState()
+                    val showQualityShortcut by playerPreferences.showQualityShortcut().collectAsState()
                     TopRightPlayerControls(
                         onCastClick = {
                             if (castActivity.castRequest() != null) {
@@ -610,6 +613,8 @@ fun PlayerControls(
                         onAudioLongClick = { viewModel.showPanel(Panels.AudioDelay) },
                         onQualityClick = { viewModel.showSheet(Sheets.QualityTracks) },
                         isEpisodeOnline = isEpisodeOnline,
+                        showAudioShortcut = showAudioShortcut,
+                        showQualityShortcut = showQualityShortcut,
                         isUltraVideo = ultraVideo,
                         isAnime4KSmartEnabled = anime4kSelection.profile == Anime4KProfile.Smart,
                         anime4KSmartLabel = if (anime4kSelection.profile == Anime4KProfile.Smart) {
@@ -742,6 +747,11 @@ fun PlayerControls(
 
         PlayerSheets(
             sheetShown = sheetShown,
+            onOpenSheet = { target ->
+                if (target == Sheets.Screenshot) viewModel.pauseByUser()
+                viewModel.showSheet(target)
+            },
+            isEpisodeOnline = isEpisodeOnline == true,
             subtitles = subtitles.toImmutableList(),
             selectedSubtitles = selectedSubtitles.toList().toImmutableList(),
             onAddSubtitle = viewModel::addSubtitle,
@@ -795,7 +805,6 @@ fun PlayerControls(
             takeScreenshot = viewModel::takeScreenshot,
             onDismissScreenshot = {
                 viewModel.showSheet(Sheets.None)
-                viewModel.unpause()
             },
             onOpenPanel = viewModel::showPanel,
             onDismissRequest = { viewModel.showSheet(Sheets.None) },

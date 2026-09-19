@@ -45,6 +45,8 @@ import java.io.InputStream
 @Composable
 fun PlayerSheets(
     sheetShown: Sheets,
+    onOpenSheet: (Sheets) -> Unit,
+    isEpisodeOnline: Boolean,
 
     // subtitles sheet
     subtitles: ImmutableList<VideoTrack>,
@@ -186,6 +188,10 @@ fun PlayerSheets(
         )
         Sheets.More -> {
             MoreSheet(
+                onOpenAudio = { onOpenSheet(Sheets.AudioTracks) },
+                onOpenQuality = { onOpenSheet(Sheets.QualityTracks) },
+                onOpenScreenshot = { onOpenSheet(Sheets.Screenshot) },
+                qualityAvailable = isEpisodeOnline,
                 selectedDecoder = decoder,
                 onSelectDecoder = onUpdateDecoder,
                 remainingTime = sleepTimerTimeRemaining,
