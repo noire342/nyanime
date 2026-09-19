@@ -132,7 +132,7 @@ fun TopRightPlayerControls(
             if (isUltraVideo) {
                 Text(
                     "ULTRA",
-                    color = Color(0xFFE477FF),
+                    color = Color.White,
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(horizontal = MaterialTheme.padding.mediumSmall),
                 )

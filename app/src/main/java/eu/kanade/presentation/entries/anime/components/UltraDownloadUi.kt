@@ -22,9 +22,11 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PauseCircle
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -46,7 +48,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,13 +74,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
 internal val UltraAccent: Color
-    @Composable get() = if (MaterialTheme.colorScheme.surface.luminance() >
-        0.5f
-    ) {
-        Color(0xFF84229D)
-    } else {
-        Color(0xFFE477FF)
-    }
+    @Composable get() = MaterialTheme.colorScheme.primary
 
 /** This row is composed only for visible downloaded episodes; filesystem discovery never runs on main. */
 @Composable
@@ -102,6 +97,7 @@ internal fun UltraEpisodeDownload(anime: Anime, episode: Episode, onPlay: () -> 
         }
     }
     var show by remember(episode.id) { mutableStateOf(false) }
+    var delete by remember(episode.id) { mutableStateOf(false) }
     if (task == null) {
         TextButton(
             onClick = { retry++ },
@@ -112,7 +108,13 @@ internal fun UltraEpisodeDownload(anime: Anime, episode: Episode, onPlay: () -> 
         }
     }
     task?.let {
-        UltraStatusRow(it, { show = true }, modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp))
+        UltraStatusRow(
+            it,
+            { show = true },
+            modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
+            onDelete = { delete = true },
+        )
+        if (delete) UltraDeleteDialog(listOf(it), onDismiss = { delete = false })
         if (show) {
             UltraTaskSheet(it, onDismiss = { show = false }, onPlay = {
                 show = false
@@ -123,7 +125,9 @@ internal fun UltraEpisodeDownload(anime: Anime, episode: Episode, onPlay: () -> 
 }
 
 @Composable
-internal fun UltraTitleSummary(animeId: Long, downloaded: Int) {
+internal fun UltraTitleSummary(anime: Anime, episodes: List<Episode>) {
+    val animeId = anime.id
+    val downloaded = episodes.size
     if (downloaded == 0) return
     val context = LocalContext.current
     val flow =
@@ -161,19 +165,28 @@ internal fun UltraTitleSummary(animeId: Long, downloaded: Int) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Icon(Icons.AutoMirrored.Filled.ArrowForward, "Gestisci Ultra")
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, "Gestisci i download")
         }
     }
-    if (show) UltraQueueDialog(animeId = animeId, onDismiss = { show = false })
+    if (show) {
+        UltraQueueDialog(animeId = animeId, onDismiss = { show = false }, loadDownloads = {
+            episodes.forEach { Injekt.get<AnimeDownloadManager>().describeUltra(anime, it) }
+        })
+    }
 }
 
 @Composable
-internal fun UltraStatusRow(task: UltraTask, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun UltraStatusRow(
+    task: UltraTask,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onDelete: (() -> Unit)? = null,
+) {
     val ready = task.phase == UltraPhase.READY
     val available = task.phase == UltraPhase.AVAILABLE || task.phase == UltraPhase.CANCELLED
     Surface(
         modifier = modifier.fillMaxWidth().heightIn(min = 48.dp),
-        color = if (available) MaterialTheme.colorScheme.surfaceContainer else UltraAccent.copy(alpha = 0.09f),
+        color = MaterialTheme.colorScheme.surfaceContainer,
         shape = RoundedCornerShape(14.dp),
     ) {
         Column(
@@ -195,7 +208,7 @@ internal fun UltraStatusRow(task: UltraTask, onClick: () -> Unit, modifier: Modi
                 Text(
                     when {
                         ready -> "ULTRA · pronto"
-                        available -> "Scaricato · opzioni Ultra"
+                        available -> "Scaricato · gestisci"
                         task.phase == UltraPhase.FAILED -> "Ultra da riprendere"
                         else -> task.message
                     },
@@ -208,6 +221,15 @@ internal fun UltraStatusRow(task: UltraTask, onClick: () -> Unit, modifier: Modi
                     Text("${task.progress}%", color = UltraAccent, style = MaterialTheme.typography.labelMedium)
                 }
                 Icon(Icons.AutoMirrored.Filled.ArrowForward, "Opzioni del download", Modifier.size(16.dp))
+                if (onDelete != null) {
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Outlined.DeleteOutline,
+                            "Elimina download",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
             if (task.active || task.phase == UltraPhase.PAUSED) {
                 LinearProgressIndicator(
@@ -236,6 +258,7 @@ internal fun UltraTaskSheet(
     var feedback by remember { mutableStateOf<String?>(null) }
     var fileName by remember { mutableStateOf<String?>(null) }
     var exportUltra by rememberSaveable { mutableStateOf(false) }
+    var delete by remember { mutableStateOf(false) }
     var details by remember { mutableStateOf("Nella cartella di questo episodio, insieme al download originale.") }
     LaunchedEffect(current.phase) {
         val info = withContext(Dispatchers.IO) {
@@ -243,12 +266,17 @@ internal fun UltraTaskSheet(
                 val folder = UniFile.fromUri(context, current.folder.toUri())
                 val video = folder?.let { UltraFiles.completed(context, it) ?: UltraFiles.original(it) }
                 val name = video?.name
+                val originalBytes = folder?.let(UltraFiles::original)?.length() ?: 0L
+                val ultraBytes = folder?.findFile(UltraFiles.VIDEO)?.length() ?: 0L
+                val temporaryBytes = UltraDownloads.scratch(context, current.key).walkTopDown()
+                    .filter { it.isFile }.sumOf { it.length() } +
+                    (folder?.findFile(UltraFiles.PART)?.length() ?: 0L)
+                fun size(bytes: Long) = android.text.format.Formatter.formatFileSize(context, bytes)
                 name to (
                     video?.let {
-                        "${it.name} · ${android.text.format.Formatter.formatFileSize(
-                            context,
-                            it.length(),
-                        )}\nNella cartella di questo episodio."
+                        "Originale · ${size(
+                            originalBytes,
+                        )}\nCopia Ultra · ${size(ultraBytes)}\nTemporanei · ${size(temporaryBytes)}\n${it.name}"
                     } ?: "Il file originale non è più disponibile."
                     )
             }.getOrDefault(null to "Impossibile accedere al file. Controlla la cartella dei download.")
@@ -279,7 +307,7 @@ internal fun UltraTaskSheet(
         }
     }
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!busy) onDismiss() },
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         UltraTaskContent(
@@ -295,7 +323,7 @@ internal fun UltraTaskSheet(
             } else {
                 "Guarda l'originale"
             },
-            onPrimary = onPlay ?: onOpenTitle,
+            onPrimary = if (fileName != null) onPlay ?: onOpenTitle else onOpenTitle,
             onToggle = {
                 command {
                     if (current.active) {
@@ -319,7 +347,15 @@ internal fun UltraTaskSheet(
             },
             onCancel = { command { UltraDownloads.cancel(context, current) } },
             canExport = fileName != null,
+            canPrepare = fileName != null,
+            onDelete = { delete = true },
         )
+    }
+    if (delete) {
+        UltraDeleteDialog(listOf(current), onDismiss = { delete = false }, onDeleted = { onlyUltra ->
+            delete = false
+            if (!onlyUltra) onDismiss()
+        })
     }
 }
 
@@ -335,6 +371,8 @@ internal fun UltraTaskContent(
     onExport: () -> Unit,
     onCancel: () -> Unit,
     canExport: Boolean = true,
+    canPrepare: Boolean = true,
+    onDelete: (() -> Unit)? = null,
 ) {
     Column(
         Modifier.fillMaxWidth().widthIn(max = 600.dp).verticalScroll(rememberScrollState())
@@ -342,16 +380,16 @@ internal fun UltraTaskContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(Icons.Filled.AutoAwesome, null, tint = UltraAccent)
+            Icon(Icons.Filled.Download, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 "IL TUO DOWNLOAD",
-                color = UltraAccent,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
             )
         }
         Text(current.title, style = MaterialTheme.typography.titleLarge)
-        Surface(color = UltraAccent.copy(alpha = 0.09f), shape = RoundedCornerShape(20.dp)) {
+        Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(20.dp)) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     if (current.phase ==
@@ -393,13 +431,19 @@ internal fun UltraTaskContent(
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = UltraAccent,
+                    containerColor = MaterialTheme.colorScheme.onSurface,
                     contentColor = MaterialTheme.colorScheme.surface,
                 ),
                 contentPadding = PaddingValues(16.dp),
             ) {
                 Icon(Icons.Filled.PlayArrow, null, Modifier.padding(end = 8.dp))
                 Text(primaryLabel)
+            }
+        }
+        if (onDelete != null) {
+            OutlinedButton(onClick = onDelete, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Outlined.DeleteOutline, null, Modifier.padding(end = 8.dp))
+                Text("Elimina download…")
             }
         }
         when {
@@ -421,7 +465,7 @@ internal fun UltraTaskContent(
             current.phase != UltraPhase.READY -> OutlinedButton(
                 onClick = onToggle,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !busy,
+                enabled = !busy && canPrepare,
             ) {
                 Text(
                     if (current.phase == UltraPhase.AVAILABLE ||
@@ -434,7 +478,7 @@ internal fun UltraTaskContent(
                 )
             }
         }
-        Text("Dove trovo il video?", style = MaterialTheme.typography.titleSmall)
+        Text("File e spazio occupato", style = MaterialTheme.typography.titleSmall)
         Text(
             details,
             style = MaterialTheme.typography.bodySmall,

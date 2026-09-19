@@ -23,6 +23,7 @@ import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import tachiyomi.domain.download.service.DownloadPreferences
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -128,45 +129,48 @@ internal object UltraDownloads {
         )
     }.flowOn(Dispatchers.IO)
 
-    suspend fun describe(context: Context, folder: UniFile, title: String, animeId: Long, episodeId: Long): UltraTask =
+    suspend fun describe(context: Context, folder: UniFile, title: String, animeId: Long, episodeId: Long): UltraTask? =
         withContext(Dispatchers.IO) {
-            val store = UltraTaskStore.get(context)
-            val key = UltraTask.key(folder.uri.toString())
-            val ready = UltraFiles.completed(context, folder) != null
-            store.change(key) { previous ->
-                val task = previous ?: UltraTask(folder.uri.toString(), title, animeId, episodeId)
-                task.copy(
-                    animeId = animeId,
-                    episodeId = episodeId,
-                    title = title,
-                    phase = if (ready) {
-                        UltraPhase.READY
-                    } else if (task.phase ==
-                        UltraPhase.READY
-                    ) {
-                        UltraPhase.AVAILABLE
-                    } else {
-                        task.phase
-                    },
-                    progress = if (ready) {
-                        100
-                    } else if (task.phase == UltraPhase.READY) {
-                        0
-                    } else {
-                        task.progress
-                    },
-                    message = if (ready) {
-                        "Ultra pronto"
-                    } else if (task.phase ==
-                        UltraPhase.READY
-                    ) {
-                        "Originale scaricato"
-                    } else {
-                        task.message
-                    },
-                )
+            commands.withLock {
+                if (!folder.exists()) return@withLock null
+                val store = UltraTaskStore.get(context)
+                val key = UltraTask.key(folder.uri.toString())
+                val ready = UltraFiles.completed(context, folder) != null
+                store.change(key) { previous ->
+                    val task = previous ?: UltraTask(folder.uri.toString(), title, animeId, episodeId)
+                    task.copy(
+                        animeId = animeId,
+                        episodeId = episodeId,
+                        title = title,
+                        phase = if (ready) {
+                            UltraPhase.READY
+                        } else if (task.phase ==
+                            UltraPhase.READY
+                        ) {
+                            UltraPhase.AVAILABLE
+                        } else {
+                            task.phase
+                        },
+                        progress = if (ready) {
+                            100
+                        } else if (task.phase == UltraPhase.READY) {
+                            0
+                        } else {
+                            task.progress
+                        },
+                        message = if (ready) {
+                            "Ultra pronto"
+                        } else if (task.phase ==
+                            UltraPhase.READY
+                        ) {
+                            "Originale scaricato"
+                        } else {
+                            task.message
+                        },
+                    )
+                }
+                store.tasks.value.getValue(key)
             }
-            store.tasks.value.getValue(key)
         }
 
     suspend fun enqueue(context: Context, task: UltraTask, replace: Boolean = false) = withContext(Dispatchers.IO) {
@@ -270,6 +274,78 @@ internal object UltraDownloads {
                 UltraTaskStore.get(context).change(key) { null }
             } catch (error: Exception) {
                 if (error is kotlinx.coroutines.CancellationException) throw error
+            }
+        }
+    }
+
+    /** Deletes only the selected episode, or just our named Ultra files, after its writer has stopped. */
+    suspend fun delete(context: Context, task: UltraTask, onlyUltra: Boolean) = withContext(Dispatchers.IO) {
+        commands.withLock {
+            val store = UltraTaskStore.get(context)
+            try {
+                UltraRemoval.run(
+                    stopWriter = {
+                        // Invalidate the old attempt before cancellation, including late file publication.
+                        store.change(task.key) {
+                            it?.copy(phase = UltraPhase.PAUSED, workId = "", message = "Eliminazione in corso…")
+                        }
+                        check(
+                            withTimeoutOrNull(30_000) {
+                                WorkManager.getInstance(context)
+                                    .cancelUniqueWork("${UltraDownloadWorker.TAG}:${task.key}").result.await()
+                                while (UltraDownloadWorker.activeKey == task.key) delay(50)
+                                true
+                            } == true,
+                        ) { "Ultra si sta ancora arrestando. Attendi qualche secondo e riprova." }
+                    },
+                    removeFiles = {
+                        val folder = requireNotNull(UniFile.fromUri(context, task.folder.toUri())) {
+                            "Cartella non accessibile. Controlla le autorizzazioni dei download."
+                        }
+                        if (onlyUltra) {
+                            // Never delete original video, subtitles or unrelated files in this mode.
+                            listOf(UltraFiles.VIDEO, UltraFiles.PART, UltraFiles.MARKER).forEach { name ->
+                                folder.findFile(name)?.let { file ->
+                                    check(file.delete() && !file.exists()) {
+                                        "Non riesco a eliminare $name. Controlla la cartella dei download."
+                                    }
+                                }
+                            }
+                        } else if (folder.exists()) {
+                            check(folder.delete() && !folder.exists()) {
+                                "Download non eliminato. Controlla le autorizzazioni della cartella."
+                            }
+                        }
+                    },
+                    removeTemporary = {
+                        val temporary = scratch(context, task.key)
+                        check(!temporary.exists() || temporary.deleteRecursively()) {
+                            "Alcuni file temporanei non sono stati eliminati. Riprova per completare la pulizia."
+                        }
+                    },
+                    recordCompletion = {
+                        store.change(task.key) {
+                            if (onlyUltra) {
+                                (it ?: task).copy(
+                                    phase = UltraPhase.AVAILABLE,
+                                    progress = 0,
+                                    workId = "",
+                                    message = "Copia Ultra eliminata · originale disponibile",
+                                    coolingRequired = false,
+                                    coolingUntil = 0,
+                                )
+                            } else {
+                                null
+                            }
+                        }
+                    },
+                )
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                store.change(task.key) {
+                    it?.copy(phase = UltraPhase.FAILED, message = "Eliminazione incompleta · riprova")
+                }
+                throw error
             }
         }
     }

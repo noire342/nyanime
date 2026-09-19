@@ -13,6 +13,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.android.tools.screenshot.PreviewTest
 import eu.kanade.domain.ui.model.AppTheme
+import eu.kanade.presentation.entries.anime.components.UltraDeleteConfirmation
 import eu.kanade.presentation.entries.anime.components.UltraStatusRow
 import eu.kanade.presentation.entries.anime.components.UltraTaskContent
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
@@ -45,9 +46,9 @@ fun UltraDownloadsDetailsScreenshot() {
                     progress = 48,
                     message = "In pausa per raffreddamento",
                 ),
-                details = "Episodio 12.mp4 · 380 MB\nNella cartella di questo episodio.",
+                details = "Originale · 380 MB\nCopia Ultra · 0 B\nTemporanei · 760 MB\nEpisodio 12.mp4",
                 busy = false, feedback = null, primaryLabel = "Guarda l'originale",
-                onPrimary = {}, onToggle = {}, onExport = {}, onCancel = {},
+                onPrimary = {}, onToggle = {}, onExport = {}, onCancel = {}, onDelete = {},
             )
         }
     }
@@ -62,7 +63,7 @@ private fun UltraPreview(modern: Boolean) {
                 Text("I tuoi episodi, sempre qui", style = MaterialTheme.typography.bodyMedium)
                 val task = UltraTask("content://example/episode", "Una lunga avventura · Episodio 12")
                 Text(task.title, style = MaterialTheme.typography.titleMedium)
-                UltraStatusRow(task.copy(phase = UltraPhase.READY, progress = 100), {})
+                UltraStatusRow(task.copy(phase = UltraPhase.READY, progress = 100), {}, onDelete = {})
                 UltraStatusRow(
                     task.copy(
                         phase = UltraPhase.RUNNING,
@@ -94,5 +95,18 @@ private fun UltraPreview(modern: Boolean) {
                 UltraStatusRow(task, {})
             }
         }
+    }
+}
+
+@PreviewTest
+@Preview(name = "DeleteDownloads", widthDp = 393, heightDp = 820, locale = "it")
+@Preview(name = "DeleteDownloadsNarrow", widthDp = 320, heightDp = 820, fontScale = 1.4f, locale = "it")
+@Composable
+fun UltraDownloadsDeleteScreenshot() {
+    TachiyomiPreviewTheme(appTheme = AppTheme.NYANIME, modernUi = true) {
+        UltraDeleteConfirmation(
+            title = "3 episodi selezionati", onlyUltra = false, onChoose = {}, size = "2,4 GB",
+            busy = false, progress = null, error = null, onDismiss = {}, onConfirm = {},
+        )
     }
 }

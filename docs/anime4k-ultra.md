@@ -29,7 +29,7 @@ been removed; existing saved Maximum and Custom choices remain compatible.
   fail the conversion and retain the original.
 - `Nyanime-Ultra.mkv` is selected only after dimensions, duration, copied length
   and the completion marker have been checked. An unfinished export is never Ultra.
-- Completed downloads show a magenta **ULTRA** label in place of SM. Runtime
+- Completed downloads show a neutral **ULTRA** label in place of SM. Runtime
   Anime4K controls, diagnostics and automatic startup are suppressed for that file.
   Opening a regular video restores its own preferences. Room restrictions remain.
 
@@ -78,6 +78,19 @@ This does not change the native MPV/FFmpeg playback libraries, streaming resolve
 download quality selection, manga pipeline or external downloader behavior.
 
 ## Validation boundaries
+
+Download rows and details offer a direct delete action. The title's download sheet
+loads all its displayed downloaded episodes and supports multiple selection.
+Deletion offers either the complete episode or only Ultra plus its temporary files,
+with an estimated storage total and an explicit confirmation. Exported copies,
+library membership and playback history are not deleted.
+
+The writer is cancelled and awaited before deleting files. Its previous attempt ID
+is invalidated to prevent late publication from reviving the job. File deletion
+and temporary cleanup must both succeed before clearing the journal; failures are
+shown and can be retried. Closing the screen does not cancel confirmed cleanup.
+The download cache is refreshed even after a partial failure. Download surfaces
+use the app's neutral colors and theme accent instead of a hardcoded purple.
 
 JVM tests cover thermal hysteresis, playback/resource admission, pacing arithmetic,
 frame-aligned segment boundaries, interrupted checkpoints, queue persistence and

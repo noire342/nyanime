@@ -210,6 +210,27 @@ class AnimeDownloadManager(
             )
         }
 
+    internal suspend fun deleteStoredDownload(
+        task: eu.kanade.tachiyomi.data.download.anime.ultra.UltraTask,
+        onlyUltra: Boolean,
+    ) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.NonCancellable) {
+        if (!onlyUltra) {
+            queueState.value.filter { it.episode.id == task.episodeId }.map { it.episode }
+                .takeIf { it.isNotEmpty() }?.let(::removeFromDownloadQueue)
+        }
+        try {
+            eu.kanade.tachiyomi.data.download.anime.ultra.UltraDownloads.delete(context, task, onlyUltra)
+            if (!onlyUltra) {
+                val episode = Injekt.get<tachiyomi.domain.items.episode.interactor.GetEpisode>().await(task.episodeId)
+                val anime = Injekt.get<tachiyomi.domain.entries.anime.interactor.GetAnime>().await(task.animeId)
+                if (episode != null && anime != null) cache.removeEpisodes(listOf(episode), anime)
+            }
+        } finally {
+            // Includes partially successful deletion: badges and occupied space must reflect the filesystem.
+            cache.invalidateCache()
+        }
+    }
+
     /**
      * Returns true if the episode is downloaded.
      *

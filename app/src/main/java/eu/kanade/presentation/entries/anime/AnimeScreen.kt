@@ -1081,8 +1081,8 @@ private fun LazyGridScope.sharedEpisodeItems(
     if (!anime.isLocal()) {
         item(key = "local-downloads-summary", span = { GridItemSpan(maxLineSpan) }) {
             eu.kanade.presentation.entries.anime.components.UltraTitleSummary(
-                anime.id,
-                episodes.filterIsInstance<EpisodeList.Item>().count { it.isDownloaded },
+                anime,
+                episodes.filterIsInstance<EpisodeList.Item>().filter { it.isDownloaded }.map { it.episode },
             )
         }
     }
