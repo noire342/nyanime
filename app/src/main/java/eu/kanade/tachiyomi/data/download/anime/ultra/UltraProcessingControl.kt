@@ -20,8 +20,6 @@ internal class UltraProcessingControl(
     private val power = context.getSystemService(PowerManager::class.java)
     private val policy = UltraProcessingPolicy(cooling)
     private val stopped = AtomicBoolean(false)
-    private var lastHeadroomAt = -10_000L
-    private var headroom: Float? = null
 
     @Volatile private var interactiveOrWarm = false
 
@@ -36,9 +34,10 @@ internal class UltraProcessingControl(
         val level = battery?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         val status = if (Build.VERSION.SDK_INT >= 29) power.currentThermalStatus else 0
         val now = SystemClock.elapsedRealtime()
-        if (Build.VERSION.SDK_INT >= 30 && now - lastHeadroomAt >= 10_000) {
-            headroom = power.getThermalHeadroom(30).takeIf { it.isFinite() }
-            lastHeadroomAt = now
+        val headroom = if (Build.VERSION.SDK_INT >= 30) {
+            thermalHeadroom.sample(now) { power.getThermalHeadroom(30) }
+        } else {
+            null
         }
         interactiveOrWarm = power.isInteractive || status >= 1 || (temperature ?: 0f) >= 37f
         val memory = ActivityManager.MemoryInfo()
@@ -85,5 +84,10 @@ internal class UltraProcessingControl(
             LockSupport.parkNanos(minOf(20_000_000, duration - (System.nanoTime() - start)))
         }
         checkRunning()
+    }
+
+    companion object {
+        // Android limits this sensor across callers, including enqueue and successive workers.
+        private val thermalHeadroom = UltraThermalHeadroomCache()
     }
 }

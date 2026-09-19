@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -30,6 +31,7 @@ import eu.kanade.tachiyomi.data.download.anime.ultra.UltraPhase
 import eu.kanade.tachiyomi.data.download.anime.ultra.UltraTask
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun UltraQueueDialog(animeId: Long? = null, onDismiss: () -> Unit) {
@@ -44,6 +46,9 @@ internal fun UltraQueueDialog(animeId: Long? = null, onDismiss: () -> Unit) {
 @Composable
 internal fun UltraQueueContent(animeId: Long? = null, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var cancelling by remember { mutableStateOf(false) }
+    var actionError by remember { mutableStateOf<String?>(null) }
     var retry by remember { mutableStateOf(0) }
     val result by produceState<Result<List<UltraTask>>?>(null, retry) {
         value = null
@@ -77,6 +82,28 @@ internal fun UltraQueueContent(animeId: Long? = null, modifier: Modifier = Modif
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (jobs.any { it.active || it.phase == UltraPhase.PAUSED }) {
+                    TextButton(
+                        enabled = !cancelling,
+                        onClick = {
+                            scope.launch {
+                                cancelling = true
+                                actionError = null
+                                try {
+                                    jobs.filter { it.active || it.phase == UltraPhase.PAUSED }.forEach {
+                                        UltraDownloads.cancel(context, it)
+                                    }
+                                } catch (error: Exception) {
+                                    if (error is CancellationException) throw error
+                                    actionError = "Non è stato possibile annullare tutta la coda. Riprova."
+                                } finally {
+                                    cancelling = false
+                                }
+                            }
+                        },
+                    ) { Text(if (cancelling) "Annullamento…" else "Annulla tutte le elaborazioni") }
+                }
+                actionError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         }
         if (result == null || result?.isFailure == true) {
