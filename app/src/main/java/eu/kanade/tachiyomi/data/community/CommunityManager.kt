@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import eu.kanade.domain.base.BasePreferences
+import eu.kanade.tachiyomi.BuildConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +32,10 @@ import java.io.File
 import java.util.UUID
 
 /** Application owner. No network, source resolution or native-player work occurs on the UI thread. */
-class CommunityManager private constructor(context: Context) : CommunityInteractions {
+class CommunityManager private constructor(
+    context: Context,
+    val personalOnly: Boolean = false,
+) : CommunityInteractions {
     private val context = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
@@ -40,8 +44,13 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
     private var preferredImageHost = BlossomImages.hosts.first()
     private val mutable = MutableStateFlow(CommunityState())
     val state = mutable.asStateFlow()
-    private val vault = IdentityVault(context)
-    private val store = CommunityStore(context, vault)
+    private val vault = if (personalOnly) {
+        IdentityVault(context, PersonalSyncPolicy.VAULT, PersonalSyncPolicy.KEY_ALIAS)
+    } else {
+        IdentityVault(context)
+    }
+    private val store =
+        CommunityStore(context, vault, if (personalOnly) PersonalSyncPolicy.DATABASE else "community-v1.db")
     private val library = LibrarySyncBridge()
     private val notifications = CommunityNotifications(context)
     private val preferences: BasePreferences = Injekt.get()
@@ -60,6 +69,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
     private var lastActivity: LocalActivity? = null
     private var refreshedGeneration = -1L
     private var libraryAt = 0L
+    private val initialized = kotlinx.coroutines.CompletableDeferred<Unit>()
 
     @Volatile private var relayWarning: String? = null
     private val loggedRejections = mutableMapOf<String, Pair<RelayRejection, Long>>()
@@ -80,8 +90,14 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             mutable.update {
                 it.copy(
                     ready = true,
-                    background = store.read<Boolean>("settings", "background") ?: false,
-                    syncEnabled = store.read<Boolean>("settings", "sync") ?: true,
+                    background = !personalOnly && (store.read<Boolean>("settings", "background") ?: false),
+                    syncEnabled = if (personalOnly) {
+                        preferences.personalSyncEnabled().get()
+                    } else {
+                        store.read<Boolean>("settings", "sync")
+                            ?: true
+                    },
+                    lastReceipt = store.read<Long>("settings", "last-receipt") ?: 0,
                     presenceAccess = store.read<PresenceAccess>("settings", "presence") ?: PresenceAccess.Private,
                 )
             }
@@ -90,6 +106,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                 library.capture(state.value.syncEnabled && !preferences.incognitoMode().get())
                 connect()
             }
+            initialized.complete(Unit)
         }
         scope.launch {
             preferences.incognitoMode().changes().collect { incognito ->
@@ -113,8 +130,17 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                 delay(1000)
                 mutex.withLock {
                     try {
-                        if (identity == null || (!foreground && !state.value.background)) return@withLock
-                        if (state.value.syncEnabled && !preferences.incognitoMode().get()) drain()
+                        if (identity == null ||
+                            personalOnly &&
+                            !state.value.syncEnabled ||
+                            (!foreground && !state.value.background)
+                        ) {
+                            return@withLock
+                        }
+                        if (state.value.syncEnabled && !preferences.incognitoMode().get()) {
+                            seedPersonalIfNeeded()
+                            drain()
+                        }
                         store.cleanExpired()
                         if (state.value.syncEnabled && !preferences.incognitoMode().get()) handoff.tick()
                         ticks++
@@ -188,23 +214,50 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
     fun clearError() {
         mutable.update { it.copy(error = null) }
     }
+    internal fun createPersonal() {
+        check(personalOnly)
+        scope.launch {
+            initialized.await()
+            create("I miei dispositivi")
+        }
+    }
+    private fun enablePersonal() {
+        if (!personalOnly) return
+        preferences.personalSyncEnabled().set(true)
+        mutable.update { it.copy(syncEnabled = true) }
+    }
+    private suspend fun seedPersonalIfNeeded() {
+        if (personalOnly &&
+            store.read<Boolean>("settings", "seed-needed") == true &&
+            !preferences.incognitoMode().get()
+        ) {
+            library.seed()
+            store.save("settings", "seed-needed", false)
+        }
+    }
     fun create(name: String) = action {
-        require(identity == null && !vault.exists()) { "Un profilo è già collegato" }
+        require(identity == null && !vault.exists()) { "Questo dispositivo è già collegato" }
         require(name.trim().length in 1..40) { "Scegli un nome da 1 a 40 caratteri" }
         mutable.update { it.copy(loading = true) }
         val created = CommunityIdentity()
         val secret = created.exportSecret()
         try {
+            if (personalOnly) store.save("settings", "seed-needed", true)
             vault.save(secret)
         } finally {
             secret.fill(0)
         }
         identity = created
-        store.save("profiles", created.publicKey, CommunityProfile(created.publicKey, name.trim()))
-        if (!preferences.incognitoMode().get()) library.seed()
+        enablePersonal()
+        if (!personalOnly) store.save("profiles", created.publicKey, CommunityProfile(created.publicKey, name.trim()))
+        if (personalOnly) {
+            seedPersonalIfNeeded()
+        } else if (!preferences.incognitoMode().get()) {
+            library.seed()
+        }
         library.capture(!preferences.incognitoMode().get())
         connect()
-        publishProfileInternal(CommunityProfile(created.publicKey, name.trim()))
+        if (!personalOnly) publishProfileInternal(CommunityProfile(created.publicKey, name.trim()))
         drain()
         refresh()
     }
@@ -288,6 +341,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         address: String = "",
         priority: Int = 1,
     ): NostrEvent {
+        check(!personalOnly || kind == 30078 && PersonalSyncPolicy.address(address))
         val id = requireNotNull(identity)
         // Addressable updates in the same second remain one queued draft. The published revision is monotonic.
         val at = if (address.isEmpty()) {
@@ -304,7 +358,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         return event
     }
     private fun connect() {
-        if (transport != null) return
+        if (transport != null || personalOnly && !state.value.syncEnabled) return
         val id = identity ?: return
         transport = CommunityRelays(id, relayList, filters = {
             listOf(
@@ -329,7 +383,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                     put("#t", JsonArray(listOf(JsonPrimitive("nyanime-private-checkpoint"))))
                     put("limit", 200)
                 },
-            )
+            ).let { if (personalOnly) it.drop(1) else it }
         }, received = { event ->
             mutex.withLock {
                 ingest(event)
@@ -339,6 +393,9 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             mutex.withLock {
                 val recipient = store.recipient(event)
                 store.acknowledge(event, relay, targetsFor(recipient))
+                val at = System.currentTimeMillis()
+                store.save("settings", "last-receipt", at)
+                mutable.update { it.copy(lastReceipt = at) }
                 updateDeliveryState()
             }
         }, status = { count, error ->
@@ -346,13 +403,19 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             mutable.update { it.copy(connected = count, relayIssue = error) }
         }, next = { relay ->
             mutex.withLock {
-                if (identity == null) {
+                if (identity == null ||
+                    personalOnly &&
+                    (!state.value.syncEnabled || preferences.incognitoMode().get())
+                ) {
                     null
                 } else {
                     store.claimNext(
                         relay,
                         relay in relayList && state.value.syncEnabled && !preferences.incognitoMode().get(),
-                        accepts = { event -> relay in targetsFor(event.takeIf { it.kind == 1059 }?.tag("p")) },
+                        accepts = { event ->
+                            (!personalOnly || PersonalSyncPolicy.event(event, id.publicKey)) &&
+                                relay in targetsFor(event.takeIf { it.kind == 1059 }?.tag("p"))
+                        },
                     )
                 }
             }
@@ -375,13 +438,15 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         }, authenticated = { relay -> mutex.withLock { store.authenticated(relay) } }, diagnostic = {
             Log.w("NyanimeSync", it)
         })
-        transport?.query(id.publicKey)
+        if (!personalOnly) transport?.query(id.publicKey)
         if (state.value.syncEnabled && !preferences.incognitoMode().get()) {
             store.list<SyncCheckpoint>("sync-checkpoints").forEach { scheduleRecovery(it) }
         }
-        store.list<FriendState>("friends").filter { it.accepted || it.outgoing.isNotEmpty() }.forEach {
-            transport?.query(it.peer)
-            transport?.addDestinations(store.read<List<String>>("inbox-relays", it.peer).orEmpty(), it.peer)
+        if (!personalOnly) {
+            store.list<FriendState>("friends").filter { it.accepted || it.outgoing.isNotEmpty() }.forEach {
+                transport?.query(it.peer)
+                transport?.addDestinations(store.read<List<String>>("inbox-relays", it.peer).orEmpty(), it.peer)
+            }
         }
     }
     fun onForeground(value: Boolean) = action {
@@ -401,7 +466,17 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         } else {
             // Allow final pause/exit updates to drain without holding the manager mutex.
             disconnectJob = scope.launch {
-                delay(2000)
+                delay(250)
+                try {
+                    mutex.withLock {
+                        if (!foreground && state.value.syncEnabled && !preferences.incognitoMode().get()) drain()
+                    }
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (_: Exception) {
+                    mutable.update { it.copy(error = "L’ultimo progresso resta in coda. Riproverò alla riapertura.") }
+                }
+                delay(1750)
                 mutex.withLock {
                     if (!foreground && !state.value.background) {
                         transport?.close()
@@ -413,6 +488,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         }
     }
     fun setBackground(enabled: Boolean) = action {
+        check(!personalOnly)
         if (enabled) {
             withContext(Dispatchers.Main) {
                 context.startForegroundService(Intent(context, CommunityConnectionService::class.java))
@@ -430,6 +506,9 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         mutable.update { it.copy(background = enabled) }
     }
     fun setSync(enabled: Boolean) = action {
+        require(identity != null)
+        if (personalOnly && !enabled) handoff.disconnect()
+        if (personalOnly) preferences.personalSyncEnabled().set(enabled)
         store.save("settings", "sync", enabled)
         mutable.update { it.copy(syncEnabled = enabled) }
         library.capture(enabled && !preferences.incognitoMode().get())
@@ -442,6 +521,11 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             transport?.close()
             transport = null
             connect()
+        }
+        if (personalOnly && !enabled) {
+            transport?.close()
+            transport = null
+            mutable.update { it.copy(connected = 0) }
         }
         refresh()
     }
@@ -457,7 +541,11 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         transport?.close()
         transport = null
         connect()
-        if (identity != null) enqueuePublic(10050, "", values.map { listOf("relay", it) }, "inbox-relays")
+        if (!personalOnly &&
+            identity != null
+        ) {
+            enqueuePublic(10050, "", values.map { listOf("relay", it) }, "inbox-relays")
+        }
     }
     private fun targetsFor(recipient: String?): List<String> =
         if (recipient != null && recipient != identity?.publicKey) {
@@ -641,6 +729,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         refresh()
     }
     private fun sendAction(action: PrivateAction, peers: List<String>): PrivateAction {
+        check(!personalOnly || PersonalSyncPolicy.command(action.type) && peers.all { it == identity?.publicKey })
         val id = requireNotNull(identity)
         val command = action.copy(
             revision = if (action.revision >
@@ -663,7 +752,21 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         peers.forEach { peer ->
             transport?.addDestinations(store.read<List<String>>("inbox-relays", peer).orEmpty(), peer)
         }
-        store.transaction { envelopes.forEach { store.enqueue(it, priority = 3) } }
+        store.transaction {
+            envelopes.forEach {
+                store.enqueue(
+                    it,
+                    address = if (action.type ==
+                        "device.presence"
+                    ) {
+                        "device-presence:$device"
+                    } else {
+                        ""
+                    },
+                    priority = 3,
+                )
+            }
+        }
         return command
     }
     internal fun sendDeviceAction(
@@ -870,6 +973,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         publishPresence()
     }
     private fun publishPresence(clear: Boolean = false) {
+        if (personalOnly) return
         if (identity == null ||
             preferences.incognitoMode().get() ||
             state.value.presenceAccess == PresenceAccess.Private
@@ -1089,6 +1193,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             store.transaction {
                 val merged = SyncMerge.merge(store.read("sync", record.ref.key()), record)
                 store.save("sync", record.ref.key(), merged)
+                updateResume(merged)
                 val address = "nyanime.sync.v1:" +
                     device +
                     ":" +
@@ -1098,7 +1203,13 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                     Nip44.encrypt(id.conversationKey(id.publicKey), communityJson.encodeToString(merged)),
                     listOf(listOf("d", address)),
                     address,
-                    priority = if (record.edits.containsAll(SyncField.entries)) 0 else 2,
+                    priority = if (record.edits.containsAll(SyncField.entries) &&
+                        record.history < System.currentTimeMillis() - 15_000
+                    ) {
+                        0
+                    } else {
+                        2
+                    },
                 )
                 if (!store.contains("sync-addresses", address)) {
                     store.save("sync-addresses", address, true)
@@ -1196,6 +1307,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
     private suspend fun ingest(event: NostrEvent) {
         if (!event.valid()) return
         val id = identity ?: return
+        if (personalOnly && !PersonalSyncPolicy.event(event, id.publicKey)) return
         if (store.seen(event.id)) {
             if (event.kind == 30078 &&
                 event.pubkey == id.publicKey
@@ -1290,6 +1402,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
                         if (merged != old) {
                             val applied = library.apply(mapped(merged))
                             store.save("sync", record.ref.key(), merged)
+                            updateResume(merged)
                             if (applied) {
                                 store.remove(
                                     "unresolved",
@@ -1371,6 +1484,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             }
             1059 -> {
                 val rumor = GiftWrap.open(id, event)
+                if (personalOnly && (rumor.pubkey != id.publicKey || rumor.kind != 30079)) return
                 if (friend(rumor.pubkey).blocked) return
                 if (rumor.kind == 14) {
                     ingestChat(rumor)
@@ -1445,6 +1559,16 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             return
         }
         val self = rumor.pubkey == me
+        if (personalOnly &&
+            (
+                !self ||
+                    !state.value.syncEnabled ||
+                    preferences.incognitoMode().get() ||
+                    !PersonalSyncPolicy.command(action.type)
+                )
+        ) {
+            return
+        }
         if (self && action.revision > 0 && action.revision / 1000 <= System.currentTimeMillis() + 300_000) {
             val remoteClock = SyncRevision(action.revision / 1000, (action.revision % 1000).toInt(), device)
             if (remoteClock > revision) {
@@ -1609,11 +1733,49 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         }
         store.markSeen(rumor.id)
     }
+
+    /** Small materialized view: never decrypt the complete library on every playback tick. */
+    private fun updateResume(record: SyncRecord) {
+        if (!personalOnly) return
+        val key = record.ref.copy(itemUrl = "").key()
+        val previous = store.read<SyncRecord>("resume", key)
+        if (record.deleted && record.ref.itemUrl.isEmpty()) {
+            store.remove("resume", key)
+        } else if (previous?.ref == record.ref && (record.history == 0L || record.seen || record.deleted)) {
+            store.remove("resume", key)
+        } else if (record.ref.itemUrl.isNotEmpty() &&
+            record.history > 0 &&
+            (previous == null || record.history >= previous.history || record.ref == previous.ref)
+        ) {
+            if (record.seen || record.deleted) {
+                if (previous?.ref == record.ref) store.remove("resume", key)
+            } else {
+                store.save("resume", key, record)
+            }
+        }
+    }
+
     private suspend fun refresh() {
         updateDeliveryState()
         val now = android.os.SystemClock.elapsedRealtime()
         if (state.value.ready && now - refreshedAt < 250) return
         refreshedAt = now
+        if (personalOnly) {
+            if (store.count("unresolved") > 0 && now - libraryAt >= 5000) {
+                libraryAt = now
+                val titles = library.library()
+                mutable.update { it.copy(library = titles) }
+            }
+            mutable.update {
+                it.copy(
+                    loading = false,
+                    me = identity?.let { key -> CommunityProfile(key.publicKey, "I miei dispositivi") },
+                    recent = PersonalSyncPolicy.resume(store.list("resume", 50)),
+                    unresolved = store.list("unresolved", 100),
+                )
+            }
+            return
+        }
         if (foreground && now - libraryAt >= 5000) {
             libraryAt = now
             val titles = library.library()
@@ -1724,7 +1886,8 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         mutex.withLock {
             val bytes = requireNotNull(identity).exportSecret()
             try {
-                IdentityRecovery.export(bytes, password)
+                val protected = IdentityRecovery.export(bytes, password)
+                if (personalOnly) "NYS1." + protected else protected
             } finally {
                 bytes.fill(0)
                 password.fill('\u0000')
@@ -1732,9 +1895,11 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         }
     }
     fun restoreRecovery(encoded: String, password: CharArray) = action {
-        require(identity == null) { "Questo dispositivo ha già un profilo" }
+        require(identity == null) { "Questo dispositivo è già collegato" }
         val secret = try {
-            IdentityRecovery.restore(encoded.trim(), password)
+            val value = encoded.trim()
+            require(!personalOnly || value.startsWith("NYS1.")) { "Scegli il file di recupero di I miei dispositivi." }
+            IdentityRecovery.restore(if (personalOnly) value.removePrefix("NYS1.") else value, password)
         } finally {
             password.fill('\u0000')
         }
@@ -1749,6 +1914,7 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
         val restored = CommunityIdentity(secret)
         vault.save(secret)
         identity = restored
+        enablePersonal()
         refreshedGeneration = -1
         library.capture(state.value.syncEnabled && !preferences.incognitoMode().get())
         connect()
@@ -1785,19 +1951,43 @@ class CommunityManager private constructor(context: Context) : CommunityInteract
             mutex.withLock { store.save("uploaded-images", "$host:$hash", url) }
         }
     }
+    internal suspend fun resumeIds(record: SyncRecord): Pair<Long, Long>? = withContext(Dispatchers.IO) {
+        mutex.withLock { library.itemIds(mapped(record).ref) }
+    }
     internal fun linkedPairing() = DevicePairing(this, relays(), state.value.me != null)
     internal fun attachPlayer(adapter: DeviceHandoff.Player) = action {
         if (identity != null && state.value.syncEnabled && !preferences.incognitoMode().get()) handoff.attach(adapter)
     }
     companion object {
         @Volatile private var instance: CommunityManager? = null
-        internal fun existing() = instance
-        fun get(context: Context): CommunityManager =
-            instance
+
+        @Volatile private var personalInstance: CommunityManager? = null
+        internal fun hasPersonalIdentity(
+            context: Context,
+        ) = File(context.noBackupFilesDir, PersonalSyncPolicy.VAULT).exists()
+        internal fun existing(): CommunityManager? = personalInstance?.takeIf {
+            Injekt.get<BasePreferences>().personalSyncEnabled().get()
+        } ?: if (BuildConfig.COMMUNITY_ENABLED) instance else null
+
+        /** Called only after an explicit setup action, or for a previously configured device. */
+        internal fun personal(context: Context): CommunityManager = personalInstance ?: synchronized(this) {
+            personalInstance
+                ?: CommunityManager(context.applicationContext, personalOnly = true).also { personalInstance = it }
+        }
+        fun get(context: Context): CommunityManager {
+            check(BuildConfig.COMMUNITY_ENABLED) { "Community is dormant in this build" }
+            return instance
                 ?: synchronized(this) {
                     instance ?: CommunityManager(context.applicationContext).also { instance = it }
                 }
+        }
         fun lifecycle(context: Context, foreground: Boolean) {
+            if (Injekt.get<BasePreferences>().personalSyncEnabled().get()) {
+                personal(context).onForeground(foreground)
+            } else {
+                personalInstance?.onForeground(foreground)
+            }
+            if (!BuildConfig.COMMUNITY_ENABLED) return
             if (instance != null ||
                 File(context.noBackupFilesDir, "community.identity").exists()
             ) {

@@ -286,6 +286,8 @@ data class ChatItem(
 )
 
 data class CommunityState(
+    val recent: List<SyncRecord> = emptyList(),
+    val lastReceipt: Long = 0,
     val ready: Boolean = false,
     val loading: Boolean = false,
     val publishing: Boolean = false,

@@ -77,6 +77,38 @@ class DeviceHandoffTest {
         }
     }
 
+    @Test fun `disabling sync resumes a pending local player and drops all references before release`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            var now = 100_000L
+            val messages = mutableListOf<PrivateAction>()
+            val handoff = DeviceHandoff({ "b".repeat(32) }, messages::add, { now })
+            val player = Player("b".repeat(32), 10_000)
+            val remote = DevicePlayback("a".repeat(32), player.ref, 42_000, true)
+            handoff.receive(
+                PrivateAction(
+                    type = "device.presence",
+                    request = "presence",
+                    body = communityJson.encodeToString(DevicePlayback.serializer(), remote),
+                    expires = now + 15_000,
+                ),
+            )
+            handoff.attach(player)
+            assertFalse(player.playing)
+            handoff.disconnect()
+            assertTrue(player.playing)
+            assertEquals(10_000L, player.position)
+            assertEquals(1, player.resumes)
+            player.released = true
+            messages.clear()
+            now += 5000
+            handoff.tick()
+            assertTrue(messages.isEmpty())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test fun `detached player is never touched by delayed replies or a timeout`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         try {

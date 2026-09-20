@@ -20,6 +20,9 @@ class BasePreferences(
 
     fun incognitoMode() = preferenceStore.getBoolean(Preference.appStateKey("incognito_mode"), false)
 
+    // Device-local opt-in; excluded from portable preference backups.
+    fun personalSyncEnabled() = preferenceStore.getBoolean(Preference.appStateKey("personal_sync_enabled"), false)
+
     fun extensionInstaller() = ExtensionInstallerPreference(context, preferenceStore)
 
     fun deviceHasPip() = context.packageManager.hasSystemFeature(

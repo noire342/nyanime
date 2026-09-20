@@ -7,9 +7,13 @@ import android.database.sqlite.SQLiteOpenHelper
 import kotlinx.serialization.encodeToString
 
 /** Private data and pending signed envelopes are encrypted at rest with a non-exportable wrapping key. */
-internal class CommunityStore(context: Context, private val vault: IdentityVault) : SQLiteOpenHelper(
+internal class CommunityStore(
+    context: Context,
+    private val vault: IdentityVault,
+    database: String = "community-v1.db",
+) : SQLiteOpenHelper(
     context,
-    "community-v1.db",
+    database,
     null,
     3,
 ) {

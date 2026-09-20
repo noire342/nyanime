@@ -24,7 +24,8 @@ I documenti tecnici in inglese conservano i nomi delle API e dei componenti.
 | [API Home manga](manga-home-api.md) | Sezioni manga, capitoli, classifiche e identità degli elementi. |
 | [Anime4K Smart](anime4k-smart.md) | Misure di rendering, preset, fallback e shader. |
 | [Guarda insieme](watch-together.md) | Stanze cifrate, sincronizzazione, inviti e verifiche. |
-| [Community e dispositivi](community-protocol.md) | Profili, amicizie, bacheche, chat, gruppi e sincronizzazione personale cifrata. |
+| [I miei dispositivi](personal-sync.md) | Sync personale facoltativo, QR e ripresa di anime e manga. |
+| [Community dormiente](community-protocol.md) | Codice social conservato, disabilitato nell’app. |
 | [Cast](casting.md) | Google Cast, UPnP/DLNA, telecomando, relay locale e limiti. |
 | [Affidabilità](app-reliability.md) | Ricerca, download, backup, copertine e prestazioni. |
 | [Aggiornamenti delle estensioni](extension-update-alerts.md) | Frequenza dei controlli e deduplicazione delle notifiche. |

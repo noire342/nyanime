@@ -14,6 +14,9 @@ plugins {
 
 shortcutHelper.setFilePath("./shortcuts.xml")
 
+// Release gate: keep community code and local data dormant. Watch/reading rooms are independent.
+val communityEnabled = false
+
 android {
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
     namespace = "eu.kanade.tachiyomi"
@@ -28,6 +31,8 @@ android {
         buildConfigField("String", "COMMIT_SHA", "\"${getGitSha()}\"")
         buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLastCommitTime = false)}\"")
         buildConfigField("boolean", "UPDATER_ENABLED", "${Config.enableUpdater}")
+        buildConfigField("boolean", "COMMUNITY_ENABLED", communityEnabled.toString())
+        manifestPlaceholders["communityEnabled"] = communityEnabled.toString()
 
         // Put these fields in acra.properties
         // val acraProperties = Properties()

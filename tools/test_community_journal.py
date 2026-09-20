@@ -138,6 +138,37 @@ class CommunityJournalTest(unittest.TestCase):
                 db.execute(f'INSERT INTO {hist}({columns}) VALUES({values})')
                 self.assertEqual(0, db.execute('SELECT count(*) FROM community_changes').fetchone()[0])
 
+    def test_live_resume_overtakes_a_large_initial_library_copy(self):
+        for anime in (True, False):
+            with self.subTest(anime=anime), self.database(anime) as db:
+                _, item = self.populate(db, anime)
+                position = 'last_second_seen' if anime else 'last_page_read'
+                db.execute('UPDATE community_capture SET enabled=1')
+                db.execute(f'UPDATE {item} SET {position}=100 WHERE _id=2')
+                template = dict(db.execute('SELECT * FROM community_changes').fetchone())
+                template.pop('seq')
+                template['fields'] = 'all'
+                columns = list(template)
+                statement = f'INSERT INTO community_changes({",".join(columns)}) VALUES({",".join("?" for _ in columns)})'
+                for index in range(1500):
+                    template['title_url'] = f'/archive/{index}'
+                    db.execute(statement, list(template.values()))
+                # A seed row may already contain all fields when playback modifies it again.
+                db.execute("UPDATE community_changes SET fields='all' WHERE title_url='/title'")
+                db.execute(f'UPDATE {item} SET {position}=500 WHERE _id=2')
+                namespace = 'sqldelightanime/dataanime' if anime else 'sqldelight/data'
+                source = (ROOT / 'data/src/main' / namespace / 'communitySync.sq').read_text()
+                query = re.search(r'drain:\s*(.*?);', source, re.S).group(1)
+                rows = db.execute(query).fetchall()
+                self.assertEqual(128, len(rows))
+                self.assertEqual('/title', rows[0]['title_url'])
+                self.assertEqual(500, rows[0]['position'])
+                # Turning capture off preserves existing work and makes later writes local only.
+                db.execute('UPDATE community_capture SET enabled=0')
+                db.execute(f'UPDATE {item} SET {position}=600 WHERE _id=2')
+                self.assertEqual(1501, db.execute('SELECT count(*) FROM community_changes').fetchone()[0])
+                self.assertEqual(500, db.execute(query).fetchone()['position'])
+
 
 if __name__ == '__main__':
     unittest.main()

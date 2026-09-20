@@ -1,8 +1,22 @@
 # Community e sincronizzazione personale
 
-La community è facoltativa. Si apre dall’avatar nella Home o da **Altro → Community**.
-L’app continua a funzionare senza un profilo; l’identità sociale non sostituisce
-le chiavi temporanee delle stanze Guarda insieme.
+## Stato: dormiente
+
+La community è disattivata in tutte le varianti dell’app. Profili, amicizie,
+bacheche, feed, chat, gruppi sociali e presenza non sono accessibili. Non vengono
+aperte connessioni sociali. I dati locali esistenti sono conservati.
+Il [sync personale](personal-sync.md) è disponibile separatamente e solo dopo
+la configurazione esplicita in Impostazioni → I miei dispositivi.
+
+Le stanze Guarda e leggi insieme restano attive e indipendenti: usano un codice
+o link d’invito e chiavi temporanee, senza richiedere un profilo.
+
+Il codice seguente è mantenuto per una futura riattivazione. Il gate unico
+`communityEnabled` in `app/build.gradle.kts` controlla `BuildConfig.COMMUNITY_ENABLED`
+e i componenti Android. A ogni apertura dei database la cattura delle modifiche
+dipende dall’opt-in personale e dall’incognito; all’avvio vengono ritirate solo le notifiche della community.
+Una futura riattivazione richiederà anche di verificare la riconciliazione delle
+modifiche locali avvenute durante la sospensione prima di riprendere gli invii.
 
 ## Profili e contenuti pubblici
 

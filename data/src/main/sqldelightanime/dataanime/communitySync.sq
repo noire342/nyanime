@@ -78,7 +78,7 @@ END;
 capture:
 UPDATE community_capture SET enabled=:enabled;
 drain:
-SELECT * FROM community_changes ORDER BY seq LIMIT 128;
+SELECT * FROM community_changes ORDER BY CASE WHEN fields='all' THEN 1 ELSE 0 END, seq LIMIT 128;
 acknowledge:
 DELETE FROM community_changes WHERE seq=:seq;
 discard:

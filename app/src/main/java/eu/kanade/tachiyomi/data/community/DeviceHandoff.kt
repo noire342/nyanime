@@ -60,6 +60,18 @@ internal class DeviceHandoff(
     fun detach(adapter: Player) {
         if (player === adapter) player = null
     }
+
+    /** Turning sync off must not retain an activity or resume an old request after re-enabling. */
+    suspend fun disconnect() {
+        val waiting = request.isNotEmpty()
+        request = ""
+        peers.clear()
+        completed.clear()
+        withContext(Dispatchers.Main.immediate) {
+            if (waiting) player?.resume(fallback)
+            player = null
+        }
+    }
     private fun send(type: String, playback: DevicePlayback, target: String = "") {
         sendAction(
             PrivateAction(

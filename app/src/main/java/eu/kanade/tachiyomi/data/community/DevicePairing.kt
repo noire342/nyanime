@@ -19,7 +19,13 @@ import kotlinx.serialization.json.put
 import java.util.Base64
 
 @Serializable
-internal data class PairingCode(val key: String, val nonce: String, val until: Long, val relays: List<String>) {
+internal data class PairingCode(
+    val key: String,
+    val nonce: String,
+    val until: Long,
+    val relays: List<String>,
+    val purpose: String = "community",
+) {
     fun encode() =
         "NYD1." +
             Base64.getUrlEncoder().withoutPadding().encodeToString(communityJson.encodeToString(this).toByteArray())
@@ -59,7 +65,13 @@ internal class DevicePairing(
     private val mutex = Mutex()
     private val temporary = CommunityIdentity()
     private var code =
-        PairingCode(temporary.publicKey, randomBytes(32).hex(), System.currentTimeMillis() + 180_000, relays)
+        PairingCode(
+            temporary.publicKey,
+            randomBytes(32).hex(),
+            System.currentTimeMillis() + 180_000,
+            relays,
+            if (manager.personalOnly) PersonalSyncPolicy.PURPOSE else "community",
+        )
     private var peer = ""
     private var transport: CommunityRelays? = null
     private var outgoing = mutableListOf<NostrEvent>()
@@ -124,7 +136,9 @@ internal class DevicePairing(
             mutex.withLock {
                 runCatching {
                     require(sender && peer.isEmpty())
-                    code = PairingCode.parse(text.trim())
+                    val parsed = PairingCode.parse(text.trim())
+                    require(parsed.purpose == code.purpose) { "Usa il QR di Impostazioni → I miei dispositivi." }
+                    code = parsed
                     peer = code.key
                     connect()
                     send("hello", "")

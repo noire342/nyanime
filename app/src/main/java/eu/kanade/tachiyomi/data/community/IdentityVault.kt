@@ -16,16 +16,20 @@ import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 /** No secret enters SharedPreferences, Android backup, URLs, logging or saved activity state. */
-internal class IdentityVault(context: Context) {
-    private val file = AtomicFile(File(context.noBackupFilesDir, "community.identity"))
+internal class IdentityVault(
+    context: Context,
+    fileName: String = "community.identity",
+    private val alias: String = "nyanime.community.local.v1",
+) {
+    private val file = AtomicFile(File(context.noBackupFilesDir, fileName))
     private val wrappingKey: SecretKey by lazy { createKey() }
     private fun key() = wrappingKey
     private fun createKey(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        (store.getKey(ALIAS, null) as? SecretKey)?.let { return it }
+        (store.getKey(alias, null) as? SecretKey)?.let { return it }
         return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").apply {
             init(
-                KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                     .setBlockModes(
                         KeyProperties.BLOCK_MODE_GCM,
                     ).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build(),
@@ -57,9 +61,6 @@ internal class IdentityVault(context: Context) {
             init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOf(12)))
             doFinal(bytes.copyOfRange(12, bytes.size))
         }
-    }
-    companion object {
-        private const val ALIAS = "nyanime.community.local.v1"
     }
 }
 

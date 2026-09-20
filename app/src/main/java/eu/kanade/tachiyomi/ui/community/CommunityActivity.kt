@@ -98,6 +98,7 @@ import androidx.core.net.toUri
 import eu.kanade.presentation.motion.ModernMotion
 import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.theme.TachiyomiTheme
+import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.data.community.CommunityInteractions
 import eu.kanade.tachiyomi.data.community.CommunityItem
 import eu.kanade.tachiyomi.data.community.CommunityManager
@@ -124,10 +125,18 @@ class CommunityActivity : BaseActivity() {
     }
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (!BuildConfig.COMMUNITY_ENABLED) {
+            finish()
+            return
+        }
         accept(intent)
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!BuildConfig.COMMUNITY_ENABLED) {
+            finish()
+            return
+        }
         registerSecureActivity(this)
         enableEdgeToEdge()
         accept(intent)
@@ -137,6 +146,7 @@ class CommunityActivity : BaseActivity() {
 
 @Composable
 fun CommunityAvatarButton() {
+    if (!BuildConfig.COMMUNITY_ENABLED) return
     if (androidx.compose.ui.platform.LocalInspectionMode.current) {
         IconButton(onClick = {}) { Icon(Icons.Outlined.AccountCircle, "Community e profilo") }
         return
@@ -1055,5 +1065,6 @@ private fun Conversation(state: CommunityState, id: String, manager: CommunityMa
 }
 
 internal fun openCommunity(context: Context) {
+    if (!BuildConfig.COMMUNITY_ENABLED) return
     context.startActivity(Intent(context, CommunityActivity::class.java))
 }

@@ -27,15 +27,15 @@ disabilitare per tornare all'interfaccia legacy. Il tema manga resta indipendent
 | **Cast con telecomando** | Trasmetti a Google Cast, UPnP/DLNA o alle app Nyanime TV compatibili e continua a usare l'app dal telefono, con controlli e ripresa locale. |
 | **Player curato** | Usa tracce audio e sottotitoli, gesti, PiP, AniSkip, timer di sospensione e passaggio al prossimo episodio. |
 | **Manga completo** | Mantieni libreria e lettore legacy, con Home opzionali, aggiornamenti dei capitoli e tutte le modalità di lettura. |
-| **Community facoltativa** | Personalizza il profilo e le liste pubbliche, aggiungi amici, lascia firme e sticker, condividi consigli e usa chat cifrate e gruppi privati fino a 10 persone. |
-| **I tuoi dispositivi** | Collega telefoni e tablet con QR e conferma reciproca; sincronizza privatamente librerie, categorie, segnalibri, cronologia e punti di ripresa tramite Nostr. |
 
-La nuova community si apre dall’avatar nella Home o da **Altro → Community**.
-Scegli i titoli dalle copertine e personalizza Top 3, liste e bacheca con un’anteprima.
-Gli amici possono condividere facoltativamente ciò che stanno leggendo o guardando:
-un invito dalla loro scheda apre la visione insieme dopo l’accettazione.
-La libreria resta privata finché non scegli cosa pubblicare. Download e credenziali
-restano locali. [Funzionamento, protocollo e limiti](docs/community-protocol.md).
+Il **sync personale** si configura soltanto in [Impostazioni → I miei dispositivi](docs/personal-sync.md):
+QR temporaneo, ripresa di anime e manga e chiave di recupero protetta. È spento di default.
+
+Profili, amicizie, feed, chat e presenza social sono
+temporaneamente disattivati e non compaiono nell’app. Il codice e i dati locali
+restano conservati. Le stanze video e manga funzionano senza un profilo:
+si crea una stanza e si condivide il suo codice o link.
+[Documentazione della community dormiente](docs/community-protocol.md).
 
 ## Tutte le aree dell'app
 

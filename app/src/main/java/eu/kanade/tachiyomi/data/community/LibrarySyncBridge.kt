@@ -14,8 +14,9 @@ internal class LibrarySyncBridge(
     private val manga: MangaDatabaseHandler = Injekt.get(),
 ) {
     suspend fun capture(enabled: Boolean) {
-        anime.await { communitySyncQueries.capture(if (enabled) 1 else 0) }
-        manga.await { communitySyncQueries.capture(if (enabled) 1 else 0) }
+        val capture = if (enabled) 1L else 0L
+        anime.await { communitySyncQueries.capture(capture) }
+        manga.await { communitySyncQueries.capture(capture) }
     }
     suspend fun videoIds(ref: SyncReference): Pair<Long, Long>? {
         if (ref.manga || ref.itemUrl.isBlank()) return null
@@ -27,6 +28,19 @@ internal class LibrarySyncBridge(
                 ref.itemUrl,
             ).executeAsList().singleOrNull()
             if (title != null && episode != null) title to episode else null
+        }
+    }
+    suspend fun itemIds(ref: SyncReference): Pair<Long, Long>? {
+        if (!ref.manga) return videoIds(ref)
+        if (ref.itemUrl.isBlank()) return null
+        return manga.await {
+            val title = communitySyncQueries.findTitle(ref.source, ref.titleUrl).executeAsList().singleOrNull()
+            val chapter = communitySyncQueries.findItem(
+                ref.source,
+                ref.titleUrl,
+                ref.itemUrl,
+            ).executeAsList().singleOrNull()
+            if (title != null && chapter != null) title to chapter else null
         }
     }
     suspend fun seed() {

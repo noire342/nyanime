@@ -96,13 +96,15 @@ fun MoreScreen(
                 )
             }
 
-            item {
-                TextPreferenceWidget(
-                    title = "Community",
-                    subtitle = "Profilo, amici e i tuoi dispositivi",
-                    icon = Icons.Outlined.PeopleOutline,
-                    onPreferenceClick = { eu.kanade.tachiyomi.ui.community.openCommunity(context) },
-                )
+            if (eu.kanade.tachiyomi.BuildConfig.COMMUNITY_ENABLED) {
+                item {
+                    TextPreferenceWidget(
+                        title = "Community",
+                        subtitle = "Profilo, amici e i tuoi dispositivi",
+                        icon = Icons.Outlined.PeopleOutline,
+                        onPreferenceClick = { eu.kanade.tachiyomi.ui.community.openCommunity(context) },
+                    )
+                }
             }
 
             navStyle.overflowTabs.forEach { tab ->

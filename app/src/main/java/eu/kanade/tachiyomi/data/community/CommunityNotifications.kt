@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.community.CommunityActivity
 
@@ -13,7 +14,7 @@ internal class CommunityNotifications(context: Context) {
     private val context = context.applicationContext
     private val manager = context.getSystemService(NotificationManager::class.java)
     fun message(conversation: String, title: String, detail: String = "Hai un nuovo messaggio su Nyanime") {
-        if (!manager.areNotificationsEnabled()) return
+        if (!BuildConfig.COMMUNITY_ENABLED || !manager.areNotificationsEnabled()) return
         manager.createNotificationChannel(
             NotificationChannel(CHANNEL, "Amici, chat e inviti", NotificationManager.IMPORTANCE_DEFAULT),
         )

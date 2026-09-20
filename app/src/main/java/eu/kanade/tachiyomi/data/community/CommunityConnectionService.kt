@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.community.CommunityActivity
 
@@ -16,6 +17,10 @@ class CommunityConnectionService : Service() {
     override fun onBind(intent: Intent?) = null
     override fun onCreate() {
         super.onCreate()
+        if (!BuildConfig.COMMUNITY_ENABLED) {
+            stopSelf()
+            return
+        }
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL, "Community e sincronizzazione", NotificationManager.IMPORTANCE_LOW),
         )
@@ -45,6 +50,10 @@ class CommunityConnectionService : Service() {
         }
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!BuildConfig.COMMUNITY_ENABLED) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (intent?.action == STOP) {
             CommunityManager.get(this).setBackground(false)
             stopSelf()

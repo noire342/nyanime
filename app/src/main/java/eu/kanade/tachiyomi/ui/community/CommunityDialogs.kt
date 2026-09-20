@@ -809,7 +809,7 @@ private fun PublicImageField(
 }
 
 @Composable
-private fun RecoverySheet(manager: CommunityManager, restore: Boolean, close: () -> Unit) {
+internal fun RecoverySheet(manager: CommunityManager, restore: Boolean, close: () -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var password by remember { mutableStateOf("") }
@@ -856,9 +856,9 @@ private fun RecoverySheet(manager: CommunityManager, restore: Boolean, close: ()
             }
         }
     }
-    SheetFrame(if (restore) "Ritrova il tuo profilo" else "La chiave per ritrovarti", close) {
+    SheetFrame(if (restore) "Recupera i tuoi dispositivi" else "La tua chiave di recupero", close) {
         Text(
-            "Conserva il file protetto e la password in un posto sicuro. Servono per recuperare il profilo e i dati cifrati quando cambi telefono.",
+            "Conserva il file protetto e la password in un posto sicuro. Servono per recuperare i dati cifrati quando cambi telefono.",
         )
         if (restore) {
             OutlinedButton(onClick = { load.launch("text/*") }) { Text("Apri file di recupero") }
@@ -884,7 +884,9 @@ private fun RecoverySheet(manager: CommunityManager, restore: Boolean, close: ()
                         encoded = manager.exportRecovery(password.toCharArray())
                         password =
                             ""
-                        save.launch("Nyanime-profilo-protetto.txt")
+                        save.launch(
+                            if (manager.personalOnly) "Nyanime-sync-protetto.txt" else "Nyanime-profilo-protetto.txt",
+                        )
                     } catch (_: Exception) {
                         error =
                             "Esportazione non riuscita. Riprova."
@@ -909,7 +911,8 @@ private fun RecoverySheet(manager: CommunityManager, restore: Boolean, close: ()
 }
 
 @Composable
-private fun PairingSheet(manager: CommunityManager, close: () -> Unit) {
+internal fun PairingSheet(manager: CommunityManager, close: () -> Unit) {
+    val context = LocalContext.current
     val pairing = remember { manager.linkedPairing() }
     val state by pairing.state.collectAsState()
     var code by remember { mutableStateOf("") }
@@ -920,7 +923,7 @@ private fun PairingSheet(manager: CommunityManager, close: () -> Unit) {
             EmptyStory(
                 Icons.Outlined.CheckCircle,
                 "Collegamento completato",
-                "La libreria e i progressi verranno recuperati dai relay.",
+                "Recupero libreria e progressi. Li ritroverai nella Home e nella cronologia.",
             )
             Button(onClick = close) { Text("Continua") }
         } else if (state.comparison.isNotEmpty()) {
@@ -935,13 +938,32 @@ private fun PairingSheet(manager: CommunityManager, close: () -> Unit) {
             }
         } else if (state.code.isNotEmpty()) {
             Text(
-                "Sul telefono già collegato apri Community → Privacy e dispositivi → Collega un altro dispositivo e scansiona questo QR.",
+                if (manager.personalOnly) {
+                    "Sul telefono già configurato apri Impostazioni → I miei dispositivi → Collega un dispositivo e scansiona questo QR."
+                } else {
+                    "Sul telefono già collegato apri Community → Privacy e dispositivi → Collega un altro dispositivo e scansiona questo QR."
+                },
             )
             QrImage(state.code)
-            SelectionContainer { Text(state.code, style = MaterialTheme.typography.labelSmall) }
+            if (manager.personalOnly) {
+                TextButton(onClick = {
+                    context.getSystemService(android.content.ClipboardManager::class.java)
+                        .setPrimaryClip(
+                            android.content.ClipData.newPlainText("Codice temporaneo dispositivo", state.code),
+                        )
+                }) { Text("Copia codice temporaneo") }
+            } else {
+                SelectionContainer { Text(state.code, style = MaterialTheme.typography.labelSmall) }
+            }
             Text("Monouso · valido per 3 minuti", color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            Text("Sul nuovo dispositivo apri Community → Collega dispositivo. Qui scansiona il suo QR temporaneo.")
+            Text(
+                if (manager.personalOnly) {
+                    "Sul nuovo dispositivo apri Impostazioni → I miei dispositivi → Collega a un mio dispositivo. Qui scansiona il suo QR temporaneo."
+                } else {
+                    "Sul nuovo dispositivo apri Community → Collega dispositivo. Qui scansiona il suo QR temporaneo."
+                },
+            )
             Button(onClick = {
                 scan.launch(
                     ScanOptions().setDesiredBarcodeFormats(
