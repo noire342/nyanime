@@ -40,13 +40,8 @@ class AppUpdateChecker {
     }
 }
 
-val GITHUB_REPO: String by lazy {
-    if (isPreviewBuildType) {
-        "aniyomiorg/aniyomi-preview"
-    } else {
-        "aniyomiorg/aniyomi"
-    }
-}
+/** GitHub repository that publishes the fork's signed APK releases. */
+const val GITHUB_REPO = "noire342/ultrayomi"
 
 val RELEASE_TAG: String by lazy {
     if (isPreviewBuildType) {

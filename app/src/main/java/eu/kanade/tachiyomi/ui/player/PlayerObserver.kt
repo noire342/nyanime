@@ -1,7 +1,5 @@
 package eu.kanade.tachiyomi.ui.player
 
-import android.widget.Toast
-import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPVLib
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
@@ -41,12 +39,19 @@ class PlayerObserver(val activity: PlayerActivity) :
             httpError = null
         }
         logcat(LogPriority.ERROR) { errorMessage }
+        val generation = activity.playbackGeneration
         activity.runOnUiThread {
-            activity.toast(errorMessage, Toast.LENGTH_LONG)
+            if (activity.playbackGeneration == generation) {
+                activity.onPlaybackFailure(PlaybackFailure.fromNative(errorMessage))
+            }
         }
     }
 
     private var httpError: String? = null
+
+    fun clearError() {
+        httpError = null
+    }
 
     override fun logMessage(prefix: String, level: Int, text: String) {
         val logPriority = when (level) {
@@ -56,6 +61,9 @@ class PlayerObserver(val activity: PlayerActivity) :
             else -> LogPriority.VERBOSE
         }
         if (text.contains("HTTP error")) httpError = text
+        if ((logPriority == LogPriority.ERROR || logPriority == LogPriority.WARN) && Anime4K.isShaderError(text)) {
+            activity.onAnime4KShaderError(text)
+        }
         logcat.logcat("mpv/$prefix", logPriority) { text }
     }
 }

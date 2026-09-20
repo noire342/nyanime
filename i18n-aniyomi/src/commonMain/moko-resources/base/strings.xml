@@ -239,6 +239,27 @@
     <string name="pref_mpv_conf">Edit MPV configuration file for further player settings</string>
     <string name="pref_reset_mpv_conf">Reset MPV configuration file</string>
     <string name="pref_mpv_input">Edit MPV input file for keyboard mapping configuration</string>
+    <string name="pref_anime4k">Anime4K</string>
+    <string name="pref_anime4k_smart_auto_start">Start Smart automatically</string>
+    <string name="pref_anime4k_smart_auto_start_summary">When disabled, Smart stays off when opening a video. You can still enable it with the SM button.</string>
+    <string name="pref_anime4k_summary">Anime4K Fast and HQ presets for the internal player (HQ uses more GPU)</string>
+    <string name="pref_anime4k_max">Maximum (A+A HQ)</string>
+    <string name="pref_anime4k_off">Off</string>
+    <string name="pref_anime4k_mode_a">Mode A (Fast)</string>
+    <string name="pref_anime4k_mode_a_plus">Mode A+A (Fast)</string>
+    <string name="pref_anime4k_mode_a_hq">Mode A (HQ)</string>
+    <string name="pref_anime4k_mode_a_plus_hq">Mode A+A (HQ)</string>
+    <string name="pref_anime4k_mode_b">Mode B (Fast)</string>
+    <string name="pref_anime4k_mode_c">Mode C (Fast)</string>
+    <string name="pref_anime4k_mode_b_plus">Mode B+B (Fast)</string>
+    <string name="pref_anime4k_mode_c_plus_a">Mode C+A (Fast)</string>
+    <string name="pref_anime4k_mode_b_hq">Mode B (HQ)</string>
+    <string name="pref_anime4k_mode_c_hq">Mode C (HQ)</string>
+    <string name="pref_anime4k_mode_b_plus_hq">Mode B+B (HQ)</string>
+    <string name="pref_anime4k_mode_c_plus_a_hq">Mode C+A (HQ)</string>
+    <string name="pref_anime4k_fallback">Anime4K disabled after a shader error</string>
+    <string name="pref_anime4k_reduced">Anime4K preset reduced after a shader error</string>
+    <string name="pref_anime4k_debug_overlay">Anime4K diagnostic overlay</string>
     <!-- Player -->
 
     <!-- Player - skip intro button -->
@@ -369,6 +390,7 @@
     <string name="theme_cloudflare">Cloudflare</string>
     <string name="theme_sapphire">Sapphire</string>
     <string name="theme_doom">Doom</string>
+    <string name="theme_nyanime" translatable="false">Nyanime</string>
     <string name="theme_matrix">Matrix</string>
     <string name="pref_library_rows">List size</string>
     <!-- Reader section -->
@@ -612,4 +634,35 @@
     <string name="pref_download_fillermarked_items">Allow downloading of fillermarked episodes</string>
     <string name="show_episode_previews">Episode thumbnails</string>
     <string name="show_episode_summaries">Episode summaries</string>
+    <string name="discovery_home">Home</string>
+    <string name="discovery_navigation">Home, Anime, Manga, Esplora, Altro</string>
+    <string name="timer_pause_description">Playback pauses when the timer ends.</string>
+    <string name="timer_quick_hint">Tap a duration to start</string>
+    <string name="timer_restart_hint">Set a new duration from now</string>
+    <string name="timer_custom_minutes">Duration in minutes</string>
+    <string name="timer_duration_range">From 1 to 1439 minutes (23 h 59 min)</string>
+    <string name="timer_minutes_unit">min</string>
+    <string name="timer_quick_durations">Back to quick durations</string>
+    <string name="timer_custom_duration">Custom duration</string>
+    <string name="timer_update">Update timer</string>
+    <string name="timer_start">Start timer</string>
+    <string name="timer_pause_in">Playback pauses in</string>
+    <string name="timer_add_fifteen">+15 minutes</string>
+    <string name="timer_stop">Turn off timer</string>
+    <string name="timer_entry_hint">Quick durations and custom timer</string>
+    <string name="timer_at_episode_end">At the end of the episode</string>
+    <string name="timer_end_episode_short">Episode end</string>
+    <string name="timer_episode_end_description">Stop after this episode. The next episode will not start automatically.</string>
+    <string name="player_up_next">Up next</string>
+    <string name="player_up_next_countdown">Starting in %d s</string>
+    <string name="player_up_next_play_now">Play now</string>
+    <string name="home_artwork_retry">Reload image</string>
+    <string name="player_error_format">The server did not return a playable video. Retry or check the source page.</string>
+    <string name="player_error_network">The video could not be reached. Check your connection or retry to refresh the link.</string>
+    <string name="player_error_source_page">The server returned a web page instead of a video. Open the source to check for a verification or an unavailable episode.</string>
+    <string name="player_error_timeout">Playback did not start or resume in time. Retry to refresh the video link; your saved position is preserved.</string>
+    <string name="player_error_unknown">Playback failed. Retry or open the source to check the episode.</string>
+    <string name="player_open_source">Open source</string>
+    <string name="personal_sync_title">I miei dispositivi</string>
+    <string name="personal_sync_summary">Riprendi anime e manga sui tuoi dispositivi</string>
 </resources>

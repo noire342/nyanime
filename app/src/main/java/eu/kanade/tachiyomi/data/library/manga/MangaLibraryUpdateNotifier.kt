@@ -19,6 +19,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.common.Constants
 import eu.kanade.tachiyomi.core.security.SecurityPreferences
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloader
+import eu.kanade.tachiyomi.data.library.LibraryUpdateLoad
 import eu.kanade.tachiyomi.data.notification.NotificationHandler
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
@@ -118,13 +119,17 @@ class MangaLibraryUpdateNotifier(
      * Warn when excessively checking any single source.
      */
     fun showQueueSizeWarningNotificationIfNeeded(mangaToUpdate: List<LibraryManga>) {
-        val maxUpdatesFromSource = mangaToUpdate
-            .groupBy { it.manga.source }
-            .filterKeys { sourceManager.get(it) !is UnmeteredSource }
-            .maxOfOrNull { it.value.size } ?: 0
-
-        if (maxUpdatesFromSource <= MANGA_PER_SOURCE_QUEUE_WARNING_THRESHOLD) {
-            return
+        val load = LibraryUpdateLoad.warning(mangaToUpdate.map { it.manga.source }) {
+            sourceManager.get(it) is UnmeteredSource
+        } ?: return
+        val warning = if (securityPreferences.hideNotificationContent().get()) {
+            context.stringResource(MR.strings.notification_size_warning)
+        } else {
+            context.stringResource(
+                MR.strings.notification_library_queue_warning,
+                sourceManager.get(load.source)?.name ?: load.source.toString(),
+                load.count,
+            )
         }
 
         context.notify(
@@ -134,10 +139,11 @@ class MangaLibraryUpdateNotifier(
             setContentTitle(context.stringResource(MR.strings.label_warning))
             setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText(context.stringResource(MR.strings.notification_size_warning)),
+                    .bigText(warning),
             )
             setSmallIcon(R.drawable.ic_warning_white_24dp)
             setTimeoutAfter(MangaDownloader.WARNING_NOTIF_TIMEOUT_MS)
+            setOnlyAlertOnce(true)
             setContentIntent(NotificationHandler.openUrl(context, HELP_WARNING_URL))
         }
     }
@@ -397,4 +403,3 @@ class MangaLibraryUpdateNotifier(
 private const val NOTIF_MAX_CHAPTERS = 5
 private const val NOTIF_TITLE_MAX_LEN = 45
 private const val NOTIF_ICON_SIZE = 192
-private const val MANGA_PER_SOURCE_QUEUE_WARNING_THRESHOLD = 60

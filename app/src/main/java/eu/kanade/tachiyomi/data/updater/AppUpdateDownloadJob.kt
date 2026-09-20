@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.data.updater
 import android.content.Context
 import android.content.pm.ServiceInfo
 import android.os.Build
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -20,15 +21,17 @@ import eu.kanade.tachiyomi.network.newCachelessCallWithProgress
 import eu.kanade.tachiyomi.util.storage.getUriCompat
 import eu.kanade.tachiyomi.util.storage.saveTo
 import eu.kanade.tachiyomi.util.system.workManager
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import logcat.LogPriority
-import okhttp3.internal.http2.ErrorCode
-import okhttp3.internal.http2.StreamResetException
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.i18n.MR
 import uy.kohesive.injekt.injectLazy
 import java.io.File
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 
 class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerParameters) :
@@ -51,11 +54,21 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
             logcat(LogPriority.ERROR, e) { "Not allowed to run on foreground service" }
         }
 
-        withIOContext {
-            downloadApk(title, url)
+        return try {
+            withIOContext { downloadApk(title, url) }
+            Result.success()
+        } catch (e: CancellationException) {
+            notifier.cancel()
+            throw e
+        } catch (e: Exception) {
+            notifier.cancel()
+            if (UpdateDownloadPolicy.shouldRetry(e, runAttemptCount)) {
+                Result.retry()
+            } else {
+                notifier.onDownloadError(url)
+                Result.failure()
+            }
         }
-
-        return Result.success()
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
@@ -79,6 +92,7 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
         // Show notification download starting.
         notifier.onDownloadStarted(title)
 
+        val downloadContext = currentCoroutineContext()
         val progressListener = object : ProgressListener {
             // Progress of the download
             var savedProgress = 0
@@ -87,7 +101,8 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
             var lastTick = 0L
 
             override fun update(bytesRead: Long, contentLength: Long, done: Boolean) {
-                val progress = (100 * (bytesRead.toFloat() / contentLength)).toInt()
+                downloadContext.ensureActive()
+                val progress = UpdateDownloadPolicy.progress(bytesRead, contentLength) ?: return
                 val currentTime = System.currentTimeMillis()
                 if (progress > savedProgress && currentTime - 200 > lastTick) {
                     savedProgress = progress
@@ -97,30 +112,27 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
             }
         }
 
+        val directory = context.externalCacheDir ?: context.cacheDir
+        val temporary = File(directory, "update-$id.tmp")
+        val apkFile = File(directory, "update-$id.apk")
         try {
-            // Download the new update.
-            val response = network.client.newCachelessCallWithProgress(GET(url), progressListener)
-                .await()
-
-            // File where the apk will be saved.
-            val apkFile = File(context.externalCacheDir, "update.apk")
-
-            if (response.isSuccessful) {
-                response.body.source().saveTo(apkFile)
-            } else {
-                response.close()
-                throw Exception("Unsuccessful response")
+            network.client.newCachelessCallWithProgress(GET(url), progressListener).await().use { response ->
+                if (!response.isSuccessful) throw UpdateHttpException(response.code)
+                val expectedLength = response.body.contentLength()
+                response.body.source().saveTo(temporary)
+                downloadContext.ensureActive()
+                if (temporary.length() == 0L || (expectedLength >= 0 && temporary.length() != expectedLength)) {
+                    throw IOException("Incomplete APK download")
+                }
             }
+            val info = context.packageManager.getPackageArchiveInfo(temporary.absolutePath, 0)
+            require(info?.packageName == context.packageName) { "Invalid application update" }
+            downloadContext.ensureActive()
+            if (!temporary.renameTo(apkFile)) throw IOException("Unable to finalize APK download")
             notifier.cancel()
             notifier.promptInstall(apkFile.getUriCompat(context))
-        } catch (e: Exception) {
-            val shouldCancel = e is CancellationException ||
-                (e is StreamResetException && e.errorCode == ErrorCode.CANCEL)
-            if (shouldCancel) {
-                notifier.cancel()
-            } else {
-                notifier.onDownloadError(url)
-            }
+        } finally {
+            temporary.delete()
         }
     }
 
@@ -137,6 +149,7 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
 
             val request = OneTimeWorkRequestBuilder<AppUpdateDownloadJob>()
                 .setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
                 .addTag(TAG)
                 .setInputData(
                     workDataOf(

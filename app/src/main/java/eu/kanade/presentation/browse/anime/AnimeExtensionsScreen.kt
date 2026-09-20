@@ -94,6 +94,7 @@ fun AnimeExtensionScreen(
     val navigator = LocalNavigator.currentOrThrow
 
     PullRefresh(
+        indicatorOnGestureOnly = true,
         refreshing = state.isRefreshing,
         onRefresh = onRefresh,
         enabled = !state.isLoading,

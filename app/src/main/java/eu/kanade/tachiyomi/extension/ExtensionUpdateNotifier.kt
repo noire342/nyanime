@@ -8,17 +8,27 @@ import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.util.system.cancelNotification
 import eu.kanade.tachiyomi.util.system.notify
+import tachiyomi.core.common.preference.PreferenceStore
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
 class ExtensionUpdateNotifier(
     private val context: Context,
     private val securityPreferences: SecurityPreferences = Injekt.get(),
+    private val preferenceStore: PreferenceStore = Injekt.get(),
 ) {
 
-    fun promptUpdates(names: List<String>, anime: Boolean = false) {
+    internal fun promptUpdates(updates: List<ExtensionUpdate>, anime: Boolean = false) = synchronized(
+        announcementLock,
+    ) {
+        val announcements = ExtensionUpdateAnnouncements(
+            preferenceStore,
+            if (anime) ExtensionUpdateKind.ANIME else ExtensionUpdateKind.MANGA,
+        )
+        if (!announcements.hasNew(updates)) return@synchronized
+        val names = updates.map { it.name }
         context.notify(
-            Notifications.ID_UPDATES_TO_EXTS,
+            notificationId(anime),
             Notifications.CHANNEL_EXTENSIONS_UPDATE,
         ) {
             setContentTitle(
@@ -40,10 +50,19 @@ class ExtensionUpdateNotifier(
                 setContentIntent(NotificationReceiver.openAnimeExtensionsPendingActivity(context))
             }
             setAutoCancel(true)
+            setOnlyAlertOnce(true)
         }
+        announcements.record(updates)
     }
 
-    fun dismiss() {
-        context.cancelNotification(Notifications.ID_UPDATES_TO_EXTS)
+    fun dismiss(anime: Boolean = false) {
+        context.cancelNotification(notificationId(anime))
+    }
+
+    private fun notificationId(anime: Boolean): Int =
+        if (anime) Notifications.ID_UPDATES_TO_ANIME_EXTS else Notifications.ID_UPDATES_TO_EXTS
+
+    companion object {
+        private val announcementLock = Any()
     }
 }

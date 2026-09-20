@@ -11,6 +11,10 @@ class BackupPreferences(
 
     fun lastAutoBackupTimestamp() = preferenceStore.getLong(Preference.appStateKey("last_auto_backup_timestamp"), 0L)
 
+    fun autoBackupFailures() = preferenceStore.getInt(Preference.appStateKey("auto_backup_failures"), 0)
+
+    fun autoBackupError() = preferenceStore.getString(Preference.appStateKey("auto_backup_error"), "")
+
     fun backupFlags() = preferenceStore.getStringSet(
         "backup_flags",
         setOf(FLAG_CATEGORIES, FLAG_CHAPTERS, FLAG_HISTORY, FLAG_TRACK),

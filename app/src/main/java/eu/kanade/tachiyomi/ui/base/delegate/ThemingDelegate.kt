@@ -4,6 +4,7 @@ import android.app.Activity
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.domain.ui.model.AppTheme
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -24,7 +25,7 @@ class ThemingDelegateImpl : ThemingDelegate {
     override fun applyAppTheme(activity: Activity) {
         val uiPreferences = Injekt.get<UiPreferences>()
         ThemingDelegate.getThemeResIds(
-            uiPreferences.appTheme().get(),
+            if (activity is ReaderActivity) uiPreferences.legacyMangaTheme().get() else uiPreferences.activeAppTheme(),
             uiPreferences.themeDarkAmoled().get(),
         )
             .forEach(activity::setTheme)
@@ -32,6 +33,7 @@ class ThemingDelegateImpl : ThemingDelegate {
 }
 
 private val themeResources: Map<AppTheme, Int> = mapOf(
+    AppTheme.NYANIME to R.style.Theme_Tachiyomi_Nyanime,
     AppTheme.MONET to R.style.Theme_Tachiyomi_Monet,
     AppTheme.COTTONCANDY to R.style.Theme_Tachiyomi_CottonCandy,
     AppTheme.GREEN_APPLE to R.style.Theme_Tachiyomi_GreenApple,

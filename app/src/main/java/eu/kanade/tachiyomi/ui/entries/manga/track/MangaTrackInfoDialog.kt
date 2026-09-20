@@ -41,6 +41,7 @@ import dev.icerock.moko.resources.StringResource
 import eu.kanade.domain.track.manga.interactor.RefreshMangaTracks
 import eu.kanade.domain.track.manga.model.toDbTrack
 import eu.kanade.domain.ui.UiPreferences
+import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.track.TrackDateSelector
 import eu.kanade.presentation.track.TrackItemSelector
 import eu.kanade.presentation.track.TrackScoreSelector
@@ -96,6 +97,11 @@ data class MangaTrackInfoDialogHomeScreen(
 ) : Screen() {
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         val navigator = LocalNavigator.currentOrThrow
         val context = LocalContext.current
         val screenModel = rememberScreenModel { Model(mangaId, sourceId) }
@@ -291,6 +297,11 @@ private data class TrackStatusSelectorScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         val navigator = LocalNavigator.currentOrThrow
         val screenModel = rememberScreenModel {
             Model(
@@ -346,6 +357,11 @@ private data class TrackChapterSelectorScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         val navigator = LocalNavigator.currentOrThrow
         val screenModel = rememberScreenModel {
             Model(
@@ -409,6 +425,11 @@ private data class TrackScoreSelectorScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         val navigator = LocalNavigator.currentOrThrow
         val screenModel = rememberScreenModel {
             Model(
@@ -521,6 +542,11 @@ private data class TrackDateSelectorScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         val navigator = LocalNavigator.currentOrThrow
         val screenModel = rememberScreenModel {
             Model(
@@ -596,6 +622,11 @@ private data class TrackDateRemoverScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         val navigator = LocalNavigator.currentOrThrow
         val screenModel = rememberScreenModel {
             Model(
@@ -685,6 +716,11 @@ data class TrackServiceSearchScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         val navigator = LocalNavigator.currentOrThrow
         val screenModel = rememberScreenModel {
             Model(
@@ -777,6 +813,11 @@ private data class TrackerMangaRemoveScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         val navigator = LocalNavigator.currentOrThrow
         val screenModel = rememberScreenModel {
             Model(

@@ -2,7 +2,7 @@ package tachiyomi.presentation.core.components
 
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.clickable
@@ -25,15 +25,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -44,12 +44,10 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-
-private val sheetAnimationSpec = tween<Float>(durationMillis = 350)
 
 @Composable
 fun AdaptiveSheet(
@@ -57,10 +55,13 @@ fun AdaptiveSheet(
     enableSwipeDismiss: Boolean,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    animationDurationMillis: Int = 350,
+    waitForDismissAnimation: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
+    val animationSpec = remember(animationDurationMillis) { tween<Float>(animationDurationMillis) }
     val maxWidth = if (LocalConfiguration.current.orientation == ORIENTATION_LANDSCAPE) {
         600.dp
     } else {
@@ -68,16 +69,15 @@ fun AdaptiveSheet(
     }
 
     if (isTabletUi) {
-        var targetAlpha by remember { mutableFloatStateOf(0f) }
-        val alpha by animateFloatAsState(
-            targetValue = targetAlpha,
-            animationSpec = sheetAnimationSpec,
-            label = "alpha",
-        )
+        val alpha = remember { Animatable(0f) }
+        var closing by remember { mutableStateOf(false) }
         val internalOnDismissRequest: () -> Unit = {
-            scope.launch {
-                targetAlpha = 0f
-                onDismissRequest()
+            if (!closing) {
+                closing = true
+                scope.launch {
+                    if (waitForDismissAnimation) alpha.animateTo(0f, animationSpec) else alpha.snapTo(0f)
+                    onDismissRequest()
+                }
             }
         }
         Box(
@@ -88,7 +88,7 @@ fun AdaptiveSheet(
                     onClick = internalOnDismissRequest,
                 )
                 .fillMaxSize()
-                .alpha(alpha),
+                .graphicsLayer { this.alpha = alpha.value },
             contentAlignment = Alignment.Center,
         ) {
             Surface(
@@ -105,13 +105,13 @@ fun AdaptiveSheet(
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 content = {
-                    BackHandler(enabled = alpha > 0f, onBack = internalOnDismissRequest)
+                    BackHandler(enabled = alpha.value > 0f, onBack = internalOnDismissRequest)
                     content()
                 },
             )
 
             LaunchedEffect(Unit) {
-                targetAlpha = 1f
+                alpha.animateTo(1f, animationSpec)
             }
         }
     } else {
@@ -121,13 +121,23 @@ fun AdaptiveSheet(
                 initialValue = 1,
                 positionalThreshold = { with(density) { 56.dp.toPx() } },
                 velocityThreshold = { with(density) { 125.dp.toPx() } },
-                snapAnimationSpec = sheetAnimationSpec,
+                snapAnimationSpec = animationSpec,
                 decayAnimationSpec = decayAnimationSpec,
             )
         }
-        val internalOnDismissRequest = {
-            if (anchoredDraggableState.settledValue == 0) {
-                scope.launch { anchoredDraggableState.animateTo(1) }
+        var dismissed by remember { mutableStateOf(false) }
+        val finishDismiss = {
+            if (!dismissed) {
+                dismissed = true
+                onDismissRequest()
+            }
+        }
+        val internalOnDismissRequest: () -> Unit = {
+            if (anchoredDraggableState.targetValue != 1) {
+                scope.launch {
+                    anchoredDraggableState.animateTo(1)
+                    finishDismiss()
+                }
             }
         }
         Box(
@@ -169,6 +179,7 @@ fun AdaptiveSheet(
                         },
                     )
                     .then(modifier)
+                    .graphicsLayer { alpha = if (anchoredDraggableState.offset.isFinite()) 1f else 0f }
                     .offset {
                         IntOffset(
                             0,
@@ -198,11 +209,15 @@ fun AdaptiveSheet(
 
             LaunchedEffect(anchoredDraggableState) {
                 scope.launch { anchoredDraggableState.animateTo(0) }
-                snapshotFlow { anchoredDraggableState.settledValue }
-                    .drop(1)
-                    .filter { it == 1 }
+                // Observe actual visibility: an opening interrupted by a swipe can return to
+                // the hidden anchor without ever changing settledValue from its initial value.
+                snapshotFlow {
+                    anchoredDraggableState.offset < anchoredDraggableState.anchors.positionOf(1)
+                }
+                    .dropWhile { !it }
+                    .filter { !it }
                     .collectLatest {
-                        onDismissRequest()
+                        finishDismiss()
                     }
             }
         }

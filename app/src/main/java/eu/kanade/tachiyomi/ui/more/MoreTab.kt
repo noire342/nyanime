@@ -72,7 +72,7 @@ data object MoreTab : Tab {
             incognitoMode = screenModel.incognitoMode,
             onIncognitoModeChange = { screenModel.incognitoMode = it },
             navStyle = navStyle,
-            onClickAlt = { navigator.push(navStyle.moreTab) },
+            onClickAlt = { navigator.push(it) },
             onClickDownloadQueue = { navigator.push(DownloadsTab) },
             onClickCategories = { navigator.push(CategoriesTab) },
             onClickStats = { navigator.push(StatsTab) },

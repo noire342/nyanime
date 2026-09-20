@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ChromeReaderMode
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.CollectionsBookmark
+import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.GetApp
 import androidx.compose.material.icons.outlined.Info
@@ -176,6 +177,12 @@ object SettingsMainScreen : Screen() {
     )
 
     private val items = listOf(
+        Item(
+            titleRes = AYMR.strings.personal_sync_title,
+            subtitleRes = AYMR.strings.personal_sync_summary,
+            icon = Icons.Outlined.Devices,
+            screen = SettingsPersonalSyncScreen,
+        ),
         Item(
             titleRes = MR.strings.pref_category_appearance,
             subtitleRes = MR.strings.pref_appearance_summary,

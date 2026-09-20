@@ -13,6 +13,12 @@ class DownloadPreferences(
 
     fun useExternalDownloader() = preferenceStore.getBoolean("use_external_downloader", false)
 
+    fun ultraAfterDownload() = preferenceStore.getBoolean("ultra_after_download", false)
+
+    fun ultraOnlyWhileCharging() = preferenceStore.getBoolean("ultra_only_charging", true)
+
+    fun ultraOnlyWhileScreenOff() = preferenceStore.getBoolean("ultra_only_screen_off", true)
+
     fun externalDownloaderSelection() = preferenceStore.getString(
         "external_downloader_selection",
         "",

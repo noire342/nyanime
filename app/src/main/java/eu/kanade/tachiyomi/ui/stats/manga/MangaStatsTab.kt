@@ -25,6 +25,7 @@ fun Screen.mangaStatsTab(): TabContent {
     }
 
     return TabContent(
+        legacyManga = true,
         titleRes = AYMR.strings.label_manga,
         content = { contentPadding, _ ->
 

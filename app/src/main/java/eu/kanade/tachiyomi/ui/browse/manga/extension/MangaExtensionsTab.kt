@@ -36,6 +36,7 @@ fun mangaExtensionsTab(
     var privateExtensionToUninstall by remember { mutableStateOf<MangaExtension?>(null) }
 
     return TabContent(
+        legacyManga = true,
         titleRes = AYMR.strings.label_manga_extensions,
         badgeNumber = state.updates.takeIf { it > 0 },
         searchEnabled = true,

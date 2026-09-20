@@ -12,6 +12,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.core.util.ifMangaSourcesLoaded
 import eu.kanade.presentation.browse.manga.GlobalMangaSearchScreen
+import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.browse.manga.source.browse.BrowseMangaSourceScreen
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
@@ -24,6 +25,11 @@ class GlobalMangaSearchScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         if (!ifMangaSourcesLoaded()) {
             LoadingScreen()
             return
@@ -71,6 +77,7 @@ class GlobalMangaSearchScreen(
                 getManga = { screenModel.getManga(it) },
                 onChangeSearchFilter = screenModel::setSourceFilter,
                 onToggleResults = screenModel::toggleFilterResults,
+                onRetrySource = screenModel::retry,
                 onClickSource = {
                     navigator.push(BrowseMangaSourceScreen(it.id, state.searchQuery))
                 },

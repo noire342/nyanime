@@ -220,7 +220,11 @@ fun WebViewScreenContent(
                     WebView.setWebContentsDebuggingEnabled(true)
                 }
 
-                headers["user-agent"]?.let {
+                // OkHttp headers are case-insensitive, while the map created by
+                // `Headers.toMultimap()` preserves the original spelling. Use the same
+                // source profile in WebView so provider cookies (including Cloudflare's
+                // clearance cookie) remain valid when the extension retries playback.
+                headers.entries.firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }?.value?.let {
                     webView.settings.userAgentString = it
                 }
             },

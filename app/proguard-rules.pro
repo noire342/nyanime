@@ -1,5 +1,11 @@
 -dontobfuscate
 
+# Optional presentation setter invoked by source APKs compiled against the stable manga API.
+-keepclassmembers class eu.kanade.tachiyomi.source.model.SMangaImpl {
+    public void setHomePresentation(java.lang.String);
+    public java.lang.String getHomePresentation();
+}
+
 -keep,allowoptimization class eu.kanade.**
 -keep,allowoptimization class tachiyomi.**
 -keep,allowoptimization class mihon.**
@@ -14,6 +20,10 @@
 -keep,allowoptimization class kotlinx.serialization.** { public protected *; }
 -keep,allowoptimization class okhttp3.** { public protected *; }
 -keep,allowoptimization class okio.** { public protected *; }
+# Zstd's native initializer looks up these classes and byte counters by name,
+# including the compressor even when OkHttp only uses decompression. R8 cannot
+# see those JNI references; removing/renaming them aborts the entire process.
+-keep class com.squareup.zstd.** { *; }
 -keep,allowoptimization class org.jsoup.** { public protected *; }
 -keep,allowoptimization class rx.** { public protected *; }
 -keep,allowoptimization class app.cash.quickjs.** { public protected *; }
@@ -81,3 +91,6 @@
 
 # XmlUtil
 -keep public enum nl.adaptivity.xmlutil.EventType { *; }
+
+# Loaded by the Google Cast framework from manifest metadata.
+-keep class eu.kanade.tachiyomi.data.cast.GoogleCastOptions { *; }

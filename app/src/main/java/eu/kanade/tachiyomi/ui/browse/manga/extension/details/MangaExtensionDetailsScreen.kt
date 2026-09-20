@@ -9,6 +9,7 @@ import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.browse.manga.MangaExtensionDetailsScreen
+import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.util.Screen
 import kotlinx.coroutines.flow.collectLatest
 import tachiyomi.presentation.core.screens.LoadingScreen
@@ -19,6 +20,11 @@ data class MangaExtensionDetailsScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         val context = LocalContext.current
         val screenModel = rememberScreenModel {
             MangaExtensionDetailsScreenModel(

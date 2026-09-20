@@ -137,7 +137,7 @@ fun Context.createReaderThemeContext(): Context {
         val wrappedContext = ContextThemeWrapper(this, R.style.Theme_Tachiyomi)
         wrappedContext.applyOverrideConfiguration(overrideConf)
         ThemingDelegate.getThemeResIds(
-            preferences.appTheme().get(),
+            preferences.legacyMangaTheme().get(),
             preferences.themeDarkAmoled().get(),
         )
             .forEach { wrappedContext.theme.applyStyle(it, true) }

@@ -29,6 +29,7 @@ data object UpdatesTab : Tab {
             val isSelected = LocalTabNavigator.current.current.key == key
             val image = AnimatedImageVector.animatedVectorResource(R.drawable.anim_updates_enter)
             val index: UShort = when (currentNavigationStyle()) {
+                NavStyle.DISCOVERY -> 6u
                 NavStyle.MOVE_UPDATES_TO_MORE -> 5u
                 NavStyle.MOVE_HISTORY_TO_MORE -> 2u
                 NavStyle.MOVE_BROWSE_TO_MORE -> 2u
@@ -47,7 +48,7 @@ data object UpdatesTab : Tab {
     @Composable
     override fun Content() {
         val context = LocalContext.current
-        val fromMore = currentNavigationStyle() == NavStyle.MOVE_UPDATES_TO_MORE
+        val fromMore = this in currentNavigationStyle().overflowTabs
 
         TabbedScreen(
             titleRes = MR.strings.label_recent_updates,

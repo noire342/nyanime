@@ -9,23 +9,30 @@ plugins {
     id("com.github.zellius.shortcut-helper")
     kotlin("plugin.serialization")
     alias(libs.plugins.aboutLibraries)
+    id("com.android.compose.screenshot") version "0.0.1-alpha15"
 }
 
 shortcutHelper.setFilePath("./shortcuts.xml")
 
+// Release gate: keep community code and local data dormant. Watch/reading rooms are independent.
+val communityEnabled = false
+
 android {
+    experimentalProperties["android.experimental.enableScreenshotTest"] = true
     namespace = "eu.kanade.tachiyomi"
 
     defaultConfig {
-        applicationId = "xyz.jmir.tachiyomi.mi"
+        applicationId = "xyz.jmir.tachiyomi.mi.anime4k"
 
-        versionCode = 131
-        versionName = "0.18.1.2"
+        versionCode = 133
+        versionName = "0.18.1.4"
 
         buildConfigField("String", "COMMIT_COUNT", "\"${getCommitCount()}\"")
         buildConfigField("String", "COMMIT_SHA", "\"${getGitSha()}\"")
         buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLastCommitTime = false)}\"")
         buildConfigField("boolean", "UPDATER_ENABLED", "${Config.enableUpdater}")
+        buildConfigField("boolean", "COMMUNITY_ENABLED", communityEnabled.toString())
+        manifestPlaceholders["communityEnabled"] = communityEnabled.toString()
 
         // Put these fields in acra.properties
         // val acraProperties = Properties()
@@ -66,6 +73,7 @@ android {
 
             versionNameSuffix = debug.versionNameSuffix
             signingConfig = debug.signingConfig
+            buildConfigField("boolean", "UPDATER_ENABLED", "true")
 
             matchingFallbacks.addAll(commonMatchingFallbacks)
 
@@ -74,6 +82,10 @@ android {
         create("benchmark") {
             initWith(release)
 
+            // Profile generation needs source names; timing runs keep release optimizations.
+            val generatingProfile = providers.gradleProperty("profileGeneration").orNull == "true"
+            isMinifyEnabled = !generatingProfile
+            isShrinkResources = !generatingProfile
             isDebuggable = false
             isProfileable = true
             versionNameSuffix = "-benchmark"
@@ -183,7 +195,22 @@ kotlin {
     }
 }
 
+// Artwork is an optional test-only JAR, so renders never add pictures to application assets.
+val nyanimePreviewArtwork by tasks.registering(Jar::class) {
+    archiveFileName.set("nyanime-preview-artwork.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("screenshot-artwork"))
+    providers.environmentVariable("NYANIME_PREVIEW_ARTWORK").orNull?.let { directory ->
+        from(directory) {
+            include("poster-*.jpg", "backdrop.jpg")
+            into("nyanime-preview")
+        }
+    }
+}
+
 dependencies {
+    add("screenshotTestImplementation", files(nyanimePreviewArtwork))
+    add("screenshotTestImplementation", "com.android.tools.screenshot:screenshot-validation-api:0.0.1-alpha15")
+    add("screenshotTestImplementation", "io.coil-kt.coil3:coil-test:3.1.0")
     implementation(projects.i18n)
     implementation(projects.i18nAniyomi)
     implementation(projects.core.archive)
@@ -246,6 +273,8 @@ dependencies {
     implementation(libs.bundles.okhttp)
     implementation(libs.okio)
     implementation(libs.conscrypt.android) // TLS 1.3 support for Android < 10
+    implementation(libs.community.crypto)
+    implementation(libs.community.scanner)
 
     // Data serialization (JSON, protobuf, xml)
     implementation(kotlinx.bundles.serialization)
@@ -296,6 +325,9 @@ dependencies {
 
     // Tests
     testImplementation(libs.bundles.test)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.okhttp.tls)
+    testImplementation(libs.sqldelight.jvm.driver)
 
     // For detecting memory leaks; see https://square.github.io/leakcanary/
     // debugImplementation(libs.leakcanary.android)
@@ -308,9 +340,18 @@ dependencies {
     implementation(aniyomilibs.aniyomi.mpv)
     // FFmpeg-kit
     implementation(aniyomilibs.ffmpeg.kit)
+    implementation("androidx.media3:media3-transformer:1.8.0")
+    implementation("androidx.media3:media3-effect:1.8.0")
     implementation(aniyomilibs.arthenica.smartexceptions)
     // TorrServer
     implementation(aniyomilibs.torrserver)
+    implementation(aniyomilibs.nanohttpd)
+    implementation(libs.cast.framework)
+    implementation(libs.media.router)
+    implementation(libs.watch.secp256k1)
+    implementation(libs.watch.qr)
+    implementation(libs.watch.secp256k1.android)
+    testRuntimeOnly(libs.watch.secp256k1.jvm)
     // seeker seek bar
     implementation(aniyomilibs.seeker)
     // true type parser
@@ -318,14 +359,6 @@ dependencies {
 }
 
 androidComponents {
-    beforeVariants { variantBuilder ->
-        // Disables standardBenchmark
-        if (variantBuilder.buildType == "benchmark") {
-            variantBuilder.enable = variantBuilder.productFlavors.containsAll(
-                listOf("default" to "dev"),
-            )
-        }
-    }
     onVariants(selector().withFlavor("default" to "standard")) {
         // Only excluding in standard flavor because this breaks
         // Layout Inspector's Compose tree

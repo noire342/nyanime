@@ -23,14 +23,19 @@ class PackageInstallerInstallerManga(private val service: Service) : InstallerMa
 
     private val packageActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            val sessionId = activeSession?.second ?: return
+            if (intent.action != INSTALL_ACTION ||
+                intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1) != sessionId
+            ) {
+                return
+            }
             when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
                 PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                     val userAction = intent.getParcelableExtraCompat<Intent>(Intent.EXTRA_INTENT)
                         ?.run {
-                            // Doesn't actually needed as the receiver is actually not exported
-                            // But the warnings can't be suppressed without this
+                            val action = action ?: return@run null
                             IntentSanitizer.Builder()
-                                .allowAction(this.action!!)
+                                .allowAction(action)
                                 .allowExtra(PackageInstaller.EXTRA_SESSION_ID) { id -> id == activeSession?.second }
                                 .allowAnyComponent()
                                 .allowPackage {
@@ -42,22 +47,33 @@ class PackageInstallerInstallerManga(private val service: Service) : InstallerMa
                         }
                     if (userAction == null) {
                         logcat(LogPriority.ERROR) { "Fatal error for $intent" }
-                        continueQueue(InstallStep.Error)
+                        finishSession(InstallStep.Error)
                         return
                     }
                     userAction.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    service.startActivity(userAction)
+                    try {
+                        service.startActivity(userAction)
+                    } catch (error: RuntimeException) {
+                        logcat(LogPriority.ERROR, error) { "Unable to open the system installer confirmation" }
+                        runCatching { packageInstaller.abandonSession(sessionId) }
+                        finishSession(InstallStep.Error)
+                    }
                 }
                 PackageInstaller.STATUS_FAILURE_ABORTED -> {
-                    continueQueue(InstallStep.Idle)
+                    finishSession(InstallStep.Idle)
                 }
-                PackageInstaller.STATUS_SUCCESS -> continueQueue(InstallStep.Installed)
-                else -> continueQueue(InstallStep.Error)
+                PackageInstaller.STATUS_SUCCESS -> finishSession(InstallStep.Installed)
+                else -> finishSession(InstallStep.Error)
             }
         }
     }
 
     private var activeSession: Pair<Entry, Int>? = null
+
+    private fun finishSession(result: InstallStep) {
+        activeSession = null
+        continueQueue(result)
+    }
 
     // Always ready
     override var ready = true
@@ -71,12 +87,15 @@ class PackageInstallerInstallerManga(private val service: Service) : InstallerMa
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 installParams.setRequireUserAction(
-                    PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED,
+                    PackageInstaller.SessionParams.USER_ACTION_REQUIRED,
                 )
             }
-            activeSession = entry to packageInstaller.createSession(installParams)
             val fileSize = service.getUriSize(entry.uri) ?: throw IllegalStateException()
             installParams.setSize(fileSize)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                installParams.setPackageSource(PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE)
+            }
+            activeSession = entry to packageInstaller.createSession(installParams)
 
             val inputStream = service.contentResolver.openInputStream(entry.uri) ?: throw IllegalStateException()
             val session = packageInstaller.openSession(activeSession!!.second)
@@ -98,9 +117,9 @@ class PackageInstallerInstallerManga(private val service: Service) : InstallerMa
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "Failed to install extension ${entry.downloadId} ${entry.uri}" }
             activeSession?.let { (_, sessionId) ->
-                packageInstaller.abandonSession(sessionId)
+                runCatching { packageInstaller.abandonSession(sessionId) }
             }
-            continueQueue(InstallStep.Error)
+            finishSession(InstallStep.Error)
         }
     }
 
@@ -129,4 +148,4 @@ class PackageInstallerInstallerManga(private val service: Service) : InstallerMa
     }
 }
 
-private const val INSTALL_ACTION = "PackageInstallerInstaller.INSTALL_ACTION"
+private const val INSTALL_ACTION = "PackageInstallerInstallerManga.INSTALL_ACTION"

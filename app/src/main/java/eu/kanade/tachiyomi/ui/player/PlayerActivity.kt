@@ -39,6 +39,7 @@ import android.media.session.PlaybackState
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Rational
 import android.view.KeyEvent
 import android.view.View
@@ -61,13 +62,21 @@ import aniyomi.core.common.torrent.TorrentPreferences
 import aniyomi.core.common.torrent.TorrentServerApi
 import aniyomi.core.common.torrent.TorrentServerUtils
 import com.hippo.unifile.UniFile
+import eu.kanade.domain.items.episode.model.toSEpisode
 import eu.kanade.presentation.theme.TachiyomiTheme
+import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.animesource.model.ChapterType
 import eu.kanade.tachiyomi.animesource.model.Hoster
 import eu.kanade.tachiyomi.animesource.model.HttpServer
 import eu.kanade.tachiyomi.animesource.model.SerializableHoster.Companion.serialize
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
+import eu.kanade.tachiyomi.data.cast.CastController
+import eu.kanade.tachiyomi.data.cast.CastHandoffPolicy
+import eu.kanade.tachiyomi.data.cast.CastRequest
+import eu.kanade.tachiyomi.data.database.models.anime.toDomainEpisode
+import eu.kanade.tachiyomi.data.download.anime.ultra.UltraFiles
+import eu.kanade.tachiyomi.data.download.anime.ultra.UltraPlaybackGuard
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
@@ -87,11 +96,16 @@ import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPVLib
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
@@ -114,6 +128,41 @@ import kotlin.math.floor
 import kotlin.time.Duration.Companion.seconds
 
 class PlayerActivity : BaseActivity() {
+    val castController by lazy { CastController.get(applicationContext) }
+
+    fun castRequest(video: Video? = viewModel.currentVideo.value): CastRequest? {
+        val anime = viewModel.currentAnime.value ?: return null
+        val episode = viewModel.currentEpisode.value ?: return null
+        val episodeId = episode.id ?: return null
+        val media = castController.state.value.media?.takeIf { it.episodeId == episodeId }
+        return CastRequest(
+            anime.id, episodeId, anime.source, anime.title, episode.name, video ?: return null,
+            CastHandoffPolicy.startPosition(
+                remotePositionMs = media?.let { castController.state.value.playback.positionMs },
+                loadingEpisode = viewModel.isLoadingEpisode.value,
+                savedPositionMs = episode.last_second_seen,
+                seen = episode.seen,
+                preserveSeenPosition = playerPreferences.preserveWatchingPosition().get(),
+                localPositionMs = (viewModel.pos.value * 1000).toLong(),
+            ),
+            when {
+                media != null -> castController.state.value.playback.durationMs
+                viewModel.isLoadingEpisode.value -> episode.total_seconds
+                else -> (viewModel.duration.value * 1000).toLong()
+            },
+            viewModel.currentPlaylist.value.mapNotNull { it.id },
+            playerPreferences.autoplayEnabled().get(),
+        )
+    }
+
+    fun resumeAfterCast() {
+        val anime = viewModel.currentAnime.value ?: return
+        val episode = viewModel.currentEpisode.value ?: return
+        onNewIntent(newIntent(this, anime.id, episode.id))
+    }
+    internal fun openWatchVideo(animeId: Long, episodeId: Long) {
+        onNewIntent(newIntent(this, animeId, episodeId))
+    }
     private val viewModel by viewModels<PlayerViewModel>(factoryProducer = { PlayerViewModelProviderFactory(this) })
     private val binding by lazy { PlayerLayoutBinding.inflate(layoutInflater) }
     private val playerObserver by lazy { PlayerObserver(this) }
@@ -143,11 +192,37 @@ class PlayerActivity : BaseActivity() {
 
     private var pipReceiver: BroadcastReceiver? = null
     private var httpServer: HttpServer? = null
+    private val anime4kShaderPipeline by lazy { Anime4KShaderPipeline(this) }
+    private var fileLoadedJob: Job? = null
+    private var videoLoadJob: Job? = null
+    private var handledFailureGeneration = -1L
+    internal val playbackGeneration: Long get() = viewModel.playbackLoadState.value.generation
+    private var anime4kAppliedRoomRestriction: Boolean? = null
+    private var anime4kRoomRestorePending = false
+    private var anime4kSmartController: Anime4KSmartController? = null
+    private var anime4kSmartNeedsMediaResolution = true
+    private var anime4kSmartResolutionRetryCount = 0
+    private var anime4kSmartRetryPending = false
+    private var anime4kMediaResolutionGeneration = 0L
+    private var anime4kTelemetryGeneration = 0L
+    private var anime4kTelemetrySession: Anime4KTelemetrySession? = null
+    private var anime4kCalibrationKey: String? = null
+    private var anime4kCalibrationMediaInfo: Anime4KMediaInfo? = null
+    private var anime4kLastSavedCalibration: Anime4KCalibration? = null
+    private val anime4kMediaRefresh by lazy {
+        Anime4KMediaRefresh(
+            schedule = { delay, refresh ->
+                binding.root.postDelayed({ if (!isFinishing && !isDestroyed && !player.isExiting) refresh() }, delay)
+            },
+            refresh = ::applySmartAnime4KForLoadedMedia,
+        )
+    }
 
     private val noisyReceiver = object : BroadcastReceiver() {
         var initialized = false
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
+                viewModel.watchTogether.hold()
                 viewModel.pause()
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
@@ -182,6 +257,7 @@ class PlayerActivity : BaseActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        fileLoadedJob?.cancel()
 
         val animeId = intent.extras?.getLong("animeId") ?: -1
         val episodeId = intent.extras?.getLong("episodeId") ?: -1
@@ -192,6 +268,8 @@ class PlayerActivity : BaseActivity() {
             finish()
             return
         }
+        advancedPlayerPreferences.setAnime4kUltraActive(false)
+        advancedPlayerPreferences.beginAnime4kSession()
         NotificationReceiver.dismissNotification(
             this,
             animeId.hashCode(),
@@ -234,6 +312,7 @@ class PlayerActivity : BaseActivity() {
         enableEdgeToEdge()
         registerSecureActivity(this)
         super.onCreate(savedInstanceState)
+        UltraPlaybackGuard.enterPlayer()
         setContentView(binding.root)
 
         setupPlayerMPV()
@@ -241,13 +320,15 @@ class PlayerActivity : BaseActivity() {
         setupMediaSession()
         setupPlayerOrientation()
 
-        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
-            runOnUiThread {
-                toast(throwable.message)
+        castController.state.distinctUntilChangedBy { it.active || it.connecting }.onEach { cast ->
+            setupPlayerOrientation()
+            if (cast.active || cast.connecting) {
+                viewModel.remoteProgressOwned = true
+                mediaSession?.isActive = false
+                player.paused = true
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
-            logcat(LogPriority.ERROR, throwable)
-            finish()
-        }
+        }.launchIn(lifecycleScope)
 
         viewModel.eventFlow
             .onEach { event ->
@@ -276,6 +357,8 @@ class PlayerActivity : BaseActivity() {
                             finish()
                         }
                     },
+                    onToggleAnime4KSmart = ::toggleAnime4KSmart,
+                    onSelectAnime4KCustom = ::selectAnime4KCustom,
                     modifier = Modifier.onGloballyPositioned {
                         pipRect = run {
                             val boundsInWindow = it.boundsInWindow()
@@ -291,10 +374,23 @@ class PlayerActivity : BaseActivity() {
             }
         }
 
+        viewModel.watchTogether.state.distinctUntilChangedBy { it.active }.onEach {
+            if (it.active) viewModel.endHoldSpeed()
+            updateAnime4KRoomRestriction()
+        }.launchIn(lifecycleScope)
+
+        viewModel.bindWatchPlayer()
         onNewIntent(this.intent)
     }
 
     override fun onDestroy() {
+        viewModel.endHoldSpeed()
+        UltraPlaybackGuard.leavePlayer()
+        viewModel.detachDevicePlayback()
+        viewModel.watchManager.detach(this)
+        videoLoadJob?.cancel()
+        viewModel.playbackLoad.cancel()
+        fileLoadedJob?.cancel()
         player.isExiting = true
 
         httpServer?.stop()
@@ -304,6 +400,11 @@ class PlayerActivity : BaseActivity() {
             AudioManagerCompat.abandonAudioFocusRequest(audioManager, it)
         }
         audioFocusRequest = null
+
+        pipReceiver?.let {
+            unregisterReceiver(it)
+            pipReceiver = null
+        }
 
         mediaSession?.let {
             it.isActive = false
@@ -323,6 +424,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onPause() {
+        viewModel.endHoldSpeed()
         viewModel.saveCurrentEpisodeWatchingProgress()
 
         if (isInPictureInPictureMode) {
@@ -330,7 +432,9 @@ class PlayerActivity : BaseActivity() {
             return
         }
 
+        viewModel.watchTogether.hold()
         player.isExiting = true
+        viewModel.cancelNextEpisode()
         if (isFinishing) {
             viewModel.deletePendingEpisodes()
             MPVLib.command(arrayOf("stop"))
@@ -378,7 +482,7 @@ class PlayerActivity : BaseActivity() {
 
     override fun onStart() {
         super.onStart()
-        setPictureInPictureParams(createPipParams())
+        if (isPipSupportedAndEnabled) setPictureInPictureParams(createPipParams())
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setFlags(
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
@@ -415,6 +519,564 @@ class PlayerActivity : BaseActivity() {
         }
     }
 
+    private fun currentAnime4KEpisodeIds(): Pair<Long, Long>? {
+        val animeId = viewModel.currentAnime.value?.id ?: return null
+        val episodeId = viewModel.currentEpisode.value?.id ?: return null
+        return animeId to episodeId
+    }
+
+    private fun anime4KRuntimeCalibrationKey(mediaInfo: Anime4KMediaInfo): String {
+        return Anime4K.calibrationKey(
+            mediaInfo = mediaInfo,
+            renderer = getAnime4KPropertyString("gpu-renderer")
+                ?: getAnime4KPropertyString("gpu-context")
+                ?: Build.HARDWARE,
+            api = getAnime4KPropertyString("gpu-api") ?: "unknown",
+            driver = getAnime4KPropertyString("gpu-driver") ?: Build.VERSION.SDK_INT.toString(),
+            hwdec = getAnime4KPropertyString("hwdec-current"),
+            calibrationRevision = "${Anime4K.CALIBRATION_REVISION}:${BuildConfig.VERSION_CODE}",
+        )
+    }
+
+    internal fun onAnime4KShaderError(message: String? = null) {
+        runOnUiThread {
+            if (player.isExiting || isAnime4KUnavailable()) return@runOnUiThread
+
+            val now = SystemClock.elapsedRealtime()
+
+            val currentSelection = currentAnime4KSelection()
+            if (currentSelection.profile == Anime4KProfile.Off || currentSelection.mode == Anime4KMode.Off) {
+                return@runOnUiThread
+            }
+
+            if (currentSelection.profile == Anime4KProfile.Smart) {
+                val controller = anime4kSmartController
+                if (controller == null) {
+                    applyAnime4KSelection(
+                        profile = Anime4KProfile.Smart,
+                        mode = Anime4KMode.Off,
+                        resetSmartController = false,
+                        persistEpisodeProfile = false,
+                        fallbackToOffOnFailure = false,
+                    )
+                } else {
+                    val adjustment = controller.onShaderError(
+                        nowMillis = now,
+                        shaderName = message?.let(Anime4K::shaderNameInError),
+                    )
+                    adjustment?.let { applySmartAdjustment(it, now) }
+                }
+                return@runOnUiThread
+            }
+
+            applyAnime4KSelection(Anime4KProfile.Off, Anime4KMode.Off)
+            toast(AYMR.strings.pref_anime4k_fallback)
+        }
+    }
+
+    internal fun toggleAnime4KSmart() {
+        if (isAnime4KUnavailable()) return
+        val mediaInfo = resolveAnime4KMediaInfo()
+        val current = currentAnime4KSelection()
+        if (current.profile == Anime4KProfile.Smart && anime4kSmartController?.isSuspended == true) {
+            val now = SystemClock.elapsedRealtime()
+            val controller = anime4kSmartController ?: return
+            controller.resume(now)
+            advancedPlayerPreferences.setAnime4kActiveSelection(
+                Anime4KSelection(Anime4KProfile.Smart, Anime4KMode.Off),
+            )
+            advancedPlayerPreferences.anime4kProfile().set(Anime4KProfile.Smart)
+            advancedPlayerPreferences.anime4kMode().set(Anime4KMode.Off)
+            currentAnime4KEpisodeIds()?.let { (animeId, episodeId) ->
+                advancedPlayerPreferences.saveAnime4kEpisodeProfile(
+                    animeId,
+                    episodeId,
+                    Anime4KEpisodeProfile(Anime4KProfile.Smart),
+                )
+            }
+            if (applySmartMode(controller, controller.currentMode, now)) {
+                applySmartAnime4KForLoadedMedia()
+            }
+            return
+        }
+
+        val target = Anime4KSelectionRules.toggleSmart(
+            current,
+            mediaInfo?.let(Anime4K::resolveSmartMode) ?: Anime4KMode.ModeA,
+        )
+        if (target.profile == Anime4KProfile.Smart) {
+            if (applyAnime4KSelection(
+                    profile = Anime4KProfile.Smart,
+                    mode = Anime4KMode.Off,
+                    resetSmartController = true,
+                    persistEpisodeProfile = true,
+                    fallbackToOffOnFailure = false,
+                )
+            ) {
+                applySmartAnime4KForLoadedMedia()
+            }
+        } else {
+            applyAnime4KSelection(Anime4KProfile.Off, Anime4KMode.Off)
+        }
+    }
+
+    internal fun selectAnime4KCustom(mode: Anime4KMode) {
+        if (isAnime4KUnavailable()) return
+        val target = Anime4KSelectionRules.selectCustom(currentAnime4KSelection(), mode)
+        applyAnime4KSelection(target.profile, target.mode)
+    }
+
+    private fun isAnime4KUnavailable() =
+        viewModel.watchTogether.active || UltraFiles.isUltra(viewModel.currentVideo.value)
+
+    private fun currentAnime4KSelection(): Anime4KSelection =
+        advancedPlayerPreferences.anime4kActiveSelection().value
+
+    private fun applyAnime4KSelection(
+        profile: Anime4KProfile,
+        mode: Anime4KMode,
+        resetSmartController: Boolean = true,
+        persistEpisodeProfile: Boolean = true,
+        fallbackToOffOnFailure: Boolean = true,
+    ): Boolean {
+        if (isAnime4KUnavailable()) return false
+        if (anime4kShaderPipeline.apply(mode)) {
+            val selection = Anime4KSelection(profile, mode)
+            advancedPlayerPreferences.setAnime4kActiveSelection(selection)
+            advancedPlayerPreferences.anime4kProfile().set(profile)
+            advancedPlayerPreferences.anime4kMode().set(mode)
+            if (persistEpisodeProfile) {
+                currentAnime4KEpisodeIds()?.let { (animeId, episodeId) ->
+                    advancedPlayerPreferences.saveAnime4kEpisodeProfile(
+                        animeId,
+                        episodeId,
+                        Anime4KEpisodeProfile(
+                            profile = profile,
+                            customMode = if (profile == Anime4KProfile.Custom) mode else Anime4KMode.Off,
+                        ),
+                    )
+                }
+            }
+            advancedPlayerPreferences.setAnime4kDiagnostics(
+                Anime4KSmartDiagnostics(
+                    profile = profile,
+                    mode = mode,
+                ),
+            )
+            if (profile != Anime4KProfile.Smart) {
+                resetAnime4KRuntime()
+            } else if (resetSmartController) {
+                resetAnime4KRuntime()
+            } else {
+                anime4kSmartNeedsMediaResolution = anime4kSmartController == null
+                startAnime4KTelemetry()
+            }
+            return true
+        }
+
+        if (!fallbackToOffOnFailure) return false
+
+        if (!anime4kShaderPipeline.apply(Anime4KMode.Off)) {
+            toast(AYMR.strings.pref_anime4k_fallback)
+            return false
+        }
+        advancedPlayerPreferences.setAnime4kActiveSelection(
+            Anime4KSelection(Anime4KProfile.Off, Anime4KMode.Off),
+        )
+        advancedPlayerPreferences.anime4kProfile().set(Anime4KProfile.Off)
+        advancedPlayerPreferences.anime4kMode().set(Anime4KMode.Off)
+        if (persistEpisodeProfile) {
+            currentAnime4KEpisodeIds()?.let { (animeId, episodeId) ->
+                advancedPlayerPreferences.saveAnime4kEpisodeProfile(
+                    animeId,
+                    episodeId,
+                    Anime4KEpisodeProfile(Anime4KProfile.Off),
+                )
+            }
+        }
+        resetAnime4KRuntime()
+        toast(AYMR.strings.pref_anime4k_fallback)
+        return false
+    }
+
+    private fun updateAnime4KRoomRestriction() {
+        if (isFinishing || isDestroyed || player.isExiting) return
+        val active = viewModel.watchTogether.active
+        if (anime4kAppliedRoomRestriction == active) return
+        anime4kAppliedRoomRestriction = active
+        anime4kRoomRestorePending = !active
+        advancedPlayerPreferences.setAnime4kRoomActive(active)
+        resetAnime4KRuntime()
+        if (active) {
+            anime4kShaderPipeline.apply(Anime4KMode.Off)
+        } else if (viewModel.playbackLoadState.value.started &&
+            !viewModel.playbackLoadState.value.opening &&
+            !viewModel.isLoadingEpisode.value
+        ) {
+            loadAnime4KForCurrentEpisode()
+        }
+    }
+
+    private fun applyAnime4K() {
+        val roomActive = viewModel.watchTogether.active
+        anime4kAppliedRoomRestriction = roomActive
+        advancedPlayerPreferences.setAnime4kRoomActive(roomActive)
+        advancedPlayerPreferences.setAnime4kUltraActive(false)
+        advancedPlayerPreferences.beginAnime4kSession()
+        // The episode profile is loaded after MPV has identified the current episode. Never
+        // apply a previous episode's profile during MPV initialization.
+        anime4kShaderPipeline.apply(Anime4KMode.Off)
+        advancedPlayerPreferences.setAnime4kActiveSelection(
+            Anime4KSelection(Anime4KProfile.Off, Anime4KMode.Off),
+        )
+        advancedPlayerPreferences.setAnime4kDiagnostics(Anime4KSmartDiagnostics())
+        resetAnime4KRuntime()
+    }
+
+    private fun loadAnime4KForCurrentEpisode() {
+        advancedPlayerPreferences.setAnime4kRoomActive(viewModel.watchTogether.active)
+        advancedPlayerPreferences.setAnime4kUltraActive(UltraFiles.isUltra(viewModel.currentVideo.value))
+        resetAnime4KRuntime()
+
+        val ids = currentAnime4KEpisodeIds() ?: run {
+            anime4kShaderPipeline.apply(Anime4KMode.Off)
+            advancedPlayerPreferences.setAnime4kActiveSelection(
+                Anime4KSelection(Anime4KProfile.Off, Anime4KMode.Off),
+            )
+            advancedPlayerPreferences.setAnime4kDiagnostics(Anime4KSmartDiagnostics())
+            return
+        }
+        val profile = advancedPlayerPreferences.loadAnime4kEpisodeProfile(ids.first, ids.second)
+        anime4kRoomRestorePending = false
+        if (isAnime4KUnavailable()) {
+            anime4kShaderPipeline.apply(Anime4KMode.Off)
+            return
+        }
+        when (profile.profile) {
+            Anime4KProfile.Off -> applyAnime4KSelection(
+                Anime4KProfile.Off,
+                Anime4KMode.Off,
+                persistEpisodeProfile = false,
+            )
+            Anime4KProfile.Smart -> {
+                if (!applyAnime4KSelection(
+                        Anime4KProfile.Smart,
+                        Anime4KMode.Off,
+                        persistEpisodeProfile = false,
+                        fallbackToOffOnFailure = false,
+                    )
+                ) {
+                    return
+                }
+                applySmartAnime4KForLoadedMedia()
+            }
+            Anime4KProfile.Maximum -> applyAnime4KSelection(
+                Anime4KProfile.Maximum,
+                Anime4KMode.ModeAPlusHq,
+                persistEpisodeProfile = false,
+            )
+            Anime4KProfile.Custom -> applyAnime4KSelection(
+                Anime4KProfile.Custom,
+                profile.customMode,
+                persistEpisodeProfile = false,
+            )
+        }
+    }
+
+    private fun requestAnime4KMediaRefresh() {
+        if (isAnime4KUnavailable()) return
+        if (currentAnime4KSelection().profile == Anime4KProfile.Smart) anime4kMediaRefresh.request()
+    }
+
+    private fun applySmartAnime4KForLoadedMedia() {
+        if (isAnime4KUnavailable()) return
+        if (currentAnime4KSelection().profile != Anime4KProfile.Smart) return
+
+        val mediaInfo = resolveAnime4KMediaInfo() ?: run {
+            scheduleAnime4KMediaResolutionRetry()
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        val controller = anime4kSmartController
+        if (
+            controller == null ||
+            anime4kSmartNeedsMediaResolution
+        ) {
+            val calibrationKey = anime4KRuntimeCalibrationKey(mediaInfo)
+            val calibration = advancedPlayerPreferences.anime4kCalibration(calibrationKey)
+            val newController = Anime4KSmartController(mediaInfo, now, calibration)
+            anime4kSmartController = newController
+            anime4kSmartNeedsMediaResolution = false
+            anime4kSmartResolutionRetryCount = 0
+            anime4kCalibrationKey = calibrationKey
+            anime4kCalibrationMediaInfo = mediaInfo
+            anime4kLastSavedCalibration = calibration
+            if (applySmartMode(newController, newController.currentMode, now)) {
+                logcat(LogPriority.INFO) {
+                    "Anime4K Smart started at ${newController.currentMode.name} for " +
+                        "${mediaInfo.sourceWidth}x${mediaInfo.sourceHeight} -> " +
+                        "${mediaInfo.targetWidth}x${mediaInfo.targetHeight} @ " +
+                        "${mediaInfo.framesPerSecond}fps"
+                }
+            }
+            publishAnime4KSmartState(newController)
+            return
+        }
+
+        if (anime4kCalibrationMediaInfo?.let { Anime4K.sameWorkload(it, mediaInfo) } != true) {
+            anime4kCalibrationKey = anime4KRuntimeCalibrationKey(mediaInfo)
+            anime4kCalibrationMediaInfo = mediaInfo
+            anime4kLastSavedCalibration = null
+        }
+
+        controller.updateMediaInfo(mediaInfo, now)?.let { adjustment ->
+            applySmartAdjustment(adjustment, now)
+        }
+        publishAnime4KSmartState(controller)
+        saveAnime4KCalibrationIfChanged(controller)
+    }
+
+    private fun applySmartMode(
+        controller: Anime4KSmartController,
+        mode: Anime4KMode,
+        nowMillis: Long,
+    ): Boolean {
+        if (isAnime4KUnavailable()) return false
+        var candidate = mode
+        // Every failure removes a candidate. Even a broken installation terminates at Off.
+        repeat(Anime4KMode.entries.size) {
+            if (applyAnime4KSelection(
+                    profile = Anime4KProfile.Smart,
+                    mode = candidate,
+                    resetSmartController = false,
+                    persistEpisodeProfile = false,
+                    fallbackToOffOnFailure = false,
+                )
+            ) {
+                publishAnime4KSmartState(controller)
+                saveAnime4KCalibrationIfChanged(controller)
+                return candidate == mode
+            }
+            candidate = controller.onModeApplyFailure(nowMillis)?.mode ?: return forceSmartOff(controller)
+        }
+        return forceSmartOff(controller)
+    }
+
+    private fun applySmartAdjustment(
+        adjustment: Anime4KSmartAdjustment,
+        nowMillis: Long,
+    ) {
+        val controller = anime4kSmartController ?: return
+        val previousMode = currentAnime4KSelection().mode
+        if (adjustment.mode != previousMode) {
+            applySmartMode(controller, adjustment.mode, nowMillis)
+        }
+        publishAnime4KSmartState(controller)
+        saveAnime4KCalibrationIfChanged(controller)
+        if (previousMode != adjustment.mode) {
+            logcat(LogPriority.INFO) {
+                "Anime4K Smart changed $previousMode to ${currentAnime4KSelection().mode.name}: ${adjustment.reason}"
+            }
+        }
+    }
+
+    private fun forceSmartOff(controller: Anime4KSmartController): Boolean {
+        controller.suspend(SystemClock.elapsedRealtime())
+        stopAnime4KTelemetry()
+        if (!anime4kShaderPipeline.apply(Anime4KMode.Off)) {
+            // MPV rejected even clearing our shaders; report the last applied selection honestly.
+            advancedPlayerPreferences.setAnime4kDiagnostics(
+                controller.diagnostics.copy(mode = currentAnime4KSelection().mode, reason = "shader update rejected"),
+            )
+            toast(AYMR.strings.pref_anime4k_fallback)
+            return false
+        }
+        advancedPlayerPreferences.setAnime4kActiveSelection(
+            Anime4KSelection(Anime4KProfile.Smart, Anime4KMode.Off),
+        )
+        advancedPlayerPreferences.anime4kProfile().set(Anime4KProfile.Smart)
+        advancedPlayerPreferences.anime4kMode().set(Anime4KMode.Off)
+        publishAnime4KSmartState(controller)
+        saveAnime4KCalibrationIfChanged(controller)
+        return false
+    }
+
+    private fun resetAnime4KRuntime() {
+        anime4kMediaRefresh.reset()
+        stopAnime4KTelemetry()
+        anime4kSmartController = null
+        anime4kSmartNeedsMediaResolution = true
+        anime4kSmartResolutionRetryCount = 0
+        anime4kSmartRetryPending = false
+        anime4kMediaResolutionGeneration++
+        anime4kCalibrationKey = null
+        anime4kCalibrationMediaInfo = null
+        anime4kLastSavedCalibration = null
+    }
+
+    private fun publishAnime4KSmartState(controller: Anime4KSmartController) {
+        advancedPlayerPreferences.setAnime4kDiagnostics(
+            controller.diagnostics.copy(mode = currentAnime4KSelection().mode),
+        )
+    }
+
+    private fun saveAnime4KCalibrationIfChanged(controller: Anime4KSmartController) {
+        if (!controller.hasStableMeasurement) return
+        val key = anime4kCalibrationKey ?: return
+        val calibration = controller.calibration
+        if (calibration != anime4kLastSavedCalibration) {
+            advancedPlayerPreferences.saveAnime4kCalibration(
+                key,
+                calibration.copy(updatedAtMillis = System.currentTimeMillis()),
+            )
+            anime4kLastSavedCalibration = calibration
+        }
+    }
+
+    /** MPV can publish FILE_LOADED before video-params is available. Retry only briefly. */
+    private fun scheduleAnime4KMediaResolutionRetry() {
+        if (
+            anime4kSmartRetryPending ||
+            currentAnime4KSelection().profile != Anime4KProfile.Smart ||
+            !anime4kSmartNeedsMediaResolution ||
+            anime4kSmartResolutionRetryCount >= 4
+        ) {
+            return
+        }
+
+        val generation = anime4kMediaResolutionGeneration
+        anime4kSmartResolutionRetryCount++
+        anime4kSmartRetryPending = true
+        binding.root.postDelayed({
+            if (generation != anime4kMediaResolutionGeneration) return@postDelayed
+            anime4kSmartRetryPending = false
+            if (isFinishing || isDestroyed) return@postDelayed
+            if (currentAnime4KSelection().profile == Anime4KProfile.Smart) {
+                applySmartAnime4KForLoadedMedia()
+            }
+        }, anime4kSmartResolutionRetryCount * 250L)
+    }
+
+    private fun resolveAnime4KMediaInfo(): Anime4KMediaInfo? {
+        // video-out-params describes the shader input after video filters, not the window.
+        val parameters = if ((getAnime4KPropertyInt("video-out-params/w") ?: 0) >
+            0
+        ) {
+            "video-out-params"
+        } else {
+            "video-params"
+        }
+        val geometry = Anime4KGeometry.resolve(
+            sourceWidth = getAnime4KPropertyInt("$parameters/w") ?: return null,
+            sourceHeight = getAnime4KPropertyInt("$parameters/h") ?: return null,
+            rotation = getAnime4KPropertyInt("$parameters/rotate") ?: 0,
+            displayAspect = getAnime4KPropertyDouble("$parameters/aspect"),
+            osdWidth = getAnime4KPropertyInt("osd-dimensions/w"),
+            osdHeight = getAnime4KPropertyInt("osd-dimensions/h"),
+            marginLeft = getAnime4KPropertyInt("osd-dimensions/ml"),
+            marginRight = getAnime4KPropertyInt("osd-dimensions/mr"),
+            marginTop = getAnime4KPropertyInt("osd-dimensions/mt"),
+            marginBottom = getAnime4KPropertyInt("osd-dimensions/mb"),
+            surfaceWidth = player.width,
+            surfaceHeight = player.height,
+        ) ?: return null
+        val containerFps = getAnime4KPropertyDouble("container-fps")
+        val displayRefreshRate = getAnime4KPropertyDouble("display-fps")
+            ?.takeIf { it.isFinite() && it > 0.0 }
+            ?: getAnime4KPropertyDouble("estimated-display-fps")?.takeIf { it.isFinite() && it > 0.0 }
+
+        return Anime4KMediaInfo(
+            sourceWidth = geometry.sourceWidth,
+            sourceHeight = geometry.sourceHeight,
+            targetWidth = geometry.targetWidth,
+            targetHeight = geometry.targetHeight,
+            framesPerSecond = Anime4K.resolveFramesPerSecond(null, containerFps),
+            displayRefreshRate = displayRefreshRate,
+            frameRateKnown = containerFps?.let { it.isFinite() && it > 0.0 } == true,
+            playbackSpeed = getAnime4KPropertyDouble("speed")
+                ?.takeIf { it.isFinite() && it > 0.0 }
+                ?: 1.0,
+        )
+    }
+
+    private fun sampleAnime4KSmart() {
+        if (isAnime4KUnavailable()) return
+        if (currentAnime4KSelection().profile != Anime4KProfile.Smart) return
+        val controller = anime4kSmartController ?: return
+        if (controller.isSuspended) return
+        val now = SystemClock.elapsedRealtime()
+        if (anime4kTelemetrySession?.shouldSampleFallback(now) != true) return
+        // Older/custom MPV builds may not load Lua. Drop counters still permit safe degradation,
+        // but no measured GPU capacity is invented when render-pass timings are unavailable.
+        acceptAnime4KSample(
+            Anime4KPerformanceSample(
+                timestampMillis = now,
+                outputDroppedFrames = getAnime4KPropertyString("frame-drop-count")?.toLongOrNull(),
+                decoderDroppedFrames = getAnime4KPropertyString("decoder-frame-drop-count")?.toLongOrNull(),
+                delayedFrames = getAnime4KPropertyString("vo-delayed-frame-count")?.toLongOrNull(),
+                renderTimeMillis = null,
+                mistimedFrames = if (getAnime4KPropertyString("display-sync-active") == "yes") {
+                    getAnime4KPropertyString("mistimed-frame-count")?.toLongOrNull()
+                } else {
+                    null
+                },
+                playing = player.paused == false &&
+                    getAnime4KPropertyString("paused-for-cache") == "no" &&
+                    getAnime4KPropertyString("seeking") == "no",
+            ),
+        )
+    }
+
+    private fun startAnime4KTelemetry() {
+        if (isAnime4KUnavailable()) return
+        if (anime4kSmartController?.isSuspended != false) {
+            stopAnime4KTelemetry()
+            return
+        }
+        val session = Anime4KTelemetrySession((++anime4kTelemetryGeneration).toString(), SystemClock.elapsedRealtime())
+        anime4kTelemetrySession = session
+        runCatching {
+            MPVLib.command(
+                arrayOf("script-message-to", Anime4KTelemetry.SCRIPT_NAME, "set-active", "yes", session.token),
+            )
+        }
+    }
+
+    private fun stopAnime4KTelemetry() {
+        if (anime4kTelemetrySession == null) return
+        anime4kTelemetrySession = null
+        runCatching {
+            MPVLib.command(arrayOf("script-message-to", Anime4KTelemetry.SCRIPT_NAME, "set-active", "no", ""))
+        }
+    }
+
+    private fun acceptAnime4KTelemetry(value: String) {
+        if (isAnime4KUnavailable()) return
+        if (currentAnime4KSelection().profile != Anime4KProfile.Smart) return
+        val telemetry = Anime4KTelemetry.parse(value) ?: return
+        val sample = anime4kTelemetrySession?.accept(telemetry, SystemClock.elapsedRealtime()) ?: return
+        acceptAnime4KSample(sample)
+    }
+
+    private fun acceptAnime4KSample(sample: Anime4KPerformanceSample) {
+        if (isAnime4KUnavailable()) return
+        val controller = anime4kSmartController ?: return
+        controller.onSample(sample)?.let { adjustment ->
+            applySmartAdjustment(adjustment, sample.timestampMillis)
+        }
+        publishAnime4KSmartState(controller)
+        saveAnime4KCalibrationIfChanged(controller)
+    }
+
+    private fun getAnime4KPropertyInt(property: String): Int? =
+        runCatching { MPVLib.getPropertyInt(property) }.getOrNull()
+
+    private fun getAnime4KPropertyDouble(property: String): Double? =
+        runCatching { MPVLib.getPropertyDouble(property) }.getOrNull()
+
+    private fun getAnime4KPropertyString(property: String): String? =
+        runCatching { MPVLib.getPropertyString(property) }.getOrNull()
+
     private fun UniFile.writeText(text: String) {
         this.openOutputStream().use {
             it.write(text.toByteArray())
@@ -432,6 +1094,7 @@ class PlayerActivity : BaseActivity() {
         advancedPlayerPreferences.mpvInput().get().let { mpvInputFile.writeText(it) }
 
         copyUserFiles(mpvDir)
+        anime4kShaderPipeline.copyAssets()
         copyAssets(mpvDir)
         copyFontsDirectory(mpvDir)
 
@@ -445,6 +1108,7 @@ class PlayerActivity : BaseActivity() {
         )
         MPVLib.addLogObserver(playerObserver)
         MPVLib.addObserver(playerObserver)
+        applyAnime4K()
     }
 
     private fun copyUserFiles(mpvDir: UniFile) {
@@ -479,11 +1143,11 @@ class PlayerActivity : BaseActivity() {
             }
         }
 
-        // Copy over the bridge file
-        val luaFile = scriptsDir()?.createFile("aniyomi.lua")
-        val luaBridge = assets.open("aniyomi.lua")
-        luaFile?.openOutputStream()?.bufferedWriter()?.use { scriptLua ->
-            luaBridge.bufferedReader().use { scriptLua.write(it.readText()) }
+        // Bundled bridges are refreshed on every initialization, independently of user scripts.
+        for (filename in listOf("aniyomi.lua", "${Anime4KTelemetry.SCRIPT_NAME}.lua")) {
+            scriptsDir()?.createFile(filename)?.openOutputStream()?.use { output ->
+                assets.open(filename).use { input -> input.copyTo(output) }
+            }
         }
     }
 
@@ -583,7 +1247,7 @@ class PlayerActivity : BaseActivity() {
 
     private fun setupPlayerAudio() {
         with(audioPreferences) {
-            audioChannels().get().let { MPVLib.setPropertyString(it.property, it.value) }
+            applyAudioChannels(audioChannels().get())
 
             val request = AudioFocusRequestCompat.Builder(AudioManagerCompat.AUDIOFOCUS_GAIN).also {
                 it.setAudioAttributes(
@@ -606,6 +1270,7 @@ class PlayerActivity : BaseActivity() {
             -> {
                 val oldRestore = restoreAudioFocus
                 val wasPlayerPaused = player.paused ?: false
+                viewModel.watchTogether.hold()
                 viewModel.pause()
                 restoreAudioFocus = {
                     oldRestore()
@@ -633,11 +1298,13 @@ class PlayerActivity : BaseActivity() {
 
     override fun onResume() {
         if (!player.isExiting) {
+            updateAnime4KRoomRestriction()
             super.onResume()
             return
         }
 
         player.isExiting = false
+        updateAnime4KRoomRestriction()
         super.onResume()
 
         viewModel.currentVolume.update {
@@ -668,6 +1335,7 @@ class PlayerActivity : BaseActivity() {
             "time-pos" -> {
                 viewModel.updatePlayBackPos(value.toFloat())
                 viewModel.setChapter(value.toFloat())
+                sampleAnime4KSmart()
             }
             "demuxer-cache-time" -> viewModel.updateReadAhead(value = value)
             "volume" -> viewModel.setMPVVolume(value.toInt())
@@ -686,19 +1354,23 @@ class PlayerActivity : BaseActivity() {
                 viewModel.updateChapter(0)
             }
             "track-list" -> viewModel.loadTracks()
+            "osd-dimensions" -> requestAnime4KMediaRefresh()
         }
     }
 
     internal fun onObserverEvent(property: String, value: Boolean) {
         if (player.isExiting) return
+        if (property in listOf("pause", "paused-for-cache", "seeking")) {
+            anime4kSmartController?.resetTelemetry(SystemClock.elapsedRealtime())
+        }
         when (property) {
             "pause" -> {
                 if (value && player.paused == true) {
-                    viewModel.pause()
+                    if (viewModel.watchTogether.active) viewModel.onNativePause(true) else viewModel.pause()
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 } else if (!value && player.paused == false) {
-                    viewModel.unpause()
-                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    if (viewModel.watchTogether.active) viewModel.onNativePause(false) else viewModel.unpause()
+                    if (!viewModel.paused.value) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 }
 
                 runCatching {
@@ -707,11 +1379,16 @@ class PlayerActivity : BaseActivity() {
             }
 
             "paused-for-cache" -> {
-                viewModel.isLoading.update { value }
+                logcat(LogPriority.INFO) {
+                    "Playback buffering=$value positionSeconds=${viewModel.pos.value}"
+                }
+                viewModel.playbackLoad.buffering(value)
+                viewModel.isLoading.value = viewModel.playbackLoadState.value.loading
             }
 
             "seeking" -> {
-                viewModel.isLoading.update { value }
+                viewModel.playbackLoad.seeking(value)
+                viewModel.isLoading.value = viewModel.playbackLoadState.value.loading
             }
 
             "eof-reached" -> {
@@ -730,13 +1407,22 @@ class PlayerActivity : BaseActivity() {
 
     internal fun onObserverEvent(property: String, value: String) {
         if (player.isExiting) return
+        if (property == Anime4KTelemetry.PROPERTY) {
+            acceptAnime4KTelemetry(value)
+            return
+        }
         when (property.substringBeforeLast("/")) {
             "aid" -> trackId(value)?.let { viewModel.updateAudio(it) }
             "sid" -> trackId(value)?.let { viewModel.updateSubtitle(it, viewModel.selectedSubtitles.value.second) }
             "secondary-sid" -> trackId(value)?.let {
                 viewModel.updateSubtitle(viewModel.selectedSubtitles.value.first, it)
             }
-            "hwdec", "hwdec-current" -> viewModel.getDecoder()
+            "hwdec", "hwdec-current" -> {
+                viewModel.getDecoder()
+                anime4kCalibrationMediaInfo = null
+                anime4kSmartController?.invalidateCalibration(SystemClock.elapsedRealtime())
+                applySmartAnime4KForLoadedMedia()
+            }
             "user-data/aniyomi" -> viewModel.handleLuaInvocation(property, value)
         }
     }
@@ -745,24 +1431,57 @@ class PlayerActivity : BaseActivity() {
     internal fun onObserverEvent(property: String, value: Double) {
         if (player.isExiting) return
         when (property) {
-            "speed" -> viewModel.playbackSpeed.update { value.toFloat() }
-            "video-params/aspect" -> if (isPipSupportedAndEnabled) createPipParams()
+            "speed" -> {
+                val baseSpeed = if (viewModel.watchTogether.isManagedSpeed(value)) {
+                    viewModel.watchTogether.preferredSpeed().also {
+                        if (kotlin.math.abs(viewModel.playbackSpeed.value - it) < 0.0001) return
+                    }
+                } else {
+                    value
+                }
+                viewModel.playbackSpeed.update { baseSpeed.toFloat() }
+                anime4kSmartController?.resetTelemetry(SystemClock.elapsedRealtime())
+                requestAnime4KMediaRefresh()
+            }
+            "video-params/aspect" -> if (isPipSupportedAndEnabled) setPictureInPictureParams(createPipParams())
+            "container-fps",
+            "display-fps",
+            "estimated-display-fps",
+            -> requestAnime4KMediaRefresh()
         }
     }
 
     internal fun event(eventId: Int) {
         if (player.isExiting) return
         when (eventId) {
-            MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED -> {
-                viewModel.viewModelScope.launchIO { fileLoaded() }
+            MPVLib.mpvEventId.MPV_EVENT_START_FILE -> {
+                viewModel.endHoldSpeed()
+                fileLoadedJob?.cancel()
             }
-            MPVLib.mpvEventId.MPV_EVENT_SEEK -> viewModel.isLoading.update { true }
-            MPVLib.mpvEventId.MPV_EVENT_PLAYBACK_RESTART -> player.isExiting = false
+            MPVLib.mpvEventId.MPV_EVENT_FILE_LOADED -> {
+                if (viewModel.playbackLoadState.value.failure != null) return
+                loadAnime4KForCurrentEpisode()
+                fileLoadedJob?.cancel()
+                fileLoadedJob = lifecycleScope.launch { fileLoaded() }
+            }
+            MPVLib.mpvEventId.MPV_EVENT_VIDEO_RECONFIG -> requestAnime4KMediaRefresh()
+            MPVLib.mpvEventId.MPV_EVENT_SEEK -> {
+                anime4kSmartController?.resetTelemetry(SystemClock.elapsedRealtime())
+                viewModel.playbackLoad.seeking(true)
+                viewModel.isLoading.value = viewModel.playbackLoadState.value.loading
+            }
+            MPVLib.mpvEventId.MPV_EVENT_PLAYBACK_RESTART -> {
+                player.isExiting = false
+                viewModel.playbackLoad.restarted(MPVLib.getPropertyBoolean("paused-for-cache") == true)
+                viewModel.isLoading.value = viewModel.playbackLoadState.value.loading
+                if (anime4kRoomRestorePending && !viewModel.watchTogether.active) loadAnime4KForCurrentEpisode()
+            }
         }
     }
 
     fun createPipParams(): PictureInPictureParams {
         val builder = PictureInPictureParams.Builder()
+        val paused = if (player.isExiting) true else player.paused ?: true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val anime = viewModel.currentAnime.value
             val episode = viewModel.currentEpisode.value
@@ -773,24 +1492,24 @@ class PlayerActivity : BaseActivity() {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val autoEnter = playerPreferences.pipOnExit().get()
-            builder.setAutoEnterEnabled(player.paused == false && autoEnter)
-            builder.setSeamlessResizeEnabled(player.paused == false && autoEnter)
+            builder.setAutoEnterEnabled(!paused && autoEnter)
+            builder.setSeamlessResizeEnabled(!paused && autoEnter)
         }
         builder.setActions(
             createPipActions(
                 context = this,
-                isPaused = player.paused ?: true,
+                isPaused = paused,
                 replaceWithPrevious = playerPreferences.pipReplaceWithPrevious().get(),
                 playlistCount = viewModel.currentPlaylist.value.size,
                 playlistPosition = viewModel.getCurrentEpisodeIndex(),
             ),
         )
-        builder.setSourceRectHint(pipRect)
-        player.videoH?.let {
-            val height = it
-            val width = it * player.getVideoOutAspect()!!
-            val rational = Rational(height, width.toInt()).toFloat()
-            if (rational in 0.42..2.38) builder.setAspectRatio(Rational(width.toInt(), height))
+        pipRect?.takeUnless { it.isEmpty }?.let(builder::setSourceRectHint)
+        // MPV can expose height before aspect, or clear aspect during a transition.
+        // Missing geometry is valid: omit it and let Android use its default.
+        val aspect = if (player.isExiting) null else player.getVideoOutAspect()
+        PipVideoGeometry.fromAspect(aspect)?.let {
+            builder.setAspectRatio(Rational(it.width, it.height))
         }
         return builder.build()
     }
@@ -809,12 +1528,19 @@ class PlayerActivity : BaseActivity() {
             viewModel.isBrightnessSliderShown.update { false }
             viewModel.isVolumeSliderShown.update { false }
             viewModel.sheetShown.update { Sheets.None }
+            if (pipReceiver != null) {
+                super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+                return
+            }
             pipReceiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
                     if (intent == null || intent.action != PIP_INTENTS_FILTER) return
                     when (intent.getIntExtra(PIP_INTENT_ACTION, 0)) {
-                        PIP_PAUSE -> viewModel.pause()
-                        PIP_PLAY -> viewModel.unpause()
+                        PIP_PAUSE -> {
+                            viewModel.cancelNextEpisode()
+                            viewModel.pauseByUser()
+                        }
+                        PIP_PLAY -> viewModel.resumeByUser()
                         PIP_NEXT -> viewModel.changeEpisode(false)
                         PIP_PREVIOUS -> viewModel.changeEpisode(true)
                         PIP_SKIP -> viewModel.seekBy(10)
@@ -833,6 +1559,11 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun setupPlayerOrientation() {
+        val cast = castController.state.value
+        if (cast.active || cast.connecting) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            return
+        }
         if (player.isExiting) return
         requestedOrientation = when (playerPreferences.defaultPlayerOrientationType().get()) {
             PlayerOrientation.Free -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
@@ -852,6 +1583,12 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (castController.state.value.active &&
+            (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)
+        ) {
+            castController.adjustVolume(if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) 0.05f else -0.05f)
+            return true
+        }
         when (keyCode) {
             KeyEvent.KEYCODE_VOLUME_UP -> {
                 viewModel.changeVolumeBy(1)
@@ -897,7 +1634,7 @@ class PlayerActivity : BaseActivity() {
                             SingleActionGesture.Seek -> {}
                             SingleActionGesture.PlayPause -> {
                                 super.onPlay()
-                                viewModel.unpause()
+                                viewModel.resumeByUser()
                                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                             }
                             SingleActionGesture.Custom -> {
@@ -914,7 +1651,7 @@ class PlayerActivity : BaseActivity() {
                             SingleActionGesture.Seek -> {}
                             SingleActionGesture.PlayPause -> {
                                 super.onPause()
-                                viewModel.pause()
+                                viewModel.pauseByUser()
                                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                             }
                             SingleActionGesture.Custom -> {
@@ -999,7 +1736,16 @@ class PlayerActivity : BaseActivity() {
      * @param episodeId id of the episode to switch the player to
      * @param autoPlay whether the episode is switching due to auto play
      */
-    internal fun changeEpisode(episodeId: Long?, autoPlay: Boolean = false) {
+    internal fun changeEpisode(episodeId: Long?, autoPlay: Boolean = false, fromWatchRoom: Boolean = false) {
+        viewModel.endHoldSpeed()
+        if (viewModel.watchTogether.active && !viewModel.watchTogether.state.value.host && !fromWatchRoom) {
+            showToast("L'episodio viene scelto da chi ha creato la stanza")
+            return
+        }
+        videoLoadJob?.cancel()
+        viewModel.playbackLoad.begin()
+        viewModel.prepareMediaChange(episodeId)
+        fileLoadedJob?.cancel()
         viewModel.sheetShown.update { _ -> Sheets.None }
         viewModel.panelShown.update { _ -> Panels.None }
         viewModel.pause()
@@ -1022,6 +1768,8 @@ class PlayerActivity : BaseActivity() {
                         launchUI { toast(AYMR.strings.no_next_episode) }
                     }
                     viewModel.isLoading.update { _ -> false }
+                    viewModel.updateIsLoadingEpisode(false)
+                    viewModel.playbackLoad.cancel()
                 }
 
                 else -> {
@@ -1044,6 +1792,7 @@ class PlayerActivity : BaseActivity() {
                         }
                     } else {
                         logcat(LogPriority.ERROR) { "Error getting links" }
+                        onPlaybackFailure(PlaybackFailure.Network)
                     }
 
                     if (isInPictureInPictureMode && pipEpisodeToasts) {
@@ -1064,26 +1813,39 @@ class PlayerActivity : BaseActivity() {
     fun setVideo(video: Video?, position: Long? = null) {
         if (player.isExiting) return
         if (video == null) return
+        advancedPlayerPreferences.setAnime4kUltraActive(UltraFiles.isUltra(video))
+        resetAnime4KRuntime()
+        anime4kShaderPipeline.apply(Anime4KMode.Off)
+        if (castController.state.value.active || castController.state.value.connecting) {
+            lifecycleScope.launch {
+                castRequest(video)?.let { castController.play(it) }
+                viewModel.updateIsLoadingEpisode(false)
+            }
+            return
+        }
+        viewModel.prepareMediaChange(viewModel.currentEpisode.value?.id)
         httpServer?.stop()
         httpServer = null
 
         setHttpOptions(video)
+        videoLoadJob?.cancel()
+        viewModel.playbackLoad.begin()
+        viewModel.isLoading.value = true
+        playerObserver.clearError()
 
         if (viewModel.isLoadingEpisode.value) {
             viewModel.currentEpisode.value?.let { episode ->
                 val preservePos = playerPreferences.preserveWatchingPosition().get()
-                val resumePosition = position
+                val resumePosition = castController.takePhoneResume(episode.id ?: -1) ?: position
                     ?: if (episode.seen && !preservePos) {
                         0L
                     } else {
                         episode.last_second_seen
                     }
-                MPVLib.command(arrayOf("set", "start", "${resumePosition / 1000F}"))
+                MPVLib.command(arrayOf("set", "start", "${resumePosition.coerceAtLeast(0) / 1000.0}"))
             }
         } else {
-            player.timePos?.let {
-                MPVLib.command(arrayOf("set", "start", "${player.timePos}"))
-            }
+            MPVLib.command(arrayOf("set", "start", "${player.timePos ?: 0.0}"))
         }
 
         val videoOptions = video.mpvArgs.joinToString(",") { (option, value) ->
@@ -1097,12 +1859,12 @@ class PlayerActivity : BaseActivity() {
                     video.videoUrl.endsWith("torrent")
                 )
         ) {
-            launchIO {
+            videoLoadJob = launchVideoLoad {
                 TorrentServerService.start()
                 torrentLinkHandler(video.videoUrl, video.videoTitle, videoOptions)
             }
         } else {
-            launchIO {
+            videoLoadJob = launchVideoLoad {
                 val httpSource = viewModel.currentSource.value as? AnimeHttpSource
                 var videoUrl: String = video.videoUrl
                 if (video.usesHttpServer() && httpSource != null) {
@@ -1114,8 +1876,9 @@ class PlayerActivity : BaseActivity() {
                         logcat(LogPriority.ERROR, e) { "Failed to start http server" }
                         launchUI {
                             toast(AYMR.strings.http_server_start_failure)
+                            onPlaybackFailure(PlaybackFailure.Unknown)
                         }
-                        return@launchIO
+                        return@launchVideoLoad
                     }
 
                     val newVideo = video.copyHttpServer(port)
@@ -1123,6 +1886,7 @@ class PlayerActivity : BaseActivity() {
                     viewModel.updateVideo(newVideo)
                 }
 
+                currentCoroutineContext().ensureActive()
                 MPVLib.command(
                     arrayOf(
                         "loadfile",
@@ -1202,11 +1966,10 @@ class PlayerActivity : BaseActivity() {
     }
 
     fun setHttpOptions(video: Video) {
-        if (viewModel.isEpisodeOnline() != true) return
-        val source = viewModel.currentSource.value as? AnimeHttpSource ?: return
+        val source = viewModel.currentSource.value as? AnimeHttpSource
 
-        val headers = (video.headers ?: source.headers)
-            .toMultimap()
+        val headers = (video.headers ?: source?.headers)
+            ?.toMultimap().orEmpty()
             .mapValues { it.value.firstOrNull() ?: "" }
             .toMutableMap()
 
@@ -1220,6 +1983,60 @@ class PlayerActivity : BaseActivity() {
         // MPVLib.setOptionString("cache-on-disk", "yes")
         // val cacheDir = File(applicationContext.filesDir, "media").path
         // MPVLib.setOptionString("cache-dir", cacheDir)
+    }
+
+    internal fun onPlaybackFailure(reason: PlaybackFailure) {
+        if (isDestroyed || isFinishing) return
+        if (handledFailureGeneration == playbackGeneration) return
+        handledFailureGeneration = playbackGeneration
+        fileLoadedJob?.cancel()
+        videoLoadJob?.cancel()
+        viewModel.onPlaybackFailed(reason)
+        player.paused = true
+        // Stop stale native I/O after the failure state is published. Never reset saved progress.
+        MPVLib.command(arrayOf("stop"))
+    }
+
+    private fun launchVideoLoad(block: suspend () -> Unit): Job {
+        val generation = playbackGeneration
+        return lifecycleScope.launchIO {
+            try {
+                block()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main.immediate) {
+                    if (playbackGeneration == generation) {
+                        onPlaybackFailure(PlaybackFailure.fromNative(e.message.orEmpty()))
+                    }
+                }
+            }
+        }
+    }
+
+    internal fun openPlaybackSource() {
+        val source = viewModel.currentSource.value as? AnimeHttpSource ?: return
+        val episode = viewModel.currentEpisode.value ?: return
+        lifecycleScope.launch {
+            try {
+                val domainEpisode = episode.toDomainEpisode() ?: return@launch
+                val url = withContext(Dispatchers.IO) {
+                    source.getEpisodeUrl(domainEpisode.toSEpisode())
+                }
+                startActivity(
+                    eu.kanade.tachiyomi.ui.webview.WebViewActivity.newIntent(
+                        this@PlayerActivity,
+                        url,
+                        source.id,
+                        isAnime = true,
+                    ),
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                toast(AYMR.strings.player_error_source_page)
+            }
+        }
     }
 
     /**
@@ -1277,33 +2094,49 @@ class PlayerActivity : BaseActivity() {
     // at void eu.kanade.tachiyomi.ui.player.PlayerActivity.fileLoaded() (PlayerActivity.kt:1874)
     // at void eu.kanade.tachiyomi.ui.player.PlayerActivity.event(int) (PlayerActivity.kt:1566)
     // at void is.xyz.mpv.MPVLib.event(int) (MPVLib.java:86)
-    private fun fileLoaded() {
-        if (player.isExiting) return
+    private suspend fun fileLoaded() {
+        if (player.isExiting || viewModel.playbackLoadState.value.failure != null) return
+        if (castController.state.value.active || castController.state.value.connecting) {
+            player.paused = true
+            return
+        }
+        viewModel.remoteProgressOwned = false
+        mediaSession?.isActive = true
         setMpvOptions()
         setMpvMediaTitle()
         setupPlayerOrientation()
         setupChapters()
         setupTracks()
 
-        // aniSkip stuff
+        viewModel.onDevicePlaybackReady()
+
         viewModel.waitingSkipIntro = playerPreferences.waitingTimeIntroSkip().get()
-        runBlocking {
-            if (
-                viewModel.introSkipEnabled &&
-                playerPreferences.aniSkipEnabled().get() &&
-                !(playerPreferences.disableAniSkipOnChapters().get() && viewModel.chapters.value.isNotEmpty())
+        if (!viewModel.introSkipEnabled ||
+            !playerPreferences.aniSkipEnabled().get() ||
+            (playerPreferences.disableAniSkipOnChapters().get() && viewModel.chapters.value.isNotEmpty())
+        ) {
+            return
+        }
+        val animeId = viewModel.currentAnime.value?.id ?: return
+        val episodeId = viewModel.currentEpisode.value?.id ?: return
+        val video = viewModel.currentVideo.value ?: return
+        val duration = player.duration ?: return
+        val stamps = withTimeoutOrNull(8_000L) { viewModel.aniSkipResponse(duration) } ?: return
+        withContext(Dispatchers.Main.immediate) {
+            currentCoroutineContext().ensureActive()
+            if (player.isExiting ||
+                viewModel.currentAnime.value?.id != animeId ||
+                viewModel.currentEpisode.value?.id != episodeId ||
+                viewModel.currentVideo.value !== video ||
+                castController.state.value.active ||
+                castController.state.value.connecting
             ) {
-                viewModel.aniSkipResponse(player.duration)?.let {
-                    viewModel.updateChapters(
-                        ChapterUtils.mergeChapters(
-                            currentChapters = viewModel.chapters.value,
-                            stamps = it,
-                            duration = player.duration,
-                        ),
-                    )
-                    viewModel.setChapter(viewModel.pos.value)
-                }
+                return@withContext
             }
+            viewModel.updateChapters(
+                ChapterUtils.mergeChapters(viewModel.chapters.value, stamps, duration),
+            )
+            viewModel.setChapter(viewModel.pos.value)
         }
     }
 
@@ -1406,8 +2239,6 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun endFile(eofReached: Boolean) {
-        if (eofReached && playerPreferences.autoplayEnabled().get()) {
-            viewModel.changeEpisode(previous = false, autoPlay = true)
-        }
+        viewModel.onPlaybackEof(eofReached)
     }
 }

@@ -1,12 +1,16 @@
-<!--
-  Please include a summary of the change and which issue is fixed.
-  Also make sure you've tested your code and also done a self-review of it.
-  Don't forget to check all base themes and tablet mode for relevant changes.
-  
-  If your changes are visual, please provide images below:
+## Problema e risultato
 
-### Images
-| Image 1 | Image 2 |
-| ------- | ------- |
-| ![](https://github.githubassets.com/images/modules/logos_page/Octocat.png) | ![](https://github.githubassets.com/images/modules/logos_page/Octocat.png) |
--->
+<!-- Descrivi il problema concreto e il comportamento ottenuto in Nyanime. -->
+
+## Verifica
+
+<!-- Riporta comandi e risultati pertinenti. Distingui test, build, render e prove
+     reali; indica cosa non hai verificato. Per documentazione basta il controllo
+     di link, contenuti e assenza di dati privati. -->
+
+## Interfaccia e compatibilità
+
+<!-- Se pertinente: ModernUI/legacy, tema manga, caratteri grandi, orientamenti,
+     librerie e progressi, offline/incognito, visione individuale, stanze e Cast.
+     Allega solo immagini sintetiche o prive di materiale privato.
+     Elimina questa sezione se non si applica. -->

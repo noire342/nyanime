@@ -17,84 +17,94 @@
 
 package eu.kanade.tachiyomi.ui.player.controls.components.sheets
 
-import android.text.format.DateUtils
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardAlt
+import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.HighQuality
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimeInput
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import eu.kanade.presentation.player.components.PlayerSheet
+import eu.kanade.tachiyomi.ui.player.Anime4KMode
+import eu.kanade.tachiyomi.ui.player.Anime4KProfile
 import eu.kanade.tachiyomi.ui.player.Decoder
+import eu.kanade.tachiyomi.ui.player.applyAudioChannels
 import eu.kanade.tachiyomi.ui.player.execute
 import eu.kanade.tachiyomi.ui.player.executeLongPress
 import eu.kanade.tachiyomi.ui.player.settings.AdvancedPlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.AudioChannels
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
+import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.ImmutableList
 import tachiyomi.domain.custombuttons.model.CustomButton
-import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
-import tachiyomi.presentation.core.util.collectAsState
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import tachiyomi.presentation.core.util.collectAsState as collectPreferenceAsState
 
 @Composable
 fun MoreSheet(
+    onOpenAudio: () -> Unit,
+    onOpenQuality: () -> Unit,
+    onOpenScreenshot: () -> Unit,
+    qualityAvailable: Boolean,
     selectedDecoder: Decoder,
     onSelectDecoder: (Decoder) -> Unit,
     remainingTime: Int,
-    onStartTimer: (Int) -> Unit,
+    timerAtEpisodeEnd: Boolean,
+    onOpenSleepTimer: () -> Unit,
+    onOpenWatchTogether: () -> Unit,
     onDismissRequest: () -> Unit,
     onEnterFiltersPanel: () -> Unit,
     customButtons: ImmutableList<CustomButton>,
+    onSelectAnime4KCustom: (Anime4KMode) -> Unit,
     modifier: Modifier = Modifier,
+    anime4kAvailable: Boolean = true,
 ) {
     val advancedPreferences = remember { Injekt.get<AdvancedPlayerPreferences>() }
     val audioPreferences = remember { Injekt.get<AudioPreferences>() }
-    val statisticsPage by advancedPreferences.playerStatisticsPage().collectAsState()
+    val playerPreferences = remember { Injekt.get<PlayerPreferences>() }
+    val showAudioShortcut by playerPreferences.showAudioShortcut().collectPreferenceAsState()
+    val showQualityShortcut by playerPreferences.showQualityShortcut().collectPreferenceAsState()
+    var customizeControls by rememberSaveable { mutableStateOf(false) }
+    val statisticsPage by advancedPreferences.playerStatisticsPage().collectPreferenceAsState()
+    val anime4kSelection by advancedPreferences.anime4kActiveSelection().collectAsState()
+    val anime4kDiagnosticsEnabled by advancedPreferences.anime4kDiagnosticsEnabled().collectPreferenceAsState()
 
     PlayerSheet(
         onDismissRequest = onDismissRequest,
@@ -116,47 +126,49 @@ fun MoreSheet(
                     text = stringResource(AYMR.strings.player_sheets_more_title),
                     style = MaterialTheme.typography.headlineMedium,
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.extraSmall),
-                ) {
-                    var isSleepTimerDialogShown by remember { mutableStateOf(false) }
-                    TextButton(onClick = { isSleepTimerDialogShown = true }) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.extraSmall),
-                        ) {
-                            Icon(imageVector = Icons.Outlined.Timer, contentDescription = null)
-                            Text(
-                                text =
-                                if (remainingTime == 0) {
-                                    stringResource(AYMR.strings.timer_title)
-                                } else {
-                                    stringResource(
-                                        AYMR.strings.timer_remaining,
-                                        DateUtils.formatElapsedTime(remainingTime.toLong()),
-                                    )
-                                },
-                            )
-                            if (isSleepTimerDialogShown) {
-                                TimePickerDialog(
-                                    remainingTime = remainingTime,
-                                    onDismissRequest = { isSleepTimerDialogShown = false },
-                                    onTimeSelect = onStartTimer,
-                                )
-                            }
-                        }
-                    }
-                    TextButton(onClick = onEnterFiltersPanel) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.extraSmall),
-                        ) {
-                            Icon(imageVector = Icons.Default.Tune, contentDescription = null)
-                            Text(text = stringResource(AYMR.strings.player_sheets_filters_title))
-                        }
+                TextButton(onClick = onEnterFiltersPanel) {
+                    Icon(imageVector = Icons.Default.Tune, contentDescription = null)
+                    Text(
+                        text = stringResource(AYMR.strings.player_sheets_filters_title),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
+            SleepTimerEntry(remainingTime, onOpenSleepTimer, timerAtEpisodeEnd)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onOpenAudio) {
+                    Icon(Icons.Default.Audiotrack, null)
+                    Text("Audio", Modifier.padding(start = 8.dp))
+                }
+                if (qualityAvailable) {
+                    OutlinedButton(onClick = onOpenQuality) {
+                        Icon(Icons.Default.HighQuality, null)
+                        Text("Qualità video", Modifier.padding(start = 8.dp))
                     }
                 }
+                OutlinedButton(onClick = onOpenScreenshot) {
+                    Icon(Icons.Default.PhotoCamera, null)
+                    Text("Fotogramma", Modifier.padding(start = 8.dp))
+                }
+            }
+            TextButton(onClick = { customizeControls = !customizeControls }) {
+                Text("Personalizza comandi")
+                Icon(if (customizeControls) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null)
+            }
+            if (customizeControls) {
+                ShortcutPreference(
+                    "Mostra il tasto audio",
+                    showAudioShortcut,
+                    playerPreferences.showAudioShortcut()::set,
+                )
+                ShortcutPreference(
+                    "Mostra il tasto HQ",
+                    showQualityShortcut,
+                    playerPreferences.showQualityShortcut()::set,
+                )
+            }
+            TextButton(onClick = onOpenWatchTogether, modifier = Modifier.fillMaxWidth()) {
+                Text("Guarda insieme", style = MaterialTheme.typography.titleMedium)
             }
 
             Text(stringResource(AYMR.strings.player_hwdec_mode))
@@ -206,6 +218,33 @@ fun MoreSheet(
                 }
             }
 
+            if (anime4kAvailable) {
+                Text(stringResource(AYMR.strings.pref_anime4k))
+                FlowRow(
+                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
+                ) {
+                    Anime4KMode.entries.forEach { mode ->
+                        FilterChip(
+                            selected = if (mode == Anime4KMode.Off) {
+                                anime4kSelection.profile == Anime4KProfile.Off
+                            } else {
+                                anime4kSelection.profile == Anime4KProfile.Custom && anime4kSelection.mode == mode
+                            },
+                            onClick = { onSelectAnime4KCustom(mode) },
+                            label = { Text(text = stringResource(mode.titleRes)) },
+                        )
+                    }
+                    FilterChip(
+                        selected = anime4kDiagnosticsEnabled,
+                        onClick = {
+                            advancedPreferences.anime4kDiagnosticsEnabled().set(!anime4kDiagnosticsEnabled)
+                        },
+                        label = { Text(text = stringResource(AYMR.strings.pref_anime4k_debug_overlay)) },
+                    )
+                }
+            }
+
             if (customButtons.isNotEmpty()) {
                 Text(text = stringResource(AYMR.strings.player_sheets_custom_buttons_title))
                 FlowRow(
@@ -239,7 +278,7 @@ fun MoreSheet(
                 }
             }
             Text(text = stringResource(AYMR.strings.pref_audio_channels))
-            val audioChannels by audioPreferences.audioChannels().collectAsState()
+            val audioChannels by audioPreferences.audioChannels().collectPreferenceAsState()
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
             ) {
@@ -247,13 +286,8 @@ fun MoreSheet(
                     FilterChip(
                         selected = audioChannels == it,
                         onClick = {
+                            applyAudioChannels(it, previous = audioChannels)
                             audioPreferences.audioChannels().set(it)
-                            if (it == AudioChannels.ReverseStereo) {
-                                MPVLib.setPropertyString(AudioChannels.AutoSafe.property, AudioChannels.AutoSafe.value)
-                            } else {
-                                MPVLib.setPropertyString(AudioChannels.ReverseStereo.property, "")
-                            }
-                            MPVLib.setPropertyString(it.property, it.value)
                         },
                         label = { Text(text = stringResource(it.titleRes)) },
                     )
@@ -263,92 +297,16 @@ fun MoreSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TimePickerDialog(
-    onDismissRequest: () -> Unit,
-    onTimeSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-    remainingTime: Int = 0,
-) {
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+private fun ShortcutPreference(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .toggleable(checked, role = Role.Switch, onValueChange = onCheckedChange)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surface,
-            modifier = modifier.padding(MaterialTheme.padding.medium),
-        ) {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .width(IntrinsicSize.Max)
-                    .animateContentSize()
-                    .padding(MaterialTheme.padding.medium),
-            ) {
-                var currentLayoutType by rememberSaveable { mutableIntStateOf(0) }
-                Text(
-                    text = stringResource(
-                        if (currentLayoutType == 1) {
-                            AYMR.strings.timer_picker_pick_time
-                        } else {
-                            AYMR.strings.timer_picker_enter_timer
-                        },
-                    ),
-                )
-
-                val state = rememberTimePickerState(
-                    remainingTime / 3600,
-                    (remainingTime % 3600) / 60,
-                    is24Hour = true,
-                )
-                Box(
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (currentLayoutType == 1) {
-                        TimePicker(state = state)
-                    } else {
-                        TimeInput(state = state)
-                    }
-                }
-                Row(
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    IconButton(onClick = { currentLayoutType = if (currentLayoutType == 0) 1 else 0 }) {
-                        Icon(
-                            imageVector = if (currentLayoutType ==
-                                0
-                            ) {
-                                Icons.Outlined.Schedule
-                            } else {
-                                Icons.Default.KeyboardAlt
-                            },
-                            contentDescription = null,
-                        )
-                    }
-                    Row {
-                        if (remainingTime > 0) {
-                            TextButton(onClick = {
-                                onTimeSelect(0)
-                                onDismissRequest()
-                            }) {
-                                Text(stringResource(AYMR.strings.timer_cancel_timer))
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        TextButton(
-                            onClick = {
-                                onTimeSelect(state.hour * 3600 + state.minute * 60)
-                                onDismissRequest()
-                            },
-                        ) {
-                            Text(stringResource(MR.strings.action_ok))
-                        }
-                    }
-                }
-            }
-        }
+        Text(label, Modifier.weight(1f))
+        Switch(checked, onCheckedChange = null)
     }
 }

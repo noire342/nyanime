@@ -52,7 +52,7 @@ data object HistoriesTab : Tab {
     @Composable
     override fun Content() {
         val context = LocalContext.current
-        val fromMore = currentNavigationStyle() == NavStyle.MOVE_HISTORY_TO_MORE
+        val fromMore = this in currentNavigationStyle().overflowTabs
         // Hoisted for history tab's search bar
         val mangaHistoryScreenModel = rememberScreenModel { MangaHistoryScreenModel() }
         val mangaSearchQuery by mangaHistoryScreenModel.query.collectAsState()

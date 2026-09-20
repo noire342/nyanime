@@ -133,9 +133,79 @@ jobs:
           printf '%s' "$encoded_keystore" | base64 --decode > "$HOME/.android/debug.keystore"
           chmod 600 "$HOME/.android/debug.keystore"
 
+      - name: Verify Anime4K Lua telemetry
+        if: steps.merge.outputs.build == 'true'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/anime4k-tests"
+          "$RUNNER_TEMP/anime4k-tests/bin/python" -m pip install --disable-pip-version-check lupa==2.8
+          "$RUNNER_TEMP/anime4k-tests/bin/python" scripts/tests/test_anime4k_telemetry.py
+
       - name: Verify merged fork and build preview APK
         if: steps.merge.outputs.build == 'true'
         run: ./gradlew spotlessCheck assemblePreview testDebugUnitTest -Penable-updater --no-daemon
+
+      - name: Upload deterministic test reports
+        if: always() && steps.merge.outputs.build == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fork-unit-tests
+          path: app/build/test-results/testDebugUnitTest
+          if-no-files-found: warn
+
+      - name: Verify JNI symbols in optimized APKs
+        if: steps.merge.outputs.build == 'true'
+        run: python3 scripts/verify_apk_jni.py app/build/outputs/apk/preview/app-*-preview.apk
+
+      - name: Build independent device JNI probe
+        if: steps.merge.outputs.build == 'true'
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          android_jar="$sdk_root/platforms/android-36/android.jar"
+          d8="$(find "$sdk_root/build-tools" -type f -name d8 | sort -V | tail -n 1)"
+          mkdir -p build/jni-probe/classes build/jni-probe/dex
+          javac -source 8 -target 8 -cp "$android_jar" -d build/jni-probe/classes scripts/ZstdApkProbe.java
+          "$d8" --lib "$android_jar" --output build/jni-probe/dex build/jni-probe/classes/ZstdApkProbe.class
+
+      - name: Preserve release diagnostics and device probe
+        if: always() && steps.merge.outputs.build == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-diagnostics
+          path: |
+            app/build/outputs/mapping/preview/mapping.txt
+            build/jni-probe/dex/classes.dex
+          if-no-files-found: error
+
+      - name: Probe live public catalogue
+        id: catalogue
+        if: steps.merge.outputs.build == 'true'
+        continue-on-error: true
+        env:
+          ANIYOMI_VERIFY_CATALOG: 'true'
+        run: ./gradlew :app:testDebugUnitTest --tests '*AnilistLiveCatalogTest' --no-daemon
+
+      - name: Upload live catalogue report
+        if: always() && steps.catalogue.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: catalogue-live-probe
+          path: app/build/test-results/testDebugUnitTest/TEST-*AnilistLiveCatalogTest.xml
+          if-no-files-found: warn
+
+      - name: Verify live fallback catalogue
+        if: steps.merge.outputs.build == 'true'
+        env:
+          ANIYOMI_VERIFY_FALLBACK: 'true'
+        run: ./gradlew :app:testDebugUnitTest --tests '*KitsuLiveCatalogTest' --no-daemon
+
+      - name: Upload fallback catalogue report
+        if: always() && steps.merge.outputs.build == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: catalogue-fallback-live
+          path: app/build/test-results/testDebugUnitTest/TEST-*KitsuLiveCatalogTest.xml
+          if-no-files-found: warn
 
       - name: Verify stable preview signature
         if: steps.merge.outputs.build == 'true'
@@ -226,16 +296,16 @@ jobs:
           fork_commit_count="$(git rev-list --count HEAD)"
           tag="r${fork_commit_count}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          notes="AniYomi bleeding-edge build from $UPSTREAM_REPOSITORY:$UPSTREAM_BRANCH at $MAIN_SHA (fork commit $fork_commit_count)."
+          notes="Nyanime preview based on $UPSTREAM_REPOSITORY:$UPSTREAM_BRANCH at $MAIN_SHA (fork commit $fork_commit_count)."
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" dist/*.apk dist/SHA256SUMS \
               --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" \
-              --title "AniYomi preview $tag" --notes "$notes"
+              --title "Nyanime preview $tag" --notes "$notes"
           else
             gh release create "$tag" dist/*.apk dist/SHA256SUMS \
               --repo "$GITHUB_REPOSITORY" --target "$SYNC_BRANCH" \
-              --title "AniYomi preview $tag" --prerelease --notes "$notes"
+              --title "Nyanime preview $tag" --prerelease --notes "$notes"
           fi
 
       - name: Open or update synchronization PR

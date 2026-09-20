@@ -44,6 +44,7 @@ import eu.kanade.presentation.browse.manga.MissingSourceScreen
 import eu.kanade.presentation.browse.manga.components.BrowseMangaSourceToolbar
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.entries.manga.DuplicateMangaDialog
+import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.core.common.Constants
@@ -72,6 +73,7 @@ import tachiyomi.source.local.entries.manga.LocalMangaSource
 data class BrowseMangaSourceScreen(
     val sourceId: Long,
     private val listingQuery: String?,
+    private val initialSelections: Map<String, String> = emptyMap(),
 ) : Screen(), AssistContentScreen {
 
     private var assistUrl: String? = null
@@ -80,12 +82,19 @@ data class BrowseMangaSourceScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         if (!ifMangaSourcesLoaded()) {
             LoadingScreen()
             return
         }
 
-        val screenModel = rememberScreenModel { BrowseMangaSourceScreenModel(sourceId, listingQuery) }
+        val screenModel = rememberScreenModel {
+            BrowseMangaSourceScreenModel(sourceId, listingQuery, initialSelections = initialSelections)
+        }
         val state by screenModel.state.collectAsState()
 
         val navigator = LocalNavigator.currentOrThrow

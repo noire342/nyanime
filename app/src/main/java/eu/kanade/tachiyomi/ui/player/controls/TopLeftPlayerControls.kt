@@ -17,6 +17,8 @@
 
 package eu.kanade.tachiyomi.ui.player.controls
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,6 +35,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
+import eu.kanade.tachiyomi.data.watch.WatchActivity
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
 import tachiyomi.presentation.core.components.material.padding
 
@@ -43,6 +46,8 @@ fun TopLeftPlayerControls(
     onTitleClick: () -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
+    activity: WatchActivity? = null,
+    reduceMotion: Boolean = false,
 ) {
     Row(
         modifier = modifier,
@@ -66,15 +71,21 @@ fun TopLeftPlayerControls(
                 color = Color.White,
                 style = MaterialTheme.typography.bodyLarge,
             )
-            Text(
-                mediaTitle,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = Color.White.copy(alpha = 0.5f),
-                style = MaterialTheme.typography.bodyLarge,
-                fontStyle = FontStyle.Italic,
-            )
+            Crossfade(
+                targetState = (activity?.label ?: mediaTitle) to (activity != null),
+                animationSpec = tween(if (reduceMotion) 0 else 180),
+                label = "episodeOrSharedAction",
+            ) { (label, sharedAction) ->
+                Text(
+                    label,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = Color.White.copy(alpha = if (sharedAction) 0.95f else 0.5f),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontStyle = if (sharedAction) FontStyle.Normal else FontStyle.Italic,
+                )
+            }
         }
     }
 }

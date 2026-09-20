@@ -19,6 +19,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.common.Constants
 import eu.kanade.tachiyomi.core.security.SecurityPreferences
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloader
+import eu.kanade.tachiyomi.data.library.LibraryUpdateLoad
 import eu.kanade.tachiyomi.data.notification.NotificationHandler
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
@@ -136,13 +137,17 @@ class AnimeLibraryUpdateNotifier(
      * Warn when excessively checking any single source.
      */
     fun showQueueSizeWarningNotificationIfNeeded(animeToUpdate: List<LibraryAnime>) {
-        val maxUpdatesFromSource = animeToUpdate
-            .groupBy { it.anime.source }
-            .filterKeys { sourceManager.get(it) !is UnmeteredSource }
-            .maxOfOrNull { it.value.size } ?: 0
-
-        if (maxUpdatesFromSource <= ANIME_PER_SOURCE_QUEUE_WARNING_THRESHOLD) {
-            return
+        val load = LibraryUpdateLoad.warning(animeToUpdate.map { it.anime.source }) {
+            sourceManager.get(it) is UnmeteredSource
+        } ?: return
+        val warning = if (securityPreferences.hideNotificationContent().get()) {
+            context.stringResource(MR.strings.notification_size_warning)
+        } else {
+            context.stringResource(
+                MR.strings.notification_library_queue_warning,
+                sourceManager.get(load.source)?.name ?: load.source.toString(),
+                load.count,
+            )
         }
 
         context.notify(
@@ -152,10 +157,11 @@ class AnimeLibraryUpdateNotifier(
             setContentTitle(context.stringResource(MR.strings.label_warning))
             setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText(context.stringResource(MR.strings.notification_size_warning)),
+                    .bigText(warning),
             )
             setSmallIcon(R.drawable.ic_warning_white_24dp)
             setTimeoutAfter(AnimeDownloader.WARNING_NOTIF_TIMEOUT_MS)
+            setOnlyAlertOnce(true)
             setContentIntent(NotificationHandler.openUrl(context, HELP_WARNING_URL))
         }
     }
@@ -410,4 +416,3 @@ class AnimeLibraryUpdateNotifier(
 private const val NOTIF_MAX_EPISODES = 5
 private const val NOTIF_TITLE_MAX_LEN = 45
 private const val NOTIF_ICON_SIZE = 192
-private const val ANIME_PER_SOURCE_QUEUE_WARNING_THRESHOLD = 60

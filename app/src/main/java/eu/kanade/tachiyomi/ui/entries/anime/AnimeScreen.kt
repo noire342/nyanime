@@ -38,6 +38,8 @@ import eu.kanade.presentation.entries.anime.components.AnimeImagesDialog
 import eu.kanade.presentation.entries.components.DeleteItemsDialog
 import eu.kanade.presentation.entries.components.SetIntervalDialog
 import eu.kanade.presentation.more.settings.screen.player.PlayerSettingsGesturesScreen.SkipIntroLengthDialog
+import eu.kanade.presentation.motion.PosterAnimeLoadingScreen
+import eu.kanade.presentation.motion.PosterDetailsScreen
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.formatEpisodeNumber
@@ -80,7 +82,7 @@ import tachiyomi.presentation.core.screens.LoadingScreen
 class AnimeScreen(
     private val animeId: Long,
     val fromSource: Boolean = false,
-) : Screen(), AssistContentScreen {
+) : Screen(), AssistContentScreen, PosterDetailsScreen {
 
     private var assistUrl: String? = null
 
@@ -104,7 +106,7 @@ class AnimeScreen(
         val state by screenModel.state.collectAsStateWithLifecycle()
 
         if (state is AnimeScreenModel.State.Loading) {
-            LoadingScreen()
+            PosterAnimeLoadingScreen(isTabletUi(), navigator::pop)
             return
         }
 

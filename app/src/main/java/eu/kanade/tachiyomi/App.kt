@@ -52,6 +52,7 @@ import eu.kanade.tachiyomi.util.system.notify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import logcat.AndroidLogcatLogger
 import logcat.LogPriority
 import logcat.LogcatLogger
@@ -99,6 +100,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         Injekt.importModule(PreferenceModule(this))
         Injekt.importModule(AppModule(this))
         Injekt.importModule(DomainModule())
+        Injekt.importModule(eu.kanade.tachiyomi.data.discovery.DiscoveryModule(this))
         // SY -->
         Injekt.importModule(SYDomainModule())
         // SY <--
@@ -108,6 +110,9 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
 
         val scope = ProcessLifecycleOwner.get().lifecycleScope
+        scope.launch(Dispatchers.IO) {
+            eu.kanade.tachiyomi.data.community.CommunityDormancy.stopBackgroundWork(this@App)
+        }
 
         // Show notification to disable Incognito Mode when it's enabled
         basePreferences.incognitoMode().changes()
@@ -146,7 +151,10 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
             .onEach { ImageUtil.hardwareBitmapThreshold = it }
             .launchIn(scope)
 
-        setAppCompatDelegateThemeMode(Injekt.get<UiPreferences>().themeMode().get())
+        Injekt.get<UiPreferences>().let {
+            it.installNyanimeThemeOnce()
+            setAppCompatDelegateThemeMode(it.themeMode().get())
+        }
 
         // Updates widget update
         with(MangaWidgetManager(Injekt.get(), Injekt.get())) {
@@ -157,8 +165,13 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
             init(ProcessLifecycleOwner.get().lifecycleScope)
         }
 
-        if (!LogcatLogger.isInstalled && networkPreferences.verboseLogging().get()) {
-            LogcatLogger.install(AndroidLogcatLogger(LogPriority.VERBOSE))
+        if (!LogcatLogger.isInstalled) {
+            val minimumPriority = if (networkPreferences.verboseLogging().get()) {
+                LogPriority.VERBOSE
+            } else {
+                LogPriority.WARN
+            }
+            LogcatLogger.install(AndroidLogcatLogger(minimumPriority))
         }
 
         initializeMigrator()
@@ -213,10 +226,12 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
     override fun onStart(owner: LifecycleOwner) {
         SecureActivityDelegate.onApplicationStart()
+        eu.kanade.tachiyomi.data.community.CommunityManager.lifecycle(this, true)
     }
 
     override fun onStop(owner: LifecycleOwner) {
         SecureActivityDelegate.onApplicationStopped()
+        eu.kanade.tachiyomi.data.community.CommunityManager.lifecycle(this, false)
     }
 
     override fun getPackageName(): String {

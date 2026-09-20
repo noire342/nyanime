@@ -104,7 +104,7 @@ data object DownloadsTab : Tab {
             derivedStateOf { mangaDownloadList.sumOf { it.subItems.size } }
         }
 
-        val state = rememberPagerState { 2 }
+        val state = rememberPagerState { 3 }
         val snackbarHostState = remember { SnackbarHostState() }
 
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
@@ -263,6 +263,12 @@ data object DownloadsTab : Tab {
                             },
                             unselectedContentColor = MaterialTheme.colorScheme.onSurface,
                         ),
+                        Tab(
+                            selected = state.currentPage == 2,
+                            onClick = { scope.launch { state.animateScrollToPage(2) } },
+                            text = { Text("Ultra") },
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
                     )
                 }
 
@@ -273,6 +279,9 @@ data object DownloadsTab : Tab {
                     pageNestedScrollConnection = nestedScrollConnection,
                 ) { page ->
                     when (page) {
+                        2 -> eu.kanade.presentation.more.settings.widget.UltraQueueContent(
+                            modifier = Modifier.padding(bottom = contentPadding.calculateBottomPadding()),
+                        )
                         0 -> animeDownloadTab(
                             nestedScrollConnection,
                         ).content(

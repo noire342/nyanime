@@ -22,6 +22,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import dev.vivvvek.seeker.Segment
+import eu.kanade.tachiyomi.ui.player.Anime4KMode
 import eu.kanade.tachiyomi.ui.player.ArtType
 import eu.kanade.tachiyomi.ui.player.Decoder
 import eu.kanade.tachiyomi.ui.player.Panels
@@ -34,6 +35,7 @@ import eu.kanade.tachiyomi.ui.player.controls.components.sheets.MoreSheet
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.PlaybackSpeedSheet
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.QualitySheet
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.ScreenshotSheet
+import eu.kanade.tachiyomi.ui.player.controls.components.sheets.SleepTimerDialog
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.SubtitlesSheet
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -43,6 +45,8 @@ import java.io.InputStream
 @Composable
 fun PlayerSheets(
     sheetShown: Sheets,
+    onOpenSheet: (Sheets) -> Unit,
+    isEpisodeOnline: Boolean,
 
     // subtitles sheet
     subtitles: ImmutableList<VideoTrack>,
@@ -81,7 +85,17 @@ fun PlayerSheets(
     // More sheet
     sleepTimerTimeRemaining: Int,
     onStartSleepTimer: (Int) -> Unit,
+    onStartCustomSleepTimer: (Int) -> Unit,
+    onEndSleepTimer: () -> Unit,
+    sleepTimerAtEpisodeEnd: Boolean,
+    lastCustomTimerMinutes: Int,
+    onExtendSleepTimer: (Int) -> Unit,
+    onOpenSleepTimer: () -> Unit,
+    onOpenWatchTogether: () -> Unit,
+    reduceMotion: Boolean,
     buttons: ImmutableList<CustomButton>,
+    onSelectAnime4KCustom: (Anime4KMode) -> Unit,
+    anime4kAvailable: Boolean,
 
     // Screenshot sheet
     isLocalSource: Boolean,
@@ -99,6 +113,7 @@ fun PlayerSheets(
     dismissSheet: Boolean,
 ) {
     when (sheetShown) {
+        Sheets.WatchTogether -> eu.kanade.tachiyomi.ui.watch.WatchTogetherSheet(onDismissRequest)
         Sheets.None -> {}
         Sheets.SubtitleTracks -> {
             val subtitlesPicker = rememberLauncherForActivityResult(
@@ -160,15 +175,34 @@ fun PlayerSheets(
             )
         }
 
+        Sheets.SleepTimer -> SleepTimerDialog(
+            remainingTime = sleepTimerTimeRemaining,
+            onStartTimer = onStartSleepTimer,
+            onStartCustomTimer = onStartCustomSleepTimer,
+            onEndTimer = onEndSleepTimer,
+            atEpisodeEnd = sleepTimerAtEpisodeEnd,
+            initialCustomMinutes = lastCustomTimerMinutes,
+            onExtendTimer = onExtendSleepTimer,
+            onDismissRequest = onDismissRequest,
+            reduceMotion = reduceMotion,
+        )
         Sheets.More -> {
             MoreSheet(
+                onOpenAudio = { onOpenSheet(Sheets.AudioTracks) },
+                onOpenQuality = { onOpenSheet(Sheets.QualityTracks) },
+                onOpenScreenshot = { onOpenSheet(Sheets.Screenshot) },
+                qualityAvailable = isEpisodeOnline,
                 selectedDecoder = decoder,
                 onSelectDecoder = onUpdateDecoder,
                 remainingTime = sleepTimerTimeRemaining,
-                onStartTimer = onStartSleepTimer,
+                timerAtEpisodeEnd = sleepTimerAtEpisodeEnd,
+                onOpenSleepTimer = onOpenSleepTimer,
+                onOpenWatchTogether = onOpenWatchTogether,
                 onDismissRequest = onDismissRequest,
                 onEnterFiltersPanel = { onOpenPanel(Panels.VideoFilters) },
                 customButtons = buttons,
+                onSelectAnime4KCustom = onSelectAnime4KCustom,
+                anime4kAvailable = anime4kAvailable,
             )
         }
 

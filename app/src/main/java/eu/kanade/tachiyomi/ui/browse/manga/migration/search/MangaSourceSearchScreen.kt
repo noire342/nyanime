@@ -20,6 +20,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.core.util.ifMangaSourcesLoaded
 import eu.kanade.presentation.browse.manga.BrowseSourceContent
 import eu.kanade.presentation.components.SearchToolbar
+import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.core.common.Constants
 import eu.kanade.tachiyomi.source.online.HttpSource
@@ -46,6 +47,11 @@ data class MangaSourceSearchScreen(
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         if (!ifMangaSourcesLoaded()) {
             LoadingScreen()
             return

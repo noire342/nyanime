@@ -3,10 +3,12 @@ package eu.kanade.tachiyomi.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -17,18 +19,25 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -36,9 +45,15 @@ import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.TabNavigator
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.ui.UiPreferences
+import eu.kanade.presentation.motion.ModernMotion
+import eu.kanade.presentation.motion.modernMotionEnabled
+import eu.kanade.presentation.motion.posterForeground
+import eu.kanade.presentation.theme.LocalNyanimeStyle
+import eu.kanade.presentation.theme.MangaSectionTheme
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.isTabletUi
 import eu.kanade.tachiyomi.ui.browse.BrowseTab
+import eu.kanade.tachiyomi.ui.cast.CastMiniController
 import eu.kanade.tachiyomi.ui.download.DownloadsTab
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
@@ -75,67 +90,104 @@ object HomeScreen : Screen() {
     private const val TAB_NAVIGATOR_KEY = "HomeTabs"
 
     private val uiPreferences: UiPreferences by injectLazy()
-    private val defaultTab = uiPreferences.startScreen().get().tab
-    private val moreTab = uiPreferences.navStyle().get().moreTab
 
     @Composable
     override fun Content() {
+        remember { uiPreferences.installDiscoveryNavigationOnce() }
+        val defaultTab = uiPreferences.startScreen().get().tab
         val navStyle by uiPreferences.navStyle().collectAsState()
         val navigator = LocalNavigator.currentOrThrow
         TabNavigator(
             tab = defaultTab,
             key = TAB_NAVIGATOR_KEY,
         ) { tabNavigator ->
-            // Provide usable navigator to content screen
-            CompositionLocalProvider(LocalNavigator provides navigator) {
-                Scaffold(
-                    startBar = {
-                        if (isTabletUi()) {
-                            NavigationRail {
-                                navStyle.tabs.fastForEach {
-                                    NavigationRailItem(it)
-                                }
-                            }
-                        }
-                    },
-                    bottomBar = {
-                        if (!isTabletUi()) {
-                            val bottomNavVisible by produceState(initialValue = true) {
-                                showBottomNavEvent.receiveAsFlow().collectLatest { value = it }
-                            }
-                            AnimatedVisibility(
-                                visible = bottomNavVisible && tabNavigator.current != navStyle.moreTab,
-                                enter = expandVertically(),
-                                exit = shrinkVertically(),
-                            ) {
-                                NavigationBar {
-                                    navStyle.tabs.fastForEach {
-                                        NavigationBarItem(it)
+            MangaSectionTheme(legacy = tabNavigator.current == MangaLibraryTab) {
+                val modern = LocalNyanimeStyle.current
+                val motion = modernMotionEnabled()
+                // Provide usable navigator to content screen
+                CompositionLocalProvider(LocalNavigator provides navigator) {
+                    Scaffold(
+                        modifier = Modifier.semantics { testTagsAsResourceId = true },
+                        startBar = {
+                            if (isTabletUi()) {
+                                NavigationRail(modifier = Modifier.posterForeground(zIndex = 3f)) {
+                                    navStyle.visibleTabs.fastForEach {
+                                        NavigationRailItem(it)
                                     }
                                 }
                             }
-                        }
-                    },
-                    contentWindowInsets = WindowInsets(0),
-                ) { contentPadding ->
-                    Box(
-                        modifier = Modifier
-                            .padding(contentPadding)
-                            .consumeWindowInsets(contentPadding),
-                    ) {
-                        AnimatedContent(
-                            targetState = tabNavigator.current,
-                            transitionSpec = {
-                                materialFadeThroughIn(
-                                    initialScale = 1f,
-                                    durationMillis = TAB_FADE_DURATION,
-                                ) togetherWith
-                                    materialFadeThroughOut(durationMillis = TAB_FADE_DURATION)
-                            },
-                            label = "tabContent",
+                        },
+                        bottomBar = {
+                            val bottomNavVisible by produceState(initialValue = true) {
+                                showBottomNavEvent.receiveAsFlow().collectLatest { value = it }
+                            }
+                            val showNavigation = !isTabletUi() &&
+                                bottomNavVisible &&
+                                tabNavigator.current !in navStyle.overflowTabs
+                            Column(Modifier.posterForeground(zIndex = 3f)) {
+                                eu.kanade.tachiyomi.ui.watch.WatchMiniController(
+                                    includeNavigationInsets = !showNavigation,
+                                )
+                                CastMiniController(includeNavigationInsets = !showNavigation)
+                                AnimatedVisibility(
+                                    visible = showNavigation,
+                                    enter = if (modern) {
+                                        expandVertically(
+                                            tween(if (motion) ModernMotion.RESIZE_MILLIS else 0),
+                                        )
+                                    } else {
+                                        expandVertically()
+                                    },
+                                    exit = if (modern) {
+                                        shrinkVertically(
+                                            tween(if (motion) ModernMotion.RESIZE_MILLIS else 0),
+                                        )
+                                    } else {
+                                        shrinkVertically()
+                                    },
+                                ) {
+                                    NavigationBar(
+                                        containerColor = if (LocalNyanimeStyle.current) {
+                                            MaterialTheme.colorScheme.surfaceContainerLow
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceContainer
+                                        },
+                                        tonalElevation = 0.dp,
+                                    ) {
+                                        navStyle.visibleTabs.fastForEach {
+                                            NavigationBarItem(it)
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        contentWindowInsets = WindowInsets(0),
+                    ) { contentPadding ->
+                        Box(
+                            modifier = Modifier
+                                .padding(contentPadding)
+                                .consumeWindowInsets(contentPadding),
                         ) {
-                            tabNavigator.saveableState(key = "currentTab", it) {
-                                it.Content()
+                            AnimatedContent(
+                                targetState = tabNavigator.current,
+                                transitionSpec = {
+                                    if (modern) {
+                                        ModernMotion.transform(motion).using(null)
+                                    } else {
+                                        val fade = materialFadeThroughIn(
+                                            initialScale = 1f,
+                                            durationMillis = TAB_FADE_DURATION,
+                                        ) togetherWith materialFadeThroughOut(durationMillis = TAB_FADE_DURATION)
+                                        fade
+                                    }
+                                },
+                                label = "tabContent",
+                            ) {
+                                tabNavigator.saveableState(key = "currentTab", it) {
+                                    Box(Modifier.testTag("content_${navigationTag(it)}")) {
+                                        it.Content()
+                                    }
+                                }
                             }
                         }
                     }
@@ -143,34 +195,30 @@ object HomeScreen : Screen() {
             }
 
             val goToStartScreen = {
-                if (defaultTab != moreTab) {
-                    tabNavigator.current = defaultTab
-                } else {
-                    tabNavigator.current = AnimeLibraryTab
-                }
+                tabNavigator.current = defaultTab
             }
             BackHandler(
-                enabled = (tabNavigator.current == moreTab || tabNavigator.current != defaultTab) &&
-                    (tabNavigator.current != AnimeLibraryTab || defaultTab != moreTab),
+                enabled = tabNavigator.current != defaultTab,
                 onBack = goToStartScreen,
             )
 
             LaunchedEffect(Unit) {
                 launch {
                     librarySearchEvent.receiveAsFlow().collectLatest {
-                        goToStartScreen()
+                        tabNavigator.current = if (defaultTab == MangaLibraryTab) MangaLibraryTab else AnimeLibraryTab
                         when (defaultTab) {
                             AnimeLibraryTab -> AnimeLibraryTab.search(it)
                             MangaLibraryTab -> MangaLibraryTab.search(it)
-                            else -> {}
+                            else -> AnimeLibraryTab.search(it)
                         }
                     }
                 }
                 launch {
                     openTabEvent.receiveAsFlow().collectLatest {
                         tabNavigator.current = when (it) {
+                            is Tab.Home -> eu.kanade.tachiyomi.ui.discovery.DiscoveryTab
                             is Tab.AnimeLib -> AnimeLibraryTab
-                            is Tab.Library -> MangaLibraryTab
+                            is Tab.Library -> MangaLibraryTab.also { tab -> tab.libraryRequested.value = true }
                             is Tab.Updates -> UpdatesTab
                             is Tab.History -> HistoriesTab
                             is Tab.Browse -> {
@@ -208,6 +256,18 @@ object HomeScreen : Screen() {
         val scope = rememberCoroutineScope()
         val selected = tabNavigator.current::class == tab::class
         NavigationBarItem(
+            colors = if (LocalNyanimeStyle.current) {
+                NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                    indicatorColor = Color.Transparent,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                NavigationBarItemDefaults.colors()
+            },
+            modifier = Modifier.semantics { testTagsAsResourceId = true }.testTag(navigationTag(tab)),
             selected = selected,
             onClick = {
                 if (!selected) {
@@ -220,7 +280,11 @@ object HomeScreen : Screen() {
             label = {
                 Text(
                     text = tab.options.title,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = if (LocalNyanimeStyle.current) {
+                        MaterialTheme.typography.labelMedium
+                    } else {
+                        MaterialTheme.typography.labelLarge
+                    },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -236,6 +300,16 @@ object HomeScreen : Screen() {
         val scope = rememberCoroutineScope()
         val selected = tabNavigator.current::class == tab::class
         NavigationRailItem(
+            colors = if (LocalNyanimeStyle.current) {
+                NavigationRailItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                    indicatorColor = Color.Transparent,
+                )
+            } else {
+                NavigationRailItemDefaults.colors()
+            },
+            modifier = Modifier.semantics { testTagsAsResourceId = true }.testTag(navigationTag(tab)),
             selected = selected,
             onClick = {
                 if (!selected) {
@@ -248,7 +322,11 @@ object HomeScreen : Screen() {
             label = {
                 Text(
                     text = tab.options.title,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = if (LocalNyanimeStyle.current) {
+                        MaterialTheme.typography.labelMedium
+                    } else {
+                        MaterialTheme.typography.labelLarge
+                    },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -262,7 +340,11 @@ object HomeScreen : Screen() {
         BadgedBox(
             badge = {
                 when {
-                    UpdatesTab::class.isInstance(tab) -> {
+                    UpdatesTab::class.isInstance(tab) ||
+                        (
+                            tab == eu.kanade.tachiyomi.ui.discovery.DiscoveryTab &&
+                                uiPreferences.navStyle().get() == eu.kanade.domain.ui.model.NavStyle.DISCOVERY
+                            ) -> {
                         val count by produceState(initialValue = 0) {
                             val pref = Injekt.get<LibraryPreferences>()
                             combine(
@@ -320,6 +402,15 @@ object HomeScreen : Screen() {
         }
     }
 
+    private fun navigationTag(tab: cafe.adriel.voyager.navigator.tab.Tab) = when (tab) {
+        AnimeLibraryTab -> "library_anime"
+        MangaLibraryTab -> "library_manga"
+        BrowseTab -> "browse"
+        MoreTab -> "more"
+        eu.kanade.tachiyomi.ui.discovery.DiscoveryTab -> "discovery"
+        else -> "navigation_other"
+    }
+
     suspend fun search(query: String) {
         librarySearchEvent.send(query)
     }
@@ -333,6 +424,7 @@ object HomeScreen : Screen() {
     }
 
     sealed interface Tab {
+        data object Home : Tab
         data class AnimeLib(val animeIdToOpen: Long? = null) : Tab
         data class Library(val mangaIdToOpen: Long? = null) : Tab
         data object Updates : Tab

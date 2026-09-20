@@ -43,7 +43,7 @@ fun createPipActions(
             AYMR.strings.action_previous_episode,
             PIP_PREVIOUS,
             PIP_PREVIOUS,
-            playlistPosition != 0,
+            playlistPosition in 1 until playlistCount,
         )
     } else {
         createPipAction(
@@ -77,7 +77,7 @@ fun createPipActions(
         AYMR.strings.action_next_episode,
         PIP_NEXT,
         PIP_NEXT,
-        playlistPosition != playlistCount - 1,
+        playlistPosition >= 0 && playlistPosition < playlistCount - 1,
     ),
 )
 

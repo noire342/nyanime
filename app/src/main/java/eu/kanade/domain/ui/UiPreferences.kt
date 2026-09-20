@@ -21,14 +21,31 @@ class UiPreferences(
 
     fun appTheme() = preferenceStore.getEnum(
         "pref_app_theme",
-        if (DeviceUtil.isDynamicColorAvailable) {
-            AppTheme.MONET
-        } else {
-            AppTheme.DEFAULT
-        },
+        AppTheme.NYANIME,
     )
 
     fun themeDarkAmoled() = preferenceStore.getBoolean("pref_theme_dark_amoled_key", false)
+
+    fun sourceHomeLogo() = preferenceStore.getBoolean("source_home_logo", false)
+
+    fun modernUi() = preferenceStore.getBoolean("nyanime_modern_ui", true)
+
+    fun legacyAppTheme() = preferenceStore.getEnum("nyanime_legacy_app_theme", legacyMangaTheme().get())
+
+    fun activeAppTheme() = if (modernUi().get()) appTheme().get() else legacyAppTheme().get()
+
+    private val legacyDefaultTheme get() = if (DeviceUtil.isDynamicColorAvailable) AppTheme.MONET else AppTheme.DEFAULT
+
+    fun legacyMangaTheme() = preferenceStore.getEnum("nyanime_legacy_manga_theme", legacyDefaultTheme)
+
+    fun installNyanimeThemeOnce() {
+        val installed = preferenceStore.getBoolean("nyanime_visual_identity_v1", false)
+        if (installed.get()) return
+        legacyMangaTheme().set(appTheme().get().takeUnless { it == AppTheme.NYANIME } ?: legacyDefaultTheme)
+        legacyAppTheme().set(legacyMangaTheme().get())
+        appTheme().set(AppTheme.NYANIME)
+        installed.set(true)
+    }
 
     fun relativeTime() = preferenceStore.getBoolean("relative_time_v2", true)
 
@@ -36,9 +53,17 @@ class UiPreferences(
 
     fun tabletUiMode() = preferenceStore.getEnum("tablet_ui_mode", TabletUiMode.AUTOMATIC)
 
-    fun startScreen() = preferenceStore.getEnum("start_screen", StartScreen.ANIME)
+    fun startScreen() = preferenceStore.getEnum("start_screen", StartScreen.HOME)
 
-    fun navStyle() = preferenceStore.getEnum("bottom_rail_nav_style", NavStyle.MOVE_HISTORY_TO_MORE)
+    fun navStyle() = preferenceStore.getEnum("bottom_rail_nav_style", NavStyle.DISCOVERY)
+
+    fun installDiscoveryNavigationOnce() {
+        val migrated = preferenceStore.getBoolean("fork_discovery_navigation_v1", false)
+        if (migrated.get()) return
+        startScreen().set(StartScreen.HOME)
+        navStyle().set(NavStyle.DISCOVERY)
+        migrated.set(true)
+    }
 
     companion object {
         fun dateFormat(format: String): DateTimeFormatter = when (format) {

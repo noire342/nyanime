@@ -9,6 +9,7 @@ import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.browse.manga.MangaSourcesFilterScreen
+import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.util.system.toast
 import tachiyomi.i18n.MR
@@ -18,6 +19,11 @@ class MangaSourcesFilterScreen : Screen() {
 
     @Composable
     override fun Content() {
+        LegacyMangaTheme { LegacyContent() }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         val navigator = LocalNavigator.currentOrThrow
         val screenModel = rememberScreenModel { MangaSourcesFilterScreenModel() }
         val state by screenModel.state.collectAsState()

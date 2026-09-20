@@ -7,6 +7,7 @@ import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.GetApp
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.PeopleOutline
 import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
@@ -38,7 +39,7 @@ fun MoreScreen(
     incognitoMode: Boolean,
     onIncognitoModeChange: (Boolean) -> Unit,
     navStyle: NavStyle,
-    onClickAlt: () -> Unit,
+    onClickAlt: (eu.kanade.presentation.util.Tab) -> Unit,
     onClickDownloadQueue: () -> Unit,
     onClickCategories: () -> Unit,
     onClickStats: () -> Unit,
@@ -49,6 +50,7 @@ fun MoreScreen(
     onClickAbout: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Scaffold { contentPadding ->
         ScrollbarLazyColumn(
@@ -80,10 +82,39 @@ fun MoreScreen(
 
             item {
                 TextPreferenceWidget(
-                    title = navStyle.moreTab.options.title,
-                    icon = navStyle.moreIcon,
-                    onPreferenceClick = onClickAlt,
+                    title = "Guarda e leggi insieme",
+                    subtitle = "Una stanza per video, manga e schizzi condivisi",
+                    icon = Icons.Outlined.PeopleOutline,
+                    onPreferenceClick = {
+                        context.startActivity(
+                            android.content.Intent(
+                                context,
+                                eu.kanade.tachiyomi.ui.watch.WatchTogetherActivity::class.java,
+                            ),
+                        )
+                    },
                 )
+            }
+
+            if (eu.kanade.tachiyomi.BuildConfig.COMMUNITY_ENABLED) {
+                item {
+                    TextPreferenceWidget(
+                        title = "Community",
+                        subtitle = "Profilo, amici e i tuoi dispositivi",
+                        icon = Icons.Outlined.PeopleOutline,
+                        onPreferenceClick = { eu.kanade.tachiyomi.ui.community.openCommunity(context) },
+                    )
+                }
+            }
+
+            navStyle.overflowTabs.forEach { tab ->
+                item {
+                    TextPreferenceWidget(
+                        title = tab.options.title,
+                        icon = navStyle.overflowIcon(tab),
+                        onPreferenceClick = { onClickAlt(tab) },
+                    )
+                }
             }
 
             item {

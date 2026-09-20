@@ -37,6 +37,7 @@ import eu.kanade.presentation.library.components.LibraryToolbar
 import eu.kanade.presentation.library.manga.MangaLibraryContent
 import eu.kanade.presentation.library.manga.MangaLibrarySettingsDialog
 import eu.kanade.presentation.more.onboarding.GETTING_STARTED_URL
+import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.library.manga.MangaLibraryUpdateJob
@@ -67,6 +68,8 @@ import tachiyomi.source.local.entries.manga.isLocal
 
 data object MangaLibraryTab : Tab {
 
+    val libraryRequested = kotlinx.coroutines.flow.MutableStateFlow(false)
+
     @OptIn(ExperimentalAnimationGraphicsApi::class)
     override val options: TabOptions
         @Composable
@@ -84,12 +87,20 @@ data object MangaLibraryTab : Tab {
         }
 
     override suspend fun onReselect(navigator: Navigator) {
+        libraryRequested.value = true
         requestOpenSettingsSheet()
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
+        LegacyMangaTheme {
+            eu.kanade.tachiyomi.ui.discovery.manga.MangaHomeTabContent { LegacyContent() }
+        }
+    }
+
+    @Composable
+    private fun LegacyContent() {
         val navigator = LocalNavigator.currentOrThrow
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
@@ -321,7 +332,10 @@ data object MangaLibraryTab : Tab {
 
     // For invoking search from other screen
     private val queryEvent = Channel<String>()
-    suspend fun search(query: String) = queryEvent.send(query)
+    suspend fun search(query: String) {
+        libraryRequested.value = true
+        queryEvent.send(query)
+    }
 
     // For opening settings sheet in LibraryController
     private val requestSettingsSheetEvent = Channel<Unit>()

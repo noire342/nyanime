@@ -60,6 +60,7 @@ import eu.kanade.tachiyomi.animesource.model.TileInfo
 import eu.kanade.tachiyomi.animesource.model.TimeStamp
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
+import eu.kanade.tachiyomi.data.cast.CastController
 import eu.kanade.tachiyomi.data.database.models.anime.Episode
 import eu.kanade.tachiyomi.data.database.models.anime.isRecognizedNumber
 import eu.kanade.tachiyomi.data.database.models.anime.toDomainEpisode
@@ -71,6 +72,11 @@ import eu.kanade.tachiyomi.data.saver.Location
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.data.track.anilist.Anilist
 import eu.kanade.tachiyomi.data.track.myanimelist.MyAnimeList
+import eu.kanade.tachiyomi.data.watch.WatchMedia
+import eu.kanade.tachiyomi.data.watch.WatchPlayback
+import eu.kanade.tachiyomi.data.watch.WatchPlayer
+import eu.kanade.tachiyomi.data.watch.WatchProblem
+import eu.kanade.tachiyomi.data.watch.WatchTogetherManager
 import eu.kanade.tachiyomi.ui.player.controls.components.IndexedSegment
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.HosterState
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.getChangedAt
@@ -79,6 +85,7 @@ import eu.kanade.tachiyomi.ui.player.loader.HosterLoader
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.utils.AniSkipApi
+import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
 import eu.kanade.tachiyomi.ui.player.utils.TrackSelect
 import eu.kanade.tachiyomi.ui.reader.SaveImageNotifier
@@ -94,12 +101,15 @@ import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPVLib
 import `is`.xyz.mpv.Utils
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -107,6 +117,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
@@ -187,6 +198,9 @@ class PlayerViewModel @JvmOverloads constructor(
     val hasNextEpisode = _hasNextEpisode.asStateFlow()
 
     private val _currentEpisode = MutableStateFlow<Episode?>(null)
+
+    // Survives a remote disconnect until a fresh local file is loaded. onCleared must not save stale MPV progress.
+    @Volatile var remoteProgressOwned = false
     val currentEpisode = _currentEpisode.asStateFlow()
 
     private val _currentAnime = MutableStateFlow<Anime?>(null)
@@ -208,7 +222,213 @@ class PlayerViewModel @JvmOverloads constructor(
     val animeTitle = MutableStateFlow("")
 
     val isLoading = MutableStateFlow(true)
+    val playbackLoad = PlaybackLoadMonitor(viewModelScope, { activity.onPlaybackFailure(PlaybackFailure.Timeout) })
+    val playbackLoadState = playbackLoad.state
     val playbackSpeed = MutableStateFlow(playerPreferences.playerSpeed().get())
+
+    private val holdSpeed = PlayerHoldSpeed(
+        available = { !activity.player.isExiting && !activity.isDestroyed },
+        readSpeed = { MPVLib.getPropertyDouble("speed") ?: playbackSpeed.value.toDouble() },
+        writeSpeed = { MPVLib.setPropertyDouble("speed", it) },
+    )
+
+    val watchManager by lazy { WatchTogetherManager.get(activity) }
+    val watchTogether get() = watchManager.controller
+
+    private fun readWatchTiming(): PlayerWatchTiming {
+        val load = playbackLoadState.value
+        return PlayerWatchTiming.read(
+            available = load.started && !load.opening && !isLoadingEpisode.value && !activity.player.isExiting,
+            readDouble = MPVLib::getPropertyDouble,
+        )
+    }
+
+    fun bindWatchPlayer() {
+        watchManager.attach(
+            activity,
+            object : WatchPlayer {
+                override fun sample(): WatchPlayback {
+                    val anime = currentAnime.value
+                    val episode = currentEpisode.value
+                    val load = playbackLoadState.value
+                    val timing = readWatchTiming()
+                    val duration = timing.duration
+                    val position = timing.position
+                    val media = if (anime != null && episode != null) {
+                        WatchMedia(
+                            anime.title.take(240),
+                            episode.name.take(240),
+                            episode.episode_number.toDouble(),
+                            duration,
+                            anime.source,
+                            anime.url,
+                            episode.url,
+                        )
+                    } else {
+                        null
+                    }
+                    return WatchPlayback(
+                        media = media,
+                        position = position,
+                        paused = paused.value,
+                        ready = timing.ready &&
+                            load.started &&
+                            load.failure == null &&
+                            !load.opening &&
+                            !load.seeking &&
+                            !isLoadingEpisode.value &&
+                            !isSeeking.value &&
+                            !activity.player.isExiting,
+                        buffering = load.buffering || load.seeking || isSeeking.value,
+                        speed = holdSpeed.originalSpeed ?: playbackSpeed.value.toDouble(),
+                        problem = if (load.failure != null) WatchProblem.SourceError else WatchProblem.None,
+                        upcoming = if (timing.ready && duration - position <= 90) watchNextMedia() else null,
+                        canAdvance = timing.ready && canWatchAdvance(),
+                        ended = timing.ready &&
+                            runCatching { MPVLib.getPropertyBoolean("eof-reached") == true }.getOrDefault(false),
+                    )
+                }
+                override fun pause(paused: Boolean) {
+                    if (!activity.player.isExiting) activity.player.paused = paused
+                    _paused.value = paused
+                }
+                override fun seek(seconds: Double) {
+                    if (!activity.player.isExiting) {
+                        completion.playbackRestarted()
+                        MPVLib.command(arrayOf("seek", seconds.toString(), "absolute+exact"))
+                    }
+                }
+                override fun speed(value: Double) {
+                    if (!activity.player.isExiting) MPVLib.setPropertyDouble("speed", value)
+                }
+                override fun userResumed() {
+                    sleepTimer.acknowledgeUserPlayback()
+                }
+                override fun advance(media: WatchMedia) {
+                    val target = getAdjacentEpisodeId(previous = false)
+                    if (watchTogether.state.value.host &&
+                        canWatchAdvance() &&
+                        watchNextMedia()?.key == media.key &&
+                        target >= 0
+                    ) {
+                        activity.changeEpisode(target, autoPlay = true, fromWatchRoom = true)
+                    }
+                }
+            },
+        ) { animeId, episodeId ->
+            if (currentAnime.value?.id == animeId) {
+                activity.changeEpisode(episodeId, autoPlay = true, fromWatchRoom = true)
+            } else {
+                activity.openWatchVideo(animeId, episodeId)
+            }
+        }
+    }
+
+    fun onNativePause(paused: Boolean) {
+        val effective = paused || watchTogether.active && watchTogether.expectsPaused
+        if (effective) endHoldSpeed()
+        _paused.value = effective
+        if (effective != paused) activity.player.paused = effective
+    }
+
+    private var deviceResumeAllowed = true
+    private val devicePlayer = object : eu.kanade.tachiyomi.data.community.DeviceHandoff.Player {
+        override fun snapshot(): eu.kanade.tachiyomi.data.community.DevicePlayback? {
+            if (activity.player.isExiting ||
+                incognitoMode ||
+                watchTogether.active ||
+                isLoadingEpisode.value
+            ) {
+                return null
+            }
+            val cast = CastController.get(activity.applicationContext).state.value
+            if (cast.active || cast.connecting) return null
+            val anime = currentAnime.value ?: return null
+            val episode = currentEpisode.value ?: return null
+            val manager = eu.kanade.tachiyomi.data.community.CommunityManager.existing() ?: return null
+            return eu.kanade.tachiyomi.data.community.DevicePlayback(
+                manager.deviceId(),
+                eu.kanade.tachiyomi.data.community.SyncReference(false, anime.source, anime.url, episode.url),
+                (pos.value.toDouble() * 1000).toLong().coerceAtLeast(0),
+                !paused.value,
+            )
+        }
+        override fun pause(): Boolean {
+            if (snapshot() == null) return false
+            this@PlayerViewModel.pause()
+            return true
+        }
+        override fun resume(position: Long) {
+            if (!deviceResumeAllowed || snapshot() == null) return
+            seekTo((position / 1000).toInt())
+            unpause()
+        }
+        override fun message(
+            text: String,
+        ) {
+            if (!activity.player.isExiting) playerUpdate.update { PlayerUpdates.ShowText(text) }
+        }
+    }
+    fun onDevicePlaybackReady() {
+        deviceResumeAllowed = true
+        eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.attachPlayer(devicePlayer)
+        if (!incognitoMode) {
+            val anime = currentAnime.value
+            val episode = currentEpisode.value
+            if (anime != null && episode != null) {
+                eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.updateActivity(
+                    this,
+                    eu.kanade.tachiyomi.data.community.SyncReference(false, anime.source, anime.url, episode.url),
+                    anime.title,
+                    episode.name,
+                )
+            }
+        }
+    }
+    fun detachDevicePlayback() {
+        deviceResumeAllowed = false
+        eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.handoff?.detach(devicePlayer)
+        eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.clearActivity(this)
+    }
+
+    fun pauseByUser() {
+        deviceResumeAllowed = false
+        if (!watchTogether.requestPause(true)) pause()
+    }
+
+    fun setPlaybackSpeedByUser(speed: Double) {
+        endHoldSpeed()
+        if (!watchTogether.requestSpeed(speed)) MPVLib.setPropertyDouble("speed", speed)
+    }
+
+    fun beginHoldSpeed(): Boolean {
+        if (watchTogether.active) {
+            playerUpdate.value = PlayerUpdates.ShowText("Il 2× temporaneo non è disponibile nelle stanze")
+            return false
+        }
+        val cast = activity.castController.state.value
+        if (paused.value ||
+            isLoading.value ||
+            isLoadingEpisode.value ||
+            areControlsLocked.value ||
+            cast.active ||
+            cast.connecting ||
+            sheetShown.value != Sheets.None ||
+            dialogShown.value != Dialogs.None ||
+            panelShown.value != Panels.None
+        ) {
+            return false
+        }
+        if (!holdSpeed.start()) return false
+        hideControls()
+        playerUpdate.value = PlayerUpdates.DoubleSpeed
+        return true
+    }
+
+    fun endHoldSpeed() {
+        holdSpeed.finish()
+        playerUpdate.update { if (it is PlayerUpdates.DoubleSpeed) PlayerUpdates.None else it }
+    }
 
     private val _subtitleTracks = MutableStateFlow<List<VideoTrack>>(emptyList())
     val subtitleTracks = _subtitleTracks.asStateFlow()
@@ -310,9 +530,106 @@ class PlayerViewModel @JvmOverloads constructor(
     private val _isSeekingForwards = MutableStateFlow(false)
     val isSeekingForwards = _isSeekingForwards.asStateFlow()
 
-    private var timerJob: Job? = null
-    private val _remainingTime = MutableStateFlow(0)
-    val remainingTime = _remainingTime.asStateFlow()
+    private val completion = PlayerPlaybackCompletion(
+        scope = viewModelScope,
+        nowMillis = android.os.SystemClock::elapsedRealtime,
+        canAdvance = ::canAutoAdvance,
+        onPlayNext = { nextId ->
+            if (getAdjacentEpisodeId(previous = false) == nextId) {
+                activity.changeEpisode(nextId, autoPlay = true)
+            }
+        },
+    )
+    val nextEpisodePrompt = completion.prompt
+
+    private val sleepTimer = PlayerSleepTimer(viewModelScope, android.os.SystemClock::elapsedRealtime) {
+        deviceResumeAllowed = false
+        completion.cancel()
+        watchTogether.hold()
+        pause()
+        Injekt.get<Application>().toast(AYMR.strings.toast_sleep_timer_ended)
+    }
+    val remainingTime = sleepTimer.remainingTime
+    val sleepTimerEndEpisode = sleepTimer.endEpisodeId
+
+    private fun watchNextMedia(): WatchMedia? {
+        val anime = currentAnime.value ?: return null
+        val id = getAdjacentEpisodeId(previous = false)
+        val next = currentPlaylist.value.firstOrNull { it.id == id } ?: return null
+        return WatchMedia(
+            anime.title.take(240),
+            next.name.take(240),
+            next.episode_number.toDouble(),
+            0.0,
+            anime.source,
+            anime.url,
+            next.url,
+        )
+    }
+
+    private fun canWatchAdvance(): Boolean {
+        val currentId = currentEpisode.value?.id ?: return false
+        val cast = CastController.get(activity.applicationContext).state.value
+        return !activity.player.isExiting &&
+            !remoteProgressOwned &&
+            !cast.active &&
+            !cast.connecting &&
+            !isLoadingEpisode.value &&
+            sheetShown.value in listOf(Sheets.None, Sheets.WatchTogether) &&
+            panelShown.value == Panels.None &&
+            dialogShown.value == Dialogs.None &&
+            sleepTimer.allowsAutoPlay(currentId) &&
+            (!watchTogether.state.value.host || playerPreferences.autoplayEnabled().get())
+    }
+
+    private fun canAutoAdvance(): Boolean {
+        val currentId = currentEpisode.value?.id ?: return false
+        val cast = CastController.get(activity.applicationContext).state.value
+        return !activity.player.isExiting &&
+            (!watchTogether.active || watchTogether.state.value.host) &&
+            !remoteProgressOwned &&
+            !cast.active &&
+            !cast.connecting &&
+            !isLoadingEpisode.value &&
+            playerPreferences.autoplayEnabled().get() &&
+            sheetShown.value == Sheets.None &&
+            panelShown.value == Panels.None &&
+            dialogShown.value == Dialogs.None &&
+            sleepTimer.allowsAutoPlay(currentId)
+    }
+
+    fun onPlaybackEof(reached: Boolean) {
+        if (!reached) {
+            completion.playbackRestarted()
+            return
+        }
+        val currentId = currentEpisode.value?.id ?: return
+        if (isLoadingEpisode.value || remoteProgressOwned || !playbackLoadState.value.canSaveProgress) return
+        sleepTimer.onEpisodeEnded(currentId)
+        if (watchTogether.active) {
+            completion.cancel()
+            hideControls()
+            return
+        }
+        completion.onEnded(
+            nextEpisodeId = getAdjacentEpisodeId(previous = false).takeIf { it >= 0 },
+            autoPlay = playerPreferences.autoplayEnabled().get(),
+        )
+        if (nextEpisodePrompt.value != null) hideControls()
+    }
+
+    fun cancelNextEpisode() {
+        if (watchTogether.active) watchTogether.cancelNext() else completion.cancel()
+    }
+
+    fun playNextEpisodeNow() {
+        if (watchTogether.active) watchTogether.playNextNow() else completion.playNow()
+    }
+
+    fun prepareMediaChange(episodeId: Long?) {
+        completion.playbackRestarted()
+        if (episodeId != null && episodeId != currentEpisode.value?.id) sleepTimer.onEpisodeChanged(episodeId)
+    }
 
     val cachePath: String = activity.cacheDir.path
 
@@ -350,17 +667,24 @@ class PlayerViewModel @JvmOverloads constructor(
      * Starts a sleep timer/cancels the current timer if [seconds] is less than 1.
      */
     fun startTimer(seconds: Int) {
-        timerJob?.cancel()
-        _remainingTime.value = seconds
-        if (seconds < 1) return
-        timerJob = viewModelScope.launch {
-            for (time in seconds downTo 0) {
-                _remainingTime.value = time
-                delay(1000)
-            }
-            pause()
-            withUIContext { Injekt.get<Application>().toast(AYMR.strings.toast_sleep_timer_ended) }
-        }
+        sleepTimer.start(seconds)
+    }
+
+    fun startCustomTimer(seconds: Int) {
+        if (seconds % 60 != 0 || seconds / 60 !in 1..1439) return
+        playerPreferences.lastSleepTimerMinutes().set(seconds / 60)
+        startTimer(seconds)
+    }
+
+    fun stopAtEpisodeEnd() {
+        val currentId = currentEpisode.value?.id ?: return
+        sleepTimer.stopAtEpisodeEnd(currentId)
+        completion.cancel()
+        if (completion.atEnd) sleepTimer.onEpisodeEnded(currentId)
+    }
+
+    fun extendTimer(seconds: Int) {
+        sleepTimer.extend(seconds)
     }
 
     fun isEpisodeOnline(): Boolean? {
@@ -376,6 +700,22 @@ class PlayerViewModel @JvmOverloads constructor(
 
     fun updateIsLoadingEpisode(value: Boolean) {
         _isLoadingEpisode.update { _ -> value }
+    }
+
+    fun onPlaybackFailed(reason: PlaybackFailure) {
+        endHoldSpeed()
+        playbackLoad.fail(reason)
+        isLoading.value = false
+        updateIsLoadingEpisode(false)
+        updateIsLoadingHosters(false)
+        isLoadingTracks.value = true
+        cancelHosterVideoLinksJob()
+        completion.cancel()
+        showControls()
+    }
+
+    fun retryPlayback() {
+        activity.changeEpisode(currentEpisode.value?.id)
     }
 
     private fun updateEpisodeList(episodeList: List<Episode>) {
@@ -478,10 +818,10 @@ class PlayerViewModel @JvmOverloads constructor(
 
     fun loadChapters() {
         val chapters = mutableListOf<IndexedSegment>()
-        val count = MPVLib.getPropertyInt("chapter-list/count")!!
+        val count = (MPVLib.getPropertyInt("chapter-list/count") ?: 0)
         for (i in 0 until count) {
             val title = MPVLib.getPropertyString("chapter-list/$i/title")
-            val time = MPVLib.getPropertyInt("chapter-list/$i/time")!!
+            val time = (MPVLib.getPropertyInt("chapter-list/$i/time") ?: continue)
             chapters.add(
                 IndexedSegment(
                     name = title,
@@ -498,7 +838,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun selectChapter(index: Int) {
-        val time = chapters.value[index].start
+        val time = chapters.value.getOrNull(index)?.start ?: return
         seekTo(time.toInt())
     }
 
@@ -642,14 +982,34 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun pauseUnpause() {
+        completion.cancel()
+        if (watchTogether.active) {
+            if (watchTogether.state.value.wantsPlayback &&
+                !watchTogether.state.value.localHold
+            ) {
+                pauseByUser()
+            } else {
+                resumeByUser()
+            }
+            return
+        }
         if (paused.value) {
-            unpause()
+            resumeByUser()
         } else {
-            pause()
+            pauseByUser()
         }
     }
 
+    fun resumeByUser() {
+        completion.cancel()
+        sleepTimer.acknowledgeUserPlayback()
+        if (watchTogether.resumeByUser()) return
+        unpause()
+        onDevicePlaybackReady()
+    }
+
     fun pause() {
+        endHoldSpeed()
         activity.player.paused = true
         _paused.update { true }
         runCatching {
@@ -658,6 +1018,12 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun unpause() {
+        val cast = CastController.get(activity.applicationContext).state.value
+        if (cast.active || cast.connecting) return
+        if (remoteProgressOwned) {
+            activity.resumeAfterCast()
+            return
+        }
         activity.player.paused = false
         _paused.update { false }
     }
@@ -707,6 +1073,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun showSheet(sheet: Sheets) {
+        if (sheet != Sheets.None) completion.cancel()
         sheetShown.update { sheet }
         if (sheet == Sheets.None) {
             resetDismissSheet()
@@ -719,6 +1086,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun showPanel(panel: Panels) {
+        if (panel != Panels.None) completion.cancel()
         panelShown.update { panel }
         if (panel == Panels.None) {
             showControls()
@@ -730,6 +1098,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun showDialog(dialog: Dialogs) {
+        if (dialog != Dialogs.None) completion.cancel()
         dialogShown.update { dialog }
         if (dialog == Dialogs.None) {
             showControls()
@@ -741,11 +1110,19 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun seekBy(offset: Int, precise: Boolean = false) {
+        if (watchTogether.active) {
+            val timing = readWatchTiming()
+            if (timing.ready) watchTogether.requestSeek(timing.position + offset)
+            return
+        }
+        completion.playbackRestarted()
         MPVLib.command(arrayOf("seek", offset.toString(), if (precise) "relative+exact" else "relative"))
     }
 
     fun seekTo(position: Int, precise: Boolean = true) {
+        if (watchTogether.requestSeek(position.toDouble())) return
         if (position !in 0..(activity.player.duration ?: 0)) return
+        completion.playbackRestarted()
         MPVLib.command(arrayOf("seek", position.toString(), if (precise) "absolute" else "absolute+keyframes"))
     }
 
@@ -800,6 +1177,7 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun setAutoPlay(value: Boolean) {
+        if (!value) completion.cancel()
         val textRes = if (value) {
             AYMR.strings.enable_auto_play
         } else {
@@ -837,6 +1215,11 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun cycleScreenRotations() {
+        val cast = activity.castController.state.value
+        if (cast.active || cast.connecting) {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            return
+        }
         activity.requestedOrientation = when (activity.requestedOrientation) {
             ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE,
             ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE,
@@ -1026,6 +1409,7 @@ class PlayerViewModel @JvmOverloads constructor(
         _hosterList.update { _ -> emptyList() }
         _hosterExpandedList.update { _ -> emptyList() }
         _selectedHosterVideoIndex.update { _ -> Pair(-1, -1) }
+        _currentVideo.value = null
         thumbnailTileCache.clear()
         thumbnailFetchJob?.cancel()
         lastThumbnailFetch = 0L
@@ -1233,7 +1617,7 @@ class PlayerViewModel @JvmOverloads constructor(
      * Whether this viewModel is initialized with the correct episode.
      */
     private fun needsInit(animeId: Long, episodeId: Long): Boolean {
-        return currentAnime.value?.id != animeId || currentEpisode.value?.id != episodeId
+        return remoteProgressOwned || currentAnime.value?.id != animeId || currentEpisode.value?.id != episodeId
     }
 
     data class InitResult(
@@ -1372,6 +1756,10 @@ class PlayerViewModel @JvmOverloads constructor(
         }
 
         getHosterVideoLinksJob?.cancel()
+        if (hosterList.any { !it.lazy }) {
+            playbackLoad.begin()
+            isLoading.value = true
+        }
         getHosterVideoLinksJob = viewModelScope.launchIO {
             _hosterState.update { _ ->
                 hosterList.map { hoster ->
@@ -1395,7 +1783,7 @@ class PlayerViewModel @JvmOverloads constructor(
                     hosterList.mapIndexed { hosterIdx, hoster ->
                         async {
                             val hosterState = EpisodeLoader.loadHosterVideos(source, hoster)
-
+                            currentCoroutineContext().ensureActive()
                             _hosterState.updateAt(hosterIdx, hosterState)
 
                             if (hosterState is HosterState.Ready) {
@@ -1447,11 +1835,13 @@ class PlayerViewModel @JvmOverloads constructor(
                     }
                 }
             } catch (e: CancellationException) {
-                _hosterState.update { _ ->
-                    hosterList.map { HosterState.Idle(it.hosterName) }
-                }
-
+                // A newer episode owns the state now; cancellation must not overwrite its hosters.
                 throw e
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main.immediate) {
+                    currentCoroutineContext().ensureActive()
+                    activity.onPlaybackFailure(PlaybackFailure.fromNative(e.message.orEmpty()))
+                }
             }
         }
     }
@@ -1521,7 +1911,10 @@ class PlayerViewModel @JvmOverloads constructor(
             loadThumbnails(resolvedVideo, source)
         }
 
-        activity.setVideo(resolvedVideo)
+        withContext(Dispatchers.Main.immediate) {
+            currentCoroutineContext().ensureActive()
+            activity.setVideo(resolvedVideo)
+        }
         return true
     }
 
@@ -1628,6 +2021,7 @@ class PlayerViewModel @JvmOverloads constructor(
         updateEpisode(chosenEpisode)
 
         return withIOContext {
+            currentHosterList = null // Never replay a previous episode's URLs after resolution fails.
             try {
                 val currentEpisode =
                     currentEpisode.value
@@ -1640,6 +2034,7 @@ class PlayerViewModel @JvmOverloads constructor(
 
                 this@PlayerViewModel.episodeId = currentEpisode.id!!
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 logcat(LogPriority.ERROR, e) { e.message ?: "Error getting links" }
             }
 
@@ -1656,7 +2051,9 @@ class PlayerViewModel @JvmOverloads constructor(
      * seen, update tracking services, enqueue downloaded episode deletion and download next episode.
      */
     private fun onSecondReached(position: Int, duration: Int) {
-        if (isLoadingEpisode.value) return
+        val cast = CastController.get(activity.applicationContext).state.value
+        if (remoteProgressOwned || cast.active || cast.connecting) return
+        if (isLoadingEpisode.value || !playbackLoadState.value.canSaveProgress) return
         val currentEp = currentEpisode.value ?: return
         if (episodeId == -1L) return
         if (duration == 0) return
@@ -1761,6 +2158,8 @@ class PlayerViewModel @JvmOverloads constructor(
      * Called when episode is changed in player or when activity is paused.
      */
     private fun saveWatchingProgress(episode: Episode) {
+        val cast = CastController.get(activity.applicationContext).state.value
+        if (remoteProgressOwned || cast.active || cast.connecting) return
         viewModelScope.launchNonCancellable {
             saveEpisodeProgress(episode)
             saveEpisodeHistory(episode)
@@ -1772,6 +2171,7 @@ class PlayerViewModel @JvmOverloads constructor(
      * If incognito mode isn't on or has at least 1 tracker
      */
     private suspend fun saveEpisodeProgress(episode: Episode) {
+        if (remoteProgressOwned) return
         if (!incognitoMode || hasTrackers) {
             updateEpisode.await(
                 EpisodeUpdate(
@@ -1781,6 +2181,7 @@ class PlayerViewModel @JvmOverloads constructor(
                     fillermark = episode.fillermark,
                     lastSecondSeen = episode.last_second_seen,
                     totalSeconds = episode.total_seconds,
+                    localOnly = incognitoMode,
                 ),
             )
         }
@@ -1790,6 +2191,7 @@ class PlayerViewModel @JvmOverloads constructor(
      * Saves this [episode] last seen history if incognito mode isn't on.
      */
     private suspend fun saveEpisodeHistory(episode: Episode) {
+        if (remoteProgressOwned) return
         if (!incognitoMode) {
             val episodeId = episode.id!!
             val seenAt = Date()
@@ -1973,6 +2375,8 @@ class PlayerViewModel @JvmOverloads constructor(
      * are ignored.
      */
     fun deletePendingEpisodes() {
+        val cast = CastController.get(activity.applicationContext).state.value
+        if (cast.active || cast.connecting) return
         viewModelScope.launchNonCancellable {
             downloadManager.deletePendingEpisodes()
         }
@@ -2028,27 +2432,24 @@ class PlayerViewModel @JvmOverloads constructor(
      * Returns the response of the AniSkipApi for this episode.
      * just works if tracking is enabled.
      */
+    private val aniSkipApi by lazy { AniSkipApi() }
+
     suspend fun aniSkipResponse(playerDuration: Int?): List<TimeStamp>? {
         val animeId = currentAnime.value?.id ?: return null
+        val episodeNumber = currentEpisode.value?.episode_number?.toDouble() ?: return null
+        val duration = playerDuration?.takeIf { it > 0 }?.toLong() ?: return null
+        if (!episodeNumber.isFinite() || episodeNumber < 0) return null
         val trackerManager = Injekt.get<TrackerManager>()
-        var malId: Long?
-        val episodeNumber = currentEpisode.value?.episode_number?.toInt() ?: return null
-        if (getTracks.await(animeId).isEmpty()) {
-            logcat { "AniSkip: No tracks found for anime $animeId" }
-            return null
-        }
-
-        getTracks.await(animeId).map { track ->
-            val tracker = trackerManager.get(track.trackerId)
-            malId = when (tracker) {
-                is MyAnimeList -> track.remoteId
-                is Anilist -> AniSkipApi().getMalIdFromAL(track.remoteId)
+        val tracks = getTracks.await(animeId).sortedBy { trackerManager.get(it.trackerId) !is MyAnimeList }
+        val requestedIds = mutableSetOf<Long>()
+        for (track in tracks) {
+            val malId = when (trackerManager.get(track.trackerId)) {
+                is MyAnimeList -> track.remoteId.takeIf { it > 0 }
+                is Anilist -> aniSkipApi.getMalIdFromAL(track.remoteId)
                 else -> null
-            }
-            val duration = playerDuration ?: return null
-            return malId?.let {
-                AniSkipApi().getResult(it.toInt(), episodeNumber, duration.toLong())
-            }
+            } ?: continue
+            if (!requestedIds.add(malId)) continue
+            aniSkipApi.getResult(malId, episodeNumber, duration)?.let { return it }
         }
         return null
     }
@@ -2061,6 +2462,31 @@ class PlayerViewModel @JvmOverloads constructor(
     var waitingSkipIntro = defaultWaitingTime
 
     fun setChapter(position: Float) {
+        if (watchTogether.active) {
+            _skipIntroText.value = null
+            if (watchTogether.state.value.host) {
+                val segment = getCurrentChapter(position)
+                if (introSkipEnabled && segment != null && segment.value.chapterType != ChapterType.Other) {
+                    val target = ChapterUtils.skipTarget(chapters.value, segment.index, pos.value, duration.value)
+                    val key = currentEpisode.value?.id.toString() + ":" + segment.value.start
+                    watchTogether.offerSkip(
+                        key,
+                        "Salta " + segment.value.name,
+                        target.toDouble(),
+                        if (netflixStyle) {
+                            defaultWaitingTime
+                        } else if (autoSkip) {
+                            3
+                        } else {
+                            null
+                        },
+                    )
+                } else {
+                    watchTogether.offerSkip(null)
+                }
+            }
+            return
+        }
         getCurrentChapter(position)?.let { (chapterIndex, chapter) ->
             if (currentChapter.value != chapter) {
                 _currentChapter.update { _ -> chapter }
@@ -2074,7 +2500,7 @@ class PlayerViewModel @JvmOverloads constructor(
                 _skipIntroText.update { _ -> null }
                 waitingSkipIntro = defaultWaitingTime
             } else {
-                val nextChapterPos = chapters.value.getOrNull(chapterIndex + 1)?.start ?: pos.value
+                val nextChapterPos = ChapterUtils.skipTarget(chapters.value, chapterIndex, pos.value, duration.value)
 
                 if (netflixStyle) {
                     // show a toast with the seconds before the skip
@@ -2131,6 +2557,10 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     fun onSkipIntro() {
+        if (watchTogether.active) {
+            watchTogether.requestSkip()
+            return
+        }
         getCurrentChapter()?.let { (chapterIndex, chapter) ->
             // this stops the counter
             if (waitingSkipIntro > 0 && netflixStyle) {
@@ -2138,7 +2568,7 @@ class PlayerViewModel @JvmOverloads constructor(
                 return
             }
 
-            val nextChapterPos = chapters.value.getOrNull(chapterIndex + 1)?.start ?: pos.value
+            val nextChapterPos = ChapterUtils.skipTarget(chapters.value, chapterIndex, pos.value, duration.value)
 
             seekToWithText(
                 seekValue = nextChapterPos.toInt(),

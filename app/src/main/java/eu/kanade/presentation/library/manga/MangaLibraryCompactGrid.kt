@@ -33,6 +33,7 @@ internal fun MangaLibraryCompactGrid(
         modifier = Modifier.fillMaxSize(),
         columns = columns,
         contentPadding = contentPadding,
+        showTitle = showTitle,
     ) {
         globalSearchItem(searchQuery, onGlobalSearchClicked)
 

@@ -540,7 +540,8 @@
     <string name="action_display_language_badge">Lingua</string>
     <string name="label_warning">Attenzione</string>
     <string name="backup_info">Dovresti tenere delle copie dei backup anche in altri posti. I backup possono contenere dati sensibili comprese le password memorizzate; fate attenzione al condividerli.</string>
-    <string name="notification_size_warning">Grossi aggiornamenti danneggiano le fonti, possono rallentare gli aggiornamenti e aumentare il consumo di batteria. Tocca per saperne di più.</string>
+    <string name="notification_size_warning">Molti controlli della libreria sulla stessa fonte possono sovraccaricare il sito e consumare batteria. Questo avviso non riguarda l’aggiornamento dell’app. Tocca per saperne di più.</string>
+    <string name="notification_library_queue_warning">%1$s: %2$d voci della libreria in coda (incluse eventuali stagioni). Molti controlli possono sovraccaricare il sito e consumare batteria; non è un errore dell’aggiornamento dell’app. Tocca per saperne di più.</string>
     <string name="connected_to_wifi">Solo su Wi-Fi</string>
     <string name="update_72hour">Ogni 3 giorni</string>
     <string name="download_queue_size_warning">Attenzione: grossi download di massa possono rallentare le fonti e/o bloccare Mihon. Tocca per saperne di più.</string>
@@ -840,4 +841,6 @@
     <string name="export">Esporta</string>
     <string name="author">Autore</string>
     <string name="artist">Artista</string>
+    <string name="ext_automatically_trust">Fiducia automatica nelle estensioni</string>
+    <string name="ext_automatically_trust_summary">Carica le estensioni anime e manga installate senza conferma. Le estensioni eseguono codice nell’app: installa solo quelle di cui ti fidi. La modifica richiede il riavvio dell’app.</string>
 </resources>

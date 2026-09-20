@@ -4,6 +4,7 @@ import android.content.Context
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
+import eu.kanade.tachiyomi.data.download.anime.ultra.UltraFiles
 import eu.kanade.tachiyomi.util.size
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -179,13 +180,55 @@ class AnimeDownloadManager(
             throw Exception(context.stringResource(AYMR.strings.video_list_empty_error))
         }
 
-        val file = files[0]
+        val ultra = episodeDir?.let { UltraFiles.completed(context, it) }
+        val file = ultra ?: files.firstOrNull { it.name != UltraFiles.VIDEO }
+            ?: throw Exception(context.stringResource(AYMR.strings.video_list_empty_error))
 
         return Video(
             videoUrl = file.uri.toString(),
             videoTitle = "download: " + file.uri.toString(),
+            memo = if (ultra != null) UltraFiles.memo else kotlinx.serialization.json.JsonObject(emptyMap()),
             initialized = true,
         ).apply { status = Video.State.READY }
+    }
+
+    /** File discovery stays off the UI thread; progress itself comes from the durable Ultra journal. */
+    internal suspend fun describeUltra(
+        anime: Anime,
+        episode: Episode,
+    ): eu.kanade.tachiyomi.data.download.anime.ultra.UltraTask? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val source = sourceManager.getOrStub(anime.source)
+            val folder = provider.findEpisodeDir(episode.name, episode.scanlator, anime.title, source)
+                ?: return@withContext null
+            eu.kanade.tachiyomi.data.download.anime.ultra.UltraDownloads.describe(
+                context,
+                folder,
+                "${anime.title} · ${episode.name}",
+                anime.id,
+                episode.id,
+            )
+        }
+
+    internal suspend fun deleteStoredDownload(
+        task: eu.kanade.tachiyomi.data.download.anime.ultra.UltraTask,
+        onlyUltra: Boolean,
+    ) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.NonCancellable) {
+        if (!onlyUltra) {
+            queueState.value.filter { it.episode.id == task.episodeId }.map { it.episode }
+                .takeIf { it.isNotEmpty() }?.let(::removeFromDownloadQueue)
+        }
+        try {
+            eu.kanade.tachiyomi.data.download.anime.ultra.UltraDownloads.delete(context, task, onlyUltra)
+            if (!onlyUltra) {
+                val episode = Injekt.get<tachiyomi.domain.items.episode.interactor.GetEpisode>().await(task.episodeId)
+                val anime = Injekt.get<tachiyomi.domain.entries.anime.interactor.GetAnime>().await(task.animeId)
+                if (episode != null && anime != null) cache.removeEpisodes(listOf(episode), anime)
+            }
+        } finally {
+            // Includes partially successful deletion: badges and occupied space must reflect the filesystem.
+            cache.invalidateCache()
+        }
     }
 
     /**
@@ -279,7 +322,10 @@ class AnimeDownloadManager(
                 anime,
                 source,
             )
-            episodeDirs.forEach { it.delete() }
+            episodeDirs.forEach {
+                eu.kanade.tachiyomi.data.download.anime.ultra.UltraDownloads.removeFolder(context, it.uri)
+                it.delete()
+            }
             cache.removeEpisodes(filteredEpisodes, anime)
 
             // Delete anime directory if empty
@@ -301,7 +347,12 @@ class AnimeDownloadManager(
             if (removeQueued) {
                 downloader.removeFromQueue(anime)
             }
-            provider.findAnimeDir(anime.title, source)?.delete()
+            provider.findAnimeDir(anime.title, source)?.let { directory ->
+                directory.listFiles().orEmpty().filter { it.isDirectory }.forEach {
+                    eu.kanade.tachiyomi.data.download.anime.ultra.UltraDownloads.removeFolder(context, it.uri)
+                }
+                directory.delete()
+            }
             cache.removeAnime(anime)
             // Delete source directory if empty
             val sourceDir = provider.findSourceDir(source)

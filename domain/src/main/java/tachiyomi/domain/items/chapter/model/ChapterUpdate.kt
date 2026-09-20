@@ -14,6 +14,7 @@ data class ChapterUpdate(
     val chapterNumber: Double? = null,
     val scanlator: String? = null,
     val version: Long? = null,
+    val localOnly: Boolean = false,
 )
 
 fun Chapter.toChapterUpdate(): ChapterUpdate {

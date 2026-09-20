@@ -1,6 +1,9 @@
 package eu.kanade.tachiyomi.extension.manga.api
 
 import android.content.Context
+import eu.kanade.tachiyomi.extension.ExtensionUpdate
+import eu.kanade.tachiyomi.extension.ExtensionUpdateCheckGate
+import eu.kanade.tachiyomi.extension.ExtensionUpdateKind
 import eu.kanade.tachiyomi.extension.ExtensionUpdateNotifier
 import eu.kanade.tachiyomi.extension.manga.MangaExtensionManager
 import eu.kanade.tachiyomi.extension.manga.model.MangaExtension
@@ -9,6 +12,7 @@ import eu.kanade.tachiyomi.extension.manga.util.MangaExtensionLoader
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.awaitSuccess
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.serialization.Serializable
@@ -25,13 +29,10 @@ import mihon.domain.extensionrepo.service.ExtensionRepoService
 import okio.BufferedSource
 import okio.buffer
 import okio.gzip
-import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
-import java.time.Instant
-import kotlin.time.Duration.Companion.days
 
 internal class MangaExtensionApi {
 
@@ -44,9 +45,7 @@ internal class MangaExtensionApi {
     private val json: Json by injectLazy()
     private val protoBuf: ProtoBuf by injectLazy()
 
-    private val lastExtCheck: Preference<Long> by lazy {
-        preferenceStore.getLong("last_ext_check", 0)
-    }
+    private val updateGate by lazy { ExtensionUpdateCheckGate(preferenceStore) }
 
     suspend fun findExtensions(): List<MangaExtension.Available> {
         return withIOContext {
@@ -62,7 +61,9 @@ internal class MangaExtensionApi {
         return try {
             fetchExtensionList(resolveIndexUrl(repoBaseUrl))
                 .filter { it.libVersion in MangaExtensionLoader.SUPPORTED_LIB_VERSIONS }
-        } catch (e: Throwable) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "Failed to get extensions from $repoBaseUrl" }
             emptyList()
         }
@@ -125,21 +126,14 @@ internal class MangaExtensionApi {
     suspend fun checkForUpdates(
         context: Context,
         fromAvailableExtensionList: Boolean = false,
-    ): List<MangaExtension.Installed>? {
-        // Limit checks to once a day at most
-        if (fromAvailableExtensionList &&
-            Instant.now().toEpochMilli() < lastExtCheck.get() + 1.days.inWholeMilliseconds
-        ) {
-            return null
-        }
-
+    ): List<MangaExtension.Installed>? = updateGate.run(ExtensionUpdateKind.MANGA) {
         // Update extension repo details
         updateExtensionRepo.awaitAll()
 
         val extensions = if (fromAvailableExtensionList) {
             extensionManager.availableExtensionsFlow.value
         } else {
-            findExtensions().also { lastExtCheck.set(Instant.now().toEpochMilli()) }
+            findExtensions()
         }
 
         val installedExtensions = MangaExtensionLoader.loadMangaExtensions(context)
@@ -147,6 +141,7 @@ internal class MangaExtensionApi {
             .map { it.extension }
 
         val extensionsWithUpdate = mutableListOf<MangaExtension.Installed>()
+        val updates = mutableListOf<ExtensionUpdate>()
         for (installedExt in installedExtensions) {
             val pkgName = installedExt.pkgName
             val availableExt = extensions.find { it.pkgName == pkgName } ?: continue
@@ -155,14 +150,22 @@ internal class MangaExtensionApi {
             val hasUpdate = hasUpdatedVer || hasUpdatedLib
             if (hasUpdate) {
                 extensionsWithUpdate.add(installedExt)
+                updates.add(
+                    ExtensionUpdate(
+                        pkgName,
+                        availableExt.versionCode.toLong(),
+                        availableExt.libVersion,
+                        installedExt.name,
+                    ),
+                )
             }
         }
 
         if (extensionsWithUpdate.isNotEmpty()) {
-            ExtensionUpdateNotifier(context).promptUpdates(extensionsWithUpdate.map { it.name })
+            ExtensionUpdateNotifier(context).promptUpdates(updates)
         }
 
-        return extensionsWithUpdate
+        extensionsWithUpdate
     }
 
     private fun List<ExtensionJsonObject>.toExtensions(repoUrl: String): List<MangaExtension.Available> {

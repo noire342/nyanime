@@ -1,11 +1,24 @@
-# Baseline profiles
+# Nyanime benchmarks
 
-The baseline profile for this app is located at [`app/src/main/baseline-prof.txt`](../app/src/main/baseline-prof.txt).
-It contains rules that enable AOT compilation of the critical user path taken during app launch.
-For more information on baseline profiles, read [this document](https://developer.android.com/studio/profile/baselineprofiles).
+The isolated package is `xyz.jmir.tachiyomi.mi.anime4k.benchmark`.
+Build with `:app:assembleBenchmark :macrobenchmark:assembleBenchmark`.
+Run `:macrobenchmark:connectedBenchmarkAndroidTest` only on a dedicated emulator
+or benchmark device. The interface smoke test temporarily changes global font size
+and display size, restoring them in `finally`.
 
-> Note: The baseline profile needs to be re-generated for release builds that touch code which changes app startup.
+Fixtures contain 500 anime, 501 manga and eight synthetic local pages. The setup
+activity exists only in the benchmark variant. No user database or extensions are
+required. Home feeds are seeded in the real catalogue cache before each run.
 
-To generate the baseline profile, select the `devBenchmark` build variant and run the
-`BaselineProfileGenerator` benchmark test on an AOSP Android Emulator.
-Then copy the resulting baseline profile from the emulator to [`app/src/main/baseline-prof.txt`](../app/src/main/baseline-prof.txt).
+The `App performance and interface checks` workflow runs only when manually requested and preserves startup and
+frame timing JSON, traces, screenshots and generated baseline profiles. Emulator
+results verify repeatability and regressions; they do not establish phone speed,
+GPU capacity, power consumption or thermal behavior.
+
+BaselineProfileGenerator prepares fixtures outside the profiled block, then covers
+Home, library scrolling, search and opening the manga reader. Inspect the generated
+profile (generated with `-PprofileGeneration=true`, without minification) before copying it to `app/src/main/baseline-prof.txt`; keep production rules
+only. Timing runs leave minification enabled. Never synthesize timings or replace a measured profile with guessed rules.
+
+Use a physical benchmark device for publishable before/after performance comparisons:
+https://developer.android.com/topic/performance/baselineprofiles/create-baselineprofile

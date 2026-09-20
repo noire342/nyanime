@@ -19,7 +19,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -41,6 +43,7 @@ import tachiyomi.domain.history.anime.interactor.GetAnimeHistory
 import tachiyomi.domain.history.anime.interactor.GetNextEpisodes
 import tachiyomi.domain.history.anime.interactor.RemoveAnimeHistory
 import tachiyomi.domain.history.anime.model.AnimeHistoryWithRelations
+import tachiyomi.domain.history.anime.model.forSources
 import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
@@ -60,6 +63,7 @@ class AnimeHistoryScreenModel(
     private val updateAnime: UpdateAnime = Injekt.get(),
     val snackbarHostState: SnackbarHostState = SnackbarHostState(),
     private val sourceManager: AnimeSourceManager = Injekt.get(),
+    private val sourceIds: Flow<Set<Long>?> = flowOf(null),
 ) : StateScreenModel<AnimeHistoryScreenModel.State>(State()) {
 
     private val _events: Channel<Event> = Channel(Channel.UNLIMITED)
@@ -70,14 +74,15 @@ class AnimeHistoryScreenModel(
 
     init {
         screenModelScope.launch {
-            _query.collectLatest { query ->
+            combine(_query, sourceIds) { query, sources -> query to sources }.collectLatest { (query, sources) ->
+                mutableState.update { it.copy(list = null) }
                 getHistory.subscribe(query ?: "")
                     .distinctUntilChanged()
                     .catch { error ->
                         logcat(LogPriority.ERROR, error)
                         _events.send(Event.InternalError)
                     }
-                    .map { it.toAnimeHistoryUiModels() }
+                    .map { it.forSources(sources).toAnimeHistoryUiModels() }
                     .flowOn(Dispatchers.IO)
                     .collect { newList -> mutableState.update { it.copy(list = newList) } }
             }

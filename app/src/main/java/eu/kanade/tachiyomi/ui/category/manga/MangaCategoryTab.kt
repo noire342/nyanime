@@ -25,6 +25,7 @@ fun Screen.mangaCategoryTab(): TabContent {
     val state by screenModel.state.collectAsState()
 
     return TabContent(
+        legacyManga = true,
         titleRes = AYMR.strings.label_manga,
         searchEnabled = false,
         content = { contentPadding, _ ->

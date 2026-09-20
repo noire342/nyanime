@@ -27,6 +27,7 @@ fun Screen.mangaDownloadTab(
     }
 
     return TabContent(
+        legacyManga = true,
         titleRes = AYMR.strings.label_manga,
         searchEnabled = false,
         content = { contentPadding, _ ->

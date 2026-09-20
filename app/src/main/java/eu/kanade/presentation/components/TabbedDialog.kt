@@ -1,6 +1,6 @@
 package eu.kanade.presentation.components
 
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -15,7 +15,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,6 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEachIndexed
+import eu.kanade.presentation.motion.ModernMotion
+import eu.kanade.presentation.motion.animateModernContentSize
+import eu.kanade.presentation.motion.modernMotionEnabled
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.launch
 import tachiyomi.i18n.MR
@@ -55,10 +59,13 @@ fun TabbedDialog(
         onDismissRequest = onDismissRequest,
     ) {
         val scope = rememberCoroutineScope()
+        val modern = LocalNyanimeStyle.current
+        val motion = modernMotionEnabled()
 
         Column {
             Row {
-                PrimaryTabRow(
+                PrimaryScrollableTabRow(
+                    edgePadding = 0.dp,
                     modifier = Modifier.weight(1f),
                     selectedTabIndex = pagerState.currentPage,
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -67,7 +74,18 @@ fun TabbedDialog(
                     tabTitles.fastForEachIndexed { index, tab ->
                         Tab(
                             selected = pagerState.currentPage == index,
-                            onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                            onClick = {
+                                scope.launch {
+                                    if (modern) {
+                                        pagerState.animateScrollToPage(
+                                            index,
+                                            animationSpec = tween(if (motion) ModernMotion.PAGE_MILLIS else 0),
+                                        )
+                                    } else {
+                                        pagerState.animateScrollToPage(index)
+                                    }
+                                }
+                            },
                             text = { TabText(text = tab) },
                             unselectedContentColor = MaterialTheme.colorScheme.onSurface,
                         )
@@ -79,7 +97,7 @@ fun TabbedDialog(
             HorizontalDivider()
 
             HorizontalPager(
-                modifier = Modifier.animateContentSize(),
+                modifier = Modifier.animateModernContentSize(),
                 state = pagerState,
                 verticalAlignment = Alignment.Top,
                 pageContent = { page -> content(page) },

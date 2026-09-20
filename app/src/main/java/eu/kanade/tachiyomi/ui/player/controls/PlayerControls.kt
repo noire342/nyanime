@@ -31,9 +31,12 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.LocalContentColor
@@ -48,16 +51,29 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
+import eu.kanade.presentation.discovery.SourceHomeArtwork
 import eu.kanade.presentation.more.settings.screen.player.custombutton.getButtons
 import eu.kanade.presentation.theme.playerRippleConfiguration
+import eu.kanade.tachiyomi.data.download.anime.ultra.UltraFiles
+import eu.kanade.tachiyomi.data.watch.WatchRecovery
+import eu.kanade.tachiyomi.data.watch.WatchRoomState
+import eu.kanade.tachiyomi.data.watch.recovery
+import eu.kanade.tachiyomi.data.watch.showPreparationFeedback
+import eu.kanade.tachiyomi.ui.cast.CastDevicesDialog
+import eu.kanade.tachiyomi.ui.cast.CastRemoteScreen
+import eu.kanade.tachiyomi.ui.player.Anime4K
+import eu.kanade.tachiyomi.ui.player.Anime4KMode
+import eu.kanade.tachiyomi.ui.player.Anime4KProfile
 import eu.kanade.tachiyomi.ui.player.Dialogs
 import eu.kanade.tachiyomi.ui.player.Panels
 import eu.kanade.tachiyomi.ui.player.PlayerActivity
@@ -65,18 +81,25 @@ import eu.kanade.tachiyomi.ui.player.PlayerUpdates
 import eu.kanade.tachiyomi.ui.player.PlayerViewModel
 import eu.kanade.tachiyomi.ui.player.Sheets
 import eu.kanade.tachiyomi.ui.player.VideoAspect
+import eu.kanade.tachiyomi.ui.player.controls.components.Anime4KDiagnosticsOverlay
 import eu.kanade.tachiyomi.ui.player.controls.components.BrightnessOverlay
 import eu.kanade.tachiyomi.ui.player.controls.components.BrightnessSlider
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
+import eu.kanade.tachiyomi.ui.player.controls.components.DoubleSpeedPlayerUpdate
+import eu.kanade.tachiyomi.ui.player.controls.components.NextEpisodeCard
 import eu.kanade.tachiyomi.ui.player.controls.components.SeekbarWithTimers
 import eu.kanade.tachiyomi.ui.player.controls.components.TextPlayerUpdate
 import eu.kanade.tachiyomi.ui.player.controls.components.ThumbnailPreview
 import eu.kanade.tachiyomi.ui.player.controls.components.VolumeSlider
+import eu.kanade.tachiyomi.ui.player.controls.components.sheets.QualitySheet
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.toFixed
+import eu.kanade.tachiyomi.ui.player.settings.AdvancedPlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.SubtitlePreferences
+import eu.kanade.tachiyomi.ui.watch.WatchActivityCaption
+import eu.kanade.tachiyomi.ui.watch.WatchRecoveryCaption
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
@@ -95,20 +118,69 @@ val LocalPlayerButtonsClickEvent = staticCompositionLocalOf { {} }
 fun PlayerControls(
     viewModel: PlayerViewModel,
     onBackPress: () -> Unit,
+    onToggleAnime4KSmart: () -> Unit,
+    onSelectAnime4KCustom: (Anime4KMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val spacing = MaterialTheme.padding
+    val castActivity = LocalContext.current as PlayerActivity
+    val castState by castActivity.castController.state.collectAsState()
+    LaunchedEffect(castState.active, castState.connecting) {
+        if (castState.active || castState.connecting) {
+            viewModel.watchTogether.state.collect { if (it.active) viewModel.watchTogether.leave() }
+        }
+    }
+    var showCastDevices by remember { mutableStateOf(false) }
+    if (showCastDevices) {
+        CastDevicesDialog(request = { castActivity.castRequest() }, onDismiss = { showCastDevices = false })
+    }
+    if (castState.active || castState.connecting) {
+        val episode by viewModel.currentEpisode.collectAsState()
+        var qualityShown by remember { mutableStateOf(false) }
+        val sameEpisode = episode?.id == castState.media?.episodeId && castState.active
+        CastRemoteScreen(
+            onBack = onBackPress,
+            modifier = modifier,
+            onQuality = if (sameEpisode) ({ qualityShown = true }) else null,
+        )
+        if (qualityShown && sameEpisode) {
+            val hosters by viewModel.hosterState.collectAsState()
+            val expanded by viewModel.hosterExpandedList.collectAsState()
+            val selected by viewModel.selectedHosterVideoIndex.collectAsState()
+            val loading by viewModel.isLoadingHosters.collectAsState()
+            QualitySheet(
+                isLoadingHosters = loading,
+                hosterState = hosters,
+                expandedState = expanded,
+                selectedVideoIndex = selected,
+                onClickHoster = viewModel::onHosterClicked,
+                onClickVideo = { host, video ->
+                    qualityShown = false
+                    viewModel.onVideoClicked(host, video)
+                },
+                displayHosters = true to true,
+                onDismissRequest = { qualityShown = false },
+                dismissSheet = false,
+            )
+        }
+        return
+    }
     val playerPreferences = remember { Injekt.get<PlayerPreferences>() }
     val gesturePreferences = remember { Injekt.get<GesturePreferences>() }
     val audioPreferences = remember { Injekt.get<AudioPreferences>() }
+    val advancedPlayerPreferences = remember { Injekt.get<AdvancedPlayerPreferences>() }
     val subtitlePreferences = remember { Injekt.get<SubtitlePreferences>() }
     val interactionSource = remember { MutableInteractionSource() }
 
+    val reduceMotion by playerPreferences.reduceMotion().collectAsState()
     val controlsShown by viewModel.controlsShown.collectAsState()
     val areControlsLocked by viewModel.areControlsLocked.collectAsState()
     val seekBarShown by viewModel.seekBarShown.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isLoadingEpisode by viewModel.isLoadingEpisode.collectAsState()
+    val isEpisodeOnline by viewModel.isEpisodeOnline.collectAsState()
+    val playbackLoad by viewModel.playbackLoadState.collectAsState()
+    val playbackActivity = LocalContext.current as PlayerActivity
     val duration by viewModel.duration.collectAsState()
     val position by viewModel.pos.collectAsState()
     val seekPosition by viewModel.seekPosition.collectAsState()
@@ -120,6 +192,30 @@ fun PlayerControls(
     val currentChapter by viewModel.currentChapter.collectAsState()
     val indexedChapters by viewModel.chapters.collectAsState()
     val currentBrightness by viewModel.currentBrightness.collectAsState()
+    val playerRoom by viewModel.watchTogether.state.collectAsState()
+    val currentVideo by viewModel.currentVideo.collectAsState()
+    val ultraVideo = UltraFiles.isUltra(currentVideo)
+    val sheetShown by viewModel.sheetShown.collectAsState()
+    val panel by viewModel.panelShown.collectAsState()
+    val dialog by viewModel.dialogShown.collectAsState()
+    // Refresh when entering/leaving PiP, and stop the shared animation behind other screens.
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val inPip = remember(configuration) { playbackActivity.isInPictureInPictureMode }
+    val playerOverlayVisible = !inPip &&
+        sheetShown == Sheets.None &&
+        panel == Panels.None &&
+        dialog == Dialogs.None
+    val sharedPlaybackVisible = playerRoom.active && playerOverlayVisible
+    val sharedPlaybackBusy = sharedPlaybackVisible &&
+        (
+            playerRoom.showPreparationFeedback ||
+                playerRoom.resumeSeconds != null ||
+                isLoading ||
+                isLoadingEpisode ||
+                playerRoom.recovery != WatchRecovery.None
+            )
+    val anime4kSelection by advancedPlayerPreferences.anime4kActiveSelection().collectAsState()
+    val anime4kDiagnosticsEnabled by advancedPlayerPreferences.anime4kDiagnosticsEnabled().collectAsState()
 
     val playerTimeToDisappear by playerPreferences.playerTimeToDisappear().collectAsState()
     var resetControls by remember { mutableStateOf(true) }
@@ -183,6 +279,18 @@ fun PlayerControls(
                 val thumbnail = createRef()
                 val seekbar = createRef()
                 val (playerUpdates) = createRefs()
+                val anime4kDiagnosticsOverlay = createRef()
+
+                if (anime4kDiagnosticsEnabled && !playerRoom.active && !ultraVideo) {
+                    val anime4kDiagnostics by advancedPlayerPreferences.anime4kDiagnostics().collectAsState()
+                    Anime4KDiagnosticsOverlay(
+                        diagnostics = anime4kDiagnostics,
+                        modifier = Modifier.constrainAs(anime4kDiagnosticsOverlay) {
+                            top.linkTo(parent.top, spacing.medium)
+                            start.linkTo(parent.start, spacing.medium)
+                        },
+                    )
+                }
 
                 val hasPreviousEpisode by viewModel.hasPreviousEpisode.collectAsState()
                 val hasNextEpisode by viewModel.hasNextEpisode.collectAsState()
@@ -192,7 +300,6 @@ fun PlayerControls(
                 val volume by viewModel.currentVolume.collectAsState()
                 val mpvVolume by viewModel.currentMPVVolume.collectAsState()
                 val swapVolumeAndBrightness by gesturePreferences.swapVolumeBrightness().collectAsState()
-                val reduceMotion by playerPreferences.reduceMotion().collectAsState()
 
                 LaunchedEffect(volume, mpvVolume, isVolumeSliderShown) {
                     delay(2000)
@@ -307,7 +414,7 @@ fun PlayerControls(
                     },
                 ) {
                     when (currentPlayerUpdate) {
-                        // is PlayerUpdates.DoubleSpeed -> DoubleSpeedPlayerUpdate()
+                        is PlayerUpdates.DoubleSpeed -> DoubleSpeedPlayerUpdate()
                         is PlayerUpdates.AspectRatio -> TextPlayerUpdate(stringResource(aspectRatio.titleRes))
                         is PlayerUpdates.ShowText -> TextPlayerUpdate(
                             (currentPlayerUpdate as PlayerUpdates.ShowText).value,
@@ -337,7 +444,9 @@ fun PlayerControls(
                     visible =
                     (controlsShown && !areControlsLocked || gestureSeekAmount != null) ||
                         isLoading ||
-                        isLoadingEpisode,
+                        isLoadingEpisode ||
+                        sharedPlaybackBusy ||
+                        playbackLoad.failure != null,
                     enter = fadeIn(playerControlsEnterAnimationSpec()),
                     exit = fadeOut(playerControlsExitAnimationSpec()),
                     modifier = Modifier.constrainAs(centerControls) {
@@ -358,9 +467,27 @@ fun PlayerControls(
                         controlsShown = controlsShown,
                         areControlsLocked = areControlsLocked,
                         showLoadingCircle = showLoadingCircle,
-                        paused = paused,
+                        paused = if (playerRoom.active) !playerRoom.wantsPlayback || playerRoom.localHold else paused,
                         gestureSeekAmount = gestureSeekAmount,
                         onPlayPauseClick = viewModel::pauseUnpause,
+                        watchRoom = if (sharedPlaybackVisible) playerRoom else WatchRoomState(),
+                        reduceMotion = reduceMotion || !playerOverlayVisible,
+                        failure = playbackLoad.failure,
+                        onRetry = viewModel::retryPlayback,
+                        onWatchRetry = {
+                            when (playerRoom.recovery) {
+                                WatchRecovery.Command -> viewModel.watchTogether.retryFailedCommand()
+                                WatchRecovery.Connection -> viewModel.watchTogether.retryConnection()
+                                else -> viewModel.showSheet(Sheets.WatchTogether)
+                            }
+                        },
+                        onOpenSource = if (viewModel.isEpisodeOnline() ==
+                            true
+                        ) {
+                            playbackActivity::openPlaybackSource
+                        } else {
+                            null
+                        },
                         enter = fadeIn(playerControlsEnterAnimationSpec()),
                         exit = fadeOut(playerControlsExitAnimationSpec()),
                     )
@@ -436,13 +563,16 @@ fun PlayerControls(
                     TopLeftPlayerControls(
                         animeTitle = animeTitle,
                         mediaTitle = mediaTitle,
+                        activity = playerRoom.activity.takeIf {
+                            sharedPlaybackVisible && it?.actorId != playerRoom.localMemberId
+                        },
+                        reduceMotion = reduceMotion,
                         onTitleClick = { viewModel.showEpisodeListDialog() },
                         onBackClick = onBackPress,
                     )
                 }
                 // Top right controls
                 val autoPlayEnabled by playerPreferences.autoplayEnabled().collectAsState()
-                val isEpisodeOnline by viewModel.isEpisodeOnline.collectAsState()
                 AnimatedVisibility(
                     controlsShown && !areControlsLocked,
                     enter = if (!reduceMotion) {
@@ -462,7 +592,19 @@ fun PlayerControls(
                         end.linkTo(parent.end)
                     },
                 ) {
+                    val sleepTimerTimeRemaining by viewModel.remainingTime.collectAsState()
+                    val sleepTimerEndEpisode by viewModel.sleepTimerEndEpisode.collectAsState()
+                    val watchRoom by viewModel.watchTogether.state.collectAsState()
+                    val showAudioShortcut by playerPreferences.showAudioShortcut().collectAsState()
+                    val showQualityShortcut by playerPreferences.showQualityShortcut().collectAsState()
                     TopRightPlayerControls(
+                        onCastClick = {
+                            if (castActivity.castRequest() != null) {
+                                showCastDevices = true
+                            } else {
+                                castActivity.showToast("Attendi il caricamento del video")
+                            }
+                        },
                         autoPlayEnabled = autoPlayEnabled,
                         onToggleAutoPlay = { viewModel.setAutoPlay(it) },
                         onSubtitlesClick = { viewModel.showSheet(Sheets.SubtitleTracks) },
@@ -471,8 +613,23 @@ fun PlayerControls(
                         onAudioLongClick = { viewModel.showPanel(Panels.AudioDelay) },
                         onQualityClick = { viewModel.showSheet(Sheets.QualityTracks) },
                         isEpisodeOnline = isEpisodeOnline,
+                        showAudioShortcut = showAudioShortcut,
+                        showQualityShortcut = showQualityShortcut,
+                        isUltraVideo = ultraVideo,
+                        isAnime4KSmartEnabled = anime4kSelection.profile == Anime4KProfile.Smart,
+                        anime4KSmartLabel = if (anime4kSelection.profile == Anime4KProfile.Smart) {
+                            Anime4K.smartButtonLabel(anime4kSelection.mode)
+                        } else {
+                            "SM"
+                        },
+                        onToggleAnime4KSmart = onToggleAnime4KSmart,
+                        sleepTimerRemaining = sleepTimerTimeRemaining,
+                        sleepTimerAtEpisodeEnd = sleepTimerEndEpisode != null,
+                        onSleepTimerClick = { viewModel.showSheet(Sheets.SleepTimer) },
                         onMoreClick = { viewModel.showSheet(Sheets.More) },
                         onMoreLongClick = { viewModel.showPanel(Panels.VideoFilters) },
+                        watchRoom = watchRoom,
+                        onWatchTogetherClick = { viewModel.showSheet(Sheets.WatchTogether) },
                     )
                 }
                 // Bottom right controls
@@ -549,7 +706,7 @@ fun PlayerControls(
                         onLockControls = viewModel::lockControls,
                         onCycleRotation = viewModel::cycleScreenRotations,
                         onPlaybackSpeedChange = {
-                            MPVLib.setPropertyDouble("speed", it.toDouble())
+                            viewModel.setPlaybackSpeedByUser(it.toDouble())
                         },
                         onOpenSheet = viewModel::showSheet,
                     )
@@ -569,7 +726,6 @@ fun PlayerControls(
             }
         }
 
-        val sheetShown by viewModel.sheetShown.collectAsState()
         val dismissSheet by viewModel.dismissSheet.collectAsState()
         val subtitles by viewModel.subtitleTracks.collectAsState()
         val selectedSubtitles by viewModel.selectedSubtitles.collectAsState()
@@ -582,6 +738,8 @@ fun PlayerControls(
         val decoder by viewModel.currentDecoder.collectAsState()
         val speed by viewModel.playbackSpeed.collectAsState()
         val sleepTimerTimeRemaining by viewModel.remainingTime.collectAsState()
+        val sleepTimerEndEpisode by viewModel.sleepTimerEndEpisode.collectAsState()
+        val lastCustomTimerMinutes by playerPreferences.lastSleepTimerMinutes().collectAsState()
         val showSubtitles by subtitlePreferences.screenshotSubtitles().collectAsState()
         val currentSource by viewModel.currentSource.collectAsState()
         val showFailedHosters by playerPreferences.showFailedHosters().collectAsState()
@@ -589,6 +747,11 @@ fun PlayerControls(
 
         PlayerSheets(
             sheetShown = sheetShown,
+            onOpenSheet = { target ->
+                if (target == Sheets.Screenshot) viewModel.pauseByUser()
+                viewModel.showSheet(target)
+            },
+            isEpisodeOnline = isEpisodeOnline == true,
             subtitles = subtitles.toImmutableList(),
             selectedSubtitles = selectedSubtitles.toList().toImmutableList(),
             onAddSubtitle = viewModel::addSubtitle,
@@ -617,10 +780,20 @@ fun PlayerControls(
             decoder = decoder,
             onUpdateDecoder = viewModel::updateDecoder,
             speed = speed,
-            onSpeedChange = { MPVLib.setPropertyDouble("speed", it.toFixed(2).toDouble()) },
+            onSpeedChange = { viewModel.setPlaybackSpeedByUser(it.toFixed(2).toDouble()) },
             sleepTimerTimeRemaining = sleepTimerTimeRemaining,
             onStartSleepTimer = viewModel::startTimer,
+            onStartCustomSleepTimer = viewModel::startCustomTimer,
+            onEndSleepTimer = viewModel::stopAtEpisodeEnd,
+            sleepTimerAtEpisodeEnd = sleepTimerEndEpisode != null,
+            lastCustomTimerMinutes = lastCustomTimerMinutes,
+            onExtendSleepTimer = viewModel::extendTimer,
+            onOpenSleepTimer = { viewModel.showSheet(Sheets.SleepTimer) },
+            onOpenWatchTogether = { viewModel.showSheet(Sheets.WatchTogether) },
+            reduceMotion = reduceMotion,
             buttons = customButtons.getButtons().toImmutableList(),
+            onSelectAnime4KCustom = onSelectAnime4KCustom,
+            anime4kAvailable = !playerRoom.active && !ultraVideo,
 
             isLocalSource = currentSource?.id == LocalAnimeSource.ID,
             showSubtitles = showSubtitles,
@@ -632,22 +805,98 @@ fun PlayerControls(
             takeScreenshot = viewModel::takeScreenshot,
             onDismissScreenshot = {
                 viewModel.showSheet(Sheets.None)
-                viewModel.unpause()
             },
             onOpenPanel = viewModel::showPanel,
             onDismissRequest = { viewModel.showSheet(Sheets.None) },
             dismissSheet = dismissSheet,
         )
-        val panel by viewModel.panelShown.collectAsState()
         PlayerPanels(
             panelShown = panel,
             onDismissRequest = { viewModel.showPanel(Panels.None) },
         )
 
         val activity = LocalContext.current as PlayerActivity
-        val dialog by viewModel.dialogShown.collectAsState()
         val anime by viewModel.currentAnime.collectAsState()
         val playlist by viewModel.currentPlaylist.collectAsState()
+        val nextEpisodePrompt by viewModel.nextEpisodePrompt.collectAsState()
+        val watchRoom by viewModel.watchTogether.state.collectAsState()
+
+        Box(
+            Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            WatchActivityCaption(
+                activity = playerRoom.activity.takeIf {
+                    sharedPlaybackVisible &&
+                        !controlsShown &&
+                        !areControlsLocked &&
+                        playbackLoad.failure == null &&
+                        it?.actorId != playerRoom.localMemberId
+                },
+                reduceMotion = reduceMotion,
+                modifier = Modifier.offset(y = (-76).dp),
+            )
+            WatchRecoveryCaption(
+                room = playerRoom,
+                loading = isLoading || isLoadingEpisode,
+                visible = sharedPlaybackVisible && !areControlsLocked && playbackLoad.failure == null,
+                reduceMotion = reduceMotion,
+                onDetails = { viewModel.showSheet(Sheets.WatchTogether) },
+                modifier = Modifier.offset(y = 80.dp),
+            )
+        }
+
+        Box(
+            Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp),
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            AnimatedVisibility(
+                visible =
+                (
+                    nextEpisodePrompt != null ||
+                        watchRoom.active &&
+                        (
+                            watchRoom.skip != null ||
+                                watchRoom.next != null
+                            )
+                    ) &&
+                    !areControlsLocked &&
+                    !inPip &&
+                    sheetShown == Sheets.None &&
+                    panel == Panels.None &&
+                    dialog == Dialogs.None,
+                enter = fadeIn(tween(if (reduceMotion) 0 else 220)) +
+                    slideInVertically(tween(if (reduceMotion) 0 else 260)) { it / 5 },
+                exit = fadeOut(tween(if (reduceMotion) 0 else 120)),
+            ) {
+                val prompt = nextEpisodePrompt
+                val nextEpisode = playlist.firstOrNull { it.id == prompt?.episodeId }
+                if (watchRoom.active) {
+                    eu.kanade.tachiyomi.ui.watch.WatchRoomCues(
+                        watchRoom,
+                        { viewModel.watchTogether.requestSkip() },
+                        { viewModel.watchTogether.cancelSkip() },
+                        viewModel::playNextEpisodeNow,
+                        viewModel::cancelNextEpisode,
+                        reduceMotion = reduceMotion,
+                        artwork = { anime?.let { SourceHomeArtwork(it, Modifier.fillMaxSize()) } },
+                    )
+                } else if (prompt != null && nextEpisode != null) {
+                    NextEpisodeCard(
+                        seriesTitle = anime?.title.orEmpty(),
+                        episodeTitle = nextEpisode.name,
+                        secondsRemaining = prompt.secondsRemaining,
+                        onPlayNow = viewModel::playNextEpisodeNow,
+                        onCancel = {
+                            viewModel.cancelNextEpisode()
+                            viewModel.showControls()
+                        },
+                        reduceMotion = reduceMotion,
+                        artwork = { anime?.let { SourceHomeArtwork(it, Modifier.fillMaxSize()) } },
+                    )
+                }
+            }
+        }
 
         PlayerDialogs(
             dialogShown = dialog,

@@ -217,12 +217,17 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet) : BaseMPVView(c
         "duration" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
         "volume" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
         "volume-max" to MPVLib.mpvFormat.MPV_FORMAT_INT64,
+        "osd-dimensions" to MPVLib.mpvFormat.MPV_FORMAT_NONE,
+        Anime4KTelemetry.PROPERTY to MPVLib.mpvFormat.MPV_FORMAT_STRING,
 
         "sid" to MPVLib.mpvFormat.MPV_FORMAT_STRING,
         "secondary-sid" to MPVLib.mpvFormat.MPV_FORMAT_STRING,
         "aid" to MPVLib.mpvFormat.MPV_FORMAT_STRING,
 
         "speed" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE,
+        "container-fps" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE,
+        "display-fps" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE,
+        "estimated-display-fps" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE,
         "video-params/aspect" to MPVLib.mpvFormat.MPV_FORMAT_DOUBLE,
 
         "hwdec-current" to MPVLib.mpvFormat.MPV_FORMAT_STRING,

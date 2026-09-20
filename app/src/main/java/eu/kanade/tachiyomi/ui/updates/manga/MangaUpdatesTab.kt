@@ -56,6 +56,7 @@ fun Screen.mangaUpdatesTab(
     }
 
     return TabContent(
+        legacyManga = true,
         titleRes = AYMR.strings.label_updates,
         searchEnabled = false,
         content = { contentPadding, _ ->

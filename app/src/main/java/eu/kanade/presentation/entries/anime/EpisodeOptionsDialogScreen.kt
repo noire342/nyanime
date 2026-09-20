@@ -1,7 +1,6 @@
 package eu.kanade.presentation.entries.anime
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.clickable
@@ -49,6 +48,7 @@ import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import cafe.adriel.voyager.core.screen.Screen
 import eu.kanade.presentation.components.TabbedDialogPaddings
+import eu.kanade.presentation.motion.animateModernContentSize
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.model.Hoster
 import eu.kanade.tachiyomi.animesource.model.Video
@@ -411,7 +411,7 @@ fun EpisodeOptionsDialog(
 
     Column(
         modifier = Modifier
-            .animateContentSize()
+            .animateModernContentSize()
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(vertical = TabbedDialogPaddings.Vertical)

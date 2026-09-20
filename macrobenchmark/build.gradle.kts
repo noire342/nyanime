@@ -7,7 +7,6 @@ android {
 
     defaultConfig {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        testInstrumentationRunnerArguments["androidx.benchmark.enabledRules"] = "BaselineProfile"
     }
 
     buildTypes {

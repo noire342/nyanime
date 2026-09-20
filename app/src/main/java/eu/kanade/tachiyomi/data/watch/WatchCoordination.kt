@@ -1,0 +1,91 @@
+package eu.kanade.tachiyomi.data.watch
+
+import kotlin.math.abs
+import kotlin.math.roundToLong
+
+/** Retains a single shared deadline; every interruption invalidates it before another start is planned. */
+internal class WatchStartGate {
+    private var readySince: Long? = null
+    var deadline: Long? = null
+        private set
+
+    fun reset() {
+        readySince = null
+        deadline = null
+    }
+
+    fun update(ready: Boolean, requested: Boolean, now: Long): Boolean {
+        if (!ready || !requested) {
+            reset()
+            return false
+        }
+        val since = readySince ?: now.also { readySince = it }
+        if (deadline == null && now - since >= 1000) deadline = now + 2000
+        return deadline?.let { now >= it } == true
+    }
+}
+
+/** A filtered error, hysteresis and slew limit prevent the speed from following individual jitter samples. */
+internal class WatchDriftCorrector {
+    private var previousAt: Long? = null
+    private var filtered = 0.0
+    private var adjusting = false
+    private var factor = 1.0
+    private var largeSince: Long? = null
+
+    fun reset() {
+        previousAt = null
+        filtered = 0.0
+        adjusting = false
+        factor = 1.0
+        largeSince = null
+    }
+
+    fun correct(
+        position: Double,
+        target: Double,
+        speed: Double,
+        paused: Boolean,
+        canSeek: Boolean,
+        now: Long,
+    ): WatchCorrection {
+        val drift = target - position
+        if (paused) {
+            reset()
+            return WatchCorrection(if (canSeek && abs(drift) > 0.18) target else null, speed)
+        }
+        val dt = ((previousAt?.let { now - it } ?: 250).coerceIn(1, 1000)) / 1000.0
+        val alpha = dt / (0.8 + dt)
+        filtered = if (previousAt == null) drift else filtered + alpha * (drift - filtered)
+        previousAt = now
+        if (abs(drift) > 1.5) {
+            if (largeSince == null) largeSince = now
+        } else {
+            largeSince = null
+        }
+        if (canSeek && (abs(drift) > 8.0 || largeSince?.let { now - it >= 1500 } == true)) {
+            reset()
+            return WatchCorrection(target, speed)
+        }
+        if (!adjusting && abs(filtered) > 0.35) adjusting = true
+        if (adjusting && abs(filtered) < 0.12) adjusting = false
+        val desired = if (adjusting) 1.0 + (filtered * 0.025).coerceIn(-0.03, 0.03) else 1.0
+        factor += (desired - factor).coerceIn(-0.012 * dt, 0.012 * dt)
+        factor = factor.coerceIn(0.97, 1.03)
+        return WatchCorrection(speed = speed * ((factor * 10000).roundToLong() / 10000.0))
+    }
+}
+
+internal fun remainingSeconds(deadline: Long?, now: Long): Int? =
+    deadline?.let { ((it - now).coerceAtLeast(0) + 999).div(1000).toInt() }
+
+fun WatchProblem.description(): String = when (this) {
+    WatchProblem.None -> "Pronto"
+    WatchProblem.Opening -> "Preparazione episodio"
+    WatchProblem.Buffering -> "Caricamento"
+    WatchProblem.MissingSource -> "Estensione mancante"
+    WatchProblem.SourceError -> "La fonte non risponde"
+    WatchProblem.DifferentEdition -> "Versione video diversa"
+    WatchProblem.LocalPause -> "Pausa su questo telefono"
+    WatchProblem.Connection -> "Riconnessione"
+}

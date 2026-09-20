@@ -22,6 +22,7 @@ import eu.kanade.tachiyomi.animesource.model.Track
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
+import eu.kanade.tachiyomi.data.download.anime.ultra.UltraDownloadWorker
 import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateNotifier
 import eu.kanade.tachiyomi.data.notification.NotificationHandler
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
@@ -45,15 +46,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 import logcat.LogPriority
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.storage.extension
 import tachiyomi.core.common.util.lang.launchIO
@@ -68,6 +67,8 @@ import tachiyomi.i18n.aniyomi.AYMR
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -388,6 +389,22 @@ class AnimeDownloader(
             DiskUtil.createNoMediaFile(tmpDir, context)
 
             download.status = AnimeDownload.State.DOWNLOADED
+            if (preferences.ultraAfterDownload().get() &&
+                preferences.useExternalDownloader().get() == download.changeDownloader
+            ) {
+                // Scheduling Ultra must never turn a successful download into a download error.
+                runCatching {
+                    animeDir.findFile(episodeDirname)?.let { folder ->
+                        UltraDownloadWorker.enqueue(
+                            context,
+                            folder.uri,
+                            "${download.anime.title} · ${download.episode.name}",
+                            download.anime.id,
+                            download.episode.id,
+                        )
+                    }
+                }.onFailure { logcat(LogPriority.ERROR, it) }
+            }
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
             // If the video threw, it will resume here
@@ -422,11 +439,10 @@ class AnimeDownloader(
         // Get filename from download info
         val filename = DiskUtil.buildValidFilename(download.episode.name)
 
-        // Delete temp file if it exists
-        tmpDir.findFile("$filename.tmp")?.delete()
-
         // Try to find the video file
-        val videoFile = tmpDir.listFiles()?.firstOrNull { it.name!!.startsWith("$filename.mkv") }
+        val videoFile = tmpDir.listFiles()?.firstOrNull {
+            it.name?.substringBeforeLast('.') == filename && isFinishedVideo(it)
+        }
 
         try {
             // If the video is already downloaded, do nothing. Otherwise download from network
@@ -475,17 +491,17 @@ class AnimeDownloader(
                 }
             }
 
-            video.videoUrl = file.uri.path ?: ""
+            download.video?.videoUrl = file.uri.toString()
             download.progress = 100
-            video.status = Video.State.READY
+            download.video?.status = Video.State.READY
             httpServer?.stop()
             progressJob?.cancel()
         } catch (e: Exception) {
             httpServer?.stop()
-            if (e is CancellationException) throw e
-            video.status = Video.State.ERROR
-            notifier.onError(e.message, download.episode.name, download.anime.title, download.anime.id)
             progressJob?.cancel()
+            if (e is CancellationException) throw e
+            download.video?.status = Video.State.ERROR
+            notifier.onError(e.message, download.episode.name, download.anime.title, download.anime.id)
         }
     }
 
@@ -501,33 +517,83 @@ class AnimeDownloader(
         tmpDir: UniFile,
         filename: String,
     ): UniFile {
-        return flow {
-            tmpDir.findFile("$filename.tmp")?.delete()
-            val videoFile = tmpDir.createFile("$filename.tmp")!!
+        var refreshedLink = false
+        var directDisabled = false
+        for (attempt in 0..3) {
             try {
-                if (torrentPreferences.torrServerEnable().get() && isTorrent(download.video)) {
-                    torrentDownload(download, tmpDir, videoFile, filename)
-                } else {
-                    ffmpegDownload(download, tmpDir, videoFile, filename)
+                val video = download.video!!
+                val format = video.videoUrl.toHttpUrlOrNull()?.pathSegments?.lastOrNull()
+                    ?.substringAfterLast('.', "")?.lowercase()
+                val direct = !directDisabled &&
+                    format in setOf("mp4", "m4v", "mkv", "webm") &&
+                    video.subtitleTracks.isEmpty() &&
+                    video.audioTracks.isEmpty() &&
+                    video.ffmpegStreamArgs.isEmpty() &&
+                    video.ffmpegVideoArgs.isEmpty() &&
+                    !video.usesHttpServer()
+                if (direct) {
+                    val partName = "$filename.http-part.tmp"
+                    val stateName = "$filename.http-state.tmp"
+                    val part = tmpDir.findFile(partName) ?: tmpDir.createFile(partName)!!
+                    val state = tmpDir.findFile(stateName) ?: tmpDir.createFile(stateName)!!
+                    try {
+                        val transfer = ResumableVideoTransfer(
+                            download.source.client.newBuilder().callTimeout(0, TimeUnit.MILLISECONDS)
+                                .readTimeout(60, TimeUnit.SECONDS).build(),
+                            UriPartialVideoStore(context, part, state),
+                            { DiskUtil.getAvailableStorageSpace(tmpDir) },
+                        )
+                        transfer.download(video.videoUrl, video.headers ?: download.source.headers) { bytes, total ->
+                            download.update(bytes, total, false)
+                        }
+                        if (!part.renameTo(
+                                "$filename.$format",
+                            )
+                        ) {
+                            throw VideoStorageException("Impossibile finalizzare il video scaricato.")
+                        }
+                        state.delete()
+                        return part
+                    } catch (e: UnsupportedDirectVideo) {
+                        directDisabled = true
+                        part.delete()
+                        state.delete()
+                        // Preserve the existing FFmpeg route for incompatible servers/containers.
+                    }
+                }
+                tmpDir.findFile("$filename.http-part.tmp")?.delete()
+                tmpDir.findFile("$filename.http-state.tmp")?.delete()
+                tmpDir.findFile("$filename.tmp")?.delete()
+                val file = tmpDir.createFile("$filename.tmp")!!
+                try {
+                    if (torrentPreferences.torrServerEnable().get() && isTorrent(download.video)) {
+                        torrentDownload(download, tmpDir, file, filename)
+                    } else {
+                        ffmpegDownload(download, tmpDir, file, filename)
+                    }
+                    return file
+                } catch (e: Exception) {
+                    file.delete()
+                    throw e
                 }
             } catch (e: Exception) {
-                videoFile.delete()
-                throw e
-            }
-
-            emit(videoFile)
-        }
-            // Retry 3 times, waiting 2, 4 and 8 seconds between attempts.
-            .retryWhen { _, attempt ->
-                if (attempt < 3) {
-                    delay((2L shl attempt.toInt()) * 1000)
-                    true
-                } else {
-                    false
+                if (e is CancellationException) throw e
+                if (e is VideoStorageException || attempt == 3) throw e
+                if (e is VideoHttpException) {
+                    if (e.status in setOf(401, 403, 404, 410) && !refreshedLink) {
+                        refreshedLink = true
+                        download.video = HosterLoader.getBestVideo(
+                            download.source,
+                            EpisodeLoader.getHosters(download.episode, download.anime, download.source),
+                        ) ?: throw IOException("Video non disponibile. Aggiorna gli episodi e riprova.")
+                    } else if (e.status !in setOf(408, 416, 429) && e.status !in 500..599) {
+                        throw IOException("Video non disponibile (HTTP ${e.status}). Aggiorna la fonte e riprova.", e)
+                    }
                 }
+                delay((2L shl attempt) * 1000)
             }
-            .flowOn(Dispatchers.IO)
-            .first()
+        }
+        error("Download attempts exhausted")
     }
 
     private fun isTorrent(video: Video?): Boolean {
@@ -591,9 +657,12 @@ class AnimeDownloader(
 
         var duration = 0L
 
+        var httpFailure: Int? = null
         val logCallback = LogCallback { log ->
             if (log.level <= Level.AV_LOG_WARNING) {
                 log.message?.let {
+                    Regex("HTTP (?:error |Error )?(401|403|404|410|429|5[0-9]{2})")
+                        .find(it)?.groupValues?.getOrNull(1)?.toIntOrNull()?.let { status -> httpFailure = status }
                     logcat(LogPriority.ERROR) { it }
                 }
             }
@@ -619,7 +688,10 @@ class AnimeDownloader(
                         }
                         continuation.resume(it)
                     } else {
-                        continuation.resumeWithException(Exception("Error in ffmpeg!"))
+                        continuation.resumeWithException(
+                            httpFailure?.let(::VideoHttpException)
+                                ?: IOException("Download interrotto. Controlla la connessione e riprova."),
+                        )
                     }
                 },
                 logCallback,
@@ -810,11 +882,22 @@ class AnimeDownloader(
      * @param download the download to check.
      * @param tmpDir the directory where the download is currently stored.
      */
+    private fun isFinishedVideo(file: UniFile): Boolean = file.isFile &&
+        file.length() > 0 &&
+        file.name?.substringAfterLast('.')?.lowercase() in setOf("mkv", "mp4", "m4v", "webm") &&
+        file.name?.endsWith("_tmp.mkv") != true
+
     private fun isDownloadSuccessful(
         download: AnimeDownload,
         tmpDir: UniFile,
     ): Boolean {
-        val downloadedVideo = tmpDir.listFiles().orEmpty().filterNot { it.extension == ".tmp" }
+        val files = tmpDir.listFiles().orEmpty()
+        // External downloaders own completion; retain their established handoff behavior.
+        val downloadedVideo = if (preferences.useExternalDownloader().get() != download.changeDownloader) {
+            files.filterNot { it.extension == ".tmp" }
+        } else {
+            files.filter(::isFinishedVideo)
+        }
         return downloadedVideo.size == 1
     }
 
@@ -833,7 +916,7 @@ class AnimeDownloader(
         dirname: String,
     ) {
         // Ensure that the episode folder has the full video
-        val downloadedVideo = tmpDir.listFiles().orEmpty().filterNot { it.extension == ".tmp" }
+        val downloadedVideo = tmpDir.listFiles().orEmpty().filter(::isFinishedVideo)
 
         download.status = if (downloadedVideo.size == 1) {
             // Only rename the directory if it's downloaded

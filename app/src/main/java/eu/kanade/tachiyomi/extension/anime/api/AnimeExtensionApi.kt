@@ -1,6 +1,9 @@
 package eu.kanade.tachiyomi.extension.anime.api
 
 import android.content.Context
+import eu.kanade.tachiyomi.extension.ExtensionUpdate
+import eu.kanade.tachiyomi.extension.ExtensionUpdateCheckGate
+import eu.kanade.tachiyomi.extension.ExtensionUpdateKind
 import eu.kanade.tachiyomi.extension.ExtensionUpdateNotifier
 import eu.kanade.tachiyomi.extension.anime.AnimeExtensionManager
 import eu.kanade.tachiyomi.extension.anime.model.AnimeExtension
@@ -8,12 +11,9 @@ import eu.kanade.tachiyomi.extension.anime.model.AnimeLoadResult
 import eu.kanade.tachiyomi.extension.anime.util.AnimeExtensionLoader
 import mihon.domain.extension.anime.interactor.UpdateAnimeExtensionStores
 import mihon.domain.extension.anime.repository.AnimeExtensionStoreRepository
-import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.util.lang.withIOContext
 import uy.kohesive.injekt.injectLazy
-import java.time.Instant
-import kotlin.time.Duration.Companion.days
 
 internal class AnimeExtensionApi {
 
@@ -23,9 +23,7 @@ internal class AnimeExtensionApi {
     private val updateExtensionStores: UpdateAnimeExtensionStores by injectLazy()
     private val animeExtensionManager: AnimeExtensionManager by injectLazy()
 
-    private val lastExtCheck: Preference<Long> by lazy {
-        preferenceStore.getLong("last_ext_check", 0)
-    }
+    private val updateGate by lazy { ExtensionUpdateCheckGate(preferenceStore) }
 
     suspend fun findExtensions(): List<AnimeExtension.Available> {
         return withIOContext { repository.fetchExtensions() }
@@ -34,21 +32,14 @@ internal class AnimeExtensionApi {
     suspend fun checkForUpdates(
         context: Context,
         fromAvailableExtensionList: Boolean = false,
-    ): List<AnimeExtension.Installed>? {
-        // Limit checks to once a day at most
-        if (fromAvailableExtensionList &&
-            Instant.now().toEpochMilli() < lastExtCheck.get() + 1.days.inWholeMilliseconds
-        ) {
-            return null
-        }
-
+    ): List<AnimeExtension.Installed>? = updateGate.run(ExtensionUpdateKind.ANIME) {
         // Update extension repo details
         updateExtensionStores()
 
         val extensions = if (fromAvailableExtensionList) {
             animeExtensionManager.availableExtensionsFlow.value
         } else {
-            findExtensions().also { lastExtCheck.set(Instant.now().toEpochMilli()) }
+            findExtensions()
         }
 
         val installedExtensions = AnimeExtensionLoader.loadExtensions(context)
@@ -56,6 +47,7 @@ internal class AnimeExtensionApi {
             .map { it.extension }
 
         val extensionsWithUpdate = mutableListOf<AnimeExtension.Installed>()
+        val updates = mutableListOf<ExtensionUpdate>()
         for (installedExt in installedExtensions) {
             val pkgName = installedExt.pkgName
             val availableExt = extensions.find { it.pkgName == pkgName } ?: continue
@@ -65,16 +57,24 @@ internal class AnimeExtensionApi {
             val hasUpdate = hasUpdatedVer || hasUpdatedLib
             if (hasUpdate) {
                 extensionsWithUpdate.add(installedExt)
+                updates.add(
+                    ExtensionUpdate(
+                        pkgName,
+                        availableExt.versionCode.toLong(),
+                        availableExt.libVersion,
+                        installedExt.name,
+                    ),
+                )
             }
         }
 
         if (extensionsWithUpdate.isNotEmpty()) {
             ExtensionUpdateNotifier(context).promptUpdates(
-                names = extensionsWithUpdate.map { it.name },
+                updates = updates,
                 anime = true,
             )
         }
 
-        return extensionsWithUpdate
+        extensionsWithUpdate
     }
 }

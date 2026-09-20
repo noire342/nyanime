@@ -51,3 +51,12 @@ val Options.useBackground: Boolean
     get() = getExtra(useBackgroundKey)
 
 private val useBackgroundKey = Extras.Key(default = false)
+
+fun ImageRequest.Builder.artworkTimeout(timeoutMillis: Long) = apply {
+    extras[artworkTimeoutKey] = timeoutMillis
+}
+
+val Options.artworkTimeoutMillis: Long
+    get() = getExtra(artworkTimeoutKey)
+
+private val artworkTimeoutKey = Extras.Key(default = 0L)

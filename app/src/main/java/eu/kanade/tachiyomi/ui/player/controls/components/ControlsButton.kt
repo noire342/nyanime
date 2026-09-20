@@ -98,6 +98,7 @@ fun ControlsButton(
     modifier: Modifier = Modifier,
     onLongClick: () -> Unit = {},
     color: Color = Color.White,
+    horizontalSpacing: Dp = MaterialTheme.padding.medium,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -119,7 +120,10 @@ fun ControlsButton(
                 interactionSource,
                 ripple(),
             )
-            .padding(MaterialTheme.padding.medium),
+            .padding(
+                vertical = MaterialTheme.padding.medium,
+                horizontal = horizontalSpacing,
+            ),
     ) {
         Text(
             text,

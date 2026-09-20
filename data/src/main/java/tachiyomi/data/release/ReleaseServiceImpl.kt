@@ -16,12 +16,26 @@ class ReleaseServiceImpl(
 ) : ReleaseService {
 
     override suspend fun latest(arguments: GetApplicationRelease.Arguments): Release? {
-        val release = with(json) {
-            networkService.client
-                .newCall(GET("https://api.github.com/repos/${arguments.repository}/releases/latest"))
-                .awaitSuccess()
-                .parseAs<GithubRelease>()
-        }
+        val release = if (arguments.isPreview) {
+            // GitHub's /releases/latest endpoint excludes prereleases. The fork publishes
+            // bleeding-edge builds as prereleases, so inspect the newest releases and choose the
+            // first one that contains an APK compatible with this device.
+            with(json) {
+                networkService.client
+                    .newCall(GET("https://api.github.com/repos/${arguments.repository}/releases?per_page=20"))
+                    .awaitSuccess()
+                    .parseAs<List<GithubRelease>>()
+                    .firstOrNull { getDownloadLink(it) != null }
+            }
+        } else {
+            with(json) {
+                networkService.client
+                    .newCall(GET("https://api.github.com/repos/${arguments.repository}/releases/latest"))
+                    .awaitSuccess()
+                    .parseAs<GithubRelease>()
+            }
+        } ?: return null
+
         val downloadLink = getDownloadLink(release = release) ?: return null
 
         return Release(
@@ -34,17 +48,10 @@ class ReleaseServiceImpl(
         )
     }
 
-    private fun getDownloadLink(release: GithubRelease): String? {
-        val map = release.assets.associate { asset ->
-            BUILD_TYPES.find { "-$it" in asset.name } to asset.downloadLink
-        }
-
-        return map[Build.SUPPORTED_ABIS[0]] ?: map[null]
-    }
+    private fun getDownloadLink(release: GithubRelease): String? =
+        ApplicationReleaseAssets.select(release.assets, Build.SUPPORTED_ABIS.toList())
 
     companion object {
-        private val BUILD_TYPES = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
-
         /**
          * Regular expression that matches a mention to a valid GitHub username, like it's
          * done in GitHub Flavored Markdown. It follows these constraints:

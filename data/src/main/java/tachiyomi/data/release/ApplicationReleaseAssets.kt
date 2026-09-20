@@ -1,0 +1,29 @@
+package tachiyomi.data.release
+
+/** Select application packages only: extension APKs, checksums and source archives are not app updates. */
+object ApplicationReleaseAssets {
+    private val abis = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+    private val stableTag = Regex("[vr][0-9][A-Za-z0-9.+-]*")
+
+    fun select(assets: List<GitHubAsset>, supportedAbis: List<String>): String? {
+        val packages = assets.mapNotNull { asset ->
+            val name = asset.name
+            val abi = when {
+                name == "app-universal-preview.apk" -> "universal"
+                name.removePrefix("aniyomi-").removeSuffix(".apk").matches(stableTag) &&
+                    name.startsWith("aniyomi-") &&
+                    name.endsWith(".apk") -> "universal"
+                else -> abis.firstOrNull { abi ->
+                    name == "app-" + abi + "-preview.apk" ||
+                        (
+                            name.startsWith("aniyomi-" + abi + "-") &&
+                                name.endsWith(".apk") &&
+                                name.removePrefix("aniyomi-" + abi + "-").removeSuffix(".apk").matches(stableTag)
+                            )
+                } ?: return@mapNotNull null
+            }
+            abi to asset.downloadLink
+        }.toMap()
+        return supportedAbis.firstNotNullOfOrNull { packages[it] } ?: packages["universal"]
+    }
+}

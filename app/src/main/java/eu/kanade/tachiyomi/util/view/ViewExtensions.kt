@@ -20,6 +20,7 @@ import androidx.compose.runtime.CompositionContext
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import eu.kanade.presentation.theme.MangaSectionTheme
 import eu.kanade.presentation.theme.TachiyomiTheme
 import eu.kanade.tachiyomi.R
 
@@ -40,16 +41,19 @@ inline fun ComponentActivity.setComposeContent(
 }
 
 fun ComposeView.setComposeContent(
+    legacyManga: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
     setContent {
         TachiyomiTheme {
-            CompositionLocalProvider(
-                LocalTextStyle provides MaterialTheme.typography.bodySmall,
-                LocalContentColor provides MaterialTheme.colorScheme.onBackground,
-            ) {
-                content()
+            MangaSectionTheme(legacyManga) {
+                CompositionLocalProvider(
+                    LocalTextStyle provides MaterialTheme.typography.bodySmall,
+                    LocalContentColor provides MaterialTheme.colorScheme.onBackground,
+                ) {
+                    content()
+                }
             }
         }
     }

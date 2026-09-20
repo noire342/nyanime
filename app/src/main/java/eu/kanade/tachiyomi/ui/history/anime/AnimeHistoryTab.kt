@@ -46,11 +46,12 @@ val resumeLastEpisodeSeenEvent = Channel<Unit>()
 fun Screen.animeHistoryTab(
     context: Context,
     fromMore: Boolean,
+    screenModel: AnimeHistoryScreenModel = rememberScreenModel { AnimeHistoryScreenModel() },
+    globalHistory: Boolean = true,
 ): TabContent {
     val snackbarHostState = SnackbarHostState()
 
     val navigator = LocalNavigator.currentOrThrow
-    val screenModel = rememberScreenModel { AnimeHistoryScreenModel() }
     val state by screenModel.state.collectAsState()
     val searchQuery by screenModel.query.collectAsState()
 
@@ -168,20 +169,25 @@ fun Screen.animeHistoryTab(
                 }
             }
 
-            LaunchedEffect(Unit) {
+            LaunchedEffect(globalHistory) {
+                if (!globalHistory) return@LaunchedEffect
                 resumeLastEpisodeSeenEvent.receiveAsFlow().collectLatest {
                     openEpisode(context, screenModel.getNextEpisode())
                 }
             }
         },
         actions =
-        persistentListOf(
-            AppBar.Action(
-                title = stringResource(MR.strings.pref_clear_history),
-                icon = Icons.Outlined.DeleteSweep,
-                onClick = { screenModel.setDialog(AnimeHistoryScreenModel.Dialog.DeleteAll) },
-            ),
-        ),
+        if (!globalHistory) {
+            persistentListOf()
+        } else {
+            persistentListOf(
+                AppBar.Action(
+                    title = stringResource(MR.strings.pref_clear_history),
+                    icon = Icons.Outlined.DeleteSweep,
+                    onClick = { screenModel.setDialog(AnimeHistoryScreenModel.Dialog.DeleteAll) },
+                ),
+            )
+        },
         navigateUp = navigateUp,
     )
 }

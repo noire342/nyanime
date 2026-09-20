@@ -19,8 +19,8 @@ class AudioPreferences(
 }
 
 enum class AudioChannels(val titleRes: StringResource, val property: String, val value: String) {
-    Auto(AYMR.strings.pref_player_audio_channels_auto, "audio-channels", "auto-safe"),
-    AutoSafe(AYMR.strings.pref_player_audio_channels_auto_safe, "audio-channels", "auto"),
+    Auto(AYMR.strings.pref_player_audio_channels_auto, "audio-channels", "auto"),
+    AutoSafe(AYMR.strings.pref_player_audio_channels_auto_safe, "audio-channels", "auto-safe"),
     Mono(AYMR.strings.pref_player_audio_channels_mono, "audio-channels", "mono"),
     Stereo(AYMR.strings.pref_player_audio_channels_stereo, "audio-channels", "stereo"),
     ReverseStereo(AYMR.strings.pref_player_audio_channels_reverse_stereo, "af", "pan=[stereo|c0=c1|c1=c0]"),
