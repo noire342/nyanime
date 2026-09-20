@@ -29,6 +29,18 @@ internal object PersonalSyncPolicy {
         "device.presence",
     )
 
+    /** First-device seeding must not bury resumable items behind completed history. */
+    fun deliveryPriority(record: SyncRecord, now: Long): Int = if (
+        !record.edits.containsAll(SyncField.entries) ||
+        !record.seen &&
+        record.history > 0 ||
+        record.history >= now - 15_000
+    ) {
+        2
+    } else {
+        0
+    }
+
     fun resume(records: List<SyncRecord>): List<SyncRecord> = records.asSequence()
         .filter { !it.deleted && !it.seen && it.history > 0 && it.ref.itemUrl.isNotEmpty() }
         .sortedByDescending { it.history }

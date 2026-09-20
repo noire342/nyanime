@@ -1203,13 +1203,7 @@ class CommunityManager private constructor(
                     Nip44.encrypt(id.conversationKey(id.publicKey), communityJson.encodeToString(merged)),
                     listOf(listOf("d", address)),
                     address,
-                    priority = if (record.edits.containsAll(SyncField.entries) &&
-                        record.history < System.currentTimeMillis() - 15_000
-                    ) {
-                        0
-                    } else {
-                        2
-                    },
+                    priority = PersonalSyncPolicy.deliveryPriority(record, System.currentTimeMillis()),
                 )
                 if (!store.contains("sync-addresses", address)) {
                     store.save("sync-addresses", address, true)

@@ -152,6 +152,7 @@ class CommunityJournalTest(unittest.TestCase):
                 statement = f'INSERT INTO community_changes({",".join(columns)}) VALUES({",".join("?" for _ in columns)})'
                 for index in range(1500):
                     template['title_url'] = f'/archive/{index}'
+                    template['history_at'] = index + 1
                     db.execute(statement, list(template.values()))
                 # A seed row may already contain all fields when playback modifies it again.
                 db.execute("UPDATE community_changes SET fields='all' WHERE title_url='/title'")
@@ -163,6 +164,7 @@ class CommunityJournalTest(unittest.TestCase):
                 self.assertEqual(128, len(rows))
                 self.assertEqual('/title', rows[0]['title_url'])
                 self.assertEqual(500, rows[0]['position'])
+                self.assertEqual('/archive/1499', rows[1]['title_url'])
                 # Turning capture off preserves existing work and makes later writes local only.
                 db.execute('UPDATE community_capture SET enabled=0')
                 db.execute(f'UPDATE {item} SET {position}=600 WHERE _id=2')

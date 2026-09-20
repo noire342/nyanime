@@ -118,6 +118,19 @@ class PersonalSyncPolicyTest {
         assertFalse(code.copy(until = now - 1).valid())
     }
 
+    @Test
+    fun `first sync prioritizes last nights unfinished episode over the completed library`() {
+        val yesterday = record("/episode/2", history = 50_000, position = 9000)
+        val now = 86_400_000L
+        assertEquals(2, PersonalSyncPolicy.deliveryPriority(yesterday, now))
+        assertEquals(0, PersonalSyncPolicy.deliveryPriority(yesterday.copy(seen = true), now))
+        assertEquals(
+            2,
+            PersonalSyncPolicy.deliveryPriority(yesterday.copy(seen = true, edits = setOf(SyncField.Progress)), now),
+        )
+        assertEquals(0, PersonalSyncPolicy.deliveryPriority(yesterday.copy(history = 0, position = 0), now))
+    }
+
     private fun record(item: String, manga: Boolean = false, history: Long, position: Long = 0) = SyncRecord(
         ref = SyncReference(manga, 42, "/example-title", item),
         revision = SyncRevision(100, 0, "a".repeat(32)),
