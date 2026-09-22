@@ -86,7 +86,7 @@ import uy.kohesive.injekt.api.get
 object SettingsDataScreen : SearchableSettings {
 
     val restorePreferenceKeyString = MR.strings.label_backup
-    const val HELP_URL = "https://aniyomi.org/docs/faq/storage"
+    const val HELP_URL = "https://github.com/noire342/nyanime/blob/main/docs/support.md#archiviazione"
 
     @ReadOnlyComposable
     @Composable
@@ -398,7 +398,7 @@ object SettingsDataScreen : SearchableSettings {
                 options = exportOptions,
                 onConfirm = { options ->
                     exportOptions = options
-                    saveFileLauncher.launch("aniyomi_library.csv")
+                    saveFileLauncher.launch("nyanime_library.csv")
                 },
                 onDismissRequest = { showDialog = false },
             )

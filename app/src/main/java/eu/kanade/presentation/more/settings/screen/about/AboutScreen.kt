@@ -146,18 +146,16 @@ object AboutScreen : Screen() {
 
                 item {
                     TextPreferenceWidget(
-                        title = stringResource(MR.strings.help_translate),
+                        title = stringResource(MR.strings.licenses),
                         onPreferenceClick = {
-                            uriHandler.openUri(
-                                "https://aniyomi.org/docs/contribute#translation",
-                            )
+                            uriHandler.openUri("https://github.com/noire342/nyanime/blob/main/docs/credits.md")
                         },
                     )
                 }
 
                 item {
                     TextPreferenceWidget(
-                        title = stringResource(MR.strings.licenses),
+                        title = stringResource(MR.strings.library_licenses),
                         onPreferenceClick = { navigator.push(OpenSourceLicensesScreen()) },
                     )
                 }
@@ -165,7 +163,9 @@ object AboutScreen : Screen() {
                 item {
                     TextPreferenceWidget(
                         title = stringResource(MR.strings.privacy_policy),
-                        onPreferenceClick = { uriHandler.openUri("https://aniyomi.org/privacy/") },
+                        onPreferenceClick = {
+                            uriHandler.openUri("https://github.com/noire342/nyanime/blob/main/docs/privacy.md")
+                        },
                     )
                 }
 
@@ -179,17 +179,17 @@ object AboutScreen : Screen() {
                         LinkIcon(
                             label = stringResource(MR.strings.website),
                             icon = Icons.Outlined.Public,
-                            url = "https://aniyomi.org",
+                            onClick = { context.toast(MR.strings.feature_not_yet_available) },
                         )
                         LinkIcon(
                             label = "Discord",
                             icon = CustomIcons.Discord,
-                            url = "https://discord.gg/F32UjdJZrR",
+                            onClick = { context.toast(MR.strings.feature_not_yet_available) },
                         )
                         LinkIcon(
                             label = "GitHub",
                             icon = CustomIcons.Github,
-                            url = "https://github.com/aniyomiorg/aniyomi",
+                            onClick = { context.toast(MR.strings.feature_not_yet_available) },
                         )
                     }
                 }

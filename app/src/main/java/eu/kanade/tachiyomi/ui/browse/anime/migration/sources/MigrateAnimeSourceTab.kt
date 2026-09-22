@@ -33,7 +33,9 @@ fun Screen.migrateAnimeSourceTab(): TabContent {
                 title = stringResource(MR.strings.migration_help_guide),
                 icon = Icons.AutoMirrored.Outlined.HelpOutline,
                 onClick = {
-                    uriHandler.openUri("https://aniyomi.org/help/guides/source-migration/")
+                    uriHandler.openUri(
+                        "https://github.com/noire342/nyanime/blob/main/docs/support.md#migrazione-della-fonte",
+                    )
                 },
             ),
         ),

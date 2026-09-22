@@ -8,6 +8,17 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 23 settembre 2026 — Link Nyanime e aggiornamenti OTA
+
+- I pulsanti Sito web, Discord e GitHub nella schermata Info mostrano un avviso
+  finché i relativi canali non saranno disponibili; rimossa la voce per tradurre.
+- Licenze e privacy aprono i documenti di questo repository. Guide e collegamenti
+  di aiuto nell'app non inviano più alle pagine di assistenza del progetto upstream.
+- Le release preview firmate vengono pubblicate automaticamente da `main` con APK
+  Nyanime per ogni architettura, riattivando la verifica degli aggiornamenti OTA.
+- Supporto alle estensioni video con versione 17 della libreria, conservando le
+  versioni precedenti e gli identificatori tecnici necessari alla compatibilità.
+
 ## 22 settembre 2026 — Sync disattivato e avvio Ultra più accessibile
 
 - Sync personale rimosso dalle impostazioni e disattivato anche sulle installazioni

@@ -14,7 +14,7 @@ class ApplicationReleaseAssetsTest {
     fun extensionApksAndOtherAttachmentsNeverReplaceUniversalApplication() {
         val names = listOf(
             "app-universal-preview.apk",
-            "aniyomi-test.sample-v1.0.apk",
+            "sample-extension-v1.0.apk",
             "SHA256SUMS",
             "sample-extension-source-v1.0.zip",
         )
@@ -33,12 +33,12 @@ class ApplicationReleaseAssetsTest {
     }
 
     @Test
-    fun preservesOfficialStablePackageNames() {
+    fun selectsNyanimeReleasePackages() {
         assertEquals(
-            "aniyomi-arm64-v8a-v0.18.1.2.apk",
-            select(listOf("aniyomi-v0.18.1.2.apk", "aniyomi-arm64-v8a-v0.18.1.2.apk")),
+            "Nyanime-arm64-v8a-r8241.apk",
+            select(listOf("Nyanime-r8241.apk", "Nyanime-arm64-v8a-r8241.apk")),
         )
-        assertEquals("aniyomi-v0.18.1.2.apk", select(listOf("aniyomi-v0.18.1.2.apk")))
+        assertEquals("Nyanime-r8241.apk", select(listOf("Nyanime-r8241.apk")))
     }
 
     @Test
@@ -49,8 +49,9 @@ class ApplicationReleaseAssetsTest {
                     "app-arm64-v8a-preview.apk.sha256",
                     "app-arm64-v8a-release-unsigned.apk",
                     "other-arm64-v8a.apk",
-                    "prefix-aniyomi-v1.0.apk",
-                    "aniyomi-it.example-v16.4.apk",
+                    "prefix-Nyanime-v1.0.apk",
+                    "Nyanime-it.example-v16.4.apk",
+                    "aniyomi-arm64-v8a-v0.18.2.apk",
                     "app-universal-preview.zip",
                 ),
             ),

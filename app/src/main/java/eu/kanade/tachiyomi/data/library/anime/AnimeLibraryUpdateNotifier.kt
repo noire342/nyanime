@@ -409,7 +409,7 @@ class AnimeLibraryUpdateNotifier(
 
     companion object {
         const val HELP_WARNING_URL =
-            "https://aniyomi.org/docs/faq/library#why-am-i-warned-about-large-bulk-updates-and-downloads"
+            "https://github.com/noire342/nyanime/blob/main/docs/support.md#aggiornamenti-in-blocco"
     }
 }
 

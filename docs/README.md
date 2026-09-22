@@ -9,6 +9,8 @@ I documenti tecnici in inglese conservano i nomi delle API e dei componenti.
 | Guida | Contenuto |
 | --- | --- |
 | [Primi passi e FAQ](getting-started.md) | Installazione, aggiornamenti, estensioni, preferenze e problemi comuni. |
+| [Aiuto](support.md) | Archiviazione, migrazione, tracker e risoluzione dei problemi. |
+| [Privacy](privacy.md) | Dati locali, connessioni esterne e controlli disponibili. |
 | [Tutte le funzionalità](features.md) | Catalogo delle funzioni video, manga, librerie, rete e dati. |
 | [Interfaccia](nyanime-ui.md) | ModernUI, ritorno alla legacy, tema manga e copertine. |
 | [Smart e timer](player-startup-and-sleep.md) | Avvio di Anime4K, timer, autoplay e stanze. |
