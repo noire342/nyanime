@@ -16,21 +16,21 @@ import eu.kanade.presentation.theme.NyanimeWordmark
 import eu.kanade.tachiyomi.R
 
 @Composable
-fun LogoHeader() {
+fun LogoHeader(compact: Boolean = false) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
-            painter = painterResource(R.drawable.ic_ani),
+            painter = painterResource(if (compact) R.drawable.ic_nyanime_mark else R.drawable.ic_ani),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
-                .padding(top = 32.dp, bottom = 8.dp)
-                .size(64.dp),
+                .padding(top = if (compact) 8.dp else 32.dp, bottom = 8.dp)
+                .size(if (compact) 44.dp else 64.dp),
         )
 
-        NyanimeWordmark(Modifier.padding(bottom = 24.dp))
+        NyanimeWordmark(Modifier.padding(bottom = if (compact) 16.dp else 24.dp))
         HorizontalDivider()
     }
 }

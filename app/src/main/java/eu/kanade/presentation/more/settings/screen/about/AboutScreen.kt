@@ -82,7 +82,7 @@ object AboutScreen : Screen() {
                 contentPadding = contentPadding,
             ) {
                 item {
-                    LogoHeader()
+                    LogoHeader(compact = true)
                 }
 
                 item {

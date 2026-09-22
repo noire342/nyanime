@@ -116,10 +116,20 @@ jobs:
             echo "::error::Tag $tag already points to another commit. Refusing to replace an OTA version."
             exit 1
           fi
-          notes="Nyanime ${tag} — preview Android firmata. Scegli l'APK per l'architettura del dispositivo, oppure quello universale. [Novità](https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/CHANGELOG.md)."
+          notes_file="$(mktemp)"
+          awk '
+            /^## / { if (section++) exit; print; next }
+            section == 1 { print }
+          ' CHANGELOG.md > "$notes_file"
+          if ! grep -q '^- ' "$notes_file"; then
+            echo '::error::The latest changelog section has no release notes.'
+            exit 1
+          fi
+          printf '\n[Changelog completo](https://github.com/%s/blob/%s/CHANGELOG.md).\n' \
+            "$GITHUB_REPOSITORY" "$GITHUB_SHA" >> "$notes_file"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" dist/* --repo "$GITHUB_REPOSITORY" --clobber
-            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "Nyanime $tag" --notes "$notes" --prerelease --draft=false
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "Nyanime $tag" --notes-file "$notes_file" --prerelease --draft=false
           else
-            gh release create "$tag" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Nyanime $tag" --notes "$notes" --prerelease
+            gh release create "$tag" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Nyanime $tag" --notes-file "$notes_file" --prerelease
           fi
