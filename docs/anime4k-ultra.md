@@ -2,8 +2,9 @@
 
 Ultra is an optional second step after a successful internal episode download.
 Enable **Settings → Downloads → Anime4K Ultra → Ultra dopo il download**.
-It is disabled by default; charging-only and screen-off-only processing are enabled
-by default. Existing enabled installations inherit the new screen-off default.
+It is disabled by default. Once enabled, processing can run on battery and with the
+screen on. Charging-only and screen-off-only are optional restrictions, off by default;
+explicitly saved choices are retained. These switches are checked live for waiting work too.
 
 Downloaded episode rows expose their local file and Ultra state directly in the
 title screen, in both ModernUI and legacy UI. Tap the row for playback, preparation,
@@ -51,14 +52,23 @@ remain unchanged. Each strip drains with glFinish before resting for four times
 its measured work duration (nine times while interactive/warm). These are software
 duty budgets, **not measured CPU/GPU utilization or a guaranteed device temperature**.
 
-Admission is rechecked during encoding. Android MODERATE thermal status, a battery
-sensor temperature of 39 C, or valid forecast thermal headroom >= 0.8 pauses work.
-Resume requires status <= LIGHT, battery <= 36.5 C, headroom < 0.65 when available,
-and a minimum cooling interval. Headroom is sampled at most once every 10 seconds.
+Admission is rechecked during encoding. Ordinary warmth and Android MODERATE status
+allow paced processing. SEVERE thermal status, battery sensor temperature >= 45 C,
+or current thermal headroom >= 1 pauses work. Resume requires status <= MODERATE,
+battery <= 42 C and headroom <= 0.9 when available. Headroom is sampled at most once
+every 10 seconds, using the current value rather than a 30-second forecast.
+These are app admission thresholds, not a guarantee of a particular device temperature.
+The thermal scale follows [Android PowerManager](https://developer.android.com/reference/android/os/PowerManager#getThermalHeadroom(int)).
 Battery temperature is a fallback sensor, not a measurement of the GPU temperature.
-Playback, screen-on by default, power saving, low battery and memory pressure
-also defer work. WorkManager manages retries and charging/storage constraints;
-Android may delay a restart.
+Playback, Android-reported low memory and battery below 15% while unplugged defer work.
+Power saving slows the GPU duty budget without blocking admission. Optional charging
+and screen restrictions are sampled during work; storage remains a WorkManager constraint.
+
+Resource waits schedule a new check after 30 seconds instead of accumulating an
+ever-longer failure backoff. Android may delay this check; it is not an exact timer.
+After upgrading, waiting jobs with old constraints are refreshed on app startup,
+preserving progress and completed clips. Running jobs and explicit user pauses are
+not restarted by this refresh. Only a scheduling failure uses WorkManager's retry backoff.
 
 Exports checkpoint short video-only clips, normally about two seconds of source
 video, split at actual presentation timestamps. Finished clips and atomic receipts

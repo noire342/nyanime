@@ -22,6 +22,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import logcat.LogPriority
+import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.download.service.DownloadPreferences
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -60,7 +62,22 @@ class UltraDownloadWorker(context: Context, params: WorkerParameters) : Coroutin
         )
     }
 
-    override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+    override suspend fun doWork(): Result {
+        val result = runAttempt()
+        if (result !is Result.Retry) return result
+        return try {
+            // The GPU and incomplete clip are already released before handing off to another worker.
+            UltraDownloads.defer(applicationContext, key, id.toString())
+            Result.success()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            logcat(LogPriority.WARN, error) { "Unable to schedule the next Ultra resource check" }
+            Result.retry()
+        }
+    }
+
+    private suspend fun runAttempt(): Result = withContext(Dispatchers.IO) {
         store.load()
         store.change(key) {
             when {
@@ -81,8 +98,8 @@ class UltraDownloadWorker(context: Context, params: WorkerParameters) : Coroutin
             cooling = task.coolingRequired,
         )
         val waiting = control.sample()
-        if (waiting != null || task.coolingUntil > System.currentTimeMillis()) {
-            waitFor(waiting ?: UltraProcessingPolicy.COOLING)
+        if (waiting != null) {
+            waitFor(waiting)
             return@withContext Result.retry()
         }
         store.updateWorker(key, id.toString()) { it.copy(coolingRequired = false, coolingUntil = 0) }
@@ -275,13 +292,8 @@ class UltraDownloadWorker(context: Context, params: WorkerParameters) : Coroutin
                 phase = UltraPhase.WAITING,
                 message = reason,
                 coolingRequired = it.coolingRequired || reason == UltraProcessingPolicy.COOLING,
-                coolingUntil = if (reason == UltraProcessingPolicy.COOLING &&
-                    (it.coolingUntil == 0L || it.message != UltraProcessingPolicy.COOLING)
-                ) {
-                    maxOf(it.coolingUntil, System.currentTimeMillis() + 60_000)
-                } else {
-                    it.coolingUntil
-                },
+                // Scheduling supplies the cooling interval; wall-clock changes cannot extend it.
+                coolingUntil = 0,
             )
         }
     }

@@ -12,6 +12,35 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CommunityJournalTest(unittest.TestCase):
+    def test_retirement_removes_sync_payloads_and_triggers_but_preserves_local_library(self):
+        cleanup_source = (ROOT / 'app/src/main/java/eu/kanade/tachiyomi/data/community/CommunityRetirement.kt').read_text()
+        cleanup = re.findall(r'"((?:DROP TRIGGER IF EXISTS|DELETE FROM) community_[a-z_]+)"', cleanup_source)
+        self.assertEqual(19, len(cleanup))
+        for anime in (True, False):
+            with self.subTest(anime=anime), self.database(anime) as db:
+                title, item = self.populate(db, anime)
+                seen = 'seen' if anime else 'read'
+                position = 'last_second_seen' if anime else 'last_page_read'
+                db.execute('UPDATE community_capture SET enabled=1')
+                db.execute(f'UPDATE {item} SET {position}=123,{seen}=1,bookmark=1 WHERE _id=2')
+                db.execute("INSERT INTO categories(_id,name,sort,flags) VALUES(7,'Keep me',1,0)")
+                self.assertGreater(db.execute('SELECT count(*) FROM community_changes').fetchone()[0], 0)
+                before = tuple(db.execute(f'SELECT * FROM {item} WHERE _id=2').fetchone())
+                for _ in range(2):
+                    db.execute('UPDATE community_capture SET enabled=0')
+                    for statement in cleanup:
+                        db.execute(statement)
+                self.assertEqual(before, tuple(db.execute(f'SELECT * FROM {item} WHERE _id=2').fetchone()))
+                self.assertEqual(1, db.execute(f'SELECT favorite FROM {title} WHERE _id=1').fetchone()[0])
+                self.assertEqual('Keep me', db.execute('SELECT name FROM categories WHERE _id=7').fetchone()[0])
+                db.execute(f'UPDATE {item} SET {position}=124 WHERE _id=2')
+                db.execute("INSERT INTO categories(_id,name,sort,flags) VALUES(8,'New local category',2,0)")
+                for table in ('community_changes', 'community_category_ids', 'community_removed_categories'):
+                    self.assertEqual(0, db.execute(f'SELECT count(*) FROM {table}').fetchone()[0])
+                self.assertEqual(0, db.execute(
+                    "SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'community_%'"
+                ).fetchone()[0])
+
     def database(self, anime, community=True):
         namespace = ROOT / ('data/src/main/sqldelightanime/dataanime' if anime else 'data/src/main/sqldelight/data')
         db = sqlite3.connect(':memory:')

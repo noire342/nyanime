@@ -56,15 +56,6 @@
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
             android:value="eu.kanade.tachiyomi.data.cast.GoogleCastOptions" />
-        <activity android:name=".ui.community.CommunityActivity" android:enabled="${communityEnabled}" android:exported="true" android:launchMode="singleTop" android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="nyanime" android:host="profile" />
-            </intent-filter>
-        </activity>
-        <service android:name=".data.community.CommunityConnectionService" android:enabled="${communityEnabled}" android:exported="false" android:foregroundServiceType="remoteMessaging" />
         <service
             android:name=".data.cast.CastSessionService"
             android:exported="false"

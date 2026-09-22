@@ -332,7 +332,14 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     private var deviceResumeAllowed = true
-    private val devicePlayer = object : eu.kanade.tachiyomi.data.community.DeviceHandoff.Player {
+    private val devicePlayer = if (
+        eu.kanade.tachiyomi.BuildConfig.COMMUNITY_ENABLED || eu.kanade.tachiyomi.BuildConfig.PERSONAL_SYNC_ENABLED
+    ) {
+        createDevicePlayer()
+    } else {
+        null
+    }
+    private fun createDevicePlayer() = object : eu.kanade.tachiyomi.data.community.DeviceHandoff.Player {
         override fun snapshot(): eu.kanade.tachiyomi.data.community.DevicePlayback? {
             if (activity.player.isExiting ||
                 incognitoMode ||
@@ -370,6 +377,7 @@ class PlayerViewModel @JvmOverloads constructor(
         }
     }
     fun onDevicePlaybackReady() {
+        val devicePlayer = devicePlayer ?: return
         deviceResumeAllowed = true
         eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.attachPlayer(devicePlayer)
         if (!incognitoMode) {
@@ -386,6 +394,7 @@ class PlayerViewModel @JvmOverloads constructor(
         }
     }
     fun detachDevicePlayback() {
+        val devicePlayer = devicePlayer ?: return
         deviceResumeAllowed = false
         eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.handoff?.detach(devicePlayer)
         eu.kanade.tachiyomi.data.community.CommunityManager.existing()?.clearActivity(this)

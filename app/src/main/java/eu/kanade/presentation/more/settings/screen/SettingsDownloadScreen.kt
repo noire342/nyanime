@@ -118,13 +118,13 @@ object SettingsDownloadScreen : SearchableSettings {
                     Preference.PreferenceItem.SwitchPreference(
                         preference = downloadPreferences.ultraOnlyWhileCharging(),
                         title = "Elabora solo sotto carica",
-                        subtitle = "Si applica alle nuove elaborazioni",
+                        subtitle = "Facoltativo: senza questo limite Ultra può lavorare anche a batteria",
                     ),
                     Preference.PreferenceItem.SwitchPreference(
                         preference = downloadPreferences.ultraOnlyWhileScreenOff(),
                         title = "Elabora solo a schermo spento",
-                        subtitle = "Consigliato: lascia il telefono libero mentre lo usi. " +
-                            "I segmenti completati vengono conservati.",
+                        subtitle = "Facoltativo: a schermo acceso Ultra lavora con carico ridotto. " +
+                            "Le modifiche valgono anche per le elaborazioni in attesa.",
                     ),
                     Preference.PreferenceItem.TextPreference(
                         title = "Elaborazioni Ultra",

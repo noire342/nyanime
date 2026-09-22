@@ -1,8 +1,23 @@
 # I miei dispositivi
 
-Il sync personale è facoltativo e inizialmente spento. Si configura in
-**Impostazioni → I miei dispositivi**, sia con ModernUI sia con l’interfaccia legacy.
-Non richiede un profilo pubblico e non riattiva community, chat o amicizie.
+## Stato: dormiente
+
+Il sync personale è temporaneamente disattivato in tutte le varianti dell’app.
+La voce **I miei dispositivi** non compare nelle impostazioni, né in ModernUI né
+nella UI legacy. Anche un dispositivo configurato in precedenza non avvia
+connessioni, raccolta delle modifiche o trasferimenti della riproduzione.
+L’aggiornamento elimina chiavi dal Keystore, identità cifrate (incluse copie atomiche),
+database privati e file SQLite temporanei, opt-in salvato e code del sync.
+Non cancella la libreria, i punti di ripresa locali o i download.
+Le stanze video e manga sono indipendenti e attive.
+
+`personalSyncEnabled` in `app/build.gradle.kts` controlla
+`BuildConfig.PERSONAL_SYNC_ENABLED`. Il ripristino di una vecchia schermata di navigazione
+mostra le impostazioni generali senza inizializzare il sync. Le istruzioni sotto
+documentano i sorgenti dormienti nel repository, **non una funzione accessibile nella versione attuale**.
+Il codice inutilizzato viene eliminato dall’APK dalla build ottimizzata.
+Una futura riattivazione richiederà un nuovo collegamento e migrazioni che ripristinino
+le strutture di raccolta delle modifiche, senza riutilizzare la vecchia identità cancellata.
 
 ## Collegare due telefoni o tablet
 

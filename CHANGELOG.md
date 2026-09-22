@@ -8,6 +8,16 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 22 settembre 2026 — Sync disattivato e avvio Ultra più accessibile
+
+- Sync personale rimosso dalle impostazioni e disattivato anche sulle installazioni
+  già configurate. Pulizia automatica di chiavi, archivi privati e code di sync/community;
+  librerie, progressi locali, download e stanze restano disponibili.
+- Codice social e sync inutilizzato escluso dall’APK ottimizzato.
+- Ultra può elaborare a schermo acceso e a batteria; le due restrizioni diventano
+  facoltative. Soglie termiche meno prudenti, carico GPU ancora dosato e attese
+  ricontrollate senza accumulare ritardi crescenti. Aggiornamento delle code esistenti.
+
 ## r8200 — Guarda insieme e controlli del player
 
 Riferimenti: `bc660e1b0`, `7ee9e9a4f`, `51d484a1e`, `83115106a`.

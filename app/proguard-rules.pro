@@ -6,7 +6,8 @@
     public java.lang.String getHomePresentation();
 }
 
--keep,allowoptimization class eu.kanade.**
+# Retired social/sync code is not an extension API. Let R8 remove it while retaining the cleanup paths.
+-keep,allowoptimization class !eu.kanade.tachiyomi.data.community.**,!eu.kanade.tachiyomi.ui.community.**,!eu.kanade.presentation.more.settings.screen.SettingsPersonalSyncScreenKt*,!eu.kanade.presentation.more.settings.screen.SettingsPersonalSyncScreen$*,!eu.kanade.tachiyomi.ui.player.PlayerViewModel$createDevicePlayer$*,eu.kanade.**
 -keep,allowoptimization class tachiyomi.**
 -keep,allowoptimization class mihon.**
 
@@ -75,11 +76,11 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
--keep,includedescriptorclasses class eu.kanade.**$$serializer { *; }
--keepclassmembers class eu.kanade.** {
+-keep,includedescriptorclasses class !eu.kanade.tachiyomi.data.community.**,eu.kanade.**$$serializer { *; }
+-keepclassmembers class !eu.kanade.tachiyomi.data.community.**,eu.kanade.** {
     *** Companion;
 }
--keepclasseswithmembers class eu.kanade.** {
+-keepclasseswithmembers class !eu.kanade.tachiyomi.data.community.**,eu.kanade.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
 
