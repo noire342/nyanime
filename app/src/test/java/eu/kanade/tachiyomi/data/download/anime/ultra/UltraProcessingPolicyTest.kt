@@ -12,19 +12,23 @@ class UltraProcessingPolicyTest {
     )
 
     @Test
-    fun `moderate pressure pauses before severe and resumes only after cooling`() {
+    fun `ordinary warmth and moderate pressure no longer starve the queue`() {
         val policy = UltraProcessingPolicy()
-        assertEquals(UltraProcessingPolicy.COOLING, policy.waitingReason(cool.copy(thermalStatus = 2)))
-        assertEquals(UltraProcessingPolicy.COOLING, policy.waitingReason(cool.copy(batteryCelsius = 37.5f)))
-        assertEquals(UltraProcessingPolicy.COOLING, policy.waitingReason(cool.copy(thermalHeadroom = 0.7f)))
-        assertNull(policy.waitingReason(cool))
+        assertNull(
+            policy.waitingReason(
+                cool.copy(thermalStatus = 2, batteryCelsius = 41f, thermalHeadroom = 0.85f),
+            ),
+        )
+        assertEquals(UltraProcessingPolicy.COOLING, policy.waitingReason(cool.copy(thermalStatus = 3)))
+        assertEquals(UltraProcessingPolicy.COOLING, policy.waitingReason(cool.copy(batteryCelsius = 43f)))
+        assertEquals(UltraProcessingPolicy.COOLING, policy.waitingReason(cool.copy(thermalHeadroom = 0.95f)))
+        assertNull(policy.waitingReason(cool.copy(thermalStatus = 2, batteryCelsius = 42f, thermalHeadroom = 0.9f)))
     }
 
     @Test
-    fun `resuming a warm suspended job does not bypass cooling hysteresis`() {
+    fun `previously suspended job can restart warm instead of waiting for a cold phone`() {
         val policy = UltraProcessingPolicy(cooling = true)
-        assertEquals(UltraProcessingPolicy.COOLING, policy.waitingReason(cool.copy(batteryCelsius = 38f)))
-        assertNull(policy.waitingReason(cool.copy(batteryCelsius = 36.5f)))
+        assertNull(policy.waitingReason(cool.copy(batteryCelsius = 40f, thermalStatus = 2, thermalHeadroom = 0.85f)))
     }
 
     @Test
@@ -35,14 +39,14 @@ class UltraProcessingPolicyTest {
     }
 
     @Test
-    fun `battery sensor and thermal forecast independently stop an export`() {
+    fun `severe heat signals independently stop an export even when plugged in`() {
         assertEquals(
             UltraProcessingPolicy.COOLING,
-            UltraProcessingPolicy().waitingReason(cool.copy(batteryCelsius = 39f)),
+            UltraProcessingPolicy().waitingReason(cool.copy(batteryCelsius = 45f)),
         )
         assertEquals(
             UltraProcessingPolicy.COOLING,
-            UltraProcessingPolicy().waitingReason(cool.copy(thermalHeadroom = 0.8f)),
+            UltraProcessingPolicy().waitingReason(cool.copy(thermalHeadroom = 1f)),
         )
         assertNull(UltraProcessingPolicy().waitingReason(cool.copy(batteryCelsius = null, thermalHeadroom = Float.NaN)))
     }
@@ -58,15 +62,21 @@ class UltraProcessingPolicyTest {
     }
 
     @Test
-    fun `unplugging and energy saving suspend active work`() {
+    fun `only explicitly selected charging or critically low battery defers work`() {
         assertEquals(UltraProcessingPolicy.CHARGING, UltraProcessingPolicy().waitingReason(cool.copy(charging = false)))
         assertEquals(
             UltraProcessingPolicy.BATTERY,
             UltraProcessingPolicy().waitingReason(
-                cool.copy(charging = false, chargingOnly = false, batteryPercent = 29),
+                cool.copy(charging = false, chargingOnly = false, batteryPercent = 14),
             ),
         )
-        assertEquals(UltraProcessingPolicy.BATTERY, UltraProcessingPolicy().waitingReason(cool.copy(powerSave = true)))
+        assertNull(UltraProcessingPolicy().waitingReason(cool.copy(powerSave = true)))
+        assertNull(
+            UltraProcessingPolicy().waitingReason(
+                cool.copy(charging = false, chargingOnly = false, batteryPercent = 15, powerSave = true),
+            ),
+        )
+        assertNull(UltraProcessingPolicy().waitingReason(cool.copy(batteryPercent = 5)))
     }
 
     @Test

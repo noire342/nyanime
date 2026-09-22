@@ -112,6 +112,14 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         val scope = ProcessLifecycleOwner.get().lifecycleScope
         scope.launch(Dispatchers.IO) {
             eu.kanade.tachiyomi.data.community.CommunityDormancy.stopBackgroundWork(this@App)
+            eu.kanade.tachiyomi.data.community.CommunityDormancy.cleanObsoleteData(this@App)
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                eu.kanade.tachiyomi.data.download.anime.ultra.UltraDownloads.refreshPolicy(this@App)
+            } catch (error: Exception) {
+                logcat(LogPriority.WARN, error) { "Unable to refresh pending Ultra work" }
+            }
         }
 
         // Show notification to disable Incognito Mode when it's enabled

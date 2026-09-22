@@ -2,6 +2,7 @@
 
 package eu.kanade.tachiyomi.data.community
 
+import eu.kanade.tachiyomi.BuildConfig
 import tachiyomi.data.handlers.anime.AnimeDatabaseHandler
 import tachiyomi.data.handlers.manga.MangaDatabaseHandler
 import uy.kohesive.injekt.Injekt
@@ -14,7 +15,7 @@ internal class LibrarySyncBridge(
     private val manga: MangaDatabaseHandler = Injekt.get(),
 ) {
     suspend fun capture(enabled: Boolean) {
-        val capture = if (enabled) 1L else 0L
+        val capture = if (enabled && (BuildConfig.COMMUNITY_ENABLED || BuildConfig.PERSONAL_SYNC_ENABLED)) 1L else 0L
         anime.await { communitySyncQueries.capture(capture) }
         manga.await { communitySyncQueries.capture(capture) }
     }

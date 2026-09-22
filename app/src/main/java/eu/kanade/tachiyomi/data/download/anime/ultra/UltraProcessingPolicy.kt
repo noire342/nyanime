@@ -1,6 +1,6 @@
 package eu.kanade.tachiyomi.data.download.anime.ultra
 
-/** Conservative admission and hysteresis. Independent of codecs, Android and the player. */
+/** Allow ordinary warmth with paced GPU work; stop on severe pressure, with restart hysteresis. */
 internal class UltraProcessingPolicy(private var cooling: Boolean = false) {
     data class Environment(
         val interactive: Boolean,
@@ -19,16 +19,16 @@ internal class UltraProcessingPolicy(private var cooling: Boolean = false) {
     fun waitingReason(value: Environment): String? {
         val temperature = value.batteryCelsius
         val headroom = value.thermalHeadroom?.takeIf { it.isFinite() }
-        if (value.thermalStatus >= 2 ||
-            (temperature != null && temperature >= 39f) ||
-            (headroom != null && headroom >= 0.8f)
+        if (value.thermalStatus >= 3 ||
+            (temperature != null && temperature >= 45f) ||
+            (headroom != null && headroom >= 1f)
         ) {
             cooling = true
         }
         if (cooling) {
-            val cool = value.thermalStatus <= 1 &&
-                (temperature == null || temperature <= 36.5f) &&
-                (headroom == null || headroom < 0.65f)
+            val cool = value.thermalStatus <= 2 &&
+                (temperature == null || temperature <= 42f) &&
+                (headroom == null || headroom <= 0.9f)
             if (!cool) return COOLING
             cooling = false
         }
@@ -37,7 +37,7 @@ internal class UltraProcessingPolicy(private var cooling: Boolean = false) {
             value.lowMemory -> MEMORY
             value.screenOffOnly && value.interactive -> SCREEN
             value.chargingOnly && !value.charging -> CHARGING
-            value.powerSave || (!value.charging && (value.batteryPercent ?: 100) < 30) -> BATTERY
+            !value.charging && (value.batteryPercent ?: 100) < 15 -> BATTERY
             else -> null
         }
     }
@@ -47,7 +47,7 @@ internal class UltraProcessingPolicy(private var cooling: Boolean = false) {
         const val PLAYER = "In attesa della fine della riproduzione"
         const val SCREEN = "In attesa dello schermo spento"
         const val CHARGING = "In attesa del caricatore"
-        const val BATTERY = "In attesa di batteria sufficiente · risparmio energetico disattivato"
+        const val BATTERY = "In attesa di almeno il 15% di batteria o del caricatore"
         const val MEMORY = "In attesa di memoria libera sul telefono"
 
         /** Small strips keep individual GPU submissions bounded without changing texture coordinates. */

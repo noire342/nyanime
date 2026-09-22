@@ -35,11 +35,15 @@ internal class UltraProcessingControl(
         val status = if (Build.VERSION.SDK_INT >= 29) power.currentThermalStatus else 0
         val now = SystemClock.elapsedRealtime()
         val headroom = if (Build.VERSION.SDK_INT >= 30) {
-            thermalHeadroom.sample(now) { power.getThermalHeadroom(30) }
+            thermalHeadroom.sample(now) { power.getThermalHeadroom(0) }
         } else {
             null
         }
-        interactiveOrWarm = power.isInteractive || status >= 1 || (temperature ?: 0f) >= 37f
+        interactiveOrWarm = power.isInteractive ||
+            power.isPowerSaveMode ||
+            status >= 1 ||
+            (temperature ?: 0f) >= 37f ||
+            (headroom ?: 0f) >= 0.8f
         val memory = ActivityManager.MemoryInfo()
         context.getSystemService(ActivityManager::class.java).getMemoryInfo(memory)
         waitingReason = policy.waitingReason(
@@ -54,7 +58,7 @@ internal class UltraProcessingControl(
                 thermalStatus = status,
                 thermalHeadroom = headroom,
                 powerSave = power.isPowerSaveMode,
-                lowMemory = memory.lowMemory || memory.availMem < minOf(memory.totalMem / 5, 768L * 1024 * 1024),
+                lowMemory = memory.lowMemory,
             ),
         )
         return waitingReason

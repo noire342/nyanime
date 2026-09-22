@@ -1959,14 +1959,22 @@ class CommunityManager private constructor(
         internal fun hasPersonalIdentity(
             context: Context,
         ) = File(context.noBackupFilesDir, PersonalSyncPolicy.VAULT).exists()
-        internal fun existing(): CommunityManager? = personalInstance?.takeIf {
-            Injekt.get<BasePreferences>().personalSyncEnabled().get()
-        } ?: if (BuildConfig.COMMUNITY_ENABLED) instance else null
+        internal fun existing(): CommunityManager? {
+            if (BuildConfig.PERSONAL_SYNC_ENABLED) {
+                personalInstance?.takeIf {
+                    Injekt.get<BasePreferences>().personalSyncEnabled().get()
+                }?.let { return it }
+            }
+            return if (BuildConfig.COMMUNITY_ENABLED) instance else null
+        }
 
         /** Called only after an explicit setup action, or for a previously configured device. */
-        internal fun personal(context: Context): CommunityManager = personalInstance ?: synchronized(this) {
-            personalInstance
-                ?: CommunityManager(context.applicationContext, personalOnly = true).also { personalInstance = it }
+        internal fun personal(context: Context): CommunityManager {
+            check(BuildConfig.PERSONAL_SYNC_ENABLED) { "Personal sync is dormant in this build" }
+            return personalInstance ?: synchronized(this) {
+                personalInstance
+                    ?: CommunityManager(context.applicationContext, personalOnly = true).also { personalInstance = it }
+            }
         }
         fun get(context: Context): CommunityManager {
             check(BuildConfig.COMMUNITY_ENABLED) { "Community is dormant in this build" }
@@ -1976,10 +1984,12 @@ class CommunityManager private constructor(
                 }
         }
         fun lifecycle(context: Context, foreground: Boolean) {
-            if (Injekt.get<BasePreferences>().personalSyncEnabled().get()) {
-                personal(context).onForeground(foreground)
-            } else {
-                personalInstance?.onForeground(foreground)
+            if (BuildConfig.PERSONAL_SYNC_ENABLED) {
+                if (Injekt.get<BasePreferences>().personalSyncEnabled().get()) {
+                    personal(context).onForeground(foreground)
+                } else {
+                    personalInstance?.onForeground(foreground)
+                }
             }
             if (!BuildConfig.COMMUNITY_ENABLED) return
             if (instance != null ||

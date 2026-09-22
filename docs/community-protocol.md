@@ -4,19 +4,27 @@
 
 La community è disattivata in tutte le varianti dell’app. Profili, amicizie,
 bacheche, feed, chat, gruppi sociali e presenza non sono accessibili. Non vengono
-aperte connessioni sociali. I dati locali esistenti sono conservati.
-Il [sync personale](personal-sync.md) è disponibile separatamente e solo dopo
-la configurazione esplicita in Impostazioni → I miei dispositivi.
+aperte connessioni sociali. L’aggiornamento rimuove dal telefono le identità e le
+relative chiavi Keystore, database privati (inclusi journal/WAL), bozze immagini,
+notifiche e canali obsoleti. Libreria, download, progressi locali e stanze sono preservati.
+Anche il [sync personale](personal-sync.md) è dormiente, compresi i dispositivi
+configurati in precedenza; non compare nelle impostazioni.
 
 Le stanze Guarda e leggi insieme restano attive e indipendenti: usano un codice
 o link d’invito e chiavi temporanee, senza richiedere un profilo.
 
-Il codice seguente è mantenuto per una futura riattivazione. Il gate unico
-`communityEnabled` in `app/build.gradle.kts` controlla `BuildConfig.COMMUNITY_ENABLED`
-e i componenti Android. A ogni apertura dei database la cattura delle modifiche
-dipende dall’opt-in personale e dall’incognito; all’avvio vengono ritirate solo le notifiche della community.
-Una futura riattivazione richiederà anche di verificare la riconciliazione delle
-modifiche locali avvenute durante la sospensione prima di riprendere gli invii.
+Il codice seguente è mantenuto per una futura riattivazione. Il gate
+`communityEnabled` in `app/build.gradle.kts` controlla `BuildConfig.COMMUNITY_ENABLED`;
+`personalSyncEnabled` controlla separatamente il sync personale.
+I componenti Android della community sono rimossi dal manifest per consentire
+alla build ottimizzata di eliminare il codice non usato dall’APK.
+Con entrambi disattivati, a ogni apertura dei database la cattura delle modifiche
+viene spenta prima delle scritture della libreria, senza leggere identità o preferenze del sync.
+I trigger di raccolta, le code e le associazioni di categoria del solo sync vengono rimossi.
+Le tabelle di schema restano vuote per compatibilità con le versioni del database installate.
+La pulizia di file e chiavi è ripetibile e i fallimenti vengono registrati e ritentati al prossimo avvio.
+Una futura riattivazione richiederà nuove identità, migrazioni di ripristino della raccolta
+e la registrazione dei componenti Android, oltre alle verifiche del protocollo.
 
 ## Profili e contenuti pubblici
 

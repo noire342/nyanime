@@ -46,6 +46,7 @@ import eu.kanade.presentation.more.settings.screen.about.AboutScreen
 import eu.kanade.presentation.more.settings.widget.TextPreferenceWidget
 import eu.kanade.presentation.util.LocalBackPress
 import eu.kanade.presentation.util.Screen
+import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.ui.setting.PlayerSettingsScreen
 import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.i18n.MR
@@ -110,7 +111,7 @@ object SettingsMainScreen : Screen() {
                     items.indexOfFirst { it.screen::class == navigator.items.first()::class }
                         .also {
                             LaunchedEffect(Unit) {
-                                state.animateScrollToItem(it)
+                                state.animateScrollToItem(it.coerceAtLeast(0))
                                 if (it > 0) {
                                     // Lift scroll
                                     topBarState.contentOffset = topBarState.heightOffsetLimit
@@ -176,13 +177,17 @@ object SettingsMainScreen : Screen() {
         val screen: VoyagerScreen,
     )
 
-    private val items = listOf(
-        Item(
-            titleRes = AYMR.strings.personal_sync_title,
-            subtitleRes = AYMR.strings.personal_sync_summary,
-            icon = Icons.Outlined.Devices,
-            screen = SettingsPersonalSyncScreen,
-        ),
+    private val items = listOfNotNull(
+        if (BuildConfig.PERSONAL_SYNC_ENABLED) {
+            Item(
+                titleRes = AYMR.strings.personal_sync_title,
+                subtitleRes = AYMR.strings.personal_sync_summary,
+                icon = Icons.Outlined.Devices,
+                screen = SettingsPersonalSyncScreen,
+            )
+        } else {
+            null
+        },
         Item(
             titleRes = MR.strings.pref_category_appearance,
             subtitleRes = MR.strings.pref_appearance_summary,

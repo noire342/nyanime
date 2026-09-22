@@ -44,6 +44,7 @@ import eu.kanade.domain.base.BasePreferences
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.util.LocalBackPress
 import eu.kanade.presentation.util.Screen
+import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.data.community.CommunityManager
 import eu.kanade.tachiyomi.data.community.CommunityState
 import eu.kanade.tachiyomi.data.community.SyncRecord
@@ -64,6 +65,11 @@ import java.util.Date
 object SettingsPersonalSyncScreen : Screen() {
     @Composable
     override fun Content() {
+        if (!BuildConfig.PERSONAL_SYNC_ENABLED) {
+            // A saved navigation stack from an older APK must not reopen the sync runtime.
+            SettingsMainScreen.Content()
+            return
+        }
         val context = LocalContext.current
         val preferences = remember { Injekt.get<BasePreferences>() }
         val configured by preferences.personalSyncEnabled().collectAsState()

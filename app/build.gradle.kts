@@ -14,8 +14,9 @@ plugins {
 
 shortcutHelper.setFilePath("./shortcuts.xml")
 
-// Release gate: keep community code and local data dormant. Watch/reading rooms are independent.
+// Release gates: dormant sources are retained; obsolete on-device data is purged. Rooms are independent.
 val communityEnabled = false
+val personalSyncEnabled = false
 
 android {
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
@@ -32,7 +33,7 @@ android {
         buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLastCommitTime = false)}\"")
         buildConfigField("boolean", "UPDATER_ENABLED", "${Config.enableUpdater}")
         buildConfigField("boolean", "COMMUNITY_ENABLED", communityEnabled.toString())
-        manifestPlaceholders["communityEnabled"] = communityEnabled.toString()
+        buildConfigField("boolean", "PERSONAL_SYNC_ENABLED", personalSyncEnabled.toString())
 
         // Put these fields in acra.properties
         // val acraProperties = Properties()

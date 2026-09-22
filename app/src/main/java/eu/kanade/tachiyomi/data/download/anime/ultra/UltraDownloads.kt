@@ -6,12 +6,14 @@ import androidx.core.net.toUri
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.hippo.unifile.UniFile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -180,23 +182,7 @@ internal object UltraDownloads {
             val old = store.tasks.value[task.key]
             if (!replace && (old?.active == true || old?.phase == UltraPhase.READY)) return@withLock
             val preferences = Injekt.get<DownloadPreferences>()
-            val work = OneTimeWorkRequestBuilder<UltraDownloadWorker>()
-                .addTag(UltraDownloadWorker.TAG)
-                .addTag("ultra-journal-v1")
-                .addTag("ultra-title:${task.title}")
-                .addTag("ultra-folder:${task.folder}")
-                .setInputData(
-                    workDataOf(
-                        UltraDownloadWorker.FOLDER to task.folder,
-                        UltraDownloadWorker.TITLE to task.title,
-                    ),
-                )
-                .setConstraints(
-                    Constraints.Builder().setRequiresCharging(preferences.ultraOnlyWhileCharging().get())
-                        .setRequiresBatteryNotLow(true).setRequiresStorageNotLow(true).build(),
-                )
-                .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.SECONDS)
-                .build()
+            val work = request(task)
             val reason = UltraProcessingControl(context, preferences, cooling = old?.coolingRequired == true).sample()
             store.change(task.key) {
                 (it ?: task).copy(
@@ -217,6 +203,76 @@ internal object UltraDownloads {
                     it.copy(phase = UltraPhase.FAILED, message = "Impossibile mettere Ultra in coda. Riprova.")
                 }
                 throw error
+            }
+        }
+    }
+
+    private fun request(task: UltraTask, delaySeconds: Long = 0): OneTimeWorkRequest =
+        OneTimeWorkRequestBuilder<UltraDownloadWorker>()
+            .addTag(UltraDownloadWorker.TAG)
+            .addTag("ultra-journal-v1")
+            .addTag(UltraScheduling.POLICY_TAG)
+            .addTag("ultra-title:${task.title}")
+            .addTag("ultra-folder:${task.folder}")
+            .setInputData(
+                workDataOf(
+                    UltraDownloadWorker.FOLDER to task.folder,
+                    UltraDownloadWorker.TITLE to task.title,
+                ),
+            )
+            // Charging/screen preferences are sampled live, including for existing waiting jobs.
+            .setConstraints(Constraints.Builder().setRequiresStorageNotLow(true).build())
+            .setInitialDelay(delaySeconds, TimeUnit.SECONDS)
+            .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.SECONDS)
+            .build()
+
+    suspend fun defer(context: Context, key: String, workerId: String) = withContext(Dispatchers.IO) {
+        commands.withLock {
+            val store = UltraTaskStore.get(context)
+            val task = store.tasks.value[key]?.takeIf { it.active && it.workId == workerId } ?: return@withLock
+            val next = request(task, UltraScheduling.RECHECK_SECONDS)
+            withContext(NonCancellable) {
+                UltraScheduling.handOff(store, key, workerId, next.id.toString()) {
+                    WorkManager.getInstance(context).enqueueUniqueWork(
+                        "${UltraDownloadWorker.TAG}:$key",
+                        ExistingWorkPolicy.APPEND_OR_REPLACE,
+                        next,
+                    ).result.await()
+                }
+            }
+        }
+    }
+
+    /** Upgrade pending work as well as defaults; keep saved segments and explicit user pauses. */
+    suspend fun refreshPolicy(context: Context) = withContext(Dispatchers.IO) {
+        val store = UltraTaskStore.get(context)
+        store.load()
+        val workManager = WorkManager.getInstance(context)
+        for (job in workManager.getWorkInfosByTag(UltraDownloadWorker.TAG).await()) {
+            val task = store.tasks.value.values.firstOrNull { it.workId == job.id.toString() } ?: continue
+            if (!UltraScheduling.needsRefresh(
+                    task,
+                    job.id.toString(),
+                    job.tags,
+                    job.state == WorkInfo.State.RUNNING,
+                    job.state.isFinished,
+                )
+            ) {
+                continue
+            }
+            commands.withLock {
+                val current = store.tasks.value[task.key]
+                    ?.takeIf { it.active && it.workId == task.workId } ?: return@withLock
+                val next = request(current)
+                withContext(NonCancellable) {
+                    UltraScheduling.handOff(store, current.key, current.workId, next.id.toString()) {
+                        workManager.enqueueUniqueWork(
+                            "${UltraDownloadWorker.TAG}:${current.key}",
+                            ExistingWorkPolicy.REPLACE,
+                            next,
+                        ).result.await()
+                    }
+                }
             }
         }
     }

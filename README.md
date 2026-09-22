@@ -28,12 +28,11 @@ disabilitare per tornare all'interfaccia legacy. Il tema manga resta indipendent
 | **Player curato** | Usa tracce audio e sottotitoli, gesti, PiP, AniSkip, timer di sospensione e passaggio al prossimo episodio. |
 | **Manga completo** | Mantieni libreria e lettore legacy, con Home opzionali, aggiornamenti dei capitoli e tutte le modalità di lettura. |
 
-Il **sync personale** si configura soltanto in [Impostazioni → I miei dispositivi](docs/personal-sync.md):
-QR temporaneo, ripresa di anime e manga e chiave di recupero protetta. È spento di default.
-
-Profili, amicizie, feed, chat e presenza social sono
+Il [sync tra dispositivi](docs/personal-sync.md), profili, amicizie, feed, chat e presenza social sono
 temporaneamente disattivati e non compaiono nell’app. Il codice e i dati locali
-restano conservati. Le stanze video e manga funzionano senza un profilo:
+obsoleti vengono rimossi dall’APK e dal telefono: all’avvio vengono eliminati chiavi,
+archivi privati, bozze e code delle funzioni disattivate. Nessuna connessione o raccolta di progressi per il sync viene avviata,
+anche sui dispositivi configurati in precedenza. Le stanze video e manga funzionano senza un profilo:
 si crea una stanza e si condivide il suo codice o link.
 [Documentazione della community dormiente](docs/community-protocol.md).
 
