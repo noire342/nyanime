@@ -10,15 +10,15 @@ object ApplicationReleaseAssets {
             val name = asset.name
             val abi = when {
                 name == "app-universal-preview.apk" -> "universal"
-                name.removePrefix("aniyomi-").removeSuffix(".apk").matches(stableTag) &&
-                    name.startsWith("aniyomi-") &&
+                name.removePrefix("Nyanime-").removeSuffix(".apk").matches(stableTag) &&
+                    name.startsWith("Nyanime-") &&
                     name.endsWith(".apk") -> "universal"
                 else -> abis.firstOrNull { abi ->
                     name == "app-" + abi + "-preview.apk" ||
                         (
-                            name.startsWith("aniyomi-" + abi + "-") &&
+                            name.startsWith("Nyanime-" + abi + "-") &&
                                 name.endsWith(".apk") &&
-                                name.removePrefix("aniyomi-" + abi + "-").removeSuffix(".apk").matches(stableTag)
+                                name.removePrefix("Nyanime-" + abi + "-").removeSuffix(".apk").matches(stableTag)
                             )
                 } ?: return@mapNotNull null
             }

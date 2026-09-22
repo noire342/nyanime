@@ -7,20 +7,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun LinkIcon(
     label: String,
     icon: ImageVector,
-    url: String,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val uriHandler = LocalUriHandler.current
     IconButton(
         modifier = modifier.padding(4.dp),
-        onClick = { uriHandler.openUri(url) },
+        onClick = onClick,
     ) {
         Icon(
             imageVector = icon,

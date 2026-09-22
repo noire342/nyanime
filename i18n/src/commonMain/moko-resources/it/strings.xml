@@ -347,6 +347,8 @@
     <string name="manga_info_collapse">Meno</string>
     <string name="manga_info_expand">Altro</string>
     <string name="licenses">Licenze open source</string>
+    <string name="library_licenses">Licenze delle librerie</string>
+    <string name="feature_not_yet_available">Funzione non ancora abilitata</string>
     <string name="website">Sito web</string>
     <string name="restoring_backup_canceled">Ripristino cancellato</string>
     <string name="restoring_backup_error">Ripristino backup fallito</string>

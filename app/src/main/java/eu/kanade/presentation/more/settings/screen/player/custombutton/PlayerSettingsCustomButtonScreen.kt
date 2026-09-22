@@ -41,7 +41,9 @@ object PlayerSettingsCustomButtonScreen : Screen() {
 
         CustomButtonScreen(
             state = successState,
-            onClickFAQ = { uriHandler.openUri("https://aniyomi.org/docs/guides/player-settings/custom-buttons") },
+            onClickFAQ = {
+                uriHandler.openUri("https://github.com/noire342/nyanime/blob/main/docs/support.md#pulsanti-del-player")
+            },
             onClickCreate = { screenModel.showDialog(CustomButtonDialog.Create) },
             onClickPrimary = { screenModel.togglePrimaryButton(it) },
             onClickEdit = { screenModel.showDialog(CustomButtonDialog.Edit(it)) },
