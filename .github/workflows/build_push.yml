@@ -90,11 +90,9 @@ jobs:
               echo "::error::Wrong signing certificate for $apk: $actual"
               exit 1
             fi
-            if [[ "$abi" == universal ]]; then
-              cp "$apk" "dist/Nyanime-${tag}.apk"
-            else
-              cp "$apk" "dist/Nyanime-${abi}-${tag}.apk"
-            fi
+            # Older Nyanime previews recognize these stable names; the release tag
+            # carries the version and lets every installed preview upgrade directly.
+            cp "$apk" "dist/app-${abi}-preview.apk"
           done
           (cd dist && sha256sum *.apk > SHA256SUMS)
 
