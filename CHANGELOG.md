@@ -8,14 +8,25 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 23 settembre 2026 — Licenze, aiuto e aggiornamenti OTA
+
+- Nella Home moderna, logo, Stanze e Cerca restano sulla stessa riga anche sugli
+  schermi stretti; il pulsante Cerca mantiene la sua forma a pillola.
+- La pagina delle licenze delle librerie usa un elenco compatibile con la versione
+  Compose dell'app, con ricerca e dettaglio della licenza, evitando il crash.
+- Il pulsante Aiuto e le guide collegate aprono la documentazione Nyanime.
+- La schermata di aggiornamento mostra le novità di questa release, prese dal
+  changelog, anziché istruzioni tecniche per scegliere un APK.
+- Gli APK delle nuove release mantengono nomi riconosciuti anche dalle versioni
+  già installate, per consentire l'aggiornamento OTA diretto.
+
 ## 23 settembre 2026 — Link Nyanime e aggiornamenti OTA
 
 - I pulsanti Sito web, Discord e GitHub nella schermata Info mostrano un avviso
   finché i relativi canali non saranno disponibili; rimossa la voce per tradurre.
-- Licenze e privacy aprono i documenti di questo repository. Guide e collegamenti
-  di aiuto nell'app non inviano più alle pagine di assistenza del progetto upstream.
+- Licenze e privacy aprono i documenti di questo repository.
 - Le release preview firmate vengono pubblicate automaticamente da `main` con APK
-  Nyanime per ogni architettura, riattivando la verifica degli aggiornamenti OTA.
+  per ogni architettura, riattivando la verifica degli aggiornamenti OTA.
 - Supporto alle estensioni video con versione 17 della libreria, conservando le
   versioni precedenti e gli identificatori tecnici necessari alla compatibilità.
 

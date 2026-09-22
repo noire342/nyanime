@@ -8,6 +8,10 @@ Controlla la connessione, aggiorna la fonte interessata e riprova una volta. Se 
 
 Un aggiornamento di molti titoli può richiedere tempo ed essere limitato dalla fonte. Riduci il numero di elementi aggiornati contemporaneamente o riprova più tardi. L'avviso non indica necessariamente un errore nella libreria.
 
+## Uscite in arrivo
+
+Il calendario delle uscite dipende dai dati forniti dalle fonti installate. Se un titolo non compare o una data è errata, aggiorna la fonte e controlla la pagina del titolo. Il calendario non garantisce la disponibilità immediata di un episodio o capitolo.
+
 ## Archiviazione
 
 Per cambiare cartella usa **Impostazioni → Dati e archiviazione**. Verifica che Android conceda accesso alla cartella scelta. Prima di spostare o eliminare dati, crea un backup e controlla separatamente i download: il backup della libreria non contiene i video o le pagine scaricati.

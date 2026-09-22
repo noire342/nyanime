@@ -311,6 +311,7 @@ dependencies {
     implementation(libs.insetter)
     implementation(libs.bundles.richtext)
     implementation(libs.aboutLibraries.compose)
+    implementation(libs.aboutLibraries.core)
     implementation(libs.bundles.voyager)
     implementation(libs.compose.materialmotion)
     implementation(libs.swipe)

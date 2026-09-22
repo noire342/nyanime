@@ -39,7 +39,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -81,35 +80,19 @@ fun DiscoveryHomeHeader(
     }
     Surface(modifier = Modifier.posterForeground(zIndex = 3f), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.statusBarsPadding()) {
-            BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                // Keep the wordmark and touch targets intact on narrow screens and with large text.
-                val stacked = maxWidth < 356.dp ||
-                    LocalDensity.current.fontScale > 1.15f ||
-                    (onBack != null && maxWidth < 416.dp)
-                Column {
-                    Row(
-                        Modifier.fillMaxWidth().heightIn(min = 60.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (onBack != null) {
-                            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
-                        }
-                        SourceHomeWordmark(
-                            logo,
-                            Modifier.weight(1f).padding(start = 4.dp),
-                            refreshKey = artworkRefreshKey,
-                        )
-                        if (!stacked) HomeHeaderActions(onSearch, selectedHome, homes)
-                    }
-                    if (stacked) {
-                        HomeHeaderActions(
-                            onSearch,
-                            selectedHome,
-                            homes,
-                            Modifier.align(Alignment.End).padding(bottom = 4.dp),
-                        )
-                    }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp).heightIn(min = 60.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
                 }
+                SourceHomeWordmark(
+                    logo,
+                    Modifier.weight(1f).padding(start = 4.dp),
+                    refreshKey = artworkRefreshKey,
+                )
+                HomeHeaderActions(onSearch, selectedHome, homes)
             }
             HomeContentSwitch(selectedHome, homes, onSelect)
         }
@@ -121,16 +104,16 @@ private fun HomeHeaderActions(
     onSearch: (() -> Unit)?,
     selectedHome: String?,
     homes: List<SourceHomeGroup>,
-    modifier: Modifier = Modifier,
 ) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
         if (onSearch != null) {
+            val description = "Cerca " + (homes.firstOrNull { it.id == selectedHome }?.title ?: "anime")
             Surface(
                 onClick = onSearch,
                 modifier = Modifier.widthIn(min = 96.dp).heightIn(min = 48.dp).semantics {
                     role = Role.Button
-                    contentDescription = "Cerca " + (homes.firstOrNull { it.id == selectedHome }?.title ?: "anime")
+                    contentDescription = description
                 },
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
