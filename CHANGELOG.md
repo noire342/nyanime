@@ -10,6 +10,7 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 
 ## 23 settembre 2026 — Licenze, aiuto e aggiornamenti OTA
 
+- La testata Info ora mostra il marchio Nyanime senza lo spazio vuoto sopra l'icona.
 - Nella Home moderna, logo, Stanze e Cerca restano sulla stessa riga anche sugli
   schermi stretti; il pulsante Cerca mantiene la sua forma a pillola.
 - La pagina delle licenze delle librerie usa un elenco compatibile con la versione
