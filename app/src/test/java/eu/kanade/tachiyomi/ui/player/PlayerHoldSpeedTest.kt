@@ -15,13 +15,13 @@ class PlayerHoldSpeedTest {
             speed = it
             writes.add(it)
         }
-        assertTrue(hold.start())
+        assertTrue(hold.start(2.0))
         assertEquals(2.0, speed)
         hold.finish()
         assertEquals(1.25, speed)
 
         speed = 1.75
-        assertTrue(hold.start())
+        assertTrue(hold.start(2.0))
         hold.finish()
         assertEquals(listOf(2.0, 1.25, 2.0, 1.75), writes)
     }
@@ -30,8 +30,8 @@ class PlayerHoldSpeedTest {
     fun repeatedStartCannotReplaceTheOriginalSpeedWithTheTemporaryOverride() {
         var speed = 1.5
         val hold = PlayerHoldSpeed({ true }, { speed }) { speed = it }
-        assertTrue(hold.start())
-        assertFalse(hold.start())
+        assertTrue(hold.start(1.25))
+        assertFalse(hold.start(1.5))
         assertEquals(1.5, hold.originalSpeed)
         hold.finish()
         assertEquals(1.5, speed)
@@ -41,7 +41,7 @@ class PlayerHoldSpeedTest {
     fun cancellationFollowedByReleaseRestoresOnlyOnce() {
         val writes = mutableListOf<Double>()
         val hold = PlayerHoldSpeed({ true }, { 1.0 }, writes::add)
-        hold.start()
+        hold.start(2.0)
         hold.finish()
         hold.finish()
         assertNull(hold.originalSpeed)
@@ -63,9 +63,9 @@ class PlayerHoldSpeedTest {
                 speed = it
             },
         )
-        assertFalse(hold.start())
+        assertFalse(hold.start(2.0))
         available = true
-        assertTrue(hold.start())
+        assertTrue(hold.start(2.0))
         available = false
         hold.finish()
         assertNull(hold.originalSpeed)
@@ -90,8 +90,33 @@ class PlayerHoldSpeedTest {
     fun invalidNativeSpeedsCannotBecomeARestoreTarget() {
         for (speed in listOf(Double.NaN, Double.POSITIVE_INFINITY, 0.0, -1.0)) {
             val hold = PlayerHoldSpeed({ true }, { speed }) { error("Must not write") }
-            assertFalse(hold.start())
+            assertFalse(hold.start(2.0))
             hold.finish()
+        }
+    }
+
+    @Test
+    fun selectedSpeedIsTemporaryEvenWhenItIsLowerThanTheNormalSpeed() {
+        var speed = 1.75
+        val hold = PlayerHoldSpeed({ true }, { speed }) { speed = it }
+
+        assertTrue(hold.start(1.25))
+        assertEquals(1.25, speed)
+        hold.finish()
+        assertEquals(1.75, speed)
+
+        assertTrue(hold.start(1.5))
+        assertEquals(1.5, speed)
+        hold.finish()
+        assertEquals(1.75, speed)
+    }
+
+    @Test
+    fun invalidSelectedSpeedDoesNotChangePlayback() {
+        val hold = PlayerHoldSpeed({ true }, { 1.0 }) { error("Must not write") }
+        for (target in listOf(Double.NaN, Double.POSITIVE_INFINITY, 0.0, -1.0)) {
+            assertFalse(hold.start(target))
+            assertNull(hold.originalSpeed)
         }
     }
 }

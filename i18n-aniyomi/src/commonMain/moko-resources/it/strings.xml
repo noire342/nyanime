@@ -56,7 +56,7 @@
     <string name="pref_always_use_external_player">Usa sempre un player esterno</string>
     <string name="pref_external_player_preference">Player esterno scelto</string>
     <string name="pref_player_gestures">Gesti</string>
-    <string name="pref_player_gestures_summary">Scorrimento, doppio tocco, controlli multimediali</string>
+    <string name="pref_player_gestures_summary">Scorrimento, pressione prolungata, doppio tocco, controlli multimediali</string>
     <string name="pref_category_player_sliders">Cursori</string>
     <string name="enable_volume_brightness_gestures">Attiva regolazione Volume e Retroilluminazione attraverso i gesti</string>
     <string name="pref_controls_swap_vol_brightness">Scambia i cursori del volume e della luminosità</string>
@@ -69,6 +69,11 @@
     <string name="pref_skip_disable">Disabilitato</string>
     <string name="pref_player_smooth_seek">Abilita scorrimento di precisione</string>
     <string name="pref_player_smooth_seek_summary">Se abilitata, lo scorrimento non si concentrerà sui fotogrammi chiave, rendendo la ricerca più lenta ma precisa</string>
+    <string name="pref_category_long_press">Pressione prolungata</string>
+    <string name="pref_player_long_press_action">Tieni premuto sul video</string>
+    <string name="pref_player_long_press_info">La velocità scelta vale solo mentre tieni premuto e torna a quella precedente quando rilasci. Cattura schermata apre la schermata per salvare il fotogramma.</string>
+    <string name="pref_long_press_screenshot">Cattura schermata</string>
+    <string name="player_hold_speed_unavailable_in_room">La velocità temporanea non è disponibile nelle stanze</string>
     <string name="pref_category_double_tap">Doppio tocco</string>
     <string name="pref_left_double_tap">Doppio tocco (sinistra)</string>
     <string name="pref_center_double_tap">Doppio tocco (centro)</string>

@@ -8,6 +8,14 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 23 settembre 2026 — Pressione prolungata nel player personalizzabile
+
+- Nelle impostazioni dei gesti puoi scegliere cosa accade tenendo premuto sul video:
+  velocità temporanea 2× (predefinita), 1,5× o 1,25×, cattura schermata oppure
+  nessuna azione.
+- Rilasciando il dito viene ripristinata la velocità che avevi scelto prima del
+  gesto; la velocità temporanea resta disabilitata nelle stanze.
+
 ## 23 settembre 2026 — Backup trasferibili e note OTA per versione
 
 - I nuovi backup manuali e automatici usano `.nyabk`; il ripristino continua ad

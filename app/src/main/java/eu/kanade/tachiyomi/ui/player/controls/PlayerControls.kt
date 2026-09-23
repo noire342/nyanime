@@ -85,7 +85,7 @@ import eu.kanade.tachiyomi.ui.player.controls.components.Anime4KDiagnosticsOverl
 import eu.kanade.tachiyomi.ui.player.controls.components.BrightnessOverlay
 import eu.kanade.tachiyomi.ui.player.controls.components.BrightnessSlider
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
-import eu.kanade.tachiyomi.ui.player.controls.components.DoubleSpeedPlayerUpdate
+import eu.kanade.tachiyomi.ui.player.controls.components.HoldSpeedPlayerUpdate
 import eu.kanade.tachiyomi.ui.player.controls.components.NextEpisodeCard
 import eu.kanade.tachiyomi.ui.player.controls.components.SeekbarWithTimers
 import eu.kanade.tachiyomi.ui.player.controls.components.TextPlayerUpdate
@@ -398,7 +398,7 @@ fun PlayerControls(
                 val currentPlayerUpdate by viewModel.playerUpdate.collectAsState()
                 val aspectRatio by playerPreferences.aspectState().collectAsState()
                 LaunchedEffect(currentPlayerUpdate, aspectRatio) {
-                    if (currentPlayerUpdate is PlayerUpdates.DoubleSpeed || currentPlayerUpdate is PlayerUpdates.None) {
+                    if (currentPlayerUpdate is PlayerUpdates.HoldSpeed || currentPlayerUpdate is PlayerUpdates.None) {
                         return@LaunchedEffect
                     }
                     delay(2000)
@@ -414,7 +414,9 @@ fun PlayerControls(
                     },
                 ) {
                     when (currentPlayerUpdate) {
-                        is PlayerUpdates.DoubleSpeed -> DoubleSpeedPlayerUpdate()
+                        is PlayerUpdates.HoldSpeed -> HoldSpeedPlayerUpdate(
+                            (currentPlayerUpdate as PlayerUpdates.HoldSpeed).speed,
+                        )
                         is PlayerUpdates.AspectRatio -> TextPlayerUpdate(stringResource(aspectRatio.titleRes))
                         is PlayerUpdates.ShowText -> TextPlayerUpdate(
                             (currentPlayerUpdate as PlayerUpdates.ShowText).value,

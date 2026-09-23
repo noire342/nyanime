@@ -9,12 +9,12 @@ internal class PlayerHoldSpeed(
     var originalSpeed: Double? = null
         private set
 
-    fun start(): Boolean {
-        if (originalSpeed != null || !available()) return false
+    fun start(targetSpeed: Double): Boolean {
+        if (originalSpeed != null || !available() || !targetSpeed.isFinite() || targetSpeed <= 0.0) return false
         val speed = readSpeed()
         if (!speed.isFinite() || speed <= 0.0) return false
         originalSpeed = speed
-        writeSpeed(2.0)
+        writeSpeed(targetSpeed)
         return true
     }
 

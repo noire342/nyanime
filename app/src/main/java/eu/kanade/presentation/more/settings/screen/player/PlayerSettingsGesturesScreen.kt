@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.screen.SearchableSettings
+import eu.kanade.tachiyomi.ui.player.PlayerLongPressAction
 import eu.kanade.tachiyomi.ui.player.SingleActionGesture
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import kotlinx.collections.immutable.persistentListOf
@@ -45,8 +46,28 @@ object PlayerSettingsGesturesScreen : SearchableSettings {
         return listOf(
             getSlidersGroup(gesturePreferences = gesturePreferences),
             getSeekingGroup(gesturePreferences = gesturePreferences),
+            getLongPressGroup(gesturePreferences = gesturePreferences),
             getDoubleTapGroup(gesturePreferences = gesturePreferences),
             getMediaControlsGroup(gesturePreferences = gesturePreferences),
+        )
+    }
+
+    @Composable
+    private fun getLongPressGroup(gesturePreferences: GesturePreferences): Preference.PreferenceGroup {
+        return Preference.PreferenceGroup(
+            title = stringResource(AYMR.strings.pref_category_long_press),
+            preferenceItems = persistentListOf(
+                Preference.PreferenceItem.ListPreference(
+                    preference = gesturePreferences.playerLongPressAction(),
+                    entries = PlayerLongPressAction.entries.associateWith {
+                        stringResource(it.stringRes)
+                    }.toPersistentMap(),
+                    title = stringResource(AYMR.strings.pref_player_long_press_action),
+                ),
+                Preference.PreferenceItem.InfoPreference(
+                    title = stringResource(AYMR.strings.pref_player_long_press_info),
+                ),
+            ),
         )
     }
 

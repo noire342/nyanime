@@ -64,13 +64,13 @@ fun TextPlayerUpdate(
 }
 
 @Composable
-fun DoubleSpeedPlayerUpdate() {
+fun HoldSpeedPlayerUpdate(speed: Double) {
     PlayerUpdate {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("2×", fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text("${speed.toString().removeSuffix(".0")}×", fontWeight = FontWeight.SemiBold, color = Color.White)
             Icon(Icons.Filled.FastForward, contentDescription = null, tint = Color.White)
         }
     }

@@ -101,7 +101,7 @@
     <string name="pref_external_player_preference">External player preference</string>
     <!-- Player Settings - Gestures -->
     <string name="pref_player_gestures">Gestures</string>
-    <string name="pref_player_gestures_summary">Seeking, double tap, media controls</string>
+    <string name="pref_player_gestures_summary">Seeking, press and hold, double tap, media controls</string>
     <string name="pref_category_player_sliders">Sliders</string>
     <string name="enable_volume_brightness_gestures">Enable Volume and Brightness Gestures</string>
     <string name="pref_controls_swap_vol_brightness">Swap volume and brightness slider</string>
@@ -120,6 +120,14 @@
     <string name="pref_skip_disable">Disable</string>
     <string name="pref_player_smooth_seek">Enable precise seeking</string>
     <string name="pref_player_smooth_seek_summary">When enabled, seeking will not focus on keyframes, leading to slower but precise seeking</string>
+    <string name="pref_category_long_press">Press and hold</string>
+    <string name="pref_player_long_press_action">Hold on video</string>
+    <string name="pref_player_long_press_info">Speed applies only while you hold the video and returns to your previous speed when you release. Screenshot opens the frame capture screen.</string>
+    <string name="pref_long_press_speed_2" translatable="false">2×</string>
+    <string name="pref_long_press_speed_15" translatable="false">1.5×</string>
+    <string name="pref_long_press_speed_125" translatable="false">1.25×</string>
+    <string name="pref_long_press_screenshot">Screenshot</string>
+    <string name="player_hold_speed_unavailable_in_room">Temporary speed is unavailable in rooms</string>
     <string name="pref_category_double_tap">Double tap</string>
     <string name="pref_left_double_tap">Double tap (left)</string>
     <string name="pref_center_double_tap">Double tap (center)</string>

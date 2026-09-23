@@ -57,7 +57,9 @@ import eu.kanade.presentation.player.components.LeftSideOvalShape
 import eu.kanade.presentation.player.components.RightSideOvalShape
 import eu.kanade.presentation.theme.playerRippleConfiguration
 import eu.kanade.tachiyomi.ui.player.Panels
+import eu.kanade.tachiyomi.ui.player.PlayerLongPressAction
 import eu.kanade.tachiyomi.ui.player.PlayerViewModel
+import eu.kanade.tachiyomi.ui.player.Sheets
 import eu.kanade.tachiyomi.ui.player.controls.components.DoubleTapSeekTriangles
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
@@ -105,6 +107,7 @@ fun GestureHandler(
     val seekGesture by gesturePreferences.gestureHorizontalSeek().collectAsState()
     val preciseSeeking by gesturePreferences.playerSmoothSeek().collectAsState()
     val showSeekbar by gesturePreferences.showSeekBar().collectAsState()
+    val longPressAction by gesturePreferences.playerLongPressAction().collectAsState()
     val room by viewModel.watchTogether.state.collectAsState()
     val sheetShown by viewModel.sheetShown.collectAsState()
     val episode by viewModel.currentEpisode.collectAsState()
@@ -118,7 +121,7 @@ fun GestureHandler(
         modifier = modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeGestures)
-            .pointerInput(viewModel, areControlsLocked, room.active, sheetShown, episode?.id) {
+            .pointerInput(viewModel, areControlsLocked, room.active, sheetShown, episode?.id, longPressAction) {
                 detectTapGestures(
                     onTap = {
                         if (controlsShown) viewModel.hideControls() else viewModel.showControls()
@@ -169,9 +172,20 @@ fun GestureHandler(
                         }
                     },
                     onLongPress = {
-                        if (areControlsLocked) return@detectTapGestures
-                        if (viewModel.beginHoldSpeed()) {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (areControlsLocked || sheetShown != Sheets.None) return@detectTapGestures
+                        when (longPressAction) {
+                            PlayerLongPressAction.Disabled -> Unit
+                            PlayerLongPressAction.Screenshot -> {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.pauseByUser()
+                                viewModel.showSheet(Sheets.Screenshot)
+                            }
+                            else -> {
+                                val speed = longPressAction.speed ?: return@detectTapGestures
+                                if (viewModel.beginHoldSpeed(speed)) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                }
+                            }
                         }
                     },
                 )

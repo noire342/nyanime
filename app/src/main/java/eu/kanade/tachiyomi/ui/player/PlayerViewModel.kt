@@ -410,9 +410,9 @@ class PlayerViewModel @JvmOverloads constructor(
         if (!watchTogether.requestSpeed(speed)) MPVLib.setPropertyDouble("speed", speed)
     }
 
-    fun beginHoldSpeed(): Boolean {
+    fun beginHoldSpeed(speed: Double): Boolean {
         if (watchTogether.active) {
-            playerUpdate.value = PlayerUpdates.ShowText("Il 2× temporaneo non è disponibile nelle stanze")
+            playerUpdate.value = PlayerUpdates.ShowTextResource(AYMR.strings.player_hold_speed_unavailable_in_room)
             return false
         }
         val cast = activity.castController.state.value
@@ -428,15 +428,15 @@ class PlayerViewModel @JvmOverloads constructor(
         ) {
             return false
         }
-        if (!holdSpeed.start()) return false
+        if (!holdSpeed.start(speed)) return false
         hideControls()
-        playerUpdate.value = PlayerUpdates.DoubleSpeed
+        playerUpdate.value = PlayerUpdates.HoldSpeed(speed)
         return true
     }
 
     fun endHoldSpeed() {
         holdSpeed.finish()
-        playerUpdate.update { if (it is PlayerUpdates.DoubleSpeed) PlayerUpdates.None else it }
+        playerUpdate.update { if (it is PlayerUpdates.HoldSpeed) PlayerUpdates.None else it }
     }
 
     private val _subtitleTracks = MutableStateFlow<List<VideoTrack>>(emptyList())
