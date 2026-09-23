@@ -2,6 +2,8 @@
 .gradle
 .kotlin
 build
+__pycache__/
+*.pyc
 
 # IDE files
 *.iml
