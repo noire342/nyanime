@@ -32,6 +32,11 @@
 -keep,allowoptimization class is.xyz.mpv.** { public protected *; }
 -keep,allowoptimization class com.arthenica.** { public protected *; }
 
+# These runtimes construct Java result objects from JNI. R8 cannot see the native constructor
+# lookups and otherwise removes them, causing SIGABRT during manga translation in preview builds.
+-keep class ai.onnxruntime.** { *; }
+-keep class ai.djl.huggingface.tokenizers.** { *; }
+
 # From extensions-lib
 -keep,allowoptimization class eu.kanade.tachiyomi.network.interceptor.RateLimitInterceptorKt { public protected *; }
 -keep,allowoptimization class eu.kanade.tachiyomi.network.interceptor.SpecificHostRateLimitInterceptorKt { public protected *; }
