@@ -56,7 +56,7 @@ internal object CommunityDormancy {
         }.onFailure { logcat(LogPriority.WARN, it) { "Unable to clear dormant community notifications" } }
     }
 
-    fun cleanObsoleteData(context: Context) = runCatching {
+    fun cleanObsoleteData(context: Context, preferences: BasePreferences) = runCatching {
         if (BuildConfig.COMMUNITY_ENABLED && BuildConfig.PERSONAL_SYNC_ENABLED) return@runCatching
         val keys by lazy { KeyStore.getInstance("AndroidKeyStore").apply { load(null) } }
         val failures = CommunityRetirement.clean(
@@ -66,7 +66,7 @@ internal object CommunityDormancy {
             social = !BuildConfig.COMMUNITY_ENABLED,
             personal = !BuildConfig.PERSONAL_SYNC_ENABLED,
         )
-        if (!BuildConfig.PERSONAL_SYNC_ENABLED) Injekt.get<BasePreferences>().personalSyncEnabled().delete()
+        if (!BuildConfig.PERSONAL_SYNC_ENABLED) preferences.personalSyncEnabled().delete()
         if (failures.isNotEmpty()) {
             // No completion marker: failed removals are retried at the next application start.
             logcat(LogPriority.WARN) { "Obsolete private data cleanup incomplete: ${failures.joinToString()}" }

@@ -111,10 +111,11 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
 
         val scope = ProcessLifecycleOwner.get().lifecycleScope
+        val preferencesForRetirement = basePreferences
         scope.launch(Dispatchers.IO) { removeRetiredTranslationData() }
         scope.launch(Dispatchers.IO) {
             eu.kanade.tachiyomi.data.community.CommunityDormancy.stopBackgroundWork(this@App)
-            eu.kanade.tachiyomi.data.community.CommunityDormancy.cleanObsoleteData(this@App)
+            eu.kanade.tachiyomi.data.community.CommunityDormancy.cleanObsoleteData(this@App, preferencesForRetirement)
         }
         scope.launch(Dispatchers.IO) {
             try {

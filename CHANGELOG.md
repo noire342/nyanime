@@ -8,6 +8,11 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 24 settembre 2026 — Pulizia dei dati disattivati
+
+- La pulizia dei vecchi dati di profili e sincronizzazione termina correttamente
+  anche nell'APK ottimizzato, senza un avviso a ogni avvio.
+
 ## 23 settembre 2026 — Stanze con relay verificati
 
 - Le stanze usano due relay che hanno superato una prova di scambio cifrato in
