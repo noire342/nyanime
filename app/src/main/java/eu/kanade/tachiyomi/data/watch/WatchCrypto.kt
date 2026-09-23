@@ -119,6 +119,11 @@ data class WatchInvite(
 class WatchIdentity(private val secret: ByteArray = generateSecret()) {
     val publicKey: String = Secp256k1.pubkeyCreate(secret).copyOfRange(1, 33).watchHex()
     fun sign(hash: ByteArray): String = Secp256k1.signSchnorr(hash, secret, watchRandom(32)).watchHex()
+    internal fun sharedKey(peer: String, code: String): ByteArray {
+        require(peer.matches(Regex("[0-9a-f]{64}")) && code.matches(Regex("[0-9]{8}")))
+        val point = Secp256k1.pubKeyTweakMul(byteArrayOf(2) + peer.watchBytes(), secret)
+        return watchHash("nyanime-short-ecdh-v1:".toByteArray() + point.copyOfRange(1, 33) + code.toByteArray())
+    }
     fun clear() = secret.fill(0)
     internal fun sessionSecret(): ByteArray = secret.copyOf()
 

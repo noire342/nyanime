@@ -204,6 +204,7 @@ data class WatchMessage(
     val target: String = "",
     val ping: Long = 0,
     val command: String = "",
+    val invitation: String = "",
     val sharedControls: Boolean = true,
     val waitForEveryone: Boolean = true,
     val peers: Map<String, WatchPeerStatus> = emptyMap(),
@@ -236,6 +237,7 @@ data class WatchMessage(
         name.length <= 32 &&
         target.length <= 64 &&
         command.length <= 16 &&
+        invitation.length <= 5000 &&
         coordinationVersion in 1..2 &&
         readingVersion in 0..2 &&
         (resumeAt == null || resumeAt >= 0) &&

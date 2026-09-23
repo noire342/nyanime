@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -70,6 +71,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.player.components.PlayerSheet
@@ -79,6 +81,7 @@ import eu.kanade.tachiyomi.data.watch.WatchOpeningState
 import eu.kanade.tachiyomi.data.watch.WatchPhase
 import eu.kanade.tachiyomi.data.watch.WatchProblem
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
+import eu.kanade.tachiyomi.data.watch.WatchShortState
 import eu.kanade.tachiyomi.data.watch.WatchTogetherManager
 import eu.kanade.tachiyomi.data.watch.description
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
@@ -170,6 +173,7 @@ fun WatchTogetherPanel(
     val context = LocalContext.current
     val manager = remember { WatchTogetherManager.get(context) }
     val room by manager.controller.state.collectAsState()
+    val short by manager.shortRooms.state.collectAsState()
     val opening by manager.opening.collectAsState()
     val preparation by manager.preparation.collectAsState()
     val recoverable by manager.recoverable.collectAsState()
@@ -210,7 +214,7 @@ fun WatchTogetherPanel(
         return
     }
     WatchTogetherContent(
-        room = room, opening = opening, name = name, onName = { name = it.take(32) },
+        room = room, short = short, opening = opening, name = name, onName = { name = it.take(32) },
         incomingCode = incomingCode, inviteError = inviteError, preparation = preparation,
         recoverable = recoverable,
         saveFailed = saveFailed,
@@ -233,14 +237,16 @@ fun WatchTogetherPanel(
         },
         onJoin = { code ->
             manager.displayName = name
-            if (room.active) manager.controller.leave()
-            manager.controller.join(code, name)
+            manager.joinRoom(code, name)
             onInviteConsumed()
         },
+        onCancelShort = manager.shortRooms::close,
+        onApproveShort = manager.shortRooms::approve,
+        onRejectShort = manager.shortRooms::reject,
         onCopy = {
             context.getSystemService(
                 ClipboardManager::class.java,
-            ).setPrimaryClip(ClipData.newPlainText("Codice stanza", room.invite))
+            ).setPrimaryClip(ClipData.newPlainText("Codice stanza", short.code))
             copied = true
         },
         copied = copied,
@@ -300,6 +306,10 @@ fun WatchTogetherContent(
     onSharedControls: (Boolean) -> Unit,
     onWaitForEveryone: (Boolean) -> Unit,
     onChooseVideo: () -> Unit,
+    short: WatchShortState = WatchShortState(),
+    onCancelShort: () -> Unit = {},
+    onApproveShort: (String) -> Unit = {},
+    onRejectShort: (String) -> Unit = {},
     copied: Boolean = false,
     onOpenPlayer: (() -> Unit)? = null,
     incomingCode: String = "",
@@ -365,7 +375,32 @@ fun WatchTogetherContent(
             }
         }
         if (!room.active) {
-            if (recoverable) {
+            if (short.waiting) {
+                Card(colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh)) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            "Codice ${short.code}",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        Text(short.message, color = colors.onSurfaceVariant)
+                        Text(
+                            if (short.relayCount >
+                                0
+                            ) {
+                                "Collegamento pronto · attendo la risposta di chi ha creato la stanza"
+                            } else {
+                                "Mi collego ai relay. Non serve aprire porte sul router."
+                            },
+                            color = colors.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        TextButton(onClick = onCancelShort) { Text("Annulla ingresso") }
+                    }
+                }
+            }
+            if (!short.waiting && recoverable) {
                 Card {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("La tua stanza è ancora disponibile", style = MaterialTheme.typography.titleMedium)
@@ -387,73 +422,80 @@ fun WatchTogetherContent(
                     }
                 }
             }
-            Text(
-                "Una stanza per video e manga. Chi crea la stanza sceglie l'episodio da guardare; " +
-                    "per i manga ciascuno legge al proprio ritmo e può raggiungere gli altri.",
-            )
-            OutlinedTextField(
-                value = name,
-                onValueChange = onName,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Il tuo nome (facoltativo)") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-            )
-            if (room.message.isNotBlank()) {
+            if (!short.waiting) {
                 Text(
-                    room.message,
-                    color = if (room.phase ==
-                        WatchPhase.Failed
-                    ) {
-                        colors.error
-                    } else {
-                        colors.onSurfaceVariant
-                    },
+                    "Una stanza per video e manga. Chi crea la stanza sceglie l'episodio da guardare; " +
+                        "per i manga ciascuno legge al proprio ritmo e può raggiungere gli altri.",
                 )
-            }
-            AnimatedVisibility(
-                visible = joining,
-                enter = fadeIn(tween(motionDuration)),
-                exit = fadeOut(tween(motionDuration)),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = code,
-                        onValueChange = { code = it.take(5000) },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = {
-                            Text("Codice del tuo amico")
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = onName,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Il tuo nome (facoltativo)") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                )
+                if (room.message.isNotBlank()) {
+                    Text(
+                        room.message,
+                        color = if (room.phase ==
+                            WatchPhase.Failed
+                        ) {
+                            colors.error
+                        } else {
+                            colors.onSurfaceVariant
                         },
-                        minLines = 2,
-                        maxLines = 4,
-                        shape = RoundedCornerShape(14.dp),
-                        supportingText = { Text("Puoi incollare anche l'intero messaggio d'invito.") },
                     )
+                }
+                AnimatedVisibility(
+                    visible = joining,
+                    enter = fadeIn(tween(motionDuration)),
+                    exit = fadeOut(tween(motionDuration)),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = code,
+                            onValueChange = { code = it.filter(Char::isDigit).take(8) },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = {
+                                Text("Codice a 8 cifre")
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            shape = RoundedCornerShape(14.dp),
+                            supportingText = { Text("Chiedi le 8 cifre al tuo amico. Lui confermerà l'ingresso.") },
+                        )
+                        Button(
+                            onClick = { onJoin(code) },
+                            enabled = code.matches(Regex("[0-9]{8}")) ||
+                                (incomingCode.isNotBlank() && code == incomingCode),
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                        ) { Text("Entra nella stanza") }
+                    }
+                }
+                if (!joining) {
                     Button(
-                        onClick = { onJoin(code) },
-                        enabled = code.isNotBlank(),
+                        onClick = onCreate,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape = RoundedCornerShape(14.dp),
-                    ) { Text("Entra nella stanza") }
+                    ) {
+                        Text("Crea codice")
+                    }
+                    OutlinedButton(onClick = {
+                        joining = true
+                    }, Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
+                        Text("Inserisci codice")
+                    }
+                } else {
+                    TextButton(onClick = { joining = false }) { Text("Preferisco creare una stanza") }
                 }
+                Text(
+                    "Ogni telefono usa la propria estensione. Non servono account né configurazioni del router.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                )
             }
-            if (!joining) {
-                Button(onClick = onCreate, Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
-                    Text("Crea codice")
-                }
-                OutlinedButton(onClick = {
-                    joining = true
-                }, Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
-                    Text("Inserisci codice")
-                }
-            } else {
-                TextButton(onClick = { joining = false }) { Text("Preferisco creare una stanza") }
-            }
-            Text(
-                "Ogni telefono usa la propria estensione. Non servono account né configurazioni del router.",
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.onSurfaceVariant,
-            )
         } else {
             OutlinedButton(onClick = onRead, modifier = Modifier.fillMaxWidth()) {
                 Text("Leggi insieme · manga, pagine e schizzi")
@@ -506,11 +548,11 @@ fun WatchTogetherContent(
                     }
                 }
             }
-            if (room.invite.isNotBlank() && (room.host || room.members.size < 2)) {
+            if (room.host && short.code.isNotBlank()) {
                 Text("Codice d'invito", style = MaterialTheme.typography.titleSmall)
                 TextButton(onClick = onQr) { Text("Mostra QR d'invito") }
                 SelectionContainer {
-                    Text(room.invite, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyMedium)
+                    Text(short.code, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.headlineMedium)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(onClick = onCopy, modifier = Modifier.weight(1f)) {
@@ -524,6 +566,24 @@ fun WatchTogetherContent(
                     Button(onClick = onShare, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Share, null, Modifier.size(18.dp))
                         Text(" Invita")
+                    }
+                }
+            }
+            if (room.host && short.requests.isNotEmpty()) {
+                Card(colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh)) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Richieste d'ingresso", style = MaterialTheme.typography.titleMedium)
+                        short.requests.forEach { request ->
+                            Text("${request.name} · ${request.id.takeLast(6)} vuole entrare")
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Button(onClick = { onApproveShort(request.id) }) { Text("Consenti") }
+                                OutlinedButton(onClick = { onRejectShort(request.id) }) { Text("Rifiuta") }
+                            }
+                        }
+                        Text(
+                            "Consenti solo se hai condiviso il codice con questa persona.",
+                            color = colors.onSurfaceVariant,
+                        )
                     }
                 }
             }

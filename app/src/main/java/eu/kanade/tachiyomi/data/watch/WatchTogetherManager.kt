@@ -71,6 +71,12 @@ class WatchTogetherManager private constructor(private val application: Applicat
             preferences.edit().putString("name", value.trim().take(32)).apply()
         }
 
+    val shortRooms = WatchShortRooms(scope, ::joinResolvedInvite)
+    private fun joinResolvedInvite(invite: String, name: String) {
+        playback.forgetDetached()
+        controller.join(invite, name)
+    }
+
     val controller = WatchRoomController(
         scope,
         object : WatchPlayer {
@@ -97,6 +103,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
             mutableRecoverable.value = false
         },
         onSessionEnded = {
+            shortRooms.close()
             roomArchive.clear()
             mutableRecoverable.value = false
         },
@@ -122,6 +129,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
         }
         reading.roomChanged(controller.state.value)
         reading.restore(saved.edits)
+        if (controller.state.value.host) shortRooms.host(controller.state.value.invite, saved.name)
         mutableRecoverable.value = false
         return true
     }
@@ -240,7 +248,19 @@ class WatchTogetherManager private constructor(private val application: Applicat
 
     fun createRoom(name: String) {
         playback.forgetDetached()
+        shortRooms.close()
         controller.create(name)
+        if (controller.state.value.host) shortRooms.host(controller.state.value.invite, name)
+    }
+
+    fun joinRoom(code: String, name: String) {
+        if (controller.active) controller.leave()
+        shortRooms.close()
+        if (code.matches(Regex("[0-9]{8}"))) {
+            shortRooms.join(code, name)
+        } else {
+            joinResolvedInvite(code, name)
+        }
     }
 
     fun attach(activity: Activity, player: WatchPlayer, open: (Long, Long) -> Unit) {
