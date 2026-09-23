@@ -83,7 +83,8 @@ data class WatchInvite(
             ) {
                 "Link d'invito non valido."
             }
-            return parse(text, now).encode()
+            val shortCode = uri.rawFragment.orEmpty()
+            return if (shortCode.matches(Regex("[0-9]{8}"))) shortCode else parse(text, now).encode()
         }
         fun create(owner: String, now: Long, relays: List<String> = defaultRelays): WatchInvite =
             WatchInvite(

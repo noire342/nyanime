@@ -8,6 +8,15 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 23 settembre 2026 — Inviti brevi coerenti in tutta la stanza
+
+- Link, messaggio condiviso e QR del creatore ora contengono il codice stanza a
+  otto cifre, anche quando si invita dal lettore manga. L'amico chiede di entrare
+  e il creatore conferma l'accesso.
+- La schermata delle stanze mette in primo piano Crea/Entra, codice e richieste;
+  il nome facoltativo resta modificabile senza affollare il percorso iniziale.
+- I link completi delle versioni precedenti continuano ad aprirsi.
+
 ## 23 settembre 2026 — Accesso alle stanze con codice breve
 
 - Per invitare un amico in una stanza video o manga ora bastano otto cifre temporanee.

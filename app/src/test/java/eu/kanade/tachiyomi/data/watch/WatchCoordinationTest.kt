@@ -97,6 +97,31 @@ class WatchCoordinationTest {
     }
 
     @Test
+    fun shortRoomLinkShareTextAndQrAllUseTheSameEightDigits() {
+        val code = "01234567"
+        val link = WatchShortRooms.link(code)
+        assertEquals(code, WatchInvite.codeFromLink(link, 1_800_000_000_000L))
+        val shared = WatchShortRooms.shareText(code)
+        assertTrue(shared.contains("Codice stanza: $code"))
+        assertTrue(shared.contains(link))
+        assertFalse(shared.contains("NY1."))
+        assertEquals(code, WatchShortRooms.normalizeInput(link))
+        assertEquals(code, WatchShortRooms.normalizeInput(shared))
+
+        val qr = WatchQr.encode(link)
+        val pixels = IntArray(qr.width * qr.height) {
+            if (qr[it % qr.width, it / qr.width]) 0xff000000.toInt() else 0xffffffff.toInt()
+        }
+        val bitmap = BinaryBitmap(HybridBinarizer(RGBLuminanceSource(qr.width, qr.height, pixels)))
+        val decoded = QRCodeReader().decode(bitmap, mapOf(DecodeHintType.PURE_BARCODE to true)).text
+        assertEquals(link, decoded)
+        assertThrows(IllegalArgumentException::class.java) { WatchShortRooms.link("1234567") }
+        assertThrows(IllegalArgumentException::class.java) {
+            WatchInvite.codeFromLink("nyanime://watch/v1#012345678", 1_800_000_000_000L)
+        }
+    }
+
+    @Test
     fun externalLinksMustMatchTheExactRouteAndDoNotAcceptCredentialsOrQueries() {
         val now = 1_800_000_000_000L
         val identity = WatchIdentity()

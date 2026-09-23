@@ -186,6 +186,27 @@ class WatchShortRooms(
     }
 
     companion object {
+        fun normalizeInput(input: String): String {
+            val shortLink = Regex("nyanime://watch/v1#[0-9]{8}(?![0-9])").find(input)?.value
+            return when {
+                shortLink != null -> WatchInvite.codeFromLink(shortLink, System.currentTimeMillis())
+                "NY1." in input || "nyanime://watch/" in input -> input.trim().take(5000)
+                else -> input.filter(Char::isDigit).take(8)
+            }
+        }
+
+        fun link(code: String): String {
+            require(code.matches(Regex("[0-9]{8}")))
+            return "nyanime://watch/v1#$code"
+        }
+
+        fun shareText(code: String): String =
+            "Guardiamo insieme su Nyanime!\n\n" +
+                "Codice stanza: $code\n" +
+                "${link(code)}\n\n" +
+                "Se il link non si apre, usa Guarda insieme → Inserisci codice e digita $code. " +
+                "Chi ha creato la stanza confermerà il tuo ingresso."
+
         private fun rendezvous(
             code: String,
         ) = WatchInvite(

@@ -46,7 +46,7 @@ fun WatchQrDialog(link: String, onDismiss: () -> Unit) {
         title = { Text("Invita con il QR") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Il tuo amico può inquadrarlo con la fotocamera e confermare l'ingresso in Nyanime.")
+                Text("Il tuo amico può inquadrarlo con la fotocamera e aprire l'invito in Nyanime.")
                 Canvas(
                     Modifier.fillMaxWidth().aspectRatio(1f).background(Color.White)
                         .semantics { contentDescription = "QR dell'invito alla stanza" },

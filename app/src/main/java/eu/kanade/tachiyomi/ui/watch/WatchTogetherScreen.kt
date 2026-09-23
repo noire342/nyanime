@@ -81,6 +81,7 @@ import eu.kanade.tachiyomi.data.watch.WatchOpeningState
 import eu.kanade.tachiyomi.data.watch.WatchPhase
 import eu.kanade.tachiyomi.data.watch.WatchProblem
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
+import eu.kanade.tachiyomi.data.watch.WatchShortRooms
 import eu.kanade.tachiyomi.data.watch.WatchShortState
 import eu.kanade.tachiyomi.data.watch.WatchTogetherManager
 import eu.kanade.tachiyomi.data.watch.description
@@ -179,8 +180,8 @@ fun WatchTogetherPanel(
     val recoverable by manager.recoverable.collectAsState()
     val saveFailed by manager.roomSaveFailed.collectAsState()
     var showQr by remember { mutableStateOf(false) }
-    val invitationLink = remember(room.invite) {
-        runCatching { WatchInvite.parse(room.invite, System.currentTimeMillis()).link() }.getOrNull()
+    val invitationLink = remember(short.code) {
+        runCatching { WatchShortRooms.link(short.code) }.getOrNull()
     }
     if (showQr && room.active && invitationLink != null) {
         WatchQrDialog(invitationLink) { showQr = false }
@@ -251,17 +252,13 @@ fun WatchTogetherPanel(
         },
         copied = copied,
         onShare = {
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(
-                    Intent.EXTRA_TEXT,
-                    "Guardiamo insieme su Nyanime!\n" +
-                        invitationLink.orEmpty() +
-                        "\n\nSe il link non si apre, usa Guarda insieme → Inserisci codice:\n" +
-                        room.invite,
-                )
+            if (short.code.isNotBlank()) {
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, WatchShortRooms.shareText(short.code))
+                }
+                context.startActivity(Intent.createChooser(intent, "Invita un amico"))
             }
-            context.startActivity(Intent.createChooser(intent, "Invita un amico"))
         },
         onTogglePlayback = {
             if (room.wantsPlayback &&
@@ -328,6 +325,7 @@ fun WatchTogetherContent(
     onDiscardRoom: () -> Unit = {},
 ) {
     var joining by rememberSaveable { mutableStateOf(false) }
+    var editingName by rememberSaveable { mutableStateOf(false) }
     var code by remember { mutableStateOf("") }
     LaunchedEffect(incomingCode) {
         if (incomingCode.isNotBlank()) {
@@ -352,9 +350,9 @@ fun WatchTogetherContent(
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Default.Group, null, Modifier.size(30.dp), tint = colors.onPrimary) }
             Column(Modifier.weight(1f)) {
-                Text("Una serata insieme", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Guarda insieme", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text(
-                    if (room.active) "La vostra stanza" else "Un codice. Lo stesso momento.",
+                    if (room.active) "La tua stanza" else "Video e manga, con chi vuoi.",
                     color = colors.onSurfaceVariant,
                 )
             }
@@ -366,75 +364,65 @@ fun WatchTogetherContent(
                 color = colors.error,
             )
         }
-        if (room.active && incomingCode.isNotBlank() && incomingCode != room.invite) {
+        if (room.active && incomingCode.isNotBlank() && incomingCode != room.invite && incomingCode != short.code) {
             Card {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Hai ricevuto un altro invito. Per entrare devi lasciare questa stanza.")
-                    Button(onClick = { onJoin(incomingCode) }) { Text("Lascia questa stanza ed entra") }
+                    Text("Hai ricevuto un altro invito", style = MaterialTheme.typography.titleMedium)
+                    Text("Per entrare, lascerai questa stanza.", color = colors.onSurfaceVariant)
+                    Button(onClick = { onJoin(incomingCode) }) { Text("Cambia stanza") }
                 }
             }
         }
         if (!room.active) {
             if (short.waiting) {
-                Card(colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh)) {
-                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Card(
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh),
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            "Codice ${short.code}",
+                            "In attesa di conferma",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                         )
-                        LinearProgressIndicator(Modifier.fillMaxWidth())
-                        Text(short.message, color = colors.onSurfaceVariant)
                         Text(
-                            if (short.relayCount >
-                                0
-                            ) {
-                                "Collegamento pronto · attendo la risposta di chi ha creato la stanza"
+                            short.code,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        Text(
+                            if (short.relayCount > 0) {
+                                "Richiesta inviata. Il tuo amico deve accettare."
                             } else {
-                                "Mi collego ai relay. Non serve aprire porte sul router."
+                                "Connessione in corso…"
                             },
                             color = colors.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
                         )
-                        TextButton(onClick = onCancelShort) { Text("Annulla ingresso") }
+                        TextButton(onClick = onCancelShort) { Text("Annulla") }
                     }
                 }
             }
             if (!short.waiting && recoverable) {
-                Card {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("La tua stanza è ancora disponibile", style = MaterialTheme.typography.titleMedium)
+                Card(shape = RoundedCornerShape(22.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            "Rientra per ritrovare le annotazioni salvate e riallinearti con gli altri. " +
-                                "La riproduzione non parte da sola.",
-                            color = colors.onSurfaceVariant,
+                            "Riprendi la tua stanza",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
                         )
+                        Text("La sessione precedente è ancora disponibile.", color = colors.onSurfaceVariant)
                         Button(onClick = { resumeError = !onResumeRoom() }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Rientra nella stanza")
+                            Text("Rientra")
                         }
-                        TextButton(onClick = onDiscardRoom) { Text("Elimina la sessione salvata") }
+                        TextButton(onClick = onDiscardRoom) { Text("Elimina sessione") }
                         if (resumeError) {
-                            Text(
-                                "Non è stato possibile rientrare. Puoi creare una nuova stanza.",
-                                color = colors.error,
-                            )
+                            Text("Impossibile rientrare. Puoi creare una nuova stanza.", color = colors.error)
                         }
                     }
                 }
             }
             if (!short.waiting) {
-                Text(
-                    "Una stanza per video e manga. Chi crea la stanza sceglie l'episodio da guardare; " +
-                        "per i manga ciascuno legge al proprio ritmo e può raggiungere gli altri.",
-                )
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = onName,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Il tuo nome (facoltativo)") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                )
                 if (room.message.isNotBlank()) {
                     Text(
                         room.message,
@@ -447,58 +435,137 @@ fun WatchTogetherContent(
                         },
                     )
                 }
+                Card(
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh),
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Text(
+                            if (joining) "Entra in una stanza" else "Crea una stanza",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            if (joining) {
+                                "Inserisci il codice ricevuto."
+                            } else {
+                                "Ricevi un codice da condividere con i tuoi amici."
+                            },
+                            color = colors.onSurfaceVariant,
+                        )
+                        AnimatedVisibility(
+                            visible = joining,
+                            enter = fadeIn(tween(motionDuration)),
+                            exit = fadeOut(tween(motionDuration)),
+                        ) {
+                            OutlinedTextField(
+                                value = code,
+                                onValueChange = { code = WatchShortRooms.normalizeInput(it) },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text(if (code.length > 8) "Invito ricevuto" else "Codice a 8 cifre") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = if (code.length > 8) KeyboardType.Text else KeyboardType.Number,
+                                ),
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                        }
+                        val canJoin = code.matches(Regex("[0-9]{8}")) ||
+                            runCatching { WatchInvite.parse(code, System.currentTimeMillis()) }.isSuccess
+                        Button(
+                            onClick = { if (joining) onJoin(code) else onCreate() },
+                            enabled = !joining || canJoin,
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                        ) { Text(if (joining) "Chiedi di entrare" else "Crea stanza") }
+                        TextButton(onClick = { joining = !joining }, modifier = Modifier.fillMaxWidth()) {
+                            Text(if (joining) "Crea una stanza invece" else "Ho già un codice")
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Nome: ${name.ifBlank { "Spettatore" }}",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.onSurfaceVariant,
+                    )
+                    TextButton(onClick = { editingName = !editingName }) {
+                        Text(if (editingName) "Fine" else "Modifica")
+                    }
+                }
                 AnimatedVisibility(
-                    visible = joining,
+                    editingName,
                     enter = fadeIn(tween(motionDuration)),
                     exit = fadeOut(tween(motionDuration)),
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(
-                            value = code,
-                            onValueChange = { code = it.filter(Char::isDigit).take(8) },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = {
-                                Text("Codice a 8 cifre")
-                            },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            shape = RoundedCornerShape(14.dp),
-                            supportingText = { Text("Chiedi le 8 cifre al tuo amico. Lui confermerà l'ingresso.") },
-                        )
-                        Button(
-                            onClick = { onJoin(code) },
-                            enabled = code.matches(Regex("[0-9]{8}")) ||
-                                (incomingCode.isNotBlank() && code == incomingCode),
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape = RoundedCornerShape(14.dp),
-                        ) { Text("Entra nella stanza") }
-                    }
-                }
-                if (!joining) {
-                    Button(
-                        onClick = onCreate,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = onName,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Il tuo nome") },
+                        singleLine = true,
                         shape = RoundedCornerShape(14.dp),
-                    ) {
-                        Text("Crea codice")
-                    }
-                    OutlinedButton(onClick = {
-                        joining = true
-                    }, Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
-                        Text("Inserisci codice")
-                    }
-                } else {
-                    TextButton(onClick = { joining = false }) { Text("Preferisco creare una stanza") }
+                    )
                 }
-                Text(
-                    "Ogni telefono usa la propria estensione. Non servono account né configurazioni del router.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant,
-                )
             }
         } else {
+            if (room.host && short.code.isNotBlank()) {
+                Card(
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh),
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Invita un amico", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                            TextButton(onClick = onQr) { Text("QR") }
+                        }
+                        SelectionContainer {
+                            Text(
+                                short.code,
+                                fontFamily = FontFamily.Monospace,
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                        Text("Codice temporaneo · approvi tu chi entra", color = colors.onSurfaceVariant)
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            OutlinedButton(onClick = onCopy, modifier = Modifier.weight(1f)) {
+                                Icon(
+                                    if (copied) Icons.Default.CheckCircle else Icons.Default.ContentCopy,
+                                    null,
+                                    Modifier.size(18.dp),
+                                )
+                                Text(if (copied) " Copiato" else " Copia")
+                            }
+                            Button(onClick = onShare, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Default.Share, null, Modifier.size(18.dp))
+                                Text(" Condividi")
+                            }
+                        }
+                    }
+                }
+            }
+            if (room.host && short.requests.isNotEmpty()) {
+                Card(shape = RoundedCornerShape(22.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            "Vuole entrare",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        short.requests.forEach { request ->
+                            Text("${request.name} · ${request.id.takeLast(6)}")
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Button(onClick = { onApproveShort(request.id) }) { Text("Accetta") }
+                                OutlinedButton(onClick = { onRejectShort(request.id) }) { Text("Rifiuta") }
+                            }
+                        }
+                    }
+                }
+            }
             OutlinedButton(onClick = onRead, modifier = Modifier.fillMaxWidth()) {
-                Text("Leggi insieme · manga, pagine e schizzi")
+                Text("Leggi insieme")
             }
             Card(
                 colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh),
@@ -541,49 +608,10 @@ fun WatchTogetherContent(
                     if (room.host &&
                         room.media == null
                     ) {
-                        Button(onClick = onChooseVideo) { Text("Scegli un titolo nella Home") }
+                        Button(onClick = onChooseVideo) { Text("Scegli un video") }
                     }
                     if (room.media != null && onOpenPlayer != null) {
                         OutlinedButton(onClick = onOpenPlayer, enabled = !opening.loading) { Text("Apri il player") }
-                    }
-                }
-            }
-            if (room.host && short.code.isNotBlank()) {
-                Text("Codice d'invito", style = MaterialTheme.typography.titleSmall)
-                TextButton(onClick = onQr) { Text("Mostra QR d'invito") }
-                SelectionContainer {
-                    Text(short.code, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.headlineMedium)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = onCopy, modifier = Modifier.weight(1f)) {
-                        Icon(
-                            if (copied) Icons.Default.CheckCircle else Icons.Default.ContentCopy,
-                            null,
-                            Modifier.size(18.dp),
-                        )
-                        Text(if (copied) " Copiato" else " Copia")
-                    }
-                    Button(onClick = onShare, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Share, null, Modifier.size(18.dp))
-                        Text(" Invita")
-                    }
-                }
-            }
-            if (room.host && short.requests.isNotEmpty()) {
-                Card(colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh)) {
-                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Richieste d'ingresso", style = MaterialTheme.typography.titleMedium)
-                        short.requests.forEach { request ->
-                            Text("${request.name} · ${request.id.takeLast(6)} vuole entrare")
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Button(onClick = { onApproveShort(request.id) }) { Text("Consenti") }
-                                OutlinedButton(onClick = { onRejectShort(request.id) }) { Text("Rifiuta") }
-                            }
-                        }
-                        Text(
-                            "Consenti solo se hai condiviso il codice con questa persona.",
-                            color = colors.onSurfaceVariant,
-                        )
                     }
                 }
             }

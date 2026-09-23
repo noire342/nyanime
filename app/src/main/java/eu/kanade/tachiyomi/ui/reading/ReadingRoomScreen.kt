@@ -72,6 +72,7 @@ import eu.kanade.tachiyomi.data.reading.ReadingRoomState
 import eu.kanade.tachiyomi.data.reading.ReadingTogetherManager
 import eu.kanade.tachiyomi.data.reading.ReadingTools
 import eu.kanade.tachiyomi.data.watch.WatchInvite
+import eu.kanade.tachiyomi.data.watch.WatchShortRooms
 import eu.kanade.tachiyomi.ui.watch.WatchQrDialog
 import eu.kanade.tachiyomi.ui.watch.WatchTogetherPanel
 
@@ -113,12 +114,17 @@ fun ReadingRoomPanel(
     val room by manager.controller.state.collectAsState()
     val tools by manager.tools.collectAsState()
     val saveFailed by manager.watch.roomSaveFailed.collectAsState()
+    val short by manager.watch.shortRooms.state.collectAsState()
     var qr by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }
     var addingNote by remember { mutableStateOf(false) }
     var noteText by remember { mutableStateOf("") }
-    val link = remember(room.invite) {
-        runCatching { WatchInvite.parse(room.invite, System.currentTimeMillis()).link() }.getOrNull()
+    val link = remember(room.invite, short.code) {
+        if (short.code.isNotBlank()) {
+            WatchShortRooms.link(short.code)
+        } else {
+            runCatching { WatchInvite.parse(room.invite, System.currentTimeMillis()).link() }.getOrNull()
+        }
     }
     if (qr && link != null) WatchQrDialog(link) { qr = false }
     if (addingNote) {
@@ -187,8 +193,12 @@ fun ReadingRoomPanel(
                         type = "text/plain"
                         putExtra(
                             Intent.EXTRA_TEXT,
-                            "Leggiamo o guardiamo insieme su Nyanime!\n${link.orEmpty()}\n\n" +
-                                "Codice stanza: ${room.invite}",
+                            if (short.code.isNotBlank()) {
+                                WatchShortRooms.shareText(short.code)
+                            } else {
+                                "Leggiamo o guardiamo insieme su Nyanime!\n${link.orEmpty()}\n\n" +
+                                    "Invito completo: ${room.invite}"
+                            },
                         )
                     },
                     "Invita nella stanza",
