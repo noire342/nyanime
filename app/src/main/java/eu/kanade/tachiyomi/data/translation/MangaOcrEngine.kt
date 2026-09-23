@@ -17,13 +17,7 @@ class MangaOcrEngine(private val packs: MangaOcrPacks) {
             // init() expects the parent of tessdata; the pack returns this directory.
             val root = packs.directory()
             check(api.init(root.absolutePath, language)) { "Impossibile inizializzare il modello OCR" }
-            api.setPageSegMode(
-                if (language == "jpn_vert") {
-                    TessBaseAPI.PageSegMode.PSM_SPARSE_TEXT
-                } else {
-                    TessBaseAPI.PageSegMode.PSM_AUTO
-                },
-            )
+            api.setPageSegMode(TessBaseAPI.PageSegMode.PSM_AUTO)
             api.setImage(image.bitmap)
             api.getUTF8Text()
             val lines = ArrayList<TranslationRegion>()
@@ -35,7 +29,15 @@ class MangaOcrEngine(private val packs: MangaOcrPacks) {
                         val text = iterator.getUTF8Text(level)?.trim().orEmpty()
                         val box = iterator.getBoundingBox(level)
                         val confidence = iterator.confidence(level)
-                        if (text.isNotBlank() && confidence >= 25f && box.size == 4) {
+                        val readable = if (language == "eng") {
+                            val letters = text.count(Char::isLetter)
+                            letters >= 2 &&
+                                letters.toFloat() / text.length.coerceAtLeast(1) >= 0.5f &&
+                                text.none { it in "\\<>~{}|" }
+                        } else {
+                            true
+                        }
+                        if (readable && confidence >= 50f && box.size == 4) {
                             val region = TranslationRegion(
                                 left = box[0].toFloat() / image.bitmap.width,
                                 top = box[1].toFloat() / image.bitmap.height,

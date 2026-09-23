@@ -69,21 +69,21 @@ class OfflineTextTranslator(private val pack: OfflineTranslationPack) : AutoClos
                 encoder.run(mapOf("input_ids" to inputIds, "attention_mask" to attentionMask)).use { encodedOutput ->
                     val hidden = encodedOutput[0] as OnnxTensor
                     val generated = ArrayList<Long>(64)
-                    val past = emptyPast()
+                    var past = emptyPast()
+                    var currentToken = 2L
+                    var useCache = false
                     try {
-                        val noCache = OnnxTensor.createTensor(
-                            environment,
-                            ByteBuffer.allocateDirect(1).put(0).apply { rewind() },
-                            longArrayOf(1),
-                            OnnxJavaType.BOOL,
-                        )
-                        noCache.use { branch ->
-                            repeat(128) {
-                                coroutineContext.ensureActive()
-                                val sequence = LongArray(generated.size + 1)
-                                sequence[0] = 2L
-                                generated.forEachIndexed { index, token -> sequence[index + 1] = token }
-                                longTensor(sequence).use { decoderIds ->
+                        repeat(128) {
+                            coroutineContext.ensureActive()
+                            longTensor(longArrayOf(currentToken)).use { decoderIds ->
+                                val cacheFlag = ByteBuffer.allocateDirect(1).put(if (useCache) 1 else 0)
+                                    .apply { rewind() }
+                                OnnxTensor.createTensor(
+                                    environment,
+                                    cacheFlag,
+                                    longArrayOf(1),
+                                    OnnxJavaType.BOOL,
+                                ).use { branch ->
                                     val inputs = HashMap<String, OnnxTensor>(past.size + 4)
                                     inputs.putAll(past)
                                     inputs["input_ids"] = decoderIds
@@ -91,17 +91,18 @@ class OfflineTextTranslator(private val pack: OfflineTranslationPack) : AutoClos
                                     inputs["encoder_attention_mask"] = attentionMask
                                     inputs["use_cache_branch"] = branch
                                     decoder.run(inputs).use { result ->
-                                        val logits = result[0] as OnnxTensor
-                                        val next = bestToken(logits)
-                                        if (next ==
-                                            2L
-                                        ) {
-                                            return@withContext tokenizer.decode(
-                                                generated.toLongArray(),
-                                                true,
-                                            ).trim()
+                                        val next = bestToken(result[0] as OnnxTensor)
+                                        if (next == 2L) {
+                                            return@withContext tokenizer.decode(generated.toLongArray(), true).trim()
                                         }
+                                        val updated = rollPast(result, past, useCache)
+                                        past.forEach { (key, value) ->
+                                            if (updated[key] !== value) value.close()
+                                        }
+                                        past = updated
+                                        currentToken = next
                                         generated += next
+                                        useCache = true
                                     }
                                 }
                             }
@@ -141,6 +142,34 @@ class OfflineTextTranslator(private val pack: OfflineTranslationPack) : AutoClos
                 }
             }
         }
+    }
+
+    private fun rollPast(
+        result: OrtSession.Result,
+        previous: Map<String, OnnxTensor>,
+        wasCached: Boolean,
+    ): Map<String, OnnxTensor> = buildMap {
+        repeat(3) { layer ->
+            for (kind in listOf("decoder", "encoder")) {
+                for (part in listOf("key", "value")) {
+                    val key = "past_key_values.$layer.$kind.$part"
+                    if (kind == "encoder" && wasCached) {
+                        put(key, previous.getValue(key))
+                    } else {
+                        val value = result.get("present.$layer.$kind.$part").orElseThrow() as OnnxTensor
+                        put(key, copyTensor(value))
+                    }
+                }
+            }
+        }
+    }
+
+    private fun copyTensor(source: OnnxTensor): OnnxTensor {
+        val values = source.floatBuffer
+        val copy = FloatBuffer.allocate(values.remaining())
+        copy.put(values)
+        copy.flip()
+        return OnnxTensor.createTensor(environment, copy, source.info.shape)
     }
 
     private fun bestToken(logits: OnnxTensor): Long {

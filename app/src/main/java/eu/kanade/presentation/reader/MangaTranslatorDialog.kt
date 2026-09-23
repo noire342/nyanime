@@ -99,23 +99,7 @@ fun MangaTranslatorDialog(session: MangaTranslationSession, onDismiss: () -> Uni
                         .padding(horizontal = 16.dp, vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        listOf(
-                            "Giapponese verticale" to "jpn_vert",
-                            "Giapponese" to "jpn",
-                            "Inglese" to "eng",
-                        ).forEach { (label, code) ->
-                            FilterChip(
-                                selected = state.language == code,
-                                onClick = { session.selectLanguage(code) },
-                                enabled = !state.busy,
-                                label = { Text(label) },
-                            )
-                        }
-                    }
+                    Text("Inglese → Italiano", style = MaterialTheme.typography.labelLarge)
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(
@@ -135,6 +119,19 @@ fun MangaTranslatorDialog(session: MangaTranslationSession, onDismiss: () -> Uni
                                     )
                                 }
                             }
+                            FilterChip(
+                                selected = state.showInReader,
+                                onClick = { session.setShowInReader(!state.showInReader) },
+                                label = {
+                                    Text(
+                                        if (state.showInReader) {
+                                            "Traduzione visibile nel lettore"
+                                        } else {
+                                            "Mostra nel lettore"
+                                        },
+                                    )
+                                },
+                            )
                             Box(
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp, max = 450.dp),
                                 contentAlignment = Alignment.Center,

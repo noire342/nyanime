@@ -20,15 +20,17 @@ class MangaOcrPacks(private val context: Context) {
     companion object {
         val packs = mapOf(
             "eng" to Pack("eng", 4_113_088, "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2"),
-            "jpn" to Pack("jpn", 2_471_260, "1f5de9236d2e85f5fdf4b3c500f2d4926f8d9449f28f5394472d9e8d83b91b4d"),
-            "jpn_vert" to
-                Pack("jpn_vert", 3_037_480, "bf1e2640954691797e2dc14f38533e601b59ee37958698ae0f0b81dc6f09c71b"),
         )
     }
 
     private val root = File(context.filesDir, "manga-translation/ocr")
     private val tessdata = File(root, "tessdata")
     private val checked = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    init {
+        listOf("jpn.traineddata", "jpn_vert.traineddata", "jpn.part", "jpn_vert.part")
+            .forEach { File(tessdata, it).delete() }
+    }
 
     fun directory(): File = root
 

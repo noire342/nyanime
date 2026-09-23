@@ -6,8 +6,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -40,7 +38,6 @@ class MangaTranslationDeviceTest {
     @Test
     fun offlineTranslationOcrAndReconstruction() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        assertTrue("Existing FFmpeg runtime failed", ReturnCode.isSuccess(FFmpegKit.execute("-version").returnCode))
         val textPack = OfflineTranslationPack(context)
         val ocrPacks = MangaOcrPacks(context)
         assumeTrue("Stage the translation pack before this device test", textPack.ready())
@@ -48,7 +45,6 @@ class MangaTranslationDeviceTest {
 
         OfflineTextTranslator(textPack).use { translator ->
             assertEquals("Ciao, come stai?", translator.translate("Hello, how are you?"))
-            assertEquals("Ciao, stai bene?", translator.translate("こんにちは、元気ですか？"))
         }
 
         val bitmap = Bitmap.createBitmap(1024, 512, Bitmap.Config.ARGB_8888)
@@ -66,9 +62,6 @@ class MangaTranslationDeviceTest {
         val page = MangaPageBitmap(bitmap, "a".repeat(64))
         val recognized = MangaOcrEngine(ocrPacks).recognize(page, "eng")
         assertTrue("OCR returned no text", recognized.regions.any { "hello" in it.original.lowercase() })
-        if (ocrPacks.isInstalled("jpn_vert")) {
-            assertEquals("jpn_vert", MangaOcrEngine(ocrPacks).recognize(page, "jpn_vert").language)
-        }
 
         val region = TranslationRegion(0.1f, 0.25f, 0.8f, 0.55f, "Hello world", "Ciao mondo")
         val reconstructed = MangaTranslationRenderer().render(bitmap, listOf(region), TranslationViewMode.RECONSTRUCTED)

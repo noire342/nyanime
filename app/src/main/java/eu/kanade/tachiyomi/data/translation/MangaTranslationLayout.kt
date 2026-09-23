@@ -15,7 +15,9 @@ fun groupTranslationLines(lines: List<TranslationRegion>, vertical: Boolean): Li
             val iterator = remaining.iterator()
             while (iterator.hasNext()) {
                 val candidate = iterator.next()
-                if (cluster.any { adjacent(it, candidate, vertical) }) {
+                if (cluster.any { adjacent(it, candidate, vertical) } &&
+                    (vertical || sameSpeechBubble(cluster, candidate))
+                ) {
                     cluster += candidate
                     iterator.remove()
                     changed = true
@@ -39,6 +41,18 @@ fun groupTranslationLines(lines: List<TranslationRegion>, vertical: Boolean): Li
     return grouped
 }
 
+private fun sameSpeechBubble(cluster: List<TranslationRegion>, candidate: TranslationRegion): Boolean {
+    val left = min(cluster.minOf { it.left }, candidate.left)
+    val right = max(cluster.maxOf { it.right }, candidate.right)
+    val top = min(cluster.minOf { it.top }, candidate.top)
+    val bottom = max(cluster.maxOf { it.bottom }, candidate.bottom)
+    if (right - left > 0.48f || bottom - top > 0.16f) return false
+    val nearest = cluster.minByOrNull { kotlin.math.abs((it.left + it.right) - (candidate.left + candidate.right)) }
+        ?: return false
+    val centerGap = kotlin.math.abs((nearest.left + nearest.right) - (candidate.left + candidate.right)) / 2f
+    return centerGap <= max(nearest.right - nearest.left, candidate.right - candidate.left) * 0.32f
+}
+
 private fun adjacent(a: TranslationRegion, b: TranslationRegion, vertical: Boolean): Boolean {
     val xOverlap = max(0f, min(a.right, b.right) - max(a.left, b.left))
     val yOverlap = max(0f, min(a.bottom, b.bottom) - max(a.top, b.top))
@@ -48,7 +62,7 @@ private fun adjacent(a: TranslationRegion, b: TranslationRegion, vertical: Boole
         yOverlap >= min(a.bottom - a.top, b.bottom - b.top) * 0.55f &&
             xGap <= max(a.right - a.left, b.right - b.left) * 0.7f
     } else {
-        xOverlap >= min(a.right - a.left, b.right - b.left) * 0.5f &&
-            yGap <= max(a.bottom - a.top, b.bottom - b.top) * 0.85f
+        xOverlap >= min(a.right - a.left, b.right - b.left) * 0.7f &&
+            yGap <= min(a.bottom - a.top, b.bottom - b.top) * 0.6f
     }
 }

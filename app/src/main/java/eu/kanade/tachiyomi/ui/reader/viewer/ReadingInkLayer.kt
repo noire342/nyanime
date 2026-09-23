@@ -5,6 +5,7 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
 import android.widget.ImageView
@@ -16,9 +17,13 @@ import eu.kanade.tachiyomi.data.reading.ReadingPosition
 import eu.kanade.tachiyomi.data.reading.ReadingStroke
 import eu.kanade.tachiyomi.data.reading.ReadingTogetherManager
 import eu.kanade.tachiyomi.data.reading.compactReadingPoints
+import eu.kanade.tachiyomi.data.translation.MangaTranslationCache
+import eu.kanade.tachiyomi.data.translation.MangaTranslationRenderer
+import eu.kanade.tachiyomi.data.translation.TranslationPage
 import eu.kanade.tachiyomi.data.watch.watchHex
 import eu.kanade.tachiyomi.data.watch.watchRandom
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
+import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reading.readingInkColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,9 +61,19 @@ internal class ReadingInkLayer(private val view: ReaderPageImageView, private va
     private var finger = -1
     private var cachedStrokes: List<ReadingStroke> = emptyList()
     private var cachedPoints: List<List<ReadingPoint>> = emptyList()
+    private val translationCache = MangaTranslationCache(view.context.applicationContext)
+    private val translationRenderer = MangaTranslationRenderer()
+    private val showTranslation = Injekt.get<ReaderPreferences>().mangaTranslatorShowInReader()
+    private var readerPage: ReaderPage? = null
+    private var translatedPage: TranslationPage? = null
+    private var translationLoad: Job? = null
 
     fun bind(page: ReaderPage?, manga: Manga?) {
         cancelGesture()
+        readerPage = page
+        translatedPage = null
+        translationLoad?.cancel()
+        loadTranslation()
         position = if (page != null && manga != null && !Injekt.get<GetMangaIncognitoState>().await(manga.source)) {
             ReadingPosition(
                 manga.source,
@@ -78,17 +93,40 @@ internal class ReadingInkLayer(private val view: ReaderPageImageView, private va
 
     fun attach() {
         scope?.cancel()
-        val manager = manager ?: return
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        observer = scope?.launch {
-            combine(manager.controller.state, manager.tools) { room, tools -> room to tools }.collect { (room, tools) ->
-                if (!room.active || !room.supported || !tools.drawing || !tools.visible) cancelGesture()
+        loadTranslation()
+        scope?.launch {
+            MangaTranslationCache.updates.collect { updated ->
+                if (readerPage?.let(MangaTranslationCache::pageKey) == updated) loadTranslation()
+            }
+        }
+        scope?.launch { showTranslation.changes().collect { view.invalidate() } }
+        observer = manager?.let { manager ->
+            scope?.launch {
+                combine(manager.controller.state, manager.tools) { room, tools ->
+                    room to tools
+                }.collect { (room, tools) ->
+                    if (!room.active || !room.supported || !tools.drawing || !tools.visible) cancelGesture()
+                    view.invalidate()
+                }
+            }
+        }
+    }
+
+    private fun loadTranslation() {
+        val page = readerPage ?: return
+        translationLoad?.cancel()
+        translationLoad = scope?.launch {
+            val document = translationCache.readForPage(page)
+            if (readerPage === page) {
+                translatedPage = document
                 view.invalidate()
             }
         }
     }
 
     fun detach() {
+        translationLoad?.cancel()
         scope?.cancel()
         scope = null
         observer = null
@@ -214,6 +252,7 @@ internal class ReadingInkLayer(private val view: ReaderPageImageView, private va
     }
 
     fun draw(canvas: Canvas) {
+        drawTranslation(canvas)
         val manager = manager ?: return
         val page = position ?: return
         val room = manager.controller.state.value
@@ -259,6 +298,27 @@ internal class ReadingInkLayer(private val view: ReaderPageImageView, private va
             }
         }
         if (gesture) drawLine(canvas, points, manager.tools.value.color, manager.tools.value.width)
+        canvas.restore()
+    }
+
+    private fun drawTranslation(canvas: Canvas) {
+        if (!showTranslation.get()) return
+        if (image()?.isShown != true) return
+        val document = translatedPage ?: return
+        canvas.save()
+        canvas.clipRect(0, 0, view.width, view.height)
+        document.regions.forEach { region ->
+            if (region.translated.isBlank()) return@forEach
+            val topLeft = toView(ReadingPoint(region.left, region.top)) ?: return@forEach
+            val bottomRight = toView(ReadingPoint(region.right, region.bottom)) ?: return@forEach
+            val rect = RectF(
+                minOf(topLeft.x, bottomRight.x) - 3f,
+                minOf(topLeft.y, bottomRight.y) - 3f,
+                maxOf(topLeft.x, bottomRight.x) + 3f,
+                maxOf(topLeft.y, bottomRight.y) + 3f,
+            )
+            translationRenderer.drawOverlay(canvas, region, rect)
+        }
         canvas.restore()
     }
 

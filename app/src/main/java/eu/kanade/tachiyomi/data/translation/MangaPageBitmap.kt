@@ -30,7 +30,13 @@ suspend fun loadMangaPageBitmap(page: ReaderPage): MangaPageBitmap = withContext
     BitmapFactory.decodeByteArray(raw, 0, raw.size, bounds)
     require(bounds.outWidth > 0 && bounds.outHeight > 0) { "Immagine non leggibile" }
     var sample = 1
-    while (maxOf(bounds.outWidth / sample, bounds.outHeight / sample) > 2048) sample *= 2
+    // A 1500 × 2152 digital page was previously halved to 750 × 1076; that loses
+    // the small speech-balloon glyphs before OCR can inspect them.
+    while (maxOf(bounds.outWidth / sample, bounds.outHeight / sample) > 3072 ||
+        (bounds.outWidth / sample).toLong() * (bounds.outHeight / sample) > 8_000_000
+    ) {
+        sample *= 2
+    }
     val bitmap = BitmapFactory.decodeByteArray(
         raw,
         0,

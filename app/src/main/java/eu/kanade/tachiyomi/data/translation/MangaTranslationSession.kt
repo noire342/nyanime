@@ -29,7 +29,8 @@ class MangaTranslationSession(
     preferences: ReaderPreferences,
 ) {
     data class State(
-        val language: String = "jpn_vert",
+        val language: String = "eng",
+        val showInReader: Boolean = true,
         val mode: TranslationViewMode = TranslationViewMode.OVERLAY,
         val original: Bitmap? = null,
         val preview: Bitmap? = null,
@@ -50,7 +51,10 @@ class MangaTranslationSession(
     private val cache = MangaTranslationCache(context.applicationContext)
     private val renderer = MangaTranslationRenderer()
     private val glossary = MangaTranslationGlossary(preferences)
-    private val mutableState = MutableStateFlow(State())
+    private val showInReaderPreference = preferences.mangaTranslatorShowInReader()
+    private val mutableState = MutableStateFlow(
+        State(showInReader = showInReaderPreference.get()),
+    )
     val state = mutableState.asStateFlow()
     private val sessionScope = CoroutineScope(scope.coroutineContext + SupervisorJob(scope.coroutineContext[Job]))
     private var task: Job? = null
@@ -87,16 +91,15 @@ class MangaTranslationSession(
         mutableState.update { it.copy(phase = "Modelli eliminati") }
     }
 
-    fun selectLanguage(language: String) {
-        if (language !in MangaOcrPacks.packs || state.value.busy) return
-        mutableState.update { it.copy(language = language, document = null, preview = it.original, error = null) }
-        sessionScope.launch { loadCache() }
-    }
-
     fun selectMode(mode: TranslationViewMode) {
         mutableState.update { it.copy(mode = mode, error = null) }
         previewTask?.cancel()
         previewTask = sessionScope.launch { updatePreview() }
+    }
+
+    fun setShowInReader(enabled: Boolean) {
+        showInReaderPreference.set(enabled)
+        mutableState.update { it.copy(showInReader = enabled) }
     }
 
     fun installModels() = start {
@@ -156,6 +159,7 @@ class MangaTranslationSession(
         mutableState.update { it.copy(document = revised) }
         sessionScope.launch {
             cache.write(revised)
+            cache.writeForPage(page, revised)
             updatePreview()
         }
     }
@@ -223,7 +227,7 @@ class MangaTranslationSession(
             var document = cached ?: run {
                 mutableState.update { it.copy(phase = "Riconosco il testo") }
                 val recognized = ocr.recognize(image, language)
-                recognized.copy(regions = groupTranslationLines(recognized.regions, language == "jpn_vert")).also {
+                recognized.copy(regions = groupTranslationLines(recognized.regions, false)).also {
                     cache.write(it)
                 }
             }
@@ -252,6 +256,9 @@ class MangaTranslationSession(
                         mutableState.update { it.copy(document = document) }
                     }
                 }
+            }
+            if (document.regions.any { it.translated.isNotBlank() }) {
+                cache.writeForPage(entry, document)
             }
             if (show) {
                 mutableState.update { it.copy(document = document, phase = "Pronto") }

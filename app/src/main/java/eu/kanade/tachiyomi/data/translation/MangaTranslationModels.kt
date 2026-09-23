@@ -25,16 +25,16 @@ data class TranslationRegion(
 
 @Serializable
 data class TranslationPage(
-    val version: Int = 1,
+    val version: Int = 2,
     val imageHash: String,
     val language: String,
     val width: Int,
     val height: Int,
     val regions: List<TranslationRegion>,
 ) {
-    fun valid() = version == 1 &&
+    fun valid() = version == 2 &&
         imageHash.length == 64 &&
-        language in setOf("eng", "jpn", "jpn_vert") &&
+        language == "eng" &&
         width in 1..8192 &&
         height in 1..8192 &&
         regions.size <= 300 &&
