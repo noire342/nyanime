@@ -63,11 +63,6 @@ object SettingsReaderScreen : SearchableSettings {
                 preference = readerPref.pageTransitions(),
                 title = stringResource(MR.strings.pref_page_transitions),
             ),
-            Preference.PreferenceItem.SwitchPreference(
-                preference = readerPref.mangaTranslatorEnabled(),
-                title = "Traduzione manga offline",
-                subtitle = "Nel lettore, tocca la pagina e poi Traduci. I modelli si scaricano solo su richiesta.",
-            ),
             getDisplayGroup(readerPreferences = readerPref),
             getEInkGroup(readerPreferences = readerPref),
             getReadingGroup(readerPreferences = readerPref),

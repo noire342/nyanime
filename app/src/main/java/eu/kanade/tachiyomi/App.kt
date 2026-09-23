@@ -70,6 +70,7 @@ import tachiyomi.presentation.widget.entries.manga.MangaWidgetManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
+import java.io.File
 import java.security.Security
 
 class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factory {
@@ -110,6 +111,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
 
         val scope = ProcessLifecycleOwner.get().lifecycleScope
+        scope.launch(Dispatchers.IO) { removeRetiredTranslationData() }
         scope.launch(Dispatchers.IO) {
             eu.kanade.tachiyomi.data.community.CommunityDormancy.stopBackgroundWork(this@App)
             eu.kanade.tachiyomi.data.community.CommunityDormancy.cleanObsoleteData(this@App)
@@ -183,6 +185,25 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         }
 
         initializeMigrator()
+    }
+
+    /** Removes optional model downloads from earlier previews without touching manga or reading progress. */
+    private fun removeRetiredTranslationData() {
+        val directories = listOf(
+            File(filesDir, "manga-translation"),
+            File(filesDir, "manga-translation-v2"),
+            File(cacheDir, "manga-translation-v1"),
+        )
+        directories.forEach { directory ->
+            runCatching {
+                if (directory.exists()) check(directory.deleteRecursively())
+            }.onFailure { logcat(LogPriority.WARN, it) { "Unable to remove retired reader data" } }
+        }
+        Injekt.get<PreferenceStore>().apply {
+            getBoolean("manga_translator_enabled").delete()
+            getString("manga_translator_glossary_v1").delete()
+            getBoolean("manga_translator_show_in_reader").delete()
+        }
     }
 
     private fun initializeMigrator() {

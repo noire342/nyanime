@@ -114,8 +114,6 @@ android {
 
     packaging {
         jniLibs {
-            // OpenCV and FFmpegKit both bundle libc++; package one compatible copy.
-            pickFirsts += "**/libc++_shared.so"
             keepDebugSymbols += listOf(
                 "libandroidx.graphics.path",
                 "libarchive-jni",
@@ -211,8 +209,6 @@ val nyanimePreviewArtwork by tasks.registering(Jar::class) {
 }
 
 dependencies {
-    androidTestImplementation(androidx.test.ext)
-    androidTestImplementation("androidx.test:runner:1.6.2")
     add("screenshotTestImplementation", files(nyanimePreviewArtwork))
     add("screenshotTestImplementation", "com.android.tools.screenshot:screenshot-validation-api:0.0.1-alpha15")
     add("screenshotTestImplementation", "io.coil-kt.coil3:coil-test:3.1.0")
@@ -304,11 +300,6 @@ dependencies {
         exclude(module = "image-decoder")
     }
     implementation(libs.image.decoder)
-    // Manga translation runs locally; trained language data is downloaded only on demand.
-    implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.24.3")
-    implementation("ai.djl.huggingface:tokenizers:0.33.0")
-    implementation("ai.djl.android:tokenizer-native:0.33.0")
 
     // UI libraries
     implementation(libs.material)
@@ -351,7 +342,6 @@ dependencies {
     implementation(aniyomilibs.aniyomi.mpv)
     // FFmpeg-kit
     implementation(aniyomilibs.ffmpeg.kit)
-    implementation("org.opencv:opencv:4.12.0")
     implementation("androidx.media3:media3-transformer:1.8.0")
     implementation("androidx.media3:media3-effect:1.8.0")
     implementation(aniyomilibs.arthenica.smartexceptions)
