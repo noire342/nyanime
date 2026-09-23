@@ -31,8 +31,9 @@ class WatchFeedbackTest {
     @Test
     fun waitingCaptionDistinguishesLocalLoadingAndTheActualFriend() {
         assertEquals("Aspettiamo Marco…", waiting.preparationCaption())
-        assertEquals("Prepariamo il video…", waiting.preparationCaption(localLoading = true))
-        assertEquals(null, waiting.copy(waitForEveryone = false).waitingFor)
+        assertEquals("Il tuo video sta caricando…", waiting.preparationCaption(localLoading = true))
+        assertEquals("Marco", waiting.copy(waitForEveryone = false).waitingFor?.name)
+        assertEquals(null, waiting.copy(waitForEveryone = false, phase = WatchPhase.Playing).waitingFor)
         assertEquals(WatchRecovery.None, waiting.copy(waitingSeconds = 14).recovery)
         assertEquals(WatchRecovery.Details, waiting.copy(waitingSeconds = 15).recovery)
         assertEquals(WatchRecovery.None, waiting.copy(phase = WatchPhase.DifferentVideo, waitingSeconds = 0).recovery)

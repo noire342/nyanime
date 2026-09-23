@@ -252,7 +252,7 @@ fun WatchTogetherPanel(
         },
         copied = copied,
         onShare = {
-            if (short.code.isNotBlank()) {
+            if (short.code.isNotBlank() && short.relayCount > 0 && room.relayCount > 0) {
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
                     putExtra(Intent.EXTRA_TEXT, WatchShortRooms.shareText(short.code))
@@ -395,7 +395,7 @@ fun WatchTogetherContent(
                             if (short.relayCount > 0) {
                                 "Richiesta inviata. Il tuo amico deve accettare."
                             } else {
-                                "Connessione in corso…"
+                                short.message
                             },
                             color = colors.onSurfaceVariant,
                         )
@@ -511,6 +511,7 @@ fun WatchTogetherContent(
             }
         } else {
             if (room.host && short.code.isNotBlank()) {
+                val invitationsReady = short.relayCount > 0 && room.relayCount > 0
                 Card(
                     shape = RoundedCornerShape(22.dp),
                     colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh),
@@ -518,7 +519,7 @@ fun WatchTogetherContent(
                     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Invita un amico", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                            TextButton(onClick = onQr) { Text("QR") }
+                            TextButton(onClick = onQr, enabled = invitationsReady) { Text("QR") }
                         }
                         SelectionContainer {
                             Text(
@@ -528,9 +529,20 @@ fun WatchTogetherContent(
                                 fontWeight = FontWeight.Bold,
                             )
                         }
-                        Text("Codice temporaneo · approvi tu chi entra", color = colors.onSurfaceVariant)
+                        Text(
+                            when {
+                                invitationsReady -> "Codice temporaneo · approvi tu chi entra"
+                                room.relayCount == 0 -> room.message
+                                else -> short.message
+                            },
+                            color = colors.onSurfaceVariant,
+                        )
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            OutlinedButton(onClick = onCopy, modifier = Modifier.weight(1f)) {
+                            OutlinedButton(
+                                onClick = onCopy,
+                                enabled = invitationsReady,
+                                modifier = Modifier.weight(1f),
+                            ) {
                                 Icon(
                                     if (copied) Icons.Default.CheckCircle else Icons.Default.ContentCopy,
                                     null,
@@ -538,7 +550,7 @@ fun WatchTogetherContent(
                                 )
                                 Text(if (copied) " Copiato" else " Copia")
                             }
-                            Button(onClick = onShare, modifier = Modifier.weight(1f)) {
+                            Button(onClick = onShare, enabled = invitationsReady, modifier = Modifier.weight(1f)) {
                                 Icon(Icons.Default.Share, null, Modifier.size(18.dp))
                                 Text(" Condividi")
                             }
@@ -588,6 +600,7 @@ fun WatchTogetherContent(
                         opening.error ?: when {
                             opening.loading -> "Apro l'episodio dalla tua estensione…"
                             room.preparingPlayback -> room.playbackPreparationMessage
+                            room.host && room.relayCount > 0 && short.relayCount == 0 -> "Preparo gli inviti…"
                             else -> room.message
                         },
                         color = if (opening.error != null) colors.error else colors.onSurfaceVariant,
@@ -715,7 +728,14 @@ fun WatchTogetherContent(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (room.host) {
                         WatchOption("Tutti possono usare i comandi", room.sharedControls, onSharedControls)
-                        WatchOption("Aspetta tutti durante il caricamento", room.waitForEveryone, onWaitForEveryone)
+                        WatchOption("Metti tutti in pausa se uno carica", room.waitForEveryone, onWaitForEveryone)
+                        if (!room.waitForEveryone) {
+                            Text(
+                                "Se l'amico carica, il tuo video prosegue fino a 5 secondi; poi vi fermate insieme.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.onSurfaceVariant,
+                            )
+                        }
                     }
                     Text(
                         "Connessioni attive: " +

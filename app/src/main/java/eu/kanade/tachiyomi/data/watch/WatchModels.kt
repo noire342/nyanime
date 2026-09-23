@@ -130,7 +130,7 @@ data class WatchRoomState(
     val members: List<WatchMember> = emptyList(),
     val relayCount: Int = 0,
     val sharedControls: Boolean = true,
-    val waitForEveryone: Boolean = true,
+    val waitForEveryone: Boolean = false,
     val latencyMs: Long? = null,
     val driftMs: Long? = null,
     val localHold: Boolean = false,
@@ -274,11 +274,14 @@ data class WatchMessage(
         acknowledgements.all { (key, value) -> key.matches(Regex("[0-9a-f]{64}")) && value >= 0 }
 }
 
+enum class WatchRelayFailure { None, Rejected, RateLimited }
+
 interface WatchTransport {
     val publicKey: String
     fun start(onMessage: (String, WatchMessage) -> Unit, onConnection: (Int) -> Unit)
     fun send(message: WatchMessage)
     fun retryUnavailable() {}
+    fun relayFailure(): WatchRelayFailure = WatchRelayFailure.None
     fun close()
 }
 

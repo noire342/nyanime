@@ -68,7 +68,7 @@ data class WatchInvite(
     }
 
     companion object {
-        val defaultRelays = listOf("wss://relay.damus.io", "wss://nos.lol")
+        val defaultRelays = listOf("wss://relay.primal.net", "wss://relay.snort.social")
         fun codeFromLink(text: String, now: Long): String {
             require(text.length <= 5000) { "Invito troppo lungo." }
             val uri = URI(text)

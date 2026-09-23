@@ -58,7 +58,7 @@ val WatchRoomState.recovery: WatchRecovery get() = when {
 
 val WatchRoomState.waitingFor: WatchMember? get() = members.firstOrNull {
     it.id != localMemberId && (!it.ready || it.buffering || it.problem != WatchProblem.None)
-}.takeIf { waitForEveryone }
+}.takeIf { waitForEveryone || phase == WatchPhase.Buffering }
 
 fun WatchRoomState.preparationCaption(localLoading: Boolean = false): String = when {
     commandFailed && recovery == WatchRecovery.Details -> "La stanza è in pausa"
@@ -66,7 +66,7 @@ fun WatchRoomState.preparationCaption(localLoading: Boolean = false): String = w
     recovery == WatchRecovery.Connection -> "Connessione interrotta. Tocca per riprovare"
     phase == WatchPhase.Reconnecting || relayCount == 0 -> "Ritroviamo il collegamento…"
     localHold -> "In pausa su questo telefono"
-    localLoading -> "Prepariamo il video…"
+    localLoading -> "Il tuo video sta caricando…"
     waitingFor != null -> {
         val friend = waitingFor!!
         when (friend.problem) {

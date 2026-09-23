@@ -21,6 +21,8 @@ class NostrWatchTransportTest {
         val invite = WatchInvite.create(hostIdentity.publicKey, System.currentTimeMillis(), listOf(url))
         val host = NostrWatchTransport(invite, hostIdentity)
         val guest = NostrWatchTransport(invite, guestIdentity)
+        host.diagnostics = { System.err.println("host: $it") }
+        guest.diagnostics = { System.err.println("guest: $it") }
         val connected = CountDownLatch(2)
         val delivered = CountDownLatch(2)
         val hostCount = AtomicInteger()
@@ -59,6 +61,17 @@ class NostrWatchTransportTest {
                 if (delivered.await(1500, TimeUnit.MILLISECONDS)) break
             }
             assertEquals(0, delivered.count, "Encrypted messages did not travel in both directions through " + url)
+            for (sequence in 9L..18L) {
+                host.send(
+                    WatchMessage(type = WatchMessageType.Command, sequence = sequence, at = 1000, command = "play"),
+                )
+                guest.send(
+                    WatchMessage(type = WatchMessageType.Command, sequence = sequence, at = 1000, command = "pause"),
+                )
+                Thread.sleep(1500)
+            }
+            assertTrue(hostCount.get() >= 8, "Guest messages stopped arriving through " + url)
+            assertTrue(guestCount.get() >= 8, "Host messages stopped arriving through " + url)
         } finally {
             host.close()
             guest.close()

@@ -65,7 +65,7 @@ class WatchShortRooms(
         retry = scope.launch {
             while (token == generation && mutableState.value.waiting) {
                 if (mutableState.value.relayCount > 0) send("join-request", name = displayName)
-                delay(2_500)
+                delay(5_000)
             }
         }
     }
@@ -89,7 +89,7 @@ class WatchShortRooms(
         mutableState.value = WatchShortState(
             code = code,
             waiting = joining,
-            message = if (joining) "Cerco la stanza e aspetto la conferma…" else "Codice pronto · valido per 10 minuti",
+            message = if (joining) "Cerco la stanza e aspetto la conferma…" else "Preparo il codice…",
         )
         val network = transportFactory(sideInvite, sideIdentity)
         transport = network
@@ -98,7 +98,24 @@ class WatchShortRooms(
             onMessage = { sender, message -> scope.launch { if (token == generation) receive(sender, message) } },
             onConnection = { count ->
                 scope.launch {
-                    if (token == generation) mutableState.value = mutableState.value.copy(relayCount = count)
+                    if (token == generation) {
+                        mutableState.value = mutableState.value.copy(
+                            relayCount = count,
+                            message = when (network.relayFailure()) {
+                                WatchRelayFailure.Rejected -> "I relay non accettano gli inviti di questa stanza."
+                                WatchRelayFailure.RateLimited -> "Relay occupati. Riprovo tra poco…"
+                                WatchRelayFailure.None -> if (count > 0) {
+                                    if (joining) {
+                                        "Aspetto la conferma del tuo amico…"
+                                    } else {
+                                        "Codice pronto · valido per 10 minuti"
+                                    }
+                                } else {
+                                    "Collegamento agli inviti…"
+                                }
+                            },
+                        )
+                    }
                 }
             },
         )

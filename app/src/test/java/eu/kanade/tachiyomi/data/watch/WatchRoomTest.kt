@@ -128,6 +128,30 @@ class WatchRoomTest {
     }
 
     @Test
+    fun anEmptyRoomDoesNotPublishRepeatedTimelines() = runTest {
+        val room = Pairing(this)
+        room.hostPlayer.media = null
+        room.host.create("Host")
+        runCurrent()
+        advanceTimeBy(10_000)
+        runCurrent()
+        assertTrue(room.network.endpoints.single().sent.none { it.type == WatchMessageType.Timeline })
+    }
+
+    @Test
+    fun aReadingRoomDoesNotClaimToBeOpenWithoutAUsableRelay() = runTest {
+        val room = Pairing(this)
+        room.host.setReadingMode(true)
+        room.host.create("Reader")
+        runCurrent()
+        room.network.endpoints.single().connection(0)
+        advanceTimeBy(13_000)
+        runCurrent()
+        assertEquals(WatchPhase.Reconnecting, room.host.state.value.phase)
+        assertEquals("Connessione assente. Riprovo automaticamente…", room.host.state.value.message)
+    }
+
+    @Test
     fun hostPlayShowsPreparationBeforeTheNextTickAndCanBeCancelled() = runTest {
         val room = Pairing(this)
         room.join()
@@ -431,6 +455,7 @@ class WatchRoomTest {
     fun guestCanSeekWhileHostStillSeesItsPreviousBufferingStatus() = runTest {
         val room = Pairing(this)
         room.join()
+        room.host.setWaitForEveryone(true)
         room.host.resumeByUser()
         room.advance()
         room.guestPlayer.buffering = true
@@ -452,6 +477,7 @@ class WatchRoomTest {
     fun bufferingPausesGroupUntilGuestIsReady() = runTest {
         val room = Pairing(this)
         room.join()
+        room.host.setWaitForEveryone(true)
         room.host.resumeByUser()
         room.advance()
         room.guestPlayer.buffering = true
@@ -462,6 +488,57 @@ class WatchRoomTest {
         room.advance()
         assertFalse(room.hostPlayer.paused)
         assertFalse(room.guestPlayer.paused)
+    }
+
+    @Test
+    fun newRoomsLetTheOtherPlayerContinueThroughAGuestsBuffering() = runTest {
+        val room = Pairing(this)
+        room.join()
+        assertFalse(room.host.state.value.waitForEveryone)
+        room.host.resumeByUser()
+        room.advance()
+        room.guestPlayer.buffering = true
+        room.advance(2_000)
+        assertFalse(room.hostPlayer.paused)
+        assertTrue(room.guestPlayer.paused)
+        room.guestPlayer.buffering = false
+        room.advance(5_000)
+        assertFalse(room.guestPlayer.paused)
+        assertTrue(abs(room.hostPlayer.sample().position - room.guestPlayer.sample().position) < 0.5)
+    }
+
+    @Test
+    fun prolongedGuestBufferingPausesEveryoneBeforeDriftGrowsTooLarge() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.resumeByUser()
+        room.advance()
+        room.guestPlayer.buffering = true
+        room.advance(6_000)
+        assertTrue(room.hostPlayer.paused)
+        room.guestPlayer.buffering = false
+        room.advance(5_000)
+        assertFalse(room.hostPlayer.paused)
+        assertFalse(room.guestPlayer.paused)
+    }
+
+    @Test
+    fun oneMissedPresenceUpdateDoesNotPauseBothPlayers() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.resumeByUser()
+        room.advance()
+        room.guest.resync()
+        room.advance(500)
+        assertFalse(room.hostPlayer.paused)
+        room.network.intercept = { endpoint, message, deliver ->
+            if (endpoint !== room.network.endpoints[1] || message.type != WatchMessageType.Status) deliver()
+        }
+        room.advance(7_000)
+        assertFalse(room.hostPlayer.paused)
+        assertFalse(room.guestPlayer.paused)
+        room.advance(6_000)
+        assertTrue(room.hostPlayer.paused)
     }
 
     @Test
@@ -847,7 +924,7 @@ class WatchRoomTest {
         room.advance(1000)
         assertNotNull(room.host.state.value.nextSeconds)
         room.network.endpoints[1].online = false
-        room.advance(11_000)
+        room.advance(13_000)
         assertEquals(0, room.hostPlayer.advances)
         assertEquals(null, room.host.state.value.nextSeconds)
         assertEquals(WatchProblem.Connection, room.host.state.value.members.last().problem)

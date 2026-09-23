@@ -48,11 +48,13 @@ class WatchRoomController(
     private var timeline: WatchMessage? = null
     private val pings = mutableSetOf<Long>()
     private val peers = linkedMapOf<String, Pair<WatchPeerStatus, Long>>()
+    private val peerLoadingSince = mutableMapOf<String, Long>()
     private val sequences = mutableMapOf<String, Long>()
     private val acknowledgements = mutableMapOf<String, Long>()
     private val departed = linkedMapOf<String, Long>()
     private var name = ""
     private var desiredPaused = true
+    private var hasPlayedCurrentMedia = false
     private var baseSpeed = 1.0
     private var originalSpeed = 1.0
     private var appliedSpeed: Double? = null
@@ -210,6 +212,7 @@ class WatchRoomController(
         timeline = null
         pings.clear()
         peers.clear()
+        peerLoadingSince.clear()
         sequences.clear()
         acknowledgements.clear()
         departed.clear()
@@ -218,6 +221,7 @@ class WatchRoomController(
         pendingSeek = null
         acceptedMedia = null
         desiredPaused = true
+        hasPlayedCurrentMedia = false
         expectsPaused = true
         appliedSpeed = null
         managedSpeeds.clear()
@@ -661,6 +665,7 @@ class WatchRoomController(
                 departed[sender] = incoming.sequence
                 if (departed.size > 16) departed.remove(departed.keys.first())
                 peers.remove(sender)
+                peerLoadingSince.remove(sender)
                 acknowledgements.remove(sender)
                 lastBroadcast = -10_000
             }
@@ -685,6 +690,14 @@ class WatchRoomController(
         }
         val time = now()
         if (readingMode) {
+            if (state.value.relayCount == 0) {
+                mutableState.value = state.value.copy(
+                    phase = if (time - started < 12_000) WatchPhase.Connecting else WatchPhase.Reconnecting,
+                    message = connectionMessage(time),
+                )
+                updateFeedback(time)
+                return
+            }
             tickReading(time)
             return
         }
@@ -717,13 +730,7 @@ class WatchRoomController(
                 nextSeconds = null,
                 skip = state.value.skip?.copy(deadline = null),
                 next = state.value.next?.copy(deadline = null),
-                message = if (time - started <
-                    12_000
-                ) {
-                    "Connessione alla stanza…"
-                } else {
-                    "Connessione assente. Riprovo automaticamente…"
-                },
+                message = connectionMessage(time),
             )
             updateFeedback(time)
             return
@@ -732,10 +739,20 @@ class WatchRoomController(
         updateFeedback(time)
     }
 
+    private fun connectionMessage(time: Long): String {
+        val connecting = time - started < 12_000
+        return when (transport?.relayFailure()) {
+            WatchRelayFailure.Rejected -> "I relay non accettano i messaggi della stanza."
+            WatchRelayFailure.RateLimited -> "Relay occupati. Riprovo tra poco…"
+            else -> if (connecting) "Connessione alla stanza…" else "Connessione assente. Riprovo automaticamente…"
+        }
+    }
+
     private fun tickReading(time: Long) {
         expectsPaused = true
-        peers.filterValues { time - it.second > 20_000 }.keys.toList().forEach {
+        peers.filterValues { time - it.second > 30_000 }.keys.toList().forEach {
             peers.remove(it)
+            peerLoadingSince.remove(it)
             acknowledgements.remove(it)
         }
         if (state.value.host) {
@@ -756,7 +773,7 @@ class WatchRoomController(
                 skip = null,
                 next = null,
             )
-            if (time - lastBroadcast >= 2000) {
+            if (peers.isNotEmpty() && time - lastBroadcast >= 4000) {
                 send(
                     message(WatchMessageType.Timeline).copy(
                         peers = all,
@@ -767,7 +784,7 @@ class WatchRoomController(
                 )
                 lastBroadcast = time
             }
-        } else if (time - lastStatus >= 2000) {
+        } else if (time - lastStatus >= 4000) {
             send(message(WatchMessageType.Status).copy(name = name, readingMode = true))
             lastStatus = time
         }
@@ -796,8 +813,9 @@ class WatchRoomController(
     }
 
     private fun tickHost(sample: WatchPlayback, time: Long) {
-        peers.filterValues { time - it.second > 20_000 }.keys.toList().forEach {
+        peers.filterValues { time - it.second > 30_000 }.keys.toList().forEach {
             peers.remove(it)
+            peerLoadingSince.remove(it)
             acknowledgements.remove(it)
         }
         val media = sample.media
@@ -813,6 +831,8 @@ class WatchRoomController(
             suppressedNext = null
             advancedFrom = null
             peers.replaceAll { _, entry -> entry.first.copy(ready = false) to entry.second }
+            peerLoadingSince.clear()
+            hasPlayedCurrentMedia = false
             lastBroadcast = -10_000
         }
         pendingSeek?.let {
@@ -823,10 +843,28 @@ class WatchRoomController(
             }
         }
         val position = (pendingSeek ?: sample.position).coerceIn(0.0, media?.duration ?: 0.0)
-        val waiting = state.value.waitForEveryone &&
-            peers.values.any {
-                !it.first.reading && (!it.first.ready || it.first.buffering || time - it.second > 6000)
+        val waiting = peers.map { (id, entry) ->
+            val (peer, lastSeen) = entry
+            if (peer.reading) {
+                peerLoadingSince.remove(id)
+                false
+            } else {
+                val stale = time - lastSeen > 12_000
+                val loading = !peer.ready || peer.buffering
+                if (!loading) peerLoadingSince.remove(id)
+                val since = if (loading) peerLoadingSince.getOrPut(id) { time } else time
+                val unsafe = when (peer.problem) {
+                    WatchProblem.LocalPause,
+                    WatchProblem.SourceError,
+                    WatchProblem.MissingSource,
+                    WatchProblem.DifferentEdition,
+                    -> true
+                    else -> false
+                }
+                val graceExpired = time - since >= 5_000
+                stale || (loading && (unsafe || state.value.waitForEveryone || !hasPlayedCurrentMedia || graceExpired))
             }
+        }.any { it }
         val buffering = !sample.ready || sample.buffering || pendingSeek != null || waiting
         val previousDeadline = startGate.deadline
         val running = startGate.update(
@@ -836,6 +874,7 @@ class WatchRoomController(
         )
         if (previousDeadline != startGate.deadline) lastBroadcast = -10_000
         val paused = !running
+        if (running) hasPlayedCurrentMedia = true
         expectsPaused = paused
         if (sample.paused != paused) player.pause(paused)
         setSpeed(baseSpeed)
@@ -915,7 +954,7 @@ class WatchRoomController(
             ),
         )
         peers.forEach { (id, peer) ->
-            all[id] = if (time - peer.second > 6000) {
+            all[id] = if (time - peer.second > 12_000) {
                 peer.first.copy(ready = false, problem = WatchProblem.Connection)
             } else {
                 peer.first
@@ -988,8 +1027,10 @@ class WatchRoomController(
             skipSeconds = remainingSeconds(skipCue?.deadline, time),
             upcoming = upcoming, next = nextCue, nextSeconds = remainingSeconds(nextCue?.deadline, time),
         )
-        val interval = if (countdown != null || skipCue?.deadline != null || nextCue != null) 500 else 2000
-        if (time - lastBroadcast >= interval) {
+        // Deadlines are shared once and counted down locally; repeating snapshots more often
+        // wastes relay quota without making a pause, seek or page change arrive faster.
+        val interval = if (countdown != null || skipCue?.deadline != null || nextCue != null) 2000 else 4000
+        if (peers.isNotEmpty() && time - lastBroadcast >= interval) {
             send(
                 message(WatchMessageType.Timeline).copy(
                     media = media, position = position, paused = paused, playRequested = !desiredPaused,

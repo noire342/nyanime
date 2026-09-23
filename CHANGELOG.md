@@ -8,6 +8,21 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 23 settembre 2026 — Stanze con relay verificati
+
+- Le stanze usano due relay che hanno superato una prova di scambio cifrato in
+  entrambe le direzioni, senza account. I precedenti rifiutavano gli invii.
+- La connessione viene mostrata come pronta solo dopo che il relay accetta un
+  messaggio di prova; rifiuti e limiti di frequenza non fanno più lampeggiare lo
+  stato della stanza come se fosse disponibile.
+- Una stanza vuota non invia più aggiornamenti periodici inutili e le richieste
+  di ingresso ripetute sono meno frequenti.
+- Un singolo aggiornamento di presenza perso non ferma più entrambi i video;
+  con l'opzione di attesa attiva, il buffering reale continua a mettere in pausa la stanza.
+- Le nuove stanze tollerano fino a 5 secondi di caricamento dell'ospite
+  prima di fermare anche chi ospita; chi era rimasto indietro si riallinea quando
+  torna pronto. La pausa immediata per tutti resta disponibile nelle opzioni.
+
 ## 23 settembre 2026 — Inviti brevi coerenti in tutta la stanza
 
 - Link, messaggio condiviso e QR del creatore ora contengono il codice stanza a
