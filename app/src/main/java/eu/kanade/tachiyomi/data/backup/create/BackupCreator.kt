@@ -104,7 +104,11 @@ class BackupCreator(
             } else {
                 emptyList()
             }
-            val animeEntries = getAnimeFavorites.await() + nonFavoriteAnime
+            val hiddenResume = backupHiddenResume(options)
+            val hiddenAnime = hiddenResume?.entries.orEmpty().mapNotNull { entry ->
+                animeRepository.getAnimeByUrlAndSourceId(entry.url, entry.source)
+            }
+            val animeEntries = getAnimeFavorites.await() + nonFavoriteAnime + hiddenAnime
             val seasons = animeEntries.filter { it.fetchType == FetchType.Seasons }
                 .flatMap { animeRepository.getAnimeSeasonsById(it.id).map { season -> season.anime } }
             val backupAnime = backupAnimes((animeEntries + seasons).distinctBy { it.id }, options)
@@ -130,7 +134,7 @@ class BackupCreator(
                 backupExtensions = backupExtensions(options),
                 backupAnimeExtensionStores = backupAnimeExtensionStores(options),
                 backupCustomButton = backupCustomButtons(options),
-                backupHiddenResume = backupHiddenResume(options),
+                backupHiddenResume = hiddenResume,
             )
 
             val byteArray = parser.encodeToByteArray(Backup.serializer(), backup)

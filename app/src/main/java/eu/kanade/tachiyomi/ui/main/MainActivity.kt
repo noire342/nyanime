@@ -75,6 +75,7 @@ import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.animesource.model.Hoster
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.core.common.Constants
+import eu.kanade.tachiyomi.data.backup.BackupFileFormat
 import eu.kanade.tachiyomi.data.cache.ChapterCache
 import eu.kanade.tachiyomi.data.cast.CastController
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
@@ -576,10 +577,7 @@ class MainActivity : BaseActivity() {
             }
             Intent.ACTION_VIEW -> {
                 // Handling opening of backup files
-                if (listOf(".nyabk", ".tachibk").any { extension ->
-                        intent.data?.path?.endsWith(extension, ignoreCase = true) == true
-                    }
-                ) {
+                if (BackupFileFormat.acceptsPath(intent.data?.path)) {
                     navigator.popUntilRoot()
                     navigator.push(RestoreBackupScreen(intent.data.toString()))
                 }

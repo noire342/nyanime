@@ -98,7 +98,7 @@ class BackupRestorer(
 
         // Store source mapping for error messages
         val backupAnimeMaps = backup.backupAnimeSources
-        mangaSourceMapping = backupAnimeMaps.associate { it.sourceId to it.name }
+        animeSourceMapping = backupAnimeMaps.associate { it.sourceId to it.name }
         val backupMangaMaps = backup.backupSources
         mangaSourceMapping = backupMangaMaps.associate { it.sourceId to it.name }
 
@@ -166,13 +166,17 @@ class BackupRestorer(
 
     private suspend fun restoreHiddenResume(state: BackupHiddenResumeState) {
         val ids = state.entries.mapNotNull { entry ->
-            try {
+            val id = try {
                 animeRepository.getAnimeByUrlAndSourceId(entry.url, entry.source)?.id?.toString()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
                 null
             }
+            if (id == null) {
+                errors.add(Date() to "Hidden title unavailable [${entry.source}]: ${entry.url}")
+            }
+            id
         }
         preferenceStore.getStringSet(Preference.appStateKey("discovery_hidden_resume")).set(ids.toSet())
     }
@@ -247,7 +251,7 @@ class BackupRestorer(
             preferences,
             animeCategories,
             mangaCategories,
-        )
+        ).forEach { key -> errors.add(Date() to "App setting: $key") }
 
         restoreProgress += 1
         notifier.showRestoreProgress(
@@ -261,6 +265,7 @@ class BackupRestorer(
     private fun CoroutineScope.restoreSourcePreferences(preferences: List<BackupSourcePreferences>) = launch {
         ensureActive()
         preferenceRestorer.restoreSource(preferences)
+            .forEach { key -> errors.add(Date() to "Source setting: $key") }
 
         restoreProgress += 1
         notifier.showRestoreProgress(

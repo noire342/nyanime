@@ -16,6 +16,7 @@ import eu.kanade.tachiyomi.data.backup.models.StringSetPreferenceValue
 import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateJob
 import eu.kanade.tachiyomi.data.library.manga.MangaLibraryUpdateJob
 import eu.kanade.tachiyomi.source.sourcePreferences
+import kotlinx.coroutines.CancellationException
 import tachiyomi.core.common.preference.AndroidPreferenceStore
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
@@ -36,8 +37,8 @@ class PreferenceRestorer(
         preferences: List<BackupPreference>,
         backupAnimeCategories: List<BackupCategory>?,
         backupMangaCategories: List<BackupCategory>?,
-    ) {
-        restorePreferences(
+    ): List<String> {
+        val failures = restorePreferences(
             preferences,
             preferenceStore,
             backupAnimeCategories,
@@ -47,12 +48,13 @@ class PreferenceRestorer(
         AnimeLibraryUpdateJob.setupTask(context)
         MangaLibraryUpdateJob.setupTask(context)
         BackupCreateJob.setupTask(context)
+        return failures
     }
 
-    suspend fun restoreSource(preferences: List<BackupSourcePreferences>) {
-        preferences.forEach {
+    suspend fun restoreSource(preferences: List<BackupSourcePreferences>): List<String> {
+        return preferences.flatMap {
             val sourcePrefs = AndroidPreferenceStore(context, sourcePreferences(it.sourceKey))
-            restorePreferences(it.prefs, sourcePrefs)
+            restorePreferences(it.prefs, sourcePrefs).map { key -> "${it.sourceKey}: $key" }
         }
     }
 
@@ -61,7 +63,8 @@ class PreferenceRestorer(
         preferenceStore: PreferenceStore,
         backupAnimeCategories: List<BackupCategory>? = null,
         backupMangaCategories: List<BackupCategory>? = null,
-    ) {
+    ): List<String> {
+        val failures = mutableListOf<String>()
         val allMangaCategories = if (backupMangaCategories != null) getMangaCategories.await() else emptyList()
         val allAnimeCategories = if (backupAnimeCategories != null) getAnimeCategories.await() else emptyList()
 
@@ -93,7 +96,11 @@ class PreferenceRestorer(
                             value.value
                         }
 
-                        newValue?.let { preferenceStore.getInt(key).set(it) }
+                        if (newValue == null) {
+                            failures += key
+                        } else {
+                            preferenceStore.getInt(key).set(newValue)
+                        }
                     }
                     is LongPreferenceValue -> preferenceStore.getLong(key).set(value.value)
                     is FloatPreferenceValue -> preferenceStore.getFloat(key).set(value.value)
@@ -114,10 +121,14 @@ class PreferenceRestorer(
                         if (!restored) preferenceStore.getStringSet(key).set(value.value)
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("PreferenceRestorer", "Failed to restore preference <$key>", e)
+                failures += key
             }
         }
+        return failures
     }
 
     private fun restoreCategoriesPreference(

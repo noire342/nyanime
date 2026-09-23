@@ -22,6 +22,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   singolarmente alla libreria.
 - I titoli nascosti da “Continua a guardare” sono ricollegati sul nuovo telefono
   tramite riferimento alla fonte e al titolo, senza copiare ID del database.
+- Le preferenze che non si riescono a ripristinare compaiono nel resoconto degli
+  errori invece di essere ignorate senza avviso.
 - Le note di aggiornamento OTA mostrano soltanto le novità aggiunte dal tag
   precedente, senza riproporre ogni volta l'intera sezione del changelog.
 
