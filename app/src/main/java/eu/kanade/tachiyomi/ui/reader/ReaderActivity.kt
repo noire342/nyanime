@@ -360,6 +360,12 @@ class ReaderActivity : BaseActivity() {
         return handled || super.dispatchGenericMotionEvent(event)
     }
 
+    private fun openTranslation(page: ReaderPage) {
+        viewModel.closeDialog()
+        translationSession?.close()
+        translationSession = MangaTranslationSession(this, lifecycleScope, page, readerPreferences)
+    }
+
     /**
      * Initializes the reader menu. It sets up click listeners and the initial visibility.
      */
@@ -394,6 +400,14 @@ class ReaderActivity : BaseActivity() {
             val isHttpSource = viewModel.getSource() is HttpSource
             val isFullscreen by readerPreferences.fullscreen().collectAsState()
             val flashOnPageChange by readerPreferences.flashOnPageChange().collectAsState()
+            val translatorEnabled by readerPreferences.mangaTranslatorEnabled().collectAsState()
+            val translateCurrentPage: (() -> Unit)? = if (translatorEnabled) {
+                state.currentChapter?.pages
+                    ?.firstOrNull { it.index == state.currentPage - 1 }
+                    ?.let { page -> { openTranslation(page) } }
+            } else {
+                null
+            }
 
             val colorOverlayEnabled by readerPreferences.colorFilter().collectAsState()
             val colorOverlay by readerPreferences.colorFilterValue().collectAsState()
@@ -456,6 +470,7 @@ class ReaderActivity : BaseActivity() {
                 },
                 onClickSettings = viewModel::openSettingsDialog,
                 onReadingTogether = { readingRoomVisible = true },
+                onTranslate = translateCurrentPage,
             )
 
             ReadingReaderOverlay(
@@ -543,16 +558,11 @@ class ReaderActivity : BaseActivity() {
                     val selectedPage = (state.dialog as ReaderViewModel.Dialog.PageActions).page
                     ReaderPageActionsDialog(
                         onDismissRequest = onDismissRequest,
-                        showTranslate = readerPreferences.mangaTranslatorEnabled().get(),
+                        showTranslate = translatorEnabled,
                         onSetAsCover = viewModel::setAsCover,
                         onShare = viewModel::shareImage,
                         onSave = viewModel::saveImage,
-                        onTranslate = {
-                            viewModel.closeDialog()
-                            translationSession?.close()
-                            translationSession =
-                                MangaTranslationSession(this, lifecycleScope, selectedPage, readerPreferences)
-                        },
+                        onTranslate = { openTranslation(selectedPage) },
                     )
                 }
                 null -> {}

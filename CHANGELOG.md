@@ -8,6 +8,14 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 23 settembre 2026 — Traduzione manga facile da trovare
+
+- Quando la traduzione offline è abilitata, **Traduci pagina** compare nei
+  controlli inferiori del lettore, senza comprimere gli altri pulsanti sugli
+  schermi stretti. L'azione è disponibile anche nel menu superiore.
+- Il lettore attende il caricamento della pagina prima di aprire l'anteprima,
+  invece di mostrare subito un errore se l'immagine non è ancora pronta.
+
 ## 23 settembre 2026 — Traduzione manga offline opzionale
 
 - Dalle impostazioni del lettore puoi abilitare “Traduci questa pagina”. La pagina

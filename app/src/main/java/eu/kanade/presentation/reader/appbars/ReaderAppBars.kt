@@ -67,6 +67,7 @@ fun ReaderAppBars(
     onClickCropBorder: () -> Unit,
     onClickSettings: () -> Unit,
     onReadingTogether: () -> Unit = {},
+    onTranslate: (() -> Unit)? = null,
 ) {
     val isRtl = viewer is R2LPagerViewer
     val backgroundColor = MaterialTheme.colorScheme
@@ -129,6 +130,14 @@ fun ReaderAppBars(
                                         onClick = onToggleBookmarked,
                                     ),
                                 )
+                                onTranslate?.let {
+                                    add(
+                                        AppBar.OverflowAction(
+                                            title = "Traduci pagina corrente",
+                                            onClick = it,
+                                        ),
+                                    )
+                                }
                                 onOpenInWebView?.let {
                                     add(
                                         AppBar.OverflowAction(
@@ -196,6 +205,7 @@ fun ReaderAppBars(
                     cropEnabled = cropEnabled,
                     onClickCropBorder = onClickCropBorder,
                     onClickSettings = onClickSettings,
+                    onTranslate = onTranslate,
                 )
             }
         }

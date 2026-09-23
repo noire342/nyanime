@@ -66,7 +66,7 @@ object SettingsReaderScreen : SearchableSettings {
             Preference.PreferenceItem.SwitchPreference(
                 preference = readerPref.mangaTranslatorEnabled(),
                 title = "Traduzione manga offline",
-                subtitle = "Aggiunge Traduci alla pagina. I modelli vengono scaricati solo quando lo scegli.",
+                subtitle = "Nel lettore, tocca la pagina e poi Traduci. I modelli si scaricano solo su richiesta.",
             ),
             getDisplayGroup(readerPreferences = readerPref),
             getEInkGroup(readerPreferences = readerPref),

@@ -186,8 +186,13 @@ class MangaTranslationSession(
 
     private suspend fun openPage() {
         try {
+            if (page.stream == null) {
+                mutableState.update { it.copy(phase = "Carico la pagina") }
+                val loader = page.chapter.pageLoader ?: error("Il caricatore della pagina non è disponibile")
+                awaitPage(page, loader)
+            }
             val image = loadMangaPageBitmap(page)
-            mutableState.update { it.copy(original = image.bitmap, preview = image.bitmap) }
+            mutableState.update { it.copy(original = image.bitmap, preview = image.bitmap, phase = "") }
             loadCache(image)
         } catch (e: CancellationException) {
             throw e
