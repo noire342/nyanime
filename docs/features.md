@@ -217,6 +217,8 @@ La sezione manga conserva biblioteca, dettagli e lettore indipendenti dal restyl
 - Salto dei capitoli letti, filtrati o duplicati; segnalibri, salvataggio e condivisione
   delle pagine e copertina personalizzata.
 - Opzioni di flash al cambio pagina per gli schermi che ne beneficiano.
+- Traduzione offline facoltativa di pagine e capitoli dal giapponese o dall'inglese:
+  confronto con l'originale, overlay, ricostruzione, correzioni e glossario personale.
 - Cartelle di immagini, ZIP/CBZ, RAR/CBR, 7Z/CB7, TAR/CBT e immagini degli EPUB,
   oltre ai video locali nei formati supportati dal player.
 

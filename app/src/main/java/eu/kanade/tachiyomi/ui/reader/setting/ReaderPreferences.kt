@@ -15,6 +15,11 @@ class ReaderPreferences(
 
     fun pageTransitions() = preferenceStore.getBoolean("pref_enable_transitions_key", true)
 
+    /** Optional because its offline models are downloaded separately. */
+    fun mangaTranslatorEnabled() = preferenceStore.getBoolean("manga_translator_enabled", false)
+
+    fun mangaTranslatorGlossary() = preferenceStore.getString("manga_translator_glossary_v1", "{}")
+
     fun flashOnPageChange() = preferenceStore.getBoolean("pref_reader_flash", false)
 
     fun flashDurationMillis() = preferenceStore.getInt("pref_reader_flash_duration", MILLI_CONVERSION)

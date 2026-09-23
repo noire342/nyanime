@@ -8,6 +8,17 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 23 settembre 2026 — Traduzione manga offline opzionale
+
+- Dalle impostazioni del lettore puoi abilitare “Traduci questa pagina”. La pagina
+  originale resta intatta e puoi confrontarla con l'overlay italiano o con la
+  ricostruzione dello sfondo.
+- OCR giapponese e inglese e traduzione in italiano funzionano sul dispositivo,
+  dopo il download esplicito dei modelli. I download interrotti possono riprendere;
+  i modelli si possono eliminare dall'anteprima per liberare spazio.
+- Puoi correggere le frasi, salvarle nel glossario personale e tradurre anche un
+  capitolo. I risultati intermedi restano in cache per riprendere dopo un'interruzione.
+
 ## 23 settembre 2026 — Annotazioni condivise più affidabili
 
 - Nella stessa stanza video e manga, schizzi e note sulla pagina si riallineano

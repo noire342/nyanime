@@ -2,13 +2,17 @@ package eu.kanade.presentation.reader
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Photo
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,10 +35,21 @@ fun ReaderPageActionsDialog(
     onSetAsCover: () -> Unit,
     onShare: (Boolean) -> Unit,
     onSave: () -> Unit,
+    onTranslate: () -> Unit,
+    showTranslate: Boolean = false,
 ) {
     var showSetCoverDialog by remember { mutableStateOf(false) }
 
     AdaptiveSheet(onDismissRequest = onDismissRequest) {
+        if (showTranslate) {
+            FilledTonalButton(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                onClick = onTranslate,
+            ) {
+                Icon(Icons.Outlined.Translate, contentDescription = null)
+                Text("Traduci questa pagina", modifier = Modifier.padding(start = 10.dp))
+            }
+        }
         Row(
             modifier = Modifier.padding(vertical = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),

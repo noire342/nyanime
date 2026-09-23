@@ -47,6 +47,7 @@ import dev.chrisbanes.insetter.applyInsetter
 import eu.kanade.core.util.ifMangaSourcesLoaded
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.presentation.reader.DisplayRefreshHost
+import eu.kanade.presentation.reader.MangaTranslatorDialog
 import eu.kanade.presentation.reader.OrientationSelectDialog
 import eu.kanade.presentation.reader.PageIndicatorText
 import eu.kanade.presentation.reader.ReaderContentOverlay
@@ -62,6 +63,7 @@ import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.reading.ReadingBookmark
 import eu.kanade.tachiyomi.data.reading.ReadingPosition
 import eu.kanade.tachiyomi.data.reading.ReadingTogetherManager
+import eu.kanade.tachiyomi.data.translation.MangaTranslationSession
 import eu.kanade.tachiyomi.databinding.ReaderActivityBinding
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
@@ -139,6 +141,7 @@ class ReaderActivity : BaseActivity() {
     private val displayRefreshHost = DisplayRefreshHost()
     private val readingTogether by lazy { ReadingTogetherManager.get(this) }
     private var readingRoomVisible by androidx.compose.runtime.mutableStateOf(false)
+    private var translationSession by androidx.compose.runtime.mutableStateOf<MangaTranslationSession?>(null)
 
     private val windowInsetsController by lazy { WindowInsetsControllerCompat(window, binding.root) }
 
@@ -265,6 +268,8 @@ class ReaderActivity : BaseActivity() {
      * Called when the activity is destroyed. Cleans up the viewer, configuration and any view.
      */
     override fun onDestroy() {
+        translationSession?.close()
+        translationSession = null
         super.onDestroy()
         viewModel.state.value.viewer?.destroy()
         config = null
@@ -474,6 +479,12 @@ class ReaderActivity : BaseActivity() {
                     },
                 )
             }
+            translationSession?.let { session ->
+                MangaTranslatorDialog(session) {
+                    session.close()
+                    translationSession = null
+                }
+            }
 
             if (flashOnPageChange) {
                 DisplayRefreshHost(
@@ -529,11 +540,19 @@ class ReaderActivity : BaseActivity() {
                     )
                 }
                 is ReaderViewModel.Dialog.PageActions -> {
+                    val selectedPage = (state.dialog as ReaderViewModel.Dialog.PageActions).page
                     ReaderPageActionsDialog(
                         onDismissRequest = onDismissRequest,
+                        showTranslate = readerPreferences.mangaTranslatorEnabled().get(),
                         onSetAsCover = viewModel::setAsCover,
                         onShare = viewModel::shareImage,
                         onSave = viewModel::saveImage,
+                        onTranslate = {
+                            viewModel.closeDialog()
+                            translationSession?.close()
+                            translationSession =
+                                MangaTranslationSession(this, lifecycleScope, selectedPage, readerPreferences)
+                        },
                     )
                 }
                 null -> {}
