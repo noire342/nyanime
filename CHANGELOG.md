@@ -8,6 +8,13 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 23 settembre 2026 — Accesso alle stanze con codice breve
+
+- Per invitare un amico in una stanza video o manga ora bastano otto cifre temporanee.
+  Chi crea la stanza vede la richiesta e può accettarla o rifiutarla.
+- L'ingresso mostra lo stato del collegamento; gli inviti completi già condivisi
+  continuano a funzionare.
+
 ## 23 settembre 2026 — Rimozione della traduzione manga sperimentale
 
 - Rimossi pulsanti, impostazioni e componenti della traduzione manga offline.

@@ -61,11 +61,15 @@ jobs:
             exit 1
           fi
 
+      - name: Check release notes before building
+        run: |
+          python3 -m unittest discover -s scripts/tests -p test_release_notes.py
+          tag="r$(git rev-list --count HEAD)"
+          python3 scripts/release_notes.py --tag "$tag" --output "$RUNNER_TEMP/nyanime-release-notes.md" \
+            --repository "$GITHUB_REPOSITORY" --revision "$GITHUB_SHA"
+
       - name: Check format, tests and build
         run: ./gradlew spotlessCheck :app:testDebugUnitTest :app:assemblePreview -Penable-updater --no-daemon --no-parallel --max-workers=2
-
-      - name: Check release notes selection
-        run: python3 -m unittest discover -s scripts/tests -p test_release_notes.py
 
       - name: Verify packaged native libraries
         run: python3 scripts/verify_apk_jni.py app/build/outputs/apk/preview/app-*-preview.apk
