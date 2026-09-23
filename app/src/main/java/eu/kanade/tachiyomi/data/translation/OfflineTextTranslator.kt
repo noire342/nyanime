@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.data.translation
 
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer
+import ai.djl.huggingface.tokenizers.jni.TokenizersLibrary
 import ai.onnxruntime.OnnxJavaType
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
@@ -57,7 +58,7 @@ class OfflineTextTranslator(private val pack: OfflineTranslationPack) : AutoClos
     suspend fun translate(source: String): String = withContext(Dispatchers.Default) {
         if (source.isBlank()) return@withContext ""
         require(source.length <= 2000)
-        val encoded = tokenizer.encode(source).ids
+        val encoded = encodeIds(source)
         check(encoded.size <= 256) { "Testo troppo lungo per il modello" }
         val input = LongArray(encoded.size + 1)
         input[0] = italianToken
@@ -111,6 +112,18 @@ class OfflineTextTranslator(private val pack: OfflineTranslationPack) : AutoClos
                     tokenizer.decode(generated.toLongArray(), true).trim()
                 }
             }
+        }
+    }
+
+    private fun encodeIds(source: String): LongArray {
+        // HuggingFaceTokenizer.encode() also requests character spans, which aborts inside the
+        // Android tokenizer JNI for some OCR text. Inference only needs token IDs.
+        val native = TokenizersLibrary.LIB
+        val encoding = native.encode(tokenizer.handle, source, true)
+        try {
+            return native.getTokenIds(encoding)
+        } finally {
+            native.deleteEncoding(encoding)
         }
     }
 
