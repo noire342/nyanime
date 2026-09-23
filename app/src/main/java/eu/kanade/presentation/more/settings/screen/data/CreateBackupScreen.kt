@@ -6,11 +6,16 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -33,13 +38,15 @@ import tachiyomi.presentation.core.components.SectionCard
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
 
-class CreateBackupScreen : Screen() {
+class CreateBackupScreen(private val completePreset: Boolean = false) : Screen() {
 
     @Composable
     override fun Content() {
         val context = LocalContext.current
         val navigator = LocalNavigator.currentOrThrow
-        val model = rememberScreenModel { CreateBackupScreenModel() }
+        val model = rememberScreenModel {
+            CreateBackupScreenModel(if (completePreset) BackupOptions.complete() else BackupOptions())
+        }
         val state by model.state.collectAsState()
 
         val chooseBackupDir = rememberLauncherForActivityResult(
@@ -88,6 +95,25 @@ class CreateBackupScreen : Screen() {
                 }
 
                 item {
+                    SectionCard(MR.strings.backup_complete_title) {
+                        Text(
+                            stringResource(MR.strings.backup_complete_description),
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                        Button(
+                            onClick = model::selectComplete,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
+                            Text(stringResource(MR.strings.backup_complete_select))
+                        }
+                    }
+                }
+
+                if (state.options.privateSettings) {
+                    item { WarningBanner(MR.strings.backup_complete_private_warning) }
+                }
+
+                item {
                     SectionCard(MR.strings.label_library) {
                         Options(BackupOptions.libraryOptions, state, model)
                     }
@@ -127,7 +153,12 @@ class CreateBackupScreen : Screen() {
     }
 }
 
-private class CreateBackupScreenModel : StateScreenModel<CreateBackupScreenModel.State>(State()) {
+private class CreateBackupScreenModel(initialOptions: BackupOptions) :
+    StateScreenModel<CreateBackupScreenModel.State>(State(initialOptions)) {
+
+    fun selectComplete() {
+        mutableState.update { it.copy(options = BackupOptions.complete()) }
+    }
 
     fun toggle(setter: (BackupOptions, Boolean) -> BackupOptions, enabled: Boolean) {
         mutableState.update {

@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.BuildConfig
+import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.data.backup.BackupFileValidator
 import eu.kanade.tachiyomi.data.backup.create.creators.AnimeBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.AnimeCategoriesBackupCreator
@@ -24,16 +25,21 @@ import eu.kanade.tachiyomi.data.backup.models.BackupCustomButtons
 import eu.kanade.tachiyomi.data.backup.models.BackupExtension
 import eu.kanade.tachiyomi.data.backup.models.BackupExtensionRepos
 import eu.kanade.tachiyomi.data.backup.models.BackupExtensionStore
+import eu.kanade.tachiyomi.data.backup.models.BackupHiddenResume
+import eu.kanade.tachiyomi.data.backup.models.BackupHiddenResumeState
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.models.BackupPreference
 import eu.kanade.tachiyomi.data.backup.models.BackupSource
 import eu.kanade.tachiyomi.data.backup.models.BackupSourcePreferences
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.protobuf.ProtoBuf
 import logcat.LogPriority
 import okio.buffer
 import okio.gzip
 import okio.sink
 import tachiyomi.core.common.i18n.stringResource
+import tachiyomi.core.common.preference.Preference
+import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.backup.service.BackupPreferences
 import tachiyomi.domain.entries.anime.interactor.GetAnimeFavorites
@@ -61,6 +67,7 @@ class BackupCreator(
     private val backupPreferences: BackupPreferences = Injekt.get(),
     private val mangaRepository: MangaRepository = Injekt.get(),
     private val animeRepository: AnimeRepository = Injekt.get(),
+    private val preferenceStore: PreferenceStore = Injekt.get(),
 
     private val animeCategoriesBackupCreator: AnimeCategoriesBackupCreator = AnimeCategoriesBackupCreator(),
     private val mangaCategoriesBackupCreator: MangaCategoriesBackupCreator = MangaCategoriesBackupCreator(),
@@ -97,7 +104,10 @@ class BackupCreator(
             } else {
                 emptyList()
             }
-            val backupAnime = backupAnimes(getAnimeFavorites.await() + nonFavoriteAnime, options)
+            val animeEntries = getAnimeFavorites.await() + nonFavoriteAnime
+            val seasons = animeEntries.filter { it.fetchType == FetchType.Seasons }
+                .flatMap { animeRepository.getAnimeSeasonsById(it.id).map { season -> season.anime } }
+            val backupAnime = backupAnimes((animeEntries + seasons).distinctBy { it.id }, options)
             val nonFavoriteManga = if (options.readEntries) {
                 mangaRepository.getReadMangaNotInLibrary()
             } else {
@@ -120,6 +130,7 @@ class BackupCreator(
                 backupExtensions = backupExtensions(options),
                 backupAnimeExtensionStores = backupAnimeExtensionStores(options),
                 backupCustomButton = backupCustomButtons(options),
+                backupHiddenResume = backupHiddenResume(options),
             )
 
             val byteArray = parser.encodeToByteArray(Backup.serializer(), backup)
@@ -215,6 +226,23 @@ class BackupCreator(
         return customButtonBackupCreator()
     }
 
+    private suspend fun backupHiddenResume(options: BackupOptions): BackupHiddenResumeState? {
+        if (!options.appSettings || !options.libraryEntries) return null
+
+        val hiddenIds = preferenceStore.getStringSet(Preference.appStateKey("discovery_hidden_resume")).get()
+        val entries = hiddenIds.mapNotNull { id ->
+            val anime = try {
+                animeRepository.getAnimeById(id.toLong())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            }
+            anime?.let { BackupHiddenResume(source = it.source, url = it.url) }
+        }
+        return BackupHiddenResumeState(entries)
+    }
+
     private fun backupSourcePreferences(options: BackupOptions): List<BackupSourcePreferences> {
         if (!options.sourceSettings) return emptyList()
 
@@ -229,11 +257,13 @@ class BackupCreator(
 
     companion object {
         private val FILENAME_REGEX =
-            """${BuildConfig.APPLICATION_ID}_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2}-\d{3})?\.tachibk""".toRegex()
+            """${Regex.escape(
+                BuildConfig.APPLICATION_ID,
+            )}_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2}-\d{3})?\.nyabk""".toRegex()
 
         fun getFilename(): String {
             val date = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss-SSS", Locale.ENGLISH).format(Date())
-            return "${BuildConfig.APPLICATION_ID}_$date.tachibk"
+            return "${BuildConfig.APPLICATION_ID}_$date.nyabk"
         }
     }
 }

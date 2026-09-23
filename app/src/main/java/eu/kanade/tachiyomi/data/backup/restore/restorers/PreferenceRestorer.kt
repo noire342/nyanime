@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.data.backup.restore.restorers
 
 import android.content.Context
 import android.util.Log
+import eu.kanade.tachiyomi.data.backup.BackupPreferencePolicy
 import eu.kanade.tachiyomi.data.backup.create.BackupCreateJob
 import eu.kanade.tachiyomi.data.backup.models.BackupCategory
 import eu.kanade.tachiyomi.data.backup.models.BackupPreference
@@ -17,7 +18,6 @@ import eu.kanade.tachiyomi.data.library.manga.MangaLibraryUpdateJob
 import eu.kanade.tachiyomi.source.sourcePreferences
 import tachiyomi.core.common.preference.AndroidPreferenceStore
 import tachiyomi.core.common.preference.PreferenceStore
-import tachiyomi.core.common.preference.plusAssign
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
 import tachiyomi.domain.category.manga.interactor.GetMangaCategories
 import tachiyomi.domain.category.model.Category
@@ -34,12 +34,14 @@ class PreferenceRestorer(
 ) {
     suspend fun restoreApp(
         preferences: List<BackupPreference>,
-        backupCategories: List<BackupCategory>?,
+        backupAnimeCategories: List<BackupCategory>?,
+        backupMangaCategories: List<BackupCategory>?,
     ) {
         restorePreferences(
             preferences,
             preferenceStore,
-            backupCategories,
+            backupAnimeCategories,
+            backupMangaCategories,
         )
 
         AnimeLibraryUpdateJob.setupTask(context)
@@ -57,66 +59,59 @@ class PreferenceRestorer(
     private suspend fun restorePreferences(
         toRestore: List<BackupPreference>,
         preferenceStore: PreferenceStore,
-        backupCategories: List<BackupCategory>? = null,
+        backupAnimeCategories: List<BackupCategory>? = null,
+        backupMangaCategories: List<BackupCategory>? = null,
     ) {
-        val allMangaCategories = if (backupCategories != null) getMangaCategories.await() else emptyList()
-        val allAnimeCategories = if (backupCategories != null) getAnimeCategories.await() else emptyList()
+        val allMangaCategories = if (backupMangaCategories != null) getMangaCategories.await() else emptyList()
+        val allAnimeCategories = if (backupAnimeCategories != null) getAnimeCategories.await() else emptyList()
 
         val mangaCategoriesByName = allMangaCategories.associateBy { it.name }
         val animeCategoriesByName = allAnimeCategories.associateBy { it.name }
-        val backupCategoriesById = backupCategories?.associateBy { it.id.toString() }.orEmpty()
+        val backupMangaCategoriesById = backupMangaCategories?.associateBy { it.id.toString() }.orEmpty()
+        val backupAnimeCategoriesById = backupAnimeCategories?.associateBy { it.id.toString() }.orEmpty()
 
-        val prefs = preferenceStore.getAll()
         toRestore.forEach { (key, value) ->
+            if (!BackupPreferencePolicy.isPortable(key)) return@forEach
             try {
                 when (value) {
                     is IntPreferenceValue -> {
-                        if (prefs[key] is Int?) {
-                            val newValue = if (key == LibraryPreferences.DEFAULT_MANGA_CATEGORY_PREF_KEY) {
-                                backupCategoriesById[value.value.toString()]
-                                    ?.let { mangaCategoriesByName[it.name]?.id?.toInt() }
-                            } else if (key == LibraryPreferences.DEFAULT_ANIME_CATEGORY_PREF_KEY) {
-                                backupCategoriesById[value.value.toString()]
-                                    ?.let { animeCategoriesByName[it.name]?.id?.toInt() }
+                        val newValue = if (key == LibraryPreferences.DEFAULT_MANGA_CATEGORY_PREF_KEY) {
+                            if (backupMangaCategories != null && value.value == -1) {
+                                -1
                             } else {
-                                value.value
+                                backupMangaCategoriesById[value.value.toString()]
+                                    ?.let { mangaCategoriesByName[it.name]?.id?.toInt() }
                             }
+                        } else if (key == LibraryPreferences.DEFAULT_ANIME_CATEGORY_PREF_KEY) {
+                            if (backupAnimeCategories != null && value.value == -1) {
+                                -1
+                            } else {
+                                backupAnimeCategoriesById[value.value.toString()]
+                                    ?.let { animeCategoriesByName[it.name]?.id?.toInt() }
+                            }
+                        } else {
+                            value.value
+                        }
 
-                            newValue?.let { preferenceStore.getInt(key).set(it) }
-                        }
+                        newValue?.let { preferenceStore.getInt(key).set(it) }
                     }
-                    is LongPreferenceValue -> {
-                        if (prefs[key] is Long?) {
-                            preferenceStore.getLong(key).set(value.value)
-                        }
-                    }
-                    is FloatPreferenceValue -> {
-                        if (prefs[key] is Float?) {
-                            preferenceStore.getFloat(key).set(value.value)
-                        }
-                    }
-                    is StringPreferenceValue -> {
-                        if (prefs[key] is String?) {
-                            preferenceStore.getString(key).set(value.value)
-                        }
-                    }
-                    is BooleanPreferenceValue -> {
-                        if (prefs[key] is Boolean?) {
-                            preferenceStore.getBoolean(key).set(value.value)
-                        }
-                    }
+                    is LongPreferenceValue -> preferenceStore.getLong(key).set(value.value)
+                    is FloatPreferenceValue -> preferenceStore.getFloat(key).set(value.value)
+                    is StringPreferenceValue -> preferenceStore.getString(key).set(value.value)
+                    is BooleanPreferenceValue -> preferenceStore.getBoolean(key).set(value.value)
                     is StringSetPreferenceValue -> {
-                        if (prefs[key] is Set<*>?) {
-                            val restored = restoreCategoriesPreference(
-                                key,
-                                value.value,
-                                preferenceStore,
-                                backupCategoriesById,
-                                mangaCategoriesByName,
-                                animeCategoriesByName,
-                            )
-                            if (!restored) preferenceStore.getStringSet(key).set(value.value)
-                        }
+                        val restored = restoreCategoriesPreference(
+                            key,
+                            value.value,
+                            preferenceStore,
+                            backupMangaCategoriesById,
+                            backupAnimeCategoriesById,
+                            mangaCategoriesByName,
+                            animeCategoriesByName,
+                            backupMangaCategories != null,
+                            backupAnimeCategories != null,
+                        )
+                        if (!restored) preferenceStore.getStringSet(key).set(value.value)
                     }
                 }
             } catch (e: Exception) {
@@ -129,27 +124,24 @@ class PreferenceRestorer(
         key: String,
         value: Set<String>,
         preferenceStore: PreferenceStore,
-        backupCategoriesById: Map<String, BackupCategory>,
+        backupMangaCategoriesById: Map<String, BackupCategory>,
+        backupAnimeCategoriesById: Map<String, BackupCategory>,
         mangaCategoriesByName: Map<String, Category>,
         animeCategoriesByName: Map<String, Category>,
+        restoreMangaCategories: Boolean,
+        restoreAnimeCategories: Boolean,
     ): Boolean {
-        val categoryPreferences = LibraryPreferences.categoryPreferenceKeys + DownloadPreferences.categoryPreferenceKeys
-        if (key !in categoryPreferences) return false
+        val isAnime = key in LibraryPreferences.animeCategoryPreferenceKeys ||
+            key in DownloadPreferences.animeCategoryPreferenceKeys
+        val isManga = key in LibraryPreferences.mangaCategoryPreferenceKeys ||
+            key in DownloadPreferences.mangaCategoryPreferenceKeys
+        if (!isAnime && !isManga) return false
+        if ((isAnime && !restoreAnimeCategories) || (isManga && !restoreMangaCategories)) return true
 
-        val ids = value.flatMap {
-            listOf(
-                backupCategoriesById[it]?.name?.let { name ->
-                    mangaCategoriesByName[name]?.id?.toString()
-                },
-                backupCategoriesById[it]?.name?.let { name ->
-                    animeCategoriesByName[name]?.id?.toString()
-                },
-            )
-        }.filterNotNull()
-
-        if (ids.isNotEmpty()) {
-            preferenceStore.getStringSet(key) += ids
-        }
+        val backupById = if (isAnime) backupAnimeCategoriesById else backupMangaCategoriesById
+        val restoredByName = if (isAnime) animeCategoriesByName else mangaCategoriesByName
+        val ids = value.mapNotNull { backupById[it]?.name?.let { name -> restoredByName[name]?.id?.toString() } }
+        preferenceStore.getStringSet(key).set(ids.toSet())
         return true
     }
 }

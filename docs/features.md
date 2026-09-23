@@ -285,6 +285,12 @@ sincronizzabili dipendono dal servizio. L'accesso a un tracker è facoltativo.
 Puoi creare o programmare backup, scegliere i dati da includere, ripristinarli,
 esportare gli elenchi della libreria e gestire spazio e cache. I backup automatici
 sono verificati prima della rotazione e gli errori vengono mostrati.
+In Esporta dati, **Backup completo** salva librerie anime e manga, progressi,
+cronologia, categorie, impostazioni, preferenze delle fonti e APK delle estensioni
+installate in un file `.nyabk`. I vecchi file `.tachibk` restano importabili.
+Il backup completo può contenere credenziali e token e non è cifrato: custodiscilo
+in privato. Su un altro dispositivo Android può essere necessario autorizzare
+di nuovo storage, servizi esterni e installazione delle estensioni.
 **Backup dei dati e download dei contenuti sono operazioni diverse**: video e
 pagine scaricati non vengono incorporati nel backup.
 

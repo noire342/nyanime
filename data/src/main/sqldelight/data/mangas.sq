@@ -84,7 +84,7 @@ FROM mangas
 WHERE favorite = 0 AND _id IN (
     SELECT DISTINCT chapters.manga_id
     FROM chapters
-    WHERE read = 1 OR last_page_read != 0
+    WHERE read = 1 OR last_page_read != 0 OR bookmark = 1
 );
 
 getAllManga:

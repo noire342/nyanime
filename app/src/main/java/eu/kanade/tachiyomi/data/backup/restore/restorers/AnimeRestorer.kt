@@ -62,7 +62,7 @@ class AnimeRestorer(
     ) {
         handler.await(inTransaction = true) {
             val dbAnime = findExistingAnime(backupAnime)
-            val anime = backupAnime.getAnimeImpl()
+            val anime = backupAnime.getAnimeImpl().copy(parentId = null)
             val restoredAnime = if (dbAnime == null) {
                 restoreNewAnime(anime)
             } else {
@@ -74,11 +74,19 @@ class AnimeRestorer(
                 val anime = bs.getAnimeImpl().copy(
                     parentId = restoredAnime.id,
                 )
-                if (dbAnime == null) {
+                val restoredSeason = if (dbAnime == null) {
                     restoreNewAnime(anime)
                 } else {
                     restoreExistingAnime(anime, dbAnime)
                 }
+                restoreAnimeDetails(
+                    anime = restoredSeason,
+                    episodes = bs.episodes,
+                    categories = bs.categories,
+                    backupCategories = backupCategories,
+                    history = bs.history,
+                    tracks = bs.tracking,
+                )
             }
 
             restoreAnimeDetails(

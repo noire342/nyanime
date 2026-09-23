@@ -576,7 +576,10 @@ class MainActivity : BaseActivity() {
             }
             Intent.ACTION_VIEW -> {
                 // Handling opening of backup files
-                if (intent.data.toString().endsWith(".tachibk")) {
+                if (listOf(".nyabk", ".tachibk").any { extension ->
+                        intent.data?.path?.endsWith(extension, ignoreCase = true) == true
+                    }
+                ) {
                     navigator.popUntilRoot()
                     navigator.push(RestoreBackupScreen(intent.data.toString()))
                 }

@@ -349,6 +349,7 @@ object SettingsDataScreen : SearchableSettings {
 
     @Composable
     private fun getExportGroup(): Preference.PreferenceGroup {
+        val navigator = LocalNavigator.currentOrThrow
         var showDialog by remember { mutableStateOf(false) }
         var exportOptions by remember {
             mutableStateOf(
@@ -407,6 +408,11 @@ object SettingsDataScreen : SearchableSettings {
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.export),
             preferenceItems = persistentListOf(
+                Preference.PreferenceItem.TextPreference(
+                    title = stringResource(MR.strings.backup_complete_title),
+                    subtitle = stringResource(MR.strings.backup_complete_description),
+                    onClick = { navigator.push(CreateBackupScreen(completePreset = true)) },
+                ),
                 Preference.PreferenceItem.TextPreference(
                     title = stringResource(MR.strings.library_list),
                     onClick = { showDialog = true },

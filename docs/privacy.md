@@ -4,7 +4,7 @@ Nyanime è un'app Android che gestisce localmente librerie, progressi di visione
 
 ## Dati sul dispositivo
 
-La libreria, la cronologia, i punti di ripresa, le impostazioni, i file scaricati e i dati delle estensioni restano nell'archivio dell'app sul dispositivo. Backup ed esportazioni vengono creati solo quando li richiedi e sono sotto il tuo controllo. Disinstallare l'app o cancellarne i dati può eliminare queste informazioni; i file esportati separatamente seguono le regole della posizione in cui li salvi.
+La libreria, la cronologia, i punti di ripresa, le impostazioni, i file scaricati e i dati delle estensioni restano nell'archivio dell'app sul dispositivo. Backup ed esportazioni vengono creati solo quando li richiedi e sono sotto il tuo controllo. Il backup completo `.nyabk` può includere credenziali e token delle impostazioni selezionate: non è cifrato e va conservato in privato. Non include video o pagine scaricati. Disinstallare l'app o cancellarne i dati può eliminare queste informazioni; i file esportati separatamente seguono le regole della posizione in cui li salvi.
 
 ## Connessioni facoltative
 

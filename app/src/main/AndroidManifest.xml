@@ -145,6 +145,13 @@
 
                 See https://stackoverflow.com/a/31028507
                 -->
+                <data android:pathPattern=".*\\.nyabk" />
+                <data android:pathPattern=".*\\..*\\.nyabk" />
+                <data android:pathPattern=".*\\..*\\..*\\.nyabk" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.nyabk" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.nyabk" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\.nyabk" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\..*\\..*\\.nyabk" />
                 <data android:pathPattern=".*\\.tachibk" />
                 <data android:pathPattern=".*\\..*\\.tachibk" />
                 <data android:pathPattern=".*\\..*\\..*\\.tachibk" />

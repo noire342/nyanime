@@ -43,6 +43,8 @@ data class BackupOptions(
         sourceSettings
 
     companion object {
+        fun complete() = BackupOptions(privateSettings = true, extensions = true)
+
         val libraryOptions = persistentListOf(
             Entry(
                 label = AYMR.strings.entries,
@@ -73,7 +75,7 @@ data class BackupOptions(
                 setter = { options, enabled -> options.copy(categories = enabled) },
             ),
             Entry(
-                label = AYMR.strings.non_library_settings,
+                label = MR.strings.backup_non_library_progress,
                 getter = BackupOptions::readEntries,
                 setter = { options, enabled -> options.copy(readEntries = enabled) },
                 enabled = { it.libraryEntries },

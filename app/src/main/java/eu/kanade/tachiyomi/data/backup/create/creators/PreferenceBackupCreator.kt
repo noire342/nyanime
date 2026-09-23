@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.data.backup.create.creators
 import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
 import eu.kanade.tachiyomi.animesource.preferenceKey
 import eu.kanade.tachiyomi.animesource.sourcePreferences
+import eu.kanade.tachiyomi.data.backup.BackupPreferencePolicy
 import eu.kanade.tachiyomi.data.backup.models.BackupPreference
 import eu.kanade.tachiyomi.data.backup.models.BackupSourcePreferences
 import eu.kanade.tachiyomi.data.backup.models.BooleanPreferenceValue
@@ -59,7 +60,7 @@ class PreferenceBackupCreator(
     @Suppress("UNCHECKED_CAST")
     private fun Map<String, *>.toBackupPreferences(): List<BackupPreference> {
         return this
-            .filterKeys { !Preference.isAppState(it) }
+            .filterKeys(BackupPreferencePolicy::isPortable)
             .mapNotNull { (key, value) ->
                 when (value) {
                     is Int -> BackupPreference(key, IntPreferenceValue(value))

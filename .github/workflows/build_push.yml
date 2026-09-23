@@ -64,6 +64,9 @@ jobs:
       - name: Check format, tests and build
         run: ./gradlew spotlessCheck :app:testDebugUnitTest :app:assemblePreview -Penable-updater --no-daemon --no-parallel --max-workers=2
 
+      - name: Check release notes selection
+        run: python3 -m unittest discover -s scripts/tests -p test_release_notes.py
+
       - name: Verify packaged native libraries
         run: python3 scripts/verify_apk_jni.py app/build/outputs/apk/preview/app-*-preview.apk
 
@@ -117,16 +120,8 @@ jobs:
             exit 1
           fi
           notes_file="$(mktemp)"
-          awk '
-            /^## / { if (section++) exit; print; next }
-            section == 1 { print }
-          ' CHANGELOG.md > "$notes_file"
-          if ! grep -q '^- ' "$notes_file"; then
-            echo '::error::The latest changelog section has no release notes.'
-            exit 1
-          fi
-          printf '\n[Changelog completo](https://github.com/%s/blob/%s/CHANGELOG.md).\n' \
-            "$GITHUB_REPOSITORY" "$GITHUB_SHA" >> "$notes_file"
+          python3 scripts/release_notes.py --tag "$tag" --output "$notes_file" \
+            --repository "$GITHUB_REPOSITORY" --revision "$GITHUB_SHA"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" dist/* --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "Nyanime $tag" --notes-file "$notes_file" --prerelease --draft=false

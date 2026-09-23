@@ -84,6 +84,7 @@ private fun Anime.toBackupAnime() =
         genre = this.genre.orEmpty(),
         status = this.status.toInt(),
         thumbnailUrl = this.thumbnailUrl,
+        backgroundUrl = this.backgroundUrl,
         favorite = this.favorite,
         source = this.source,
         dateAdded = this.dateAdded,

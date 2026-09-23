@@ -8,6 +8,23 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 23 settembre 2026 — Backup trasferibili e note OTA per versione
+
+- I nuovi backup manuali e automatici usano `.nyabk`; il ripristino continua ad
+  accettare i vecchi file `.tachibk` e il formato interno resta compatibile.
+- Esporta dati offre un backup completo di librerie, progressi e segnalibri di
+  visione e lettura anche fuori dalla libreria, cronologia, impostazioni, preferenze delle
+  fonti ed estensioni. Video e pagine scaricati restano esclusi.
+- Sul nuovo dispositivo vengono ripristinate anche le preferenze non ancora
+  inizializzate; categorie, impostazioni e titoli sono ripristinati nell'ordine
+  corretto. Le categorie anime e manga sono mappate separatamente e le stagioni
+  recuperano episodi e progressi, anche quando non erano state aggiunte
+  singolarmente alla libreria.
+- I titoli nascosti da “Continua a guardare” sono ricollegati sul nuovo telefono
+  tramite riferimento alla fonte e al titolo, senza copiare ID del database.
+- Le note di aggiornamento OTA mostrano soltanto le novità aggiunte dal tag
+  precedente, senza riproporre ogni volta l'intera sezione del changelog.
+
 ## 23 settembre 2026 — Licenze, aiuto e aggiornamenti OTA
 
 - La testata Info ora mostra il marchio Nyanime senza lo spazio vuoto sopra l'icona.

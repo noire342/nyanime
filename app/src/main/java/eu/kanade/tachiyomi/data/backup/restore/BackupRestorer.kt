@@ -10,6 +10,7 @@ import eu.kanade.tachiyomi.data.backup.models.BackupCustomButtons
 import eu.kanade.tachiyomi.data.backup.models.BackupExtension
 import eu.kanade.tachiyomi.data.backup.models.BackupExtensionRepos
 import eu.kanade.tachiyomi.data.backup.models.BackupExtensionStore
+import eu.kanade.tachiyomi.data.backup.models.BackupHiddenResumeState
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.models.BackupPreference
 import eu.kanade.tachiyomi.data.backup.models.BackupSourcePreferences
@@ -23,13 +24,19 @@ import eu.kanade.tachiyomi.data.backup.restore.restorers.MangaExtensionRepoResto
 import eu.kanade.tachiyomi.data.backup.restore.restorers.MangaRestorer
 import eu.kanade.tachiyomi.data.backup.restore.restorers.PreferenceRestorer
 import eu.kanade.tachiyomi.util.system.createFileInCacheDir
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import tachiyomi.core.common.i18n.stringResource
+import tachiyomi.core.common.preference.Preference
+import tachiyomi.core.common.preference.PreferenceStore
+import tachiyomi.domain.entries.anime.repository.AnimeRepository
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -49,6 +56,8 @@ class BackupRestorer(
     private val animeRestorer: AnimeRestorer = AnimeRestorer(),
     private val mangaRestorer: MangaRestorer = MangaRestorer(),
     private val extensionsRestorer: ExtensionsRestorer = ExtensionsRestorer(context),
+    private val animeRepository: AnimeRepository = Injekt.get(),
+    private val preferenceStore: PreferenceStore = Injekt.get(),
 ) {
 
     private var restoreAmount = 0
@@ -120,30 +129,52 @@ class BackupRestorer(
                 restoreCategories(
                     backupAnimeCategories = backup.backupAnimeCategories,
                     backupMangaCategories = backup.backupCategories,
-                )
+                ).join()
             }
             if (options.appSettings) {
-                restoreAppPreferences(backup.backupPreferences, backup.backupCategories.takeIf { options.categories })
+                restoreAppPreferences(
+                    backup.backupPreferences,
+                    backup.backupAnimeCategories.takeIf { options.categories },
+                    backup.backupCategories.takeIf { options.categories },
+                ).join()
             }
             if (options.sourceSettings) {
-                restoreSourcePreferences(backup.backupSourcePreferences)
+                restoreSourcePreferences(backup.backupSourcePreferences).join()
             }
             if (options.libraryEntries) {
                 restoreAnime(backup.backupAnime, if (options.categories) backup.backupAnimeCategories else emptyList())
+                    .join()
                 restoreManga(backup.backupManga, if (options.categories) backup.backupCategories else emptyList())
+                    .join()
+                if (options.appSettings) {
+                    backup.backupHiddenResume?.let { restoreHiddenResume(it) }
+                }
             }
             if (options.extensionStores) {
-                restoreExtensionStores(backup.backupAnimeExtensionStores, backup.backupMangaExtensionRepo)
+                restoreExtensionStores(backup.backupAnimeExtensionStores, backup.backupMangaExtensionRepo).join()
             }
             if (options.customButtons) {
-                restoreCustomButtons(backup.backupCustomButton)
+                restoreCustomButtons(backup.backupCustomButton).join()
             }
             if (options.extensions) {
-                restoreExtensions(backup.backupExtensions)
+                restoreExtensions(backup.backupExtensions).join()
             }
 
             // TODO: optionally trigger online library + tracker update
         }
+    }
+
+    private suspend fun restoreHiddenResume(state: BackupHiddenResumeState) {
+        val ids = state.entries.mapNotNull { entry ->
+            try {
+                animeRepository.getAnimeByUrlAndSourceId(entry.url, entry.source)?.id?.toString()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            }
+        }
+        preferenceStore.getStringSet(Preference.appStateKey("discovery_hidden_resume")).set(ids.toSet())
     }
 
     private fun CoroutineScope.restoreCategories(
@@ -167,11 +198,13 @@ class BackupRestorer(
         backupAnimes: List<BackupAnime>,
         backupAnimeCategories: List<BackupCategory>,
     ) = launch {
-        animeRestorer.sortByNew(backupAnimes)
+        val idsInBackup = backupAnimes.mapNotNull { it.id }.toSet()
+        val seasonsByParent = backupAnimes.filter { it.parentId in idsInBackup }.groupBy { it.parentId }
+        animeRestorer.sortByNew(backupAnimes.filter { it.parentId !in idsInBackup })
             .forEach {
                 ensureActive()
 
-                val seasons = backupAnimes.filter { s -> s.parentId == it.id }
+                val seasons = seasonsByParent[it.id].orEmpty()
                 try {
                     animeRestorer.restore(it, backupAnimeCategories, seasons)
                 } catch (e: Exception) {
@@ -179,7 +212,7 @@ class BackupRestorer(
                     errors.add(Date() to "${it.title} [$sourceName]: ${e.message}")
                 }
 
-                restoreProgress += 1
+                restoreProgress += 1 + seasons.size
                 notifier.showRestoreProgress(it.title, restoreProgress, restoreAmount, isSync)
             }
     }
@@ -206,12 +239,14 @@ class BackupRestorer(
 
     private fun CoroutineScope.restoreAppPreferences(
         preferences: List<BackupPreference>,
-        categories: List<BackupCategory>?,
+        animeCategories: List<BackupCategory>?,
+        mangaCategories: List<BackupCategory>?,
     ) = launch {
         ensureActive()
         preferenceRestorer.restoreApp(
             preferences,
-            categories,
+            animeCategories,
+            mangaCategories,
         )
 
         restoreProgress += 1

@@ -95,7 +95,7 @@ FROM animes
 WHERE favorite = 0 AND _id IN (
     SELECT DISTINCT episodes.anime_id
     FROM episodes
-    WHERE seen = 1 OR last_second_seen != 0
+    WHERE seen = 1 OR last_second_seen != 0 OR bookmark = 1
 );
 
 getAllAnime:
