@@ -42,6 +42,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -52,6 +53,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +65,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import eu.kanade.tachiyomi.data.reading.ReadingEdit
+import eu.kanade.tachiyomi.data.reading.ReadingEditKind
 import eu.kanade.tachiyomi.data.reading.ReadingPosition
 import eu.kanade.tachiyomi.data.reading.ReadingRoomState
 import eu.kanade.tachiyomi.data.reading.ReadingTogetherManager
@@ -89,7 +93,7 @@ fun ReadingRoomSheet(manager: ReadingTogetherManager, onDismiss: () -> Unit, onC
         if (!room.active) {
             WatchTogetherPanel(onChooseVideo = onChooseManga)
         } else {
-            ReadingRoomPanel(manager, onChooseManga = onChooseManga, onDraw = {
+            ReadingRoomPanel(manager, onChooseManga = onChooseManga, onPlaceNote = onDismiss, onDraw = {
                 manager.setDrawing(true)
                 onDismiss()
             })
@@ -102,17 +106,48 @@ fun ReadingRoomPanel(
     manager: ReadingTogetherManager,
     onChooseManga: () -> Unit,
     onDraw: () -> Unit = {},
+    onPlaceNote: () -> Unit = {},
     onVideo: (() -> Unit)? = null,
 ) {
     val activity = LocalContext.current as? Activity
     val room by manager.controller.state.collectAsState()
     val tools by manager.tools.collectAsState()
+    val saveFailed by manager.watch.roomSaveFailed.collectAsState()
     var qr by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }
+    var addingNote by remember { mutableStateOf(false) }
+    var noteText by remember { mutableStateOf("") }
     val link = remember(room.invite) {
         runCatching { WatchInvite.parse(room.invite, System.currentTimeMillis()).link() }.getOrNull()
     }
     if (qr && link != null) WatchQrDialog(link) { qr = false }
+    if (addingNote) {
+        AlertDialog(
+            onDismissRequest = { addingNote = false },
+            title = { Text("Una nota sulla pagina") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Scrivi la nota, poi tocca il punto del manga dove vuoi lasciarla.")
+                    OutlinedTextField(
+                        value = noteText,
+                        onValueChange = { noteText = it.take(280) },
+                        label = { Text("Nota") },
+                        maxLines = 4,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (manager.startNote(noteText)) {
+                        noteText = ""
+                        addingNote = false
+                        onPlaceNote()
+                    }
+                }, enabled = noteText.isNotBlank()) { Text("Scegli il punto") }
+            },
+            dismissButton = { TextButton(onClick = { addingNote = false }) { Text("Annulla") } },
+        )
+    }
     if (leaving) {
         AlertDialog(
             onDismissRequest = { leaving = false },
@@ -140,7 +175,11 @@ fun ReadingRoomPanel(
         onReturn = { if (activity != null) manager.returnToOwn(activity) },
         onChooseManga = onChooseManga,
         onDraw = onDraw,
+        onAddNote = { addingNote = true },
         onVisible = manager::setVisible,
+        history = manager.controller.history(),
+        saveFailed = saveFailed,
+        onSharedVisibility = { edit, visible -> manager.controller.setVisible(edit.page, edit.id, visible) },
         onShare = {
             activity?.startActivity(
                 Intent.createChooser(
@@ -172,7 +211,11 @@ fun ReadingRoomContent(
     onReturn: () -> Unit,
     onChooseManga: () -> Unit,
     onDraw: () -> Unit,
+    onAddNote: () -> Unit = {},
     onVisible: (Boolean) -> Unit,
+    history: List<ReadingEdit> = emptyList(),
+    saveFailed: Boolean = false,
+    onSharedVisibility: (ReadingEdit, Boolean) -> Unit = { _, _ -> },
     onShare: () -> Unit,
     onQr: () -> Unit,
     onLeave: () -> Unit,
@@ -180,6 +223,19 @@ fun ReadingRoomContent(
     onRetry: () -> Unit = {},
 ) {
     val colors = MaterialTheme.colorScheme
+    val interventions = remember(history) {
+        history.filter { it.kind in setOf(ReadingEditKind.Stroke, ReadingEditKind.Note) }
+    }
+    var visibleHistory by rememberSaveable { mutableStateOf(50) }
+    var openedNote by remember { mutableStateOf<ReadingEdit?>(null) }
+    openedNote?.let { edit ->
+        AlertDialog(
+            onDismissRequest = { openedNote = null },
+            title = { Text("Nota nella stanza") },
+            text = { Text(edit.note?.text.orEmpty()) },
+            confirmButton = { TextButton(onClick = { openedNote = null }) { Text("Chiudi") } },
+        )
+    }
     LazyColumn(
         Modifier.widthIn(max = 640.dp).fillMaxWidth(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
@@ -208,6 +264,13 @@ fun ReadingRoomContent(
                 }
                 Text("La stessa stanza. Ognuno al proprio ritmo.", style = MaterialTheme.typography.bodyMedium)
                 Text(room.status, style = MaterialTheme.typography.labelLarge, color = colors.onPrimaryContainer)
+                if (saveFailed) {
+                    Text(
+                        "Le annotazioni sono visibili, ma non riusciamo a salvarle per il rientro. " +
+                            "Tieni aperta la stanza finché il problema si risolve.",
+                        color = colors.error,
+                    )
+                }
                 if (room.relayCount == 0 ||
                     !room.connected
                 ) {
@@ -360,13 +423,22 @@ fun ReadingRoomContent(
                 if (current !=
                     null
                 ) {
-                    Button(onClick = onDraw, enabled = room.supported) {
-                        Icon(Icons.Default.Draw, null)
-                        Text("Disegna su questa pagina", Modifier.padding(start = 8.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = onDraw, enabled = room.supported) {
+                            Icon(Icons.Default.Draw, null)
+                            Text("Disegna", Modifier.padding(start = 8.dp))
+                        }
+                        if (room.crdtEnabled) {
+                            OutlinedButton(onClick = onAddNote) { Text("Lascia una nota") }
+                        }
                     }
                 }
                 Text(
-                    "Gli schizzi restano nella stanza, non nei file. Fino a 12 per pagina e 32 pagine recenti; chi crea la stanza può cancellarli tutti.",
+                    if (room.crdtEnabled) {
+                        "I segni restano nella stanza. Puoi nasconderli solo qui oppure rimuovere e ripristinare i tuoi segni per tutti."
+                    } else {
+                        "Questa stanza usa ancora la modalità disegno precedente."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant,
                 )
@@ -375,6 +447,68 @@ fun ReadingRoomContent(
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant,
                 )
+            }
+        }
+        if (room.crdtEnabled && interventions.isNotEmpty()) {
+            item {
+                Text(
+                    "Interventi nella stanza",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            items(
+                interventions.take(visibleHistory),
+                key = { it.id },
+            ) { edit ->
+                val visible = room.strokes(edit.page).any { it.id == edit.id } ||
+                    room.notes(edit.page).any { it.id == edit.id }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(
+                        Modifier.weight(1f).then(
+                            if (edit.kind ==
+                                ReadingEditKind.Note
+                            ) {
+                                Modifier.clickable { openedNote = edit }
+                            } else {
+                                Modifier
+                            },
+                        ),
+                    ) {
+                        Text(
+                            (
+                                room.members[edit.author]?.name
+                                    ?: if (edit.author == room.localId) "Tu" else "Partecipante"
+                                ) +
+                                " · " +
+                                if (edit.kind == ReadingEditKind.Note) edit.note?.text.orEmpty() else "Schizzo",
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            "${edit.page.chapterName} · pagina ${edit.page.page + 1}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.onSurfaceVariant,
+                        )
+                        if (edit.kind == ReadingEditKind.Note) {
+                            Text(
+                                "Tocca per leggere",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.primary,
+                            )
+                        }
+                    }
+                    if (room.host || edit.author == room.localId) {
+                        TextButton(onClick = { onSharedVisibility(edit, !visible) }) {
+                            Text(if (visible) "Nascondi" else "Ripristina")
+                        }
+                    }
+                }
+            }
+            if (interventions.size > visibleHistory) {
+                item {
+                    TextButton(onClick = { visibleHistory += 50 }) { Text("Mostra altri interventi") }
+                }
             }
         }
         item {
@@ -440,6 +574,19 @@ fun ReadingReaderOverlay(manager: ReadingTogetherManager, menuVisible: Boolean, 
             }
         }
         if (!room.active) return@Box
+        if (tools.noteDraft != null) {
+            Surface(
+                Modifier.align(Alignment.TopCenter).widthIn(max = 520.dp),
+                shape = RoundedCornerShape(22.dp),
+                tonalElevation = 6.dp,
+                shadowElevation = 4.dp,
+            ) {
+                Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Tocca la pagina per lasciare la nota", Modifier.weight(1f).padding(start = 8.dp))
+                    IconButton(onClick = manager::finishNote) { Icon(Icons.Default.Close, "Annulla nota") }
+                }
+            }
+        }
         if (tools.drawing) {
             Surface(
                 Modifier.align(Alignment.TopCenter).widthIn(max = 520.dp),

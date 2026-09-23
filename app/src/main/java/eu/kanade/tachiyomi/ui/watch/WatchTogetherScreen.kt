@@ -172,6 +172,8 @@ fun WatchTogetherPanel(
     val room by manager.controller.state.collectAsState()
     val opening by manager.opening.collectAsState()
     val preparation by manager.preparation.collectAsState()
+    val recoverable by manager.recoverable.collectAsState()
+    val saveFailed by manager.roomSaveFailed.collectAsState()
     var showQr by remember { mutableStateOf(false) }
     val invitationLink = remember(room.invite) {
         runCatching { WatchInvite.parse(room.invite, System.currentTimeMillis()).link() }.getOrNull()
@@ -210,6 +212,10 @@ fun WatchTogetherPanel(
     WatchTogetherContent(
         room = room, opening = opening, name = name, onName = { name = it.take(32) },
         incomingCode = incomingCode, inviteError = inviteError, preparation = preparation,
+        recoverable = recoverable,
+        saveFailed = saveFailed,
+        onResumeRoom = manager::resumePendingRoom,
+        onDiscardRoom = manager::discardPendingRoom,
         onQr = { showQr = true },
         onRead = { readingPanel = true },
         onSkip = manager.controller::requestSkip, onCancelSkip = manager.controller::cancelSkip,
@@ -306,6 +312,10 @@ fun WatchTogetherContent(
     onCancelNext: () -> Unit = {},
     onExtensions: () -> Unit = {},
     onRead: () -> Unit = {},
+    recoverable: Boolean = false,
+    saveFailed: Boolean = false,
+    onResumeRoom: () -> Boolean = { false },
+    onDiscardRoom: () -> Unit = {},
 ) {
     var joining by rememberSaveable { mutableStateOf(false) }
     var code by remember { mutableStateOf("") }
@@ -316,6 +326,7 @@ fun WatchTogetherContent(
         }
     }
     var options by rememberSaveable { mutableStateOf(false) }
+    var resumeError by remember { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     val motionDuration = if (modernMotionEnabled()) 180 else 0
     Column(
@@ -339,6 +350,12 @@ fun WatchTogetherContent(
             }
         }
         if (inviteError != null) Text(inviteError, color = colors.error)
+        if (room.active && saveFailed) {
+            Text(
+                "Le annotazioni non sono ancora salvate per il rientro. Riproveremo automaticamente.",
+                color = colors.error,
+            )
+        }
         if (room.active && incomingCode.isNotBlank() && incomingCode != room.invite) {
             Card {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -348,6 +365,28 @@ fun WatchTogetherContent(
             }
         }
         if (!room.active) {
+            if (recoverable) {
+                Card {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("La tua stanza è ancora disponibile", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Rientra per ritrovare le annotazioni salvate e riallinearti con gli altri. " +
+                                "La riproduzione non parte da sola.",
+                            color = colors.onSurfaceVariant,
+                        )
+                        Button(onClick = { resumeError = !onResumeRoom() }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Rientra nella stanza")
+                        }
+                        TextButton(onClick = onDiscardRoom) { Text("Elimina la sessione salvata") }
+                        if (resumeError) {
+                            Text(
+                                "Non è stato possibile rientrare. Puoi creare una nuova stanza.",
+                                color = colors.error,
+                            )
+                        }
+                    }
+                }
+            }
             Text(
                 "Una stanza per video e manga. Chi crea la stanza sceglie l'episodio da guardare; " +
                     "per i manga ciascuno legge al proprio ritmo e può raggiungere gli altri.",
@@ -500,6 +539,11 @@ fun WatchTogetherContent(
                                 member.problem.description()
                             } else if (member.buffering) {
                                 "Caricamento"
+                            } else if (member.reading) {
+                                "Sta leggendo"
+                            } else if (member.ready && member.positionSeconds != null) {
+                                val seconds = member.positionSeconds.toInt().coerceAtLeast(0)
+                                "Sta guardando · ${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
                             } else if (member.ready) {
                                 "Pronto"
                             } else {

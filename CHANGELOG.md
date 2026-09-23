@@ -8,6 +8,16 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 23 settembre 2026 — Annotazioni condivise più affidabili
+
+- Nella stessa stanza video e manga, schizzi e note sulla pagina si riallineano
+  dopo disconnessioni e messaggi fuori ordine; gli interventi nascosti non ricompaiono.
+- Ogni partecipante può nascondere e ripristinare i propri interventi per tutti;
+  il creatore può moderare quelli della stanza. La visibilità locale resta separata.
+- Dopo una chiusura imprevista, la schermata offre il rientro esplicito nella stanza
+  con le annotazioni temporanee salvate in forma cifrata sul dispositivo.
+- La stanza mostra temporaneamente a che punto del video stanno guardando gli altri.
+
 ## 23 settembre 2026 — Pressione prolungata nel player personalizzabile
 
 - Nelle impostazioni dei gesti puoi scegliere cosa accade tenendo premuto sul video:

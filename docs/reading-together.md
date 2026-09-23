@@ -26,7 +26,7 @@ Se il creatore passa al manga, la selezione video comune viene sospesa. Tornare 
 player riutilizza la stanza e i normali controlli di ripresa e sincronizzazione.
 Il controller della lettura non contiene riferimenti al player.
 
-## Schizzi condivisi
+## Schizzi e note condivisi
 
 “Disegna” attiva una modalità esplicita; la lettura normale conserva i suoi gesti.
 La barra offre cinque colori, tre spessori, annulla e pulizia della pagina.
@@ -34,12 +34,18 @@ Due dita permettono di tornare ai gesti di navigazione. Un tratto completato vie
 trasmesso come coordinate, mai come immagine. Per disegnare sulla pagina dell'amico,
 raggiungila: l'amico resta libero di leggere o cambiare pagina.
 
-L'occhio mostra o nasconde tutti gli schizzi su questo telefono, senza cancellarli
-per gli altri. Ogni partecipante può cancellare i propri; il creatore può pulire
-l'intera pagina, con conferma. Le immagini originali e i download non vengono modificati.
-Gli schizzi sono temporanei: fino a 12 tratti per pagina e 32 pagine recenti nella
-memoria della stanza. La chiusura del creatore o la terminazione del suo processo
-elimina questa memoria; non è un archivio di annotazioni.
+L'occhio mostra o nasconde localmente le annotazioni, senza modificarle per gli altri.
+Una nota breve si posiziona toccando la pagina. La cronologia della stanza permette
+di nascondere e ripristinare per tutti i propri interventi; il creatore può moderare
+anche quelli altrui. La pulizia della pagina richiede conferma. Le immagini originali
+e i download non vengono modificati.
+
+Gli interventi sono temporanei e limitati a 64 pagine, 256 operazioni per pagina
+e 8192 operazioni complessive.
+Un giornale cifrato conservato solo su questo dispositivo consente il rientro dopo
+una chiusura imprevista finché l'invito è valido. La schermata propone esplicitamente
+“Rientra nella stanza”; il video non riparte automaticamente. Lasciare la stanza,
+chiuderla o far scadere l'invito elimina il giornale e la chiave locale.
 
 Le coordinate sono normalizzate sulla pagina originale e trasformate per zoom,
 lettura verticale, pagine divise, doppie pagine ruotate e impilate. Durante la stanza
@@ -48,22 +54,23 @@ che due telefoni disegnino su rettangoli diversi.
 
 ## Protocollo e affidabilità
 
-Il canale applicativo reading v1 è opzionale nel messaggio cifrato della stanza
+Il canale applicativo reading v2 è opzionale nel messaggio cifrato della stanza
 [Guarda insieme](watch-together.md), senza nuovi segreti, relay o identità.
 La capacità readingVersion viene negoziata prima che un ospite invii questi dati:
 un host precedente non deve interpretare una presenza manga come stato video.
 Entrambi i telefoni devono avere la nuova versione per leggere insieme.
 
 Il creatore autentica e ammette i mittenti usando la stessa lista della stanza.
-Pubblica la presenza aggregata e ordina le modifiche ai disegni. Ogni ospite ha
-una sequenza di operazioni distinta dai messaggi video; ritenta una sola operazione
-alla volta fino a ricevere conferma insieme allo stato della pagina. La coda è
-limitata a 16 operazioni e resta visibile mentre la rete manca. I rifiuti per pagina
-piena vengono confermati con un messaggio, senza bloccare le operazioni successive.
+Schizzi, note e visibilità sono operazioni immutabili: la loro unione converge anche
+con duplicati o arrivi fuori ordine. Un riepilogo per pagina segnala le differenze;
+lo scambio a blocchi recupera gli interventi dopo la riconnessione senza dipendere
+dalla cronologia dei relay. La coda in memoria è limitata e il giornale locale
+permette il recupero dopo il riavvio. Il vecchio canale reading v1 resta disponibile
+quando il creatore usa una versione precedente, con i suoi limiti originali.
 
-Revisioni e stati completi per pagina impediscono a messaggi duplicati o fuori ordine
-di ripristinare un tratto cancellato. I cambi di presenza sono aggregati, gli stati
-sono rinnovati e una connessione scaduta non viene mostrata come attiva.
+La posizione di lettura e l'indicatore della scena video restano presenza temporanea,
+separata dalle annotazioni. I cambi di presenza sono aggregati, gli stati sono
+rinnovati e una connessione scaduta non viene mostrata come attiva.
 Dimensioni UTF-8, coordinate, autori, numero di tratti e frequenza di ingresso sono
 limitati prima di applicare un messaggio. I payload rimangono entro il limite
 dell'involucro cifrato esistente.
@@ -75,7 +82,8 @@ impostate come incognito non pubblicano la lettura né inviano schizzi.
 
 ## Verifica
 
-ReadingRoomTest copre indipendenza dei lettori, cambio titolo, coda offline,
+ReadingCrdtTest copre ordine, duplicati, note e moderazione. ReadingRoomTest copre
+recupero CRDT dopo disconnessione, indipendenza dei lettori, cambio titolo, coda offline,
 duplicazione, ordinamento, cancellazioni, autorizzazione, limiti e trasformazioni.
 WatchRoomTest verifica il canale sulla medesima stanza, l'isolamento dal player,
 la compatibilità con host precedenti e il ritorno al video.

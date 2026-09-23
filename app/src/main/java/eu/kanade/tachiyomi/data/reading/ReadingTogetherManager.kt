@@ -51,6 +51,7 @@ data class ReadingTools(
     val error: String? = null,
     val returnTo: ReadingBookmark? = null,
     val navigation: Long = 0,
+    val noteDraft: String? = null,
 )
 
 /** Android catalog/navigation adapter. The room itself never calls into a reader or native player. */
@@ -83,7 +84,7 @@ class ReadingTogetherManager private constructor(context: Context) {
                 if (!active) {
                     resolution?.cancel()
                     target = null
-                    mutableTools.value = tools.value.copy(drawing = false, opening = false)
+                    mutableTools.value = tools.value.copy(drawing = false, opening = false, noteDraft = null)
                 }
             }
         }
@@ -150,7 +151,23 @@ class ReadingTogetherManager private constructor(context: Context) {
             return
         }
         mutableTools.value =
-            tools.value.copy(drawing = value, visible = if (value) true else tools.value.visible)
+            tools.value.copy(drawing = value, visible = if (value) true else tools.value.visible, noteDraft = null)
+    }
+    fun startNote(text: String): Boolean {
+        val draft = text.trim()
+        if (draft.isEmpty() ||
+            draft.length > 280 ||
+            currentPage() == null ||
+            !controller.state.value.active ||
+            !controller.state.value.crdtEnabled
+        ) {
+            return false
+        }
+        mutableTools.value = tools.value.copy(noteDraft = draft, drawing = false, visible = true)
+        return true
+    }
+    fun finishNote() {
+        mutableTools.value = tools.value.copy(noteDraft = null)
     }
     fun setColor(value: Int) {
         if (value in 0..4) mutableTools.value = tools.value.copy(color = value)

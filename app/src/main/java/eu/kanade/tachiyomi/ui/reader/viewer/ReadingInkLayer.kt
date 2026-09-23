@@ -46,6 +46,8 @@ internal class ReadingInkLayer(private val view: ReaderPageImageView, private va
         strokeJoin =
             Paint.Join.ROUND
     }
+    private val noteBackground = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xE6222222.toInt() }
+    private val noteText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFFFFF.toInt() }
     private val path = Path()
     private val inverse = Matrix()
     private val points = ArrayList<ReadingPoint>(96)
@@ -95,6 +97,32 @@ internal class ReadingInkLayer(private val view: ReaderPageImageView, private va
 
     fun touch(event: MotionEvent, normal: (MotionEvent) -> Boolean): Boolean {
         val manager = manager
+        val draft = manager?.tools?.value?.noteDraft
+        if (draft != null && position != null && manager.controller.state.value.active) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> return true
+                MotionEvent.ACTION_UP -> {
+                    toOriginal(event.x, event.y)?.let { point ->
+                        if (manager.controller.addNote(
+                                position!!,
+                                (point.x * 10000).roundToInt().coerceIn(0, 10000),
+                                (point.y * 10000).roundToInt().coerceIn(0, 10000),
+                                draft,
+                            )
+                        ) {
+                            manager.finishNote()
+                        }
+                    }
+                    view.invalidate()
+                    return true
+                }
+                MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> {
+                    manager.finishNote()
+                    return normal(event)
+                }
+                else -> return true
+            }
+        }
         val enabled =
             manager?.controller?.state?.value?.active == true &&
                 manager.controller.state.value.supported &&
@@ -201,6 +229,34 @@ internal class ReadingInkLayer(private val view: ReaderPageImageView, private va
         }
         strokes.forEachIndexed { index, stroke ->
             drawLine(canvas, cachedPoints[index], stroke.color, stroke.width)
+        }
+        val notes = room.notes(page)
+        if (notes.isNotEmpty()) {
+            val density = view.resources.displayMetrics.density
+            noteText.textSize = 13f * view.resources.displayMetrics.scaledDensity
+            notes.forEach { note ->
+                val point = toView(ReadingPoint(note.x / 10000f, note.y / 10000f)) ?: return@forEach
+                val fullLabel = note.text.replace('\n', ' ')
+                val maxTextWidth = (view.width * .72f - 20f * density).coerceAtLeast(0f)
+                var label = fullLabel.take(32)
+                while (label.length > 1 && noteText.measureText(label) > maxTextWidth) {
+                    label = label.dropLast(2) + "…"
+                }
+                val width = (noteText.measureText(label) + 20f * density).coerceAtMost(view.width * .72f)
+                val height = 30f * density
+                val left = point.x.coerceIn(0f, (view.width - width).coerceAtLeast(0f))
+                val top = point.y.coerceIn(0f, (view.height - height).coerceAtLeast(0f))
+                canvas.drawRoundRect(
+                    left,
+                    top,
+                    left + width,
+                    top + height,
+                    11f * density,
+                    11f * density,
+                    noteBackground,
+                )
+                canvas.drawText(label, left + 10f * density, top + 20f * density, noteText)
+            }
         }
         if (gesture) drawLine(canvas, points, manager.tools.value.color, manager.tools.value.width)
         canvas.restore()

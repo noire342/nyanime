@@ -58,7 +58,7 @@ data class ReadingStroke(
 }
 
 @Serializable
-enum class ReadingKind { Presence, Roster, Ink, Board, Leave, Closed }
+enum class ReadingKind { Presence, Roster, Ink, Board, Leave, Closed, Crdt, Sync }
 
 @Serializable
 data class ReadingEnvelope(
@@ -75,8 +75,10 @@ data class ReadingEnvelope(
     val strokes: List<ReadingStroke> = emptyList(),
     val acknowledgement: Long = 0,
     val error: String = "",
+    val edits: List<ReadingEdit> = emptyList(),
+    val digest: String = "",
 ) {
-    fun valid(): Boolean = version == 1 &&
+    fun valid(): Boolean = version in 1..2 &&
         (peer == null || peer.valid()) &&
         members.size <= 8 &&
         members.all { isReadingKey(it.key) && it.value.valid() } &&
@@ -89,6 +91,9 @@ data class ReadingEnvelope(
         strokes.size <= 12 &&
         strokes.all { it.valid() } &&
         strokes.map { it.id }.distinct().size == strokes.size &&
+        edits.size <= 4 &&
+        edits.all { it.valid() && it.page.pageKey == page?.pageKey } &&
+        (digest.isEmpty() || digest.matches(Regex("[0-9a-f]{64}"))) &&
         error.length <= 240 &&
         watchJson.encodeToString(this).toByteArray().size <= 22000 &&
         when (kind) {
@@ -98,13 +103,19 @@ data class ReadingEnvelope(
                     operation > 0 &&
                     listOf(stroke != null, erase.isNotEmpty(), clear).count { it } == 1
             ReadingKind.Board -> page != null
+            ReadingKind.Crdt -> version == 2 && page != null && edits.isNotEmpty()
+            ReadingKind.Sync -> version == 2 && page != null && digest.isNotEmpty()
             else -> true
         }
 }
 
 internal fun isReadingKey(value: String): Boolean = value.matches(Regex("[0-9a-f]{64}"))
 
-data class ReadingBoard(val revision: Long = 0, val strokes: List<ReadingStroke> = emptyList())
+data class ReadingBoard(
+    val revision: Long = 0,
+    val strokes: List<ReadingStroke> = emptyList(),
+    val notes: List<ReadingNote> = emptyList(),
+)
 
 data class ReadingRoomState(
     val active: Boolean = false,
@@ -114,6 +125,7 @@ data class ReadingRoomState(
     val relayCount: Int = 0,
     val connected: Boolean = false,
     val supported: Boolean = true,
+    val crdtEnabled: Boolean = false,
     val members: Map<String, ReadingPeer> = emptyMap(),
     val boards: Map<String, ReadingBoard> = emptyMap(),
     val pending: List<ReadingEnvelope> = emptyList(),
@@ -123,6 +135,7 @@ data class ReadingRoomState(
     val status: String get() = when {
         !active -> notice
         relayCount == 0 -> "Riconnessione… puoi continuare a leggere"
+        !connected && members.isEmpty() -> "In attesa della stanza…"
         !supported -> "Per leggere insieme, aggiornate Nyanime su entrambi i telefoni"
         !connected -> "In attesa della stanza…"
         pending.isNotEmpty() -> "${pending.size} schizzi in attesa"
@@ -140,4 +153,6 @@ data class ReadingRoomState(
         }
         return result
     }
+
+    fun notes(page: ReadingPosition): List<ReadingNote> = boards[page.pageKey]?.notes.orEmpty()
 }

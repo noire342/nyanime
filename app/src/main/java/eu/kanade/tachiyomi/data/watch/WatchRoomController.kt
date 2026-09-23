@@ -23,6 +23,8 @@ class WatchRoomController(
     private val transportFactory: (WatchInvite, WatchIdentity) -> WatchTransport = { invite, identity ->
         NostrWatchTransport(invite, identity)
     },
+    private val onSessionStarted: (WatchInvite, WatchIdentity, String) -> Unit = { _, _, _ -> },
+    private val onSessionEnded: () -> Unit = {},
 ) {
     private val mutableState = MutableStateFlow(WatchRoomState())
     val state = mutableState.asStateFlow()
@@ -114,12 +116,22 @@ class WatchRoomController(
 
     fun join(code: String, displayName: String) = start(displayName) { WatchInvite.parse(code, wallMillis()) }
 
-    private fun start(displayName: String, makeInvite: (WatchIdentity) -> WatchInvite) {
-        if (active) return
-        var identity: WatchIdentity? = null
+    fun resume(room: WatchInvite, identitySecret: ByteArray, displayName: String) =
+        start(displayName, WatchIdentity(identitySecret)) { room.validate(wallMillis()) }
+
+    private fun start(
+        displayName: String,
+        restoredIdentity: WatchIdentity? = null,
+        makeInvite: (WatchIdentity) -> WatchInvite,
+    ) {
+        if (active) {
+            restoredIdentity?.clear()
+            return
+        }
+        var identity: WatchIdentity? = restoredIdentity
         try {
             val sample = if (readingMode) WatchPlayback(null, 0.0, true, false, false, 1.0) else player.sample()
-            identity = WatchIdentity()
+            identity = identity ?: WatchIdentity()
             val room = makeInvite(identity)
             val network = transportFactory(room, identity)
             reset()
@@ -140,7 +152,9 @@ class WatchRoomController(
                 message = "Connessione alla stanza…",
                 localMemberId = network.publicKey,
                 readingSupported = host,
+                readingVersion = if (host) 2 else 0,
             )
+            onSessionStarted(room, identity, name)
             if (!readingMode) player.pause(true)
             val token = ++generation
             network.start(
@@ -226,10 +240,12 @@ class WatchRoomController(
             return
         }
         send(message(if (state.value.host) WatchMessageType.Closed else WatchMessageType.Leave))
+        onSessionEnded()
         stop(WatchPhase.Idle, "")
     }
 
     private fun stop(phase: WatchPhase, reason: String) {
+        if (phase == WatchPhase.Closed) onSessionEnded()
         generation++
         ticker?.cancel()
         ticker = null
@@ -546,6 +562,7 @@ class WatchRoomController(
                         incoming.preparedNextKey,
                         incoming.nextProblem,
                         incoming.readingMode,
+                        incoming.position.takeIf { incoming.media != null && !incoming.readingMode },
                     ) to now()
                 lastBroadcast = -10_000
             }
@@ -565,7 +582,10 @@ class WatchRoomController(
                 }
                 val alreadyConnected = timeline != null
                 timeline = incoming
-                mutableState.value = state.value.copy(readingSupported = incoming.readingVersion == 1)
+                mutableState.value = state.value.copy(
+                    readingSupported = incoming.readingVersion in 1..2,
+                    readingVersion = incoming.readingVersion,
+                )
                 baseSpeed = incoming.speed
                 val own = transport?.publicKey
                 pendingCommand?.let { pending ->
@@ -611,7 +631,16 @@ class WatchRoomController(
                     upcoming = incoming.upcoming,
                     next = incoming.next,
                     members = incoming.peers.map { (id, peer) ->
-                        WatchMember(id, peer.name, peer.ready, peer.buffering, peer.problem, peer.nextProblem)
+                        WatchMember(
+                            id,
+                            peer.name,
+                            peer.ready,
+                            peer.buffering,
+                            peer.problem,
+                            peer.nextProblem,
+                            peer.positionSeconds,
+                            peer.reading,
+                        )
                     },
                 )
             }
@@ -716,7 +745,9 @@ class WatchRoomController(
                 media = null,
                 playRequested = false,
                 phase = WatchPhase.Waiting,
-                members = all.map { (id, peer) -> WatchMember(id, peer.name, peer.ready, peer.buffering) },
+                members = all.map { (id, peer) ->
+                    WatchMember(id, peer.name, peer.ready, peer.buffering, reading = peer.reading)
+                },
                 message = "Stanza aperta · lettura libera",
                 upcoming = null,
                 skipSeconds = null,
@@ -880,6 +911,7 @@ class WatchRoomController(
                 sample.canAdvance,
                 upcoming?.key,
                 reading = readingMode,
+                positionSeconds = sample.position.takeIf { media != null && !readingMode },
             ),
         )
         peers.forEach { (id, peer) ->
@@ -940,7 +972,16 @@ class WatchRoomController(
         mutableState.value = state.value.copy(
             phase = phase, media = media, playRequested = !desiredPaused,
             members = all.map { (id, peer) ->
-                WatchMember(id, peer.name, peer.ready, peer.buffering, peer.problem, peer.nextProblem)
+                WatchMember(
+                    id,
+                    peer.name,
+                    peer.ready,
+                    peer.buffering,
+                    peer.problem,
+                    peer.nextProblem,
+                    peer.positionSeconds,
+                    peer.reading,
+                )
             },
             message = if (peers.isEmpty() && media == null) "Condividi il codice con il tuo amico." else statusText,
             resumeSeconds = countdown, skip = skipCue,
@@ -993,6 +1034,7 @@ class WatchRoomController(
             sample.preparedNextKey,
             sample.nextProblem,
             readingMode,
+            sample.position.takeIf { localMedia != null && !readingMode }?.let { (it / 5).toInt() * 5.0 },
         )
         if (status != lastStatusValue || time - lastStatus >= 4000) {
             send(
@@ -1006,6 +1048,7 @@ class WatchRoomController(
                     preparedNextKey = sample.preparedNextKey,
                     nextProblem = sample.nextProblem,
                     readingMode = readingMode,
+                    position = status.positionSeconds ?: 0.0,
                 ),
             )
             lastStatusValue = status
@@ -1130,7 +1173,7 @@ class WatchRoomController(
     private fun message(type: WatchMessageType): WatchMessage = WatchMessage(
         type = type,
         coordinationVersion = 2,
-        readingVersion = 1,
+        readingVersion = 2,
         sequence = ++sequence,
         at = now(),
     )

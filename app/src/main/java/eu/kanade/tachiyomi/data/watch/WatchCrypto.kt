@@ -120,6 +120,7 @@ class WatchIdentity(private val secret: ByteArray = generateSecret()) {
     val publicKey: String = Secp256k1.pubkeyCreate(secret).copyOfRange(1, 33).watchHex()
     fun sign(hash: ByteArray): String = Secp256k1.signSchnorr(hash, secret, watchRandom(32)).watchHex()
     fun clear() = secret.fill(0)
+    internal fun sessionSecret(): ByteArray = secret.copyOf()
 
     companion object {
         private fun generateSecret(): ByteArray {

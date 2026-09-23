@@ -111,6 +111,8 @@ data class WatchMember(
     val buffering: Boolean,
     val problem: WatchProblem = WatchProblem.None,
     val nextProblem: WatchProblem = WatchProblem.None,
+    val positionSeconds: Double? = null,
+    val reading: Boolean = false,
 )
 
 @Serializable
@@ -146,6 +148,7 @@ data class WatchRoomState(
     val commandFailed: Boolean = false,
     val activity: WatchActivity? = null,
     val readingSupported: Boolean = false,
+    val readingVersion: Int = 0,
 ) {
     val wantsPlayback: Boolean get() = pendingPlaybackPaused?.not() ?: playRequested
     val preparingPlayback: Boolean get() = active &&
@@ -180,6 +183,7 @@ data class WatchPeerStatus(
     val preparedNextKey: String? = null,
     val nextProblem: WatchProblem = WatchProblem.None,
     val reading: Boolean = false,
+    val positionSeconds: Double? = null,
 )
 
 @Serializable
@@ -233,6 +237,7 @@ data class WatchMessage(
         target.length <= 64 &&
         command.length <= 16 &&
         coordinationVersion in 1..2 &&
+        readingVersion in 0..2 &&
         (resumeAt == null || resumeAt >= 0) &&
         pausedBy.length <= 32 &&
         cueId >= 0 &&
@@ -257,6 +262,10 @@ data class WatchMessage(
         peers.all { (key, value) ->
             key.matches(Regex("[0-9a-f]{64}")) &&
                 value.name.length <= 32 &&
+                (
+                    value.positionSeconds == null ||
+                        (value.positionSeconds.isFinite() && value.positionSeconds in 0.0..86_400.0)
+                    ) &&
                 (value.preparedNextKey == null || value.preparedNextKey.length <= 2200) &&
                 (value.media == null || value.media.valid())
         } &&

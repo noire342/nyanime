@@ -26,7 +26,7 @@ class ReadingRoomTest {
         author: String = guestId,
     ) = ReadingStroke(id.toString(16).padStart(32, '0'), author, 0, 2, listOf(0, 0, 10000, 10000))
 
-    private inner class Pairing(scope: TestScope) {
+    private inner class Pairing(scope: TestScope, crdt: Boolean = false) {
         var drop = false
         var duplicate = false
         var loseNextAcknowledgement = false
@@ -58,6 +58,7 @@ class ReadingRoomTest {
                     localMemberId = hostId,
                     invite = "same-code",
                     relayCount = 2,
+                    readingVersion = if (crdt) 2 else 1,
                     members = members,
                 ),
             )
@@ -66,6 +67,7 @@ class ReadingRoomTest {
                     active = true,
                     localMemberId = guestId,
                     readingSupported = true,
+                    readingVersion = if (crdt) 2 else 1,
                     invite = "same-code",
                     relayCount = 2,
                     members = members,
@@ -77,6 +79,72 @@ class ReadingRoomTest {
         private fun deliverToGuest(value: ReadingEnvelope) {
             guest.receive(hostId, value, true)
         }
+    }
+
+    @Test fun crdtRecoversOfflineNotesAndModeration() = runTest {
+        val pair = Pairing(this, crdt = true)
+        runCurrent()
+        pair.drop = true
+        assertTrue(pair.guest.draw(page, stroke(1)))
+        assertTrue(pair.guest.addNote(page, 2000, 3000, "Guarda qui"))
+        advanceTimeBy(6000)
+        runCurrent()
+        assertTrue(pair.host.state.value.strokes(page).isEmpty())
+        pair.drop = false
+        advanceTimeBy(12000)
+        runCurrent()
+        assertEquals(listOf(stroke(1)), pair.host.state.value.strokes(page))
+        assertEquals("Guarda qui", pair.host.state.value.notes(page).single().text)
+        assertEquals(pair.guest.state.value.notes(page), pair.host.state.value.notes(page))
+        assertTrue(pair.host.setVisible(page, stroke(1).id, false))
+        advanceTimeBy(3000)
+        runCurrent()
+        assertTrue(pair.guest.state.value.strokes(page).isEmpty())
+        assertTrue(pair.host.setVisible(page, stroke(1).id, true))
+        advanceTimeBy(3000)
+        runCurrent()
+        assertEquals(listOf(stroke(1)), pair.guest.state.value.strokes(page))
+    }
+
+    @Test fun guestRestoresJournalBeforeHostAdvertisesReadingVersion() = runTest {
+        val guest = ReadingRoomController(backgroundScope, { testScheduler.currentTime }) { _, _ -> }
+        val joining = WatchRoomState(
+            active = true,
+            localMemberId = guestId,
+            invite = "same-code",
+            relayCount = 1,
+        )
+        guest.roomChanged(joining)
+        val id = "1".repeat(32)
+        guest.restore(
+            listOf(
+                ReadingEdit(
+                    id,
+                    guestId,
+                    page,
+                    1,
+                    ReadingEditKind.Note,
+                    note = ReadingNote(id, guestId, 1000, 2000, "Salvata"),
+                ),
+            ),
+        )
+        assertTrue(guest.state.value.notes(page).isEmpty())
+        guest.roomChanged(joining.copy(readingSupported = true, readingVersion = 2))
+        assertEquals("Salvata", guest.state.value.notes(page).single().text)
+    }
+
+    @Test fun crdtRecoversOfflinePageTheHostHasNeverOpened() = runTest {
+        val pair = Pairing(this, crdt = true)
+        val distantPage = page.copy(page = 19)
+        runCurrent()
+        pair.drop = true
+        assertTrue(pair.guest.draw(distantPage, stroke(8)))
+        advanceTimeBy(6000)
+        runCurrent()
+        pair.drop = false
+        advanceTimeBy(12000)
+        runCurrent()
+        assertEquals(listOf(stroke(8)), pair.host.state.value.strokes(distantPage))
     }
 
     @Test fun rejectedDrawingKeepsItsExplanationAfterLostAcknowledgement() = runTest {

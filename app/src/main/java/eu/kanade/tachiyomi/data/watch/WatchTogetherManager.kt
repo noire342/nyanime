@@ -46,6 +46,10 @@ private class WatchResolveFailure(val problem: WatchProblem, message: String) : 
  */
 class WatchTogetherManager private constructor(private val application: Application) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val roomArchive = WatchRoomArchive(application)
+    private val mutableRecoverable = MutableStateFlow(roomArchive.load() != null)
+    val recoverable = mutableRecoverable.asStateFlow()
+    val roomSaveFailed = roomArchive.saveFailed
     private var foreground = WeakReference<Activity>(null)
     private var playerOwner = WeakReference<Activity>(null)
     private val playback = WatchPlayerAttachment()
@@ -88,13 +92,44 @@ class WatchTogetherManager private constructor(private val application: Applicat
             }
         },
         SystemClock::elapsedRealtime,
+        onSessionStarted = { invite, identity, name ->
+            roomArchive.begin(invite, identity, name)
+            mutableRecoverable.value = false
+        },
+        onSessionEnded = {
+            roomArchive.clear()
+            mutableRecoverable.value = false
+        },
     )
 
     val reading = eu.kanade.tachiyomi.data.reading.ReadingRoomController(
         scope,
         SystemClock::elapsedRealtime,
+        roomArchive::update,
         controller::sendReading,
     )
+
+    fun resumePendingRoom(): Boolean {
+        if (controller.active) return false
+        val saved = roomArchive.load() ?: run {
+            mutableRecoverable.value = false
+            return false
+        }
+        controller.resume(saved.invite, saved.identity.watchBytes(), saved.name)
+        if (!controller.active) {
+            mutableRecoverable.value = roomArchive.load() != null
+            return false
+        }
+        reading.roomChanged(controller.state.value)
+        reading.restore(saved.edits)
+        mutableRecoverable.value = false
+        return true
+    }
+
+    fun discardPendingRoom() {
+        roomArchive.clear()
+        mutableRecoverable.value = false
+    }
 
     init {
         controller.onReadingMessage = reading::receive
@@ -138,6 +173,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
                     selection = null
                     mutableOpening.value = WatchOpeningState()
                     if (!room.active) {
+                        mutableRecoverable.value = roomArchive.load() != null
                         resolutionGeneration++
                         playback.forgetDetached()
                         application.stopService(Intent(application, WatchSessionService::class.java))

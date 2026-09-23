@@ -26,8 +26,10 @@ This is an application envelope, not NIP-44 messaging.
 
 Relays can observe IP addresses, random room tags, event authors, timing and ciphertext sizes.
 They cannot decrypt room metadata. Ephemeral events are not expected to be stored by compliant
-relays; this is not a storage guarantee. The app does not persist room keys or signing identities.
-An active room expires after 24 hours; closing it discards its creator identity.
+relays; this is not a storage guarantee. An active room expires after 24 hours. To allow explicit
+re-entry after a crash, the app temporarily stores the invitation, signing identity and reading
+annotations encrypted with an Android Keystore key in a file excluded from backups. Explicit
+leave, closure or invitation expiry removes this local state. Playback never resumes by itself.
 
 ## Playback ownership
 
