@@ -27,7 +27,9 @@ data class WatchMedia(
     fun compatibleDuration(other: WatchMedia): Boolean =
         duration > 0 &&
             other.duration > 0 &&
-            abs(duration - other.duration) <= maxOf(3.0, minOf(duration, other.duration) * 0.005)
+            // HLS manifests and alternate encodes of the same catalog episode often report
+            // slightly different lengths. A substantial gap still protects against a wrong cut.
+            abs(duration - other.duration) <= maxOf(30.0, minOf(60.0, minOf(duration, other.duration) * 0.01))
 
     fun valid(): Boolean = title.length in 1..240 &&
         episode.length <= 240 &&
@@ -57,6 +59,7 @@ data class WatchPlayback(
     val canAdvance: Boolean = true,
     val preparedNextKey: String? = null,
     val nextProblem: WatchProblem = WatchProblem.None,
+    val bufferedAheadSeconds: Double? = null,
 )
 
 /** A source may refresh an episode URL. Only the exact locally resolved entry inherits the room identity. */
@@ -113,6 +116,7 @@ data class WatchMember(
     val nextProblem: WatchProblem = WatchProblem.None,
     val positionSeconds: Double? = null,
     val reading: Boolean = false,
+    val bufferedAheadSeconds: Int? = null,
 )
 
 @Serializable
@@ -131,6 +135,8 @@ data class WatchRoomState(
     val relayCount: Int = 0,
     val sharedControls: Boolean = true,
     val waitForEveryone: Boolean = false,
+    val prebufferOnStart: Boolean = false,
+    val prebuffering: Boolean = false,
     val latencyMs: Long? = null,
     val driftMs: Long? = null,
     val localHold: Boolean = false,
@@ -184,6 +190,7 @@ data class WatchPeerStatus(
     val nextProblem: WatchProblem = WatchProblem.None,
     val reading: Boolean = false,
     val positionSeconds: Double? = null,
+    val bufferedAheadSeconds: Int? = null,
 )
 
 @Serializable
@@ -207,6 +214,9 @@ data class WatchMessage(
     val invitation: String = "",
     val sharedControls: Boolean = true,
     val waitForEveryone: Boolean = true,
+    val prebufferOnStart: Boolean = false,
+    val bufferedAheadSeconds: Int? = null,
+    val prebuffering: Boolean = false,
     val peers: Map<String, WatchPeerStatus> = emptyMap(),
     val acknowledgements: Map<String, Long> = emptyMap(),
     val coordinationVersion: Int = 1,
@@ -240,6 +250,7 @@ data class WatchMessage(
         invitation.length <= 5000 &&
         coordinationVersion in 1..2 &&
         readingVersion in 0..2 &&
+        (bufferedAheadSeconds == null || bufferedAheadSeconds in 0..120) &&
         (resumeAt == null || resumeAt >= 0) &&
         pausedBy.length <= 32 &&
         cueId >= 0 &&
@@ -269,6 +280,7 @@ data class WatchMessage(
                         (value.positionSeconds.isFinite() && value.positionSeconds in 0.0..86_400.0)
                     ) &&
                 (value.preparedNextKey == null || value.preparedNextKey.length <= 2200) &&
+                (value.bufferedAheadSeconds == null || value.bufferedAheadSeconds in 0..120) &&
                 (value.media == null || value.media.valid())
         } &&
         acknowledgements.all { (key, value) -> key.matches(Regex("[0-9a-f]{64}")) && value >= 0 }

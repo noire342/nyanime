@@ -277,6 +277,7 @@ fun WatchTogetherPanel(
         onLeave = manager.controller::leave,
         onSharedControls = manager.controller::setSharedControls,
         onWaitForEveryone = manager.controller::setWaitForEveryone,
+        onPrebufferOnStart = manager.controller::setPrebufferOnStart,
         onChooseVideo = onChooseVideo,
         onOpenPlayer = if (context is eu.kanade.tachiyomi.ui.player.PlayerActivity) {
             null
@@ -303,6 +304,7 @@ fun WatchTogetherContent(
     onSharedControls: (Boolean) -> Unit,
     onWaitForEveryone: (Boolean) -> Unit,
     onChooseVideo: () -> Unit,
+    onPrebufferOnStart: (Boolean) -> Unit = {},
     short: WatchShortState = WatchShortState(),
     onCancelShort: () -> Unit = {},
     onApproveShort: (String) -> Unit = {},
@@ -640,6 +642,10 @@ fun WatchTogetherContent(
                                 member.problem.description()
                             } else if (member.buffering) {
                                 "Caricamento"
+                            } else if (room.prebuffering && member.ready) {
+                                member.bufferedAheadSeconds?.let {
+                                    "Precaricati ${it.coerceAtMost(15)}/15 s"
+                                } ?: "Precaricamento in corso"
                             } else if (member.reading) {
                                 "Sta leggendo"
                             } else if (member.ready && member.positionSeconds != null) {
@@ -729,6 +735,15 @@ fun WatchTogetherContent(
                     if (room.host) {
                         WatchOption("Tutti possono usare i comandi", room.sharedControls, onSharedControls)
                         WatchOption("Metti tutti in pausa se uno carica", room.waitForEveryone, onWaitForEveryone)
+                        WatchOption("Precarica prima di partire", room.prebufferOnStart, onPrebufferOnStart)
+                        if (room.prebufferOnStart) {
+                            Text(
+                                "Fino a 15 secondi di video per persona, caricati in parallelo. " +
+                                    "Se la fonte non mostra il progresso, attesa breve; massimo 15 secondi se carica lentamente.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.onSurfaceVariant,
+                            )
+                        }
                         if (!room.waitForEveryone) {
                             Text(
                                 "Se l'amico carica, il tuo video prosegue fino a 5 secondi; poi vi fermate insieme.",

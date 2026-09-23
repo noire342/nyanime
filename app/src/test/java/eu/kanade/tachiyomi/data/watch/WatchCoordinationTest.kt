@@ -79,6 +79,25 @@ class WatchCoordinationTest {
     }
 
     @Test
+    fun prebufferGateUsesTheSlowestCacheAndHasABoundedFallback() {
+        val gate = WatchPrebufferGate()
+        assertTrue(gate.waiting(true, true, true, 0, listOf(15, 3)))
+        assertFalse(gate.waiting(true, true, true, 15_000, listOf(15, null)))
+        gate.reset()
+        assertTrue(gate.waiting(true, true, true, 30_000, listOf(15, null)))
+        assertTrue(gate.waiting(true, true, true, 33_999, listOf(15, null)))
+        assertFalse(gate.waiting(true, true, true, 34_000, listOf(15, null)))
+        gate.reset()
+        assertTrue(gate.waiting(true, true, true, 40_000, listOf(3, 15)))
+        assertFalse(gate.waiting(true, true, true, 40_100, listOf(15, 15)))
+        gate.reset()
+        assertTrue(gate.waiting(true, true, true, 50_000, listOf(0, 0)))
+        assertFalse(gate.waiting(true, true, true, 65_000, listOf(0, 0)))
+        assertFalse(gate.waiting(false, true, true, 40_200, listOf(0, 0)))
+        assertFalse(gate.waiting(true, false, true, 40_300, listOf(0, 0)))
+    }
+
+    @Test
     fun linksAndQrPreserveTheExactInvitationWithoutNetworking() {
         val identity = WatchIdentity()
         val now = 1_800_000_000_000L

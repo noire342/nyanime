@@ -114,6 +114,15 @@ class WatchCryptoTest {
     }
 
     @Test
+    fun matchingCatalogEpisodesTolerateManifestDurationNoiseButRejectAnotherCut() {
+        val media = WatchMedia("Test Animation", "Episode 2", 2.0, 1400.0, 7, "/title", "/2")
+        assertTrue(media.matches(media.copy(duration = 1425.0)))
+        assertFalse(media.matches(media.copy(duration = 0.0)))
+        assertFalse(media.matches(media.copy(duration = 1500.0)))
+        assertFalse(media.matches(media.copy(episodeUrl = "/3")))
+    }
+
+    @Test
     fun anotherEpisodeCannotInheritResolvedRoomIdentity() {
         val remote = WatchMedia("Test Animation", "Episode 2", 2.0, 1400.0, 7, "/title", "/2")
         val selection = WatchSelection(remote, remote.key, 1, 2)

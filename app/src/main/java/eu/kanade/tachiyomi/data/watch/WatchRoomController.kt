@@ -74,6 +74,7 @@ class WatchRoomController(
     private var activityUntil = 0L
     private var publishedActivity: WatchActivity? = null
     private val startGate = WatchStartGate()
+    private val prebufferGate = WatchPrebufferGate()
     private val driftCorrector = WatchDriftCorrector()
     private var pausedBy = ""
     private var cueSequence = 0L
@@ -100,6 +101,8 @@ class WatchRoomController(
             }
         }
         readingMode = enabled
+        prebufferGate.reset()
+        mutableState.value = state.value.copy(prebuffering = false)
         lastStatus = -10_000
         lastBroadcast = -10_000
     }
@@ -199,6 +202,7 @@ class WatchRoomController(
         lastSeek = -10_000
         clock = WatchClock()
         startGate.reset()
+        prebufferGate.reset()
         driftCorrector.reset()
         pausedBy = ""
         cueSequence = 0L
@@ -283,6 +287,7 @@ class WatchRoomController(
         appliedSpeed = null
         driftCorrector.reset()
         startGate.reset()
+        prebufferGate.reset()
         appliedSeekRevision = -1
         lastStatus = -10_000
         lastBroadcast = -10_000
@@ -392,9 +397,10 @@ class WatchRoomController(
         when (request.command) {
             "pause" -> {
                 desiredPaused = true
-                mutableState.value = state.value.copy(playRequested = false, resumeSeconds = null)
+                mutableState.value = state.value.copy(playRequested = false, prebuffering = false, resumeSeconds = null)
                 pausedBy = actor
                 startGate.reset()
+                prebufferGate.reset()
                 suppressedNext = player.sample().media?.key
                 nextCue = null
                 skipCue = skipCue?.copy(deadline = null)
@@ -426,6 +432,7 @@ class WatchRoomController(
             }
             "seek" -> {
                 startGate.reset()
+                prebufferGate.reset()
                 driftCorrector.reset()
                 nextCue = null
                 suppressedNext = null
@@ -468,6 +475,15 @@ class WatchRoomController(
     fun setWaitForEveryone(value: Boolean) {
         if (active && state.value.host) {
             mutableState.value = state.value.copy(waitForEveryone = value)
+            lastBroadcast = -10_000
+        }
+    }
+
+    fun setPrebufferOnStart(value: Boolean) {
+        if (active && state.value.host) {
+            mutableState.value =
+                state.value.copy(prebufferOnStart = value, prebuffering = value && state.value.prebuffering)
+            prebufferGate.reset()
             lastBroadcast = -10_000
         }
     }
@@ -567,6 +583,7 @@ class WatchRoomController(
                         incoming.nextProblem,
                         incoming.readingMode,
                         incoming.position.takeIf { incoming.media != null && !incoming.readingMode },
+                        incoming.bufferedAheadSeconds,
                     ) to now()
                 lastBroadcast = -10_000
             }
@@ -623,6 +640,8 @@ class WatchRoomController(
                     media = incoming.media,
                     sharedControls = incoming.sharedControls,
                     waitForEveryone = incoming.waitForEveryone,
+                    prebufferOnStart = incoming.prebufferOnStart,
+                    prebuffering = incoming.prebuffering,
                     playRequested = incoming.playRequested,
                     pendingPlaybackPaused = pendingCommand?.command?.let {
                         when (it) {
@@ -644,6 +663,7 @@ class WatchRoomController(
                             peer.nextProblem,
                             peer.positionSeconds,
                             peer.reading,
+                            peer.bufferedAheadSeconds,
                         )
                     },
                 )
@@ -715,6 +735,7 @@ class WatchRoomController(
         }
         if (state.value.relayCount == 0) {
             startGate.reset()
+            prebufferGate.reset()
             driftCorrector.reset()
             // Reconnection must receive a new host snapshot before reusing its playback intent.
             if (!state.value.host) timeline = null
@@ -780,6 +801,7 @@ class WatchRoomController(
                         readingMode = true,
                         sharedControls = state.value.sharedControls,
                         waitForEveryone = state.value.waitForEveryone,
+                        prebufferOnStart = state.value.prebufferOnStart,
                     ),
                 )
                 lastBroadcast = time
@@ -824,6 +846,7 @@ class WatchRoomController(
             seekRevision++
             pendingSeek = null
             startGate.reset()
+            prebufferGate.reset()
             skipCue = null
             skipKey = null
             suppressedSkips.clear()
@@ -866,9 +889,19 @@ class WatchRoomController(
             }
         }.any { it }
         val buffering = !sample.ready || sample.buffering || pendingSeek != null || waiting
+        val prebuffering = prebufferGate.waiting(
+            enabled = state.value.prebufferOnStart &&
+                peers.values.any { !it.first.reading } &&
+                (media?.duration ?: 0.0) - sample.position > WatchPrebufferGate.TARGET_SECONDS,
+            firstStart = !hasPlayedCurrentMedia,
+            ready = !buffering && !state.value.localHold && !desiredPaused && !sample.ended,
+            now = time,
+            buffers = listOf(sample.bufferedAheadSeconds?.toInt()) +
+                peers.values.filter { !it.first.reading }.map { it.first.bufferedAheadSeconds },
+        )
         val previousDeadline = startGate.deadline
         val running = startGate.update(
-            !buffering && !state.value.localHold && !sample.ended,
+            !buffering && !prebuffering && !state.value.localHold && !sample.ended,
             !desiredPaused,
             time,
         )
@@ -951,11 +984,12 @@ class WatchRoomController(
                 upcoming?.key,
                 reading = readingMode,
                 positionSeconds = sample.position.takeIf { media != null && !readingMode },
+                bufferedAheadSeconds = sample.bufferedAheadSeconds?.toInt(),
             ),
         )
         peers.forEach { (id, peer) ->
             all[id] = if (time - peer.second > 12_000) {
-                peer.first.copy(ready = false, problem = WatchProblem.Connection)
+                peer.first.copy(ready = false, problem = WatchProblem.Connection, bufferedAheadSeconds = null)
             } else {
                 peer.first
             }
@@ -963,6 +997,9 @@ class WatchRoomController(
         val blocking = all.entries.firstOrNull {
             it.key != transport!!.publicKey && !it.value.reading && (!it.value.ready || it.value.buffering)
         }?.value
+        val prebufferingMember = all.values.firstOrNull {
+            !it.reading && (it.bufferedAheadSeconds ?: 0) < WatchPrebufferGate.TARGET_SECONDS
+        }
         val nextBlocking = all.entries.firstOrNull {
             it.key != transport!!.publicKey &&
                 !it.value.reading &&
@@ -976,7 +1013,7 @@ class WatchRoomController(
         val countdown = remainingSeconds(startGate.deadline, time)?.takeIf { it > 0 }
         val phase = when {
             peers.isEmpty() && desiredPaused -> WatchPhase.Waiting
-            buffering -> WatchPhase.Buffering
+            buffering || prebuffering -> WatchPhase.Buffering
             countdown != null -> WatchPhase.Starting
             paused -> WatchPhase.Paused
             else -> WatchPhase.Playing
@@ -1001,6 +1038,9 @@ class WatchRoomController(
                 blocking.name +
                     ": " +
                     if (blocking.problem != WatchProblem.None) blocking.problem.description() else "in attesa"
+            prebuffering && prebufferingMember != null ->
+                "${prebufferingMember.name} precarica · " +
+                    (prebufferingMember.bufferedAheadSeconds?.let { "$it/15 s" } ?: "in preparazione")
             buffering -> problem.description()
             countdown != null -> "Si riparte insieme tra " + countdown
             paused && !desiredPaused -> "Verifica che tutti siano pronti…"
@@ -1010,6 +1050,7 @@ class WatchRoomController(
         }
         mutableState.value = state.value.copy(
             phase = phase, media = media, playRequested = !desiredPaused,
+            prebuffering = prebuffering,
             members = all.map { (id, peer) ->
                 WatchMember(
                     id,
@@ -1020,6 +1061,7 @@ class WatchRoomController(
                     peer.nextProblem,
                     peer.positionSeconds,
                     peer.reading,
+                    peer.bufferedAheadSeconds,
                 )
             },
             message = if (peers.isEmpty() && media == null) "Condividi il codice con il tuo amico." else statusText,
@@ -1029,7 +1071,15 @@ class WatchRoomController(
         )
         // Deadlines are shared once and counted down locally; repeating snapshots more often
         // wastes relay quota without making a pause, seek or page change arrive faster.
-        val interval = if (countdown != null || skipCue?.deadline != null || nextCue != null) 2000 else 4000
+        val interval = if (countdown != null ||
+            prebuffering ||
+            skipCue?.deadline != null ||
+            nextCue != null
+        ) {
+            2000
+        } else {
+            4000
+        }
         if (peers.isNotEmpty() && time - lastBroadcast >= interval) {
             send(
                 message(WatchMessageType.Timeline).copy(
@@ -1037,9 +1087,11 @@ class WatchRoomController(
                     speed = baseSpeed, seekRevision = seekRevision, resumeAt = startGate.deadline,
                     buffering = buffering, sharedControls = state.value.sharedControls,
                     waitForEveryone = state.value.waitForEveryone,
+                    prebufferOnStart = state.value.prebufferOnStart,
                     peers = all.mapValues { it.value.copy(media = null, preparedNextKey = null) },
                     acknowledgements = acknowledgements.toMap(), pausedBy = pausedBy,
                     skip = skipCue, upcoming = upcoming, next = nextCue,
+                    prebuffering = prebuffering,
                     activity = publishedActivity?.takeIf { time - it.at <= 3500 && it.mediaKey == media?.key },
                 ),
             )
@@ -1059,11 +1111,19 @@ class WatchRoomController(
         val problem = when {
             state.value.localHold -> WatchProblem.LocalPause
             sample.problem != WatchProblem.None -> sample.problem
-            !same && sample.ready && localMedia?.key == remote?.media?.key -> WatchProblem.DifferentEdition
+            !same &&
+                sample.ready &&
+                localMedia?.key == remote?.media?.key &&
+                (remote?.media?.duration ?: 0.0) > 0.0 -> WatchProblem.DifferentEdition
             !same -> WatchProblem.Opening
             sample.buffering -> WatchProblem.Buffering
             !sample.ready -> WatchProblem.Opening
             else -> WatchProblem.None
+        }
+        val reportedBuffer = if (remote != null && remote.prebufferOnStart && remote.playRequested && remote.paused) {
+            sample.bufferedAheadSeconds?.toInt()?.coerceIn(0, 120)?.let { (it / 3) * 3 }
+        } else {
+            null
         }
         val status = WatchPeerStatus(
             name,
@@ -1076,6 +1136,7 @@ class WatchRoomController(
             sample.nextProblem,
             readingMode,
             sample.position.takeIf { localMedia != null && !readingMode }?.let { (it / 5).toInt() * 5.0 },
+            reportedBuffer,
         )
         if (status != lastStatusValue || time - lastStatus >= 4000) {
             send(
@@ -1090,6 +1151,7 @@ class WatchRoomController(
                     nextProblem = sample.nextProblem,
                     readingMode = readingMode,
                     position = status.positionSeconds ?: 0.0,
+                    bufferedAheadSeconds = status.bufferedAheadSeconds,
                 ),
             )
             lastStatusValue = status
@@ -1137,8 +1199,12 @@ class WatchRoomController(
                     stale -> "Aspetto chi ha creato la stanza. Il video resta in pausa."
                     remote == null -> "Aspetto il tuo amico. La sua stanza deve essere aperta."
                     remote.media == null -> "Il tuo amico sta scegliendo cosa guardare."
-                    !same && sample.ready && localMedia?.key == remote.media.key && localMedia.duration > 0 ->
-                        "La durata dei video è diversa. Scegli la stessa versione nelle qualità del player."
+                    !same &&
+                        sample.ready &&
+                        localMedia?.key == remote.media.key &&
+                        localMedia.duration > 0 &&
+                        remote.media.duration > 0 ->
+                        "Le durate differiscono molto. Controlla la versione nelle qualità del player."
                     !same -> "Preparazione dell'episodio scelto dal tuo amico…"
                     state.value.localHold -> "In pausa su questo telefono. Tocca Riprendi quando vuoi tornare."
                     else -> "Preparazione della sincronizzazione…"
@@ -1181,7 +1247,7 @@ class WatchRoomController(
         }
         mutableState.value = state.value.copy(
             phase = when {
-                remote.buffering || sample.buffering -> WatchPhase.Buffering
+                remote.buffering || sample.buffering || remote.prebuffering -> WatchPhase.Buffering
                 state.value.resumeSeconds != null -> WatchPhase.Starting
                 shouldPause -> WatchPhase.Paused
                 else -> WatchPhase.Playing
@@ -1194,6 +1260,7 @@ class WatchRoomController(
                     val blocked = remote.peers.values.firstOrNull { !it.ready || it.buffering }
                     blocked?.let { it.name + ": " + it.problem.description() } ?: "Preparazione del video"
                 }
+                remote.prebuffering -> "Precaricamento iniziale dei video…"
                 state.value.resumeSeconds != null -> "Si riparte insieme tra " + state.value.resumeSeconds
                 shouldPause && remote.pausedBy.isNotBlank() -> remote.pausedBy + " ha messo in pausa."
                 shouldPause -> "La stanza è in pausa."

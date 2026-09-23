@@ -26,6 +26,7 @@ class WatchRoomTest {
         var preparedNextKey: String? = null
         var problem = WatchProblem.None
         var nextProblem = WatchProblem.None
+        var bufferedAhead: Double? = null
         var advances = 0
         private var position = 40.0
         private var last = now()
@@ -35,7 +36,7 @@ class WatchRoomTest {
             last = at
             return WatchPlayback(
                 media, position, paused, ready, buffering, speed, ended, problem, upcoming,
-                canAdvance, preparedNextKey, nextProblem,
+                canAdvance, preparedNextKey, nextProblem, bufferedAhead,
             )
         }
         override fun pause(paused: Boolean) {
@@ -164,6 +165,56 @@ class WatchRoomTest {
         room.advance()
         assertTrue(room.hostPlayer.paused)
         assertTrue(room.guestPlayer.paused)
+    }
+
+    @Test
+    fun onlyHostCanEnableInitialPrebufferAndBothCachesFillInParallel() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.guest.setPrebufferOnStart(true)
+        assertFalse(room.host.state.value.prebufferOnStart)
+        room.host.setPrebufferOnStart(true)
+        room.advance(500)
+        assertTrue(room.guest.state.value.prebufferOnStart)
+        room.hostPlayer.bufferedAhead = 3.0
+        room.guestPlayer.bufferedAhead = 6.0
+        room.host.resumeByUser()
+        room.advance(7000)
+        assertTrue(room.hostPlayer.paused)
+        assertTrue(room.guestPlayer.paused)
+        assertTrue(room.host.state.value.message.contains("precarica"))
+        room.hostPlayer.bufferedAhead = 16.0
+        room.guestPlayer.bufferedAhead = 16.0
+        room.advance(7000)
+        assertFalse(room.hostPlayer.paused)
+        assertFalse(room.guestPlayer.paused)
+        assertEquals(WatchPhase.Playing, room.host.state.value.phase)
+    }
+
+    @Test
+    fun unavailableCacheEstimateCannotBlockTheInitialStartForever() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.host.setPrebufferOnStart(true)
+        room.host.resumeByUser()
+        room.advance(3000)
+        assertTrue(room.hostPlayer.paused)
+        room.advance(7000)
+        assertFalse(room.hostPlayer.paused)
+        assertFalse(room.guestPlayer.paused)
+    }
+
+    @Test
+    fun unknownHostDurationIsStillOpeningRatherThanADifferentEdition() = runTest {
+        val room = Pairing(this)
+        room.join()
+        room.hostPlayer.media = room.hostPlayer.media!!.copy(duration = 0.0)
+        room.advance(5000)
+        assertFalse(room.guest.state.value.message.contains("durate"))
+        assertEquals(WatchProblem.Opening, room.host.state.value.members.last().problem)
+        room.hostPlayer.media = room.hostPlayer.media!!.copy(duration = 1400.0)
+        room.advance(5000)
+        assertTrue(room.host.state.value.members.last().ready)
     }
 
     @Test

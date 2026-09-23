@@ -25,6 +25,35 @@ internal class WatchStartGate {
     }
 }
 
+/** Each player fills its own cache in parallel. A missing mpv estimate cannot hold the room forever. */
+internal class WatchPrebufferGate {
+    private var waitingSince: Long? = null
+
+    fun reset() {
+        waitingSince = null
+    }
+
+    fun waiting(enabled: Boolean, firstStart: Boolean, ready: Boolean, now: Long, buffers: List<Int?>): Boolean {
+        if (!enabled || !firstStart || !ready) {
+            reset()
+            return false
+        }
+        val since = waitingSince ?: now.also { waitingSince = it }
+        val elapsed = now - since
+        return elapsed < MAX_WAIT_MS &&
+            (
+                buffers.any { it != null && it < TARGET_SECONDS } ||
+                    (elapsed < UNKNOWN_WAIT_MS && buffers.any { it == null })
+                )
+    }
+
+    companion object {
+        const val TARGET_SECONDS = 15
+        const val UNKNOWN_WAIT_MS = 4_000L
+        const val MAX_WAIT_MS = 15_000L
+    }
+}
+
 /** A filtered error, hysteresis and slew limit prevent the speed from following individual jitter samples. */
 internal class WatchDriftCorrector {
     private var previousAt: Long? = null

@@ -8,6 +8,16 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 24 settembre 2026 — Stanze: avvio preparato e durate dei video
+
+- L'owner può attivare nelle opzioni della stanza il precaricamento prima del
+  primo avvio di ogni episodio. Ogni telefono carica in parallelo fino a 15
+  secondi di video; se la stima non è disponibile, usa un margine breve.
+  L'attesa massima per il precaricamento è 15 secondi.
+- Le piccole differenze di durata riportate da manifest e qualità diverse dello
+  stesso episodio non bloccano più la stanza. Durante l'apertura, una durata
+  ancora sconosciuta viene mostrata come preparazione e non come video diverso.
+
 ## 24 settembre 2026 — Pulizia dei dati disattivati
 
 - La pulizia dei vecchi dati di profili e sincronizzazione termina correttamente

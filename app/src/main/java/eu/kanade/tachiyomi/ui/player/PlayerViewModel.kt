@@ -254,6 +254,16 @@ class PlayerViewModel @JvmOverloads constructor(
                     val timing = readWatchTiming()
                     val duration = timing.duration
                     val position = timing.position
+                    val bufferedAhead = if (!watchTogether.active || !watchTogether.state.value.prebufferOnStart) {
+                        null
+                    } else if (!_isEpisodeOnline.value) {
+                        120.0 // A downloaded episode does not need network prebuffering.
+                    } else {
+                        runCatching { MPVLib.getPropertyDouble("demuxer-cache-time") }
+                            .getOrNull()
+                            ?.takeIf { it.isFinite() && it >= position }
+                            ?.let { (it - position).coerceIn(0.0, 120.0) }
+                    }
                     val media = if (anime != null && episode != null) {
                         WatchMedia(
                             anime.title.take(240),
@@ -286,6 +296,7 @@ class PlayerViewModel @JvmOverloads constructor(
                         canAdvance = timing.ready && canWatchAdvance(),
                         ended = timing.ready &&
                             runCatching { MPVLib.getPropertyBoolean("eof-reached") == true }.getOrDefault(false),
+                        bufferedAheadSeconds = bufferedAhead,
                     )
                 }
                 override fun pause(paused: Boolean) {
