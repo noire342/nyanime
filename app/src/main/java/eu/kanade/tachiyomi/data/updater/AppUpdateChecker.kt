@@ -25,6 +25,11 @@ class AppUpdateChecker {
                     BuildConfig.VERSION_NAME,
                     GITHUB_REPO,
                     forceCheck,
+                    if (isPreviewBuildType && BuildConfig.TV_RELEASE_CHANNEL) {
+                        GetApplicationRelease.PreviewChannel.TV
+                    } else {
+                        GetApplicationRelease.PreviewChannel.STANDARD
+                    },
                 ),
             )
 
@@ -45,7 +50,7 @@ const val GITHUB_REPO = "noire342/nyanime"
 
 val RELEASE_TAG: String by lazy {
     if (isPreviewBuildType) {
-        "r${BuildConfig.COMMIT_COUNT}"
+        "${if (BuildConfig.TV_RELEASE_CHANNEL) "tv-r" else "r"}${BuildConfig.COMMIT_COUNT}"
     } else {
         "v${BuildConfig.VERSION_NAME}"
     }

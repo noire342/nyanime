@@ -20,12 +20,16 @@ class ReleaseServiceImpl(
             // GitHub's /releases/latest endpoint excludes prereleases. The fork publishes
             // bleeding-edge builds as prereleases, so inspect the newest releases and choose the
             // first one that contains an APK compatible with this device.
+            val pageSize = if (arguments.previewChannel == GetApplicationRelease.PreviewChannel.TV) 100 else 20
             with(json) {
                 networkService.client
-                    .newCall(GET("https://api.github.com/repos/${arguments.repository}/releases?per_page=20"))
+                    .newCall(GET("https://api.github.com/repos/${arguments.repository}/releases?per_page=$pageSize"))
                     .awaitSuccess()
                     .parseAs<List<GithubRelease>>()
-                    .firstOrNull { getDownloadLink(it) != null }
+                    .firstOrNull { release ->
+                        release.version.matches(arguments.previewChannel.tagRegex) &&
+                            getDownloadLink(release, arguments.previewChannel) != null
+                    }
             }
         } else {
             with(json) {
@@ -36,7 +40,7 @@ class ReleaseServiceImpl(
             }
         } ?: return null
 
-        val downloadLink = getDownloadLink(release = release) ?: return null
+        val downloadLink = getDownloadLink(release, arguments.previewChannel) ?: return null
 
         return Release(
             version = release.version,
@@ -48,8 +52,10 @@ class ReleaseServiceImpl(
         )
     }
 
-    private fun getDownloadLink(release: GithubRelease): String? =
-        ApplicationReleaseAssets.select(release.assets, Build.SUPPORTED_ABIS.toList())
+    private fun getDownloadLink(
+        release: GithubRelease,
+        channel: GetApplicationRelease.PreviewChannel,
+    ): String? = ApplicationReleaseAssets.select(release.assets, Build.SUPPORTED_ABIS.toList(), channel)
 
     companion object {
         /**

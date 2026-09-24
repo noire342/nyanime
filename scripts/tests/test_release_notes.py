@@ -21,6 +21,11 @@ class ReleaseNotesTest(unittest.TestCase):
         self.assertNotIn("Previously released change.", notes)
         self.assertNotIn("Older section", notes)
 
+    def test_tv_release_uses_its_own_name(self):
+        notes = release_notes("## TV\n\n- Remote UI.\n", None, "tv-r42", "Nyanime TV")
+        self.assertIn("Novità di Nyanime TV tv-r42", notes)
+        self.assertIn("Remote UI.", notes)
+
 
 if __name__ == "__main__":
     unittest.main()

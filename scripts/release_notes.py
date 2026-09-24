@@ -11,12 +11,12 @@ def git(*args: str) -> str:
     return subprocess.check_output(["git", *args], text=True, encoding="utf-8").strip()
 
 
-def previous_tag(current_tag: str) -> str | None:
-    current_number = int(current_tag.removeprefix("r"))
-    candidates = git("tag", "--list", "r[0-9]*").splitlines()
+def previous_tag(current_tag: str, prefix: str = "r") -> str | None:
+    current_number = int(current_tag.removeprefix(prefix))
+    candidates = git("tag", "--list", f"{prefix}[0-9]*").splitlines()
     candidates = sorted(
-        (tag for tag in candidates if re.fullmatch(r"r\d+", tag) and int(tag[1:]) < current_number),
-        key=lambda tag: int(tag[1:]),
+        (tag for tag in candidates if re.fullmatch(re.escape(prefix) + r"\d+", tag) and int(tag[len(prefix):]) < current_number),
+        key=lambda tag: int(tag[len(prefix):]),
         reverse=True,
     )
     for tag in candidates:
@@ -57,10 +57,10 @@ def sections(markdown: str) -> list[tuple[str, list[str]]]:
     return result
 
 
-def release_notes(current: str, previous: str | None, tag: str) -> str:
+def release_notes(current: str, previous: str | None, tag: str, product: str = "Nyanime") -> str:
     current_sections = sections(current)
     old_entries = {entry for _, entries in sections(previous or "") for entry in entries}
-    notes = [f"## Novità di Nyanime {tag}", ""]
+    notes = [f"## Novità di {product} {tag}", ""]
     for heading, entries in current_sections:
         added = [entry for entry in entries if entry not in old_entries]
         if added:
@@ -76,15 +76,20 @@ def main() -> None:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--repository", required=True)
     parser.add_argument("--revision", required=True)
+    parser.add_argument("--changelog", type=Path, default=Path("CHANGELOG.md"))
+    parser.add_argument("--tag-prefix", default="r")
+    parser.add_argument("--product", default="Nyanime")
     args = parser.parse_args()
 
-    current = Path("CHANGELOG.md").read_text(encoding="utf-8")
-    previous = previous_tag(args.tag)
-    old = git("show", f"{previous}:CHANGELOG.md") if previous else None
-    notes = release_notes(current, old, args.tag)
+    if not re.fullmatch(re.escape(args.tag_prefix) + r"\d+", args.tag):
+        raise SystemExit("Release tag does not match the requested channel.")
+    current = args.changelog.read_text(encoding="utf-8")
+    previous = previous_tag(args.tag, args.tag_prefix)
+    old = git("show", f"{previous}:{args.changelog.as_posix()}") if previous else None
+    notes = release_notes(current, old, args.tag, args.product)
     if not re.search(r"(?m)^- ", notes):
         raise SystemExit("No new changelog entries since the previous release; add release notes before publishing.")
-    notes += f"\n[Changelog completo](https://github.com/{args.repository}/blob/{args.revision}/CHANGELOG.md).\n"
+    notes += f"\n[Changelog completo](https://github.com/{args.repository}/blob/{args.revision}/{args.changelog.as_posix()}).\n"
     args.output.write_text(notes, encoding="utf-8")
 
 

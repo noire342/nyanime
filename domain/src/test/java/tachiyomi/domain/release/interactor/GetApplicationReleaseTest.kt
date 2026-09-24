@@ -139,6 +139,25 @@ class GetApplicationReleaseTest {
     }
 
     @Test
+    fun `TV preview accepts only its own release tags`() = runTest {
+        every { preference.get() } returns 0
+        every { preference.set(any()) }.answers { }
+        val arguments = GetApplicationRelease.Arguments(
+            isPreview = true,
+            commitCount = 1000,
+            versionName = "",
+            repository = "test",
+            previewChannel = GetApplicationRelease.PreviewChannel.TV,
+        )
+        coEvery { releaseService.latest(any()) } returns Release("tv-r1001", "", "", "")
+        getApplicationRelease.await(arguments) shouldBe GetApplicationRelease.Result.NewUpdate(
+            Release("tv-r1001", "", "", ""),
+        )
+        coEvery { releaseService.latest(any()) } returns Release("r2000", "", "", "")
+        getApplicationRelease.await(arguments) shouldBe GetApplicationRelease.Result.NoNewUpdate
+    }
+
+    @Test
     fun `When now is before three days expect no new update`() = runTest {
         every { preference.get() } returns Instant.now().toEpochMilli()
         every { preference.set(any()) }.answers { }

@@ -17,6 +17,7 @@ shortcutHelper.setFilePath("./shortcuts.xml")
 // Release gates: dormant sources are retained; obsolete on-device data is purged. Rooms are independent.
 val communityEnabled = false
 val personalSyncEnabled = false
+val tvReleaseChannel = providers.gradleProperty("tv-channel").orNull == "true"
 
 android {
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
@@ -34,6 +35,7 @@ android {
         buildConfigField("boolean", "UPDATER_ENABLED", "${Config.enableUpdater}")
         buildConfigField("boolean", "COMMUNITY_ENABLED", communityEnabled.toString())
         buildConfigField("boolean", "PERSONAL_SYNC_ENABLED", personalSyncEnabled.toString())
+        buildConfigField("boolean", "TV_RELEASE_CHANNEL", tvReleaseChannel.toString())
 
         // Put these fields in acra.properties
         // val acraProperties = Properties()

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import tachiyomi.data.release.ApplicationReleaseAssets
 import tachiyomi.data.release.GitHubAsset
+import tachiyomi.domain.release.interactor.GetApplicationRelease
 
 class ApplicationReleaseAssetsTest {
     private fun select(names: List<String>, abis: List<String> = listOf("arm64-v8a")) =
@@ -54,6 +55,32 @@ class ApplicationReleaseAssetsTest {
                     "aniyomi-arm64-v8a-v0.18.2.apk",
                     "app-universal-preview.zip",
                 ),
+            ),
+        )
+    }
+
+    @Test
+    fun tvPackagesAreIsolatedFromStandardPreviewUpdates() {
+        val assets = listOf(
+            GitHubAsset("app-arm64-v8a-preview.apk", "standard"),
+            GitHubAsset("Nyanime-TV-arm64-v8a-tv-r1001.apk", "tv"),
+            GitHubAsset("Nyanime-TV-tv-r1001.apk", "tv-universal"),
+        )
+        assertEquals("standard", ApplicationReleaseAssets.select(assets, listOf("arm64-v8a")))
+        assertEquals(
+            "tv",
+            ApplicationReleaseAssets.select(
+                assets,
+                listOf("arm64-v8a"),
+                GetApplicationRelease.PreviewChannel.TV,
+            ),
+        )
+        assertNull(ApplicationReleaseAssets.select(assets.drop(1), listOf("arm64-v8a")))
+        assertNull(
+            ApplicationReleaseAssets.select(
+                assets.take(1),
+                listOf("arm64-v8a"),
+                GetApplicationRelease.PreviewChannel.TV,
             ),
         )
     }

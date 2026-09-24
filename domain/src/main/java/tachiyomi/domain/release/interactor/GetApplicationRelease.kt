@@ -12,12 +12,14 @@ class GetApplicationRelease(
     private val preferenceStore: PreferenceStore,
 ) {
 
-    private val lastChecked: Preference<Long> by lazy {
-        preferenceStore.getLong(Preference.appStateKey("last_app_check"), 0)
-    }
-
     suspend fun await(arguments: Arguments): Result {
         val now = Instant.now()
+        val checkKey = if (arguments.previewChannel == PreviewChannel.TV) {
+            "last_app_check_tv"
+        } else {
+            "last_app_check"
+        }
+        val lastChecked: Preference<Long> = preferenceStore.getLong(Preference.appStateKey(checkKey), 0)
 
         // Limit checks to once every 3 days at most
         if (!arguments.forceCheck &&
@@ -38,6 +40,7 @@ class GetApplicationRelease(
             arguments.commitCount,
             arguments.versionName,
             release.version,
+            arguments.previewChannel,
         )
         return when {
             isNewVersion -> Result.NewUpdate(release)
@@ -50,12 +53,13 @@ class GetApplicationRelease(
         commitCount: Int,
         versionName: String,
         versionTag: String,
+        previewChannel: PreviewChannel,
     ): Boolean {
         // Removes prefixes like "r" or "v"
         return if (isPreview) {
             // Preview builds from the fork are tagged as "r<fork commit count>".
             // Reject unrelated tag formats instead of accidentally extracting digits from them.
-            val newCommitCount = PREVIEW_TAG_REGEX
+            val newCommitCount = previewChannel.tagRegex
                 .matchEntire(versionTag)
                 ?.groupValues
                 ?.getOrNull(1)
@@ -86,6 +90,7 @@ class GetApplicationRelease(
         val versionName: String,
         val repository: String,
         val forceCheck: Boolean = false,
+        val previewChannel: PreviewChannel = PreviewChannel.STANDARD,
     )
 
     sealed interface Result {
@@ -94,7 +99,11 @@ class GetApplicationRelease(
         data object OsTooOld : Result
     }
 
-    private companion object {
-        val PREVIEW_TAG_REGEX = Regex("^r(\\d+)$", RegexOption.IGNORE_CASE)
+    enum class PreviewChannel(val tagPrefix: String) {
+        STANDARD("r"),
+        TV("tv-r"),
+        ;
+
+        val tagRegex = Regex("^${Regex.escape(tagPrefix)}(\\d+)$", RegexOption.IGNORE_CASE)
     }
 }
