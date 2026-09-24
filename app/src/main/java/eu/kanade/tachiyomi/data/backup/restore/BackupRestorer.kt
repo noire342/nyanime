@@ -146,6 +146,9 @@ class BackupRestorer(
                     .join()
                 restoreManga(backup.backupManga, if (options.categories) backup.backupCategories else emptyList())
                     .join()
+                backup.backupTvProfiles?.let { snapshot ->
+                    eu.kanade.tachiyomi.ui.tv.TvProfileRepository.get(context).restoreFromBackup(snapshot)
+                }
                 if (options.appSettings) {
                     backup.backupHiddenResume?.let { restoreHiddenResume(it) }
                 }

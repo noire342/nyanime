@@ -49,6 +49,33 @@ class CompanionCryptoTest {
     }
 
     @Test
+    fun `Android receiver and sender derive identical directional keys`() {
+        val client = CompanionCrypto()
+        val server = CompanionCrypto()
+        val receiverId = "a".repeat(32)
+        val sessionId = "b".repeat(32)
+        val clientKeys = client.complete(
+            receiverId,
+            sessionId,
+            "Telefono",
+            server.publicKey,
+            server.nonce,
+            server.commitment,
+        )
+        val serverKeys = server.completeAsReceiver(
+            receiverId,
+            sessionId,
+            "Telefono",
+            client.publicKey,
+            client.nonce,
+            client.commitment,
+        )
+        assertEquals(clientKeys.code, serverKeys.code)
+        assertEquals(clientKeys.client.toList(), serverKeys.client.toList())
+        assertEquals(clientKeys.server.toList(), serverKeys.server.toList())
+    }
+
+    @Test
     fun `manual address accepts only LAN IPv4 and explicit valid ports`() {
         assertEquals(38473, CompanionClient.address("192.168.1.39").port)
         assertEquals(40000, CompanionClient.address("http://10.0.0.2:40000").port)

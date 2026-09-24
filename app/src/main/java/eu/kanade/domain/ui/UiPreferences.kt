@@ -5,6 +5,8 @@ import eu.kanade.domain.ui.model.NavStyle
 import eu.kanade.domain.ui.model.StartScreen
 import eu.kanade.domain.ui.model.TabletUiMode
 import eu.kanade.domain.ui.model.ThemeMode
+import eu.kanade.domain.ui.model.TvDisplayMode
+import eu.kanade.domain.ui.model.TvUiMode
 import eu.kanade.tachiyomi.util.system.DeviceUtil
 import eu.kanade.tachiyomi.util.system.isDynamicColorAvailable
 import tachiyomi.core.common.preference.PreferenceStore
@@ -29,6 +31,12 @@ class UiPreferences(
     fun sourceHomeLogo() = preferenceStore.getBoolean("source_home_logo", false)
 
     fun modernUi() = preferenceStore.getBoolean("nyanime_modern_ui", true)
+
+    fun tvUiMode() = preferenceStore.getEnum("nyanime_tv_ui_mode", TvUiMode.AUTOMATIC)
+
+    fun tvDisplayMode() = preferenceStore.getEnum("nyanime_tv_display_mode", TvDisplayMode.MIRROR)
+
+    fun tvReduceMotion() = preferenceStore.getBoolean("nyanime_tv_reduce_motion", false)
 
     fun legacyAppTheme() = preferenceStore.getEnum("nyanime_legacy_app_theme", legacyMangaTheme().get())
 

@@ -45,7 +45,46 @@ internal class CompanionCrypto {
         require(name.isNotBlank() && name.length <= 64 && name.none { it.code < 32 || it.code == 127 })
         require(MessageDigest.isEqual(decode(commitment, 32), CompanionCrypto.commitment(serverKey, serverNonce)))
         decode(serverNonce, 16)
-        val point = decode(serverKey, 65)
+        val transcript = listOf(
+            LABEL,
+            receiverId,
+            sessionId,
+            name,
+            publicKey,
+            serverKey,
+            nonce,
+            serverNonce,
+        ).joinToString("\n")
+        return derive(sharedSecret(serverKey), transcript)
+    }
+
+    fun completeAsReceiver(
+        receiverId: String,
+        sessionId: String,
+        name: String,
+        clientKey: String,
+        clientNonce: String,
+        clientCommitment: String,
+    ): Keys {
+        require(receiverId.matches(Regex("[a-f0-9]{32}")) && sessionId.matches(Regex("[a-f0-9]{32}")))
+        require(name.isNotBlank() && name.length <= 64 && name.none { it.code < 32 || it.code == 127 })
+        require(MessageDigest.isEqual(decode(clientCommitment, 32), commitment(clientKey, clientNonce)))
+        decode(clientNonce, 16)
+        val transcript = listOf(
+            LABEL,
+            receiverId,
+            sessionId,
+            name,
+            clientKey,
+            publicKey,
+            clientNonce,
+            nonce,
+        ).joinToString("\n")
+        return derive(sharedSecret(clientKey), transcript)
+    }
+
+    private fun sharedSecret(peerKey: String): ByteArray {
+        val point = decode(peerKey, 65)
         require(point[0] == 4.toByte())
         val key = KeyFactory.getInstance("EC").generatePublic(
             ECPublicKeySpec(
@@ -57,17 +96,7 @@ internal class CompanionCrypto {
             init(pair.private)
             doPhase(key, true)
         }
-        val transcript = listOf(
-            LABEL,
-            receiverId,
-            sessionId,
-            name,
-            publicKey,
-            serverKey,
-            nonce,
-            serverNonce,
-        ).joinToString("\n")
-        return derive(agreement.generateSecret(), transcript)
+        return agreement.generateSecret()
     }
 
     data class Keys(val client: ByteArray, val server: ByteArray, val code: String) {

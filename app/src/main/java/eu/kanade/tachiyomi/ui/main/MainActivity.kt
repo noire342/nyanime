@@ -62,6 +62,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.source.anime.interactor.GetAnimeIncognitoState
 import eu.kanade.domain.source.manga.interactor.GetMangaIncognitoState
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.components.AppStateBanners
 import eu.kanade.presentation.components.DownloadedOnlyBannerBackgroundColor
 import eu.kanade.presentation.components.IncognitoModeBannerBackgroundColor
@@ -102,6 +103,9 @@ import eu.kanade.tachiyomi.ui.more.NewUpdateScreen
 import eu.kanade.tachiyomi.ui.more.OnboardingScreen
 import eu.kanade.tachiyomi.ui.player.ExternalIntents
 import eu.kanade.tachiyomi.ui.player.PlayerActivity
+import eu.kanade.tachiyomi.ui.tv.TvActivity
+import eu.kanade.tachiyomi.ui.tv.TvDisplayRouter
+import eu.kanade.tachiyomi.ui.tv.TvModeResolver
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.isNavigationBarNeedsScrim
 import eu.kanade.tachiyomi.util.system.openInBrowser
@@ -152,6 +156,7 @@ class MainActivity : BaseActivity() {
 
     private val libraryPreferences: LibraryPreferences by injectLazy()
     private val preferences: BasePreferences by injectLazy()
+    private val uiPreferences: UiPreferences by injectLazy()
 
     private val animeDownloadCache: AnimeDownloadCache by injectLazy()
     private val downloadCache: MangaDownloadCache by injectLazy()
@@ -181,6 +186,19 @@ class MainActivity : BaseActivity() {
 
         // Do not let the launcher create a new activity http://stackoverflow.com/questions/16283079
         if (!isTaskRoot) {
+            finish()
+            return
+        }
+
+        // Only launcher entry is switched: deep links and restoration keep their original route.
+        if (isLaunch &&
+            intent?.action == Intent.ACTION_MAIN &&
+            TvModeResolver.useTv(this, uiPreferences.tvUiMode().get())
+        ) {
+            TvDisplayRouter.launch(
+                this,
+                uiPreferences.tvDisplayMode().get() == eu.kanade.domain.ui.model.TvDisplayMode.SECOND_SCREEN,
+            )
             finish()
             return
         }

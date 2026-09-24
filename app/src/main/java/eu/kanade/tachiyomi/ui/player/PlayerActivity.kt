@@ -90,6 +90,8 @@ import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
+import eu.kanade.tachiyomi.ui.tv.TvPlaybackAudience
+import eu.kanade.tachiyomi.ui.tv.TvRemoteBridge
 import eu.kanade.tachiyomi.util.system.powerManager
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
@@ -312,6 +314,7 @@ class PlayerActivity : BaseActivity() {
         enableEdgeToEdge()
         registerSecureActivity(this)
         super.onCreate(savedInstanceState)
+        if (TvPlaybackAudience.from(intent) != null) TvRemoteBridge.attachPlayer(this)
         UltraPlaybackGuard.enterPlayer()
         setContentView(binding.root)
 
@@ -384,6 +387,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onDestroy() {
+        TvRemoteBridge.detachPlayer(this)
         viewModel.endHoldSpeed()
         UltraPlaybackGuard.leavePlayer()
         viewModel.detachDevicePlayback()
@@ -1583,6 +1587,34 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (TvPlaybackAudience.from(intent) != null) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    if (viewModel.controlsShown.value) viewModel.pauseUnpause() else viewModel.showControls()
+                    return true
+                }
+                KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                    if (player.paused == true) viewModel.pauseUnpause()
+                    return true
+                }
+                KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                    if (player.paused == false) viewModel.pauseUnpause()
+                    return true
+                }
+                KeyEvent.KEYCODE_PROG_RED -> {
+                    viewModel.showEpisodeListDialog()
+                    return true
+                }
+                KeyEvent.KEYCODE_PROG_GREEN -> {
+                    viewModel.pauseUnpause()
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    viewModel.showControls()
+                    return true
+                }
+            }
+        }
         if (castController.state.value.active &&
             (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)
         ) {

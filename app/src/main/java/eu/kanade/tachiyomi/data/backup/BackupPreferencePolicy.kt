@@ -15,7 +15,13 @@ object BackupPreferencePolicy {
         Preference.privateKey("anime4k_calibration_"),
     )
 
+    private val deviceSpecificKeys = setOf(
+        "nyanime_tv_ui_mode",
+        "nyanime_tv_display_mode",
+    )
+
     fun isPortable(key: String): Boolean =
-        (!Preference.isAppState(key) || key in portableAppStateKeys) &&
+        key !in deviceSpecificKeys &&
+            (!Preference.isAppState(key) || key in portableAppStateKeys) &&
             deviceSpecificPrefixes.none(key::startsWith)
 }

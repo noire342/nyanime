@@ -16,11 +16,14 @@ import eu.kanade.domain.ui.model.NavStyle
 import eu.kanade.domain.ui.model.StartScreen
 import eu.kanade.domain.ui.model.TabletUiMode
 import eu.kanade.domain.ui.model.ThemeMode
+import eu.kanade.domain.ui.model.TvDisplayMode
+import eu.kanade.domain.ui.model.TvUiMode
 import eu.kanade.domain.ui.model.setAppCompatDelegateThemeMode
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.screen.appearance.AppLanguageScreen
 import eu.kanade.presentation.more.settings.widget.AppThemeModePreferenceWidget
 import eu.kanade.presentation.more.settings.widget.AppThemePreferenceWidget
+import eu.kanade.tachiyomi.ui.tv.TvDisplayRouter
 import eu.kanade.tachiyomi.util.system.DeviceUtil
 import eu.kanade.tachiyomi.util.system.isDynamicColorAvailable
 import eu.kanade.tachiyomi.util.system.toast
@@ -161,6 +164,36 @@ object SettingsAppearanceScreen : SearchableSettings {
                     onValueChanged = {
                         context.toast(MR.strings.requires_app_restart)
                         true
+                    },
+                ),
+                Preference.PreferenceItem.ListPreference(
+                    preference = uiPreferences.tvUiMode(),
+                    entries = TvUiMode.entries.associateWith { mode ->
+                        when (mode) {
+                            TvUiMode.AUTOMATIC -> "Automatico (TV sui dispositivi TV)"
+                            TvUiMode.NORMAL -> "Interfaccia normale"
+                            TvUiMode.TV -> "Interfaccia TV"
+                        }
+                    }.toImmutableMap(),
+                    title = "Interfaccia per TV e telecomando",
+                    onValueChanged = {
+                        (context as? Activity)?.let(ActivityCompat::recreate)
+                        true
+                    },
+                ),
+                Preference.PreferenceItem.ListPreference(
+                    preference = uiPreferences.tvDisplayMode(),
+                    entries = TvDisplayMode.entries.associateWith { mode ->
+                        when (mode) {
+                            TvDisplayMode.MIRROR -> "Specchio"
+                            TvDisplayMode.SECOND_SCREEN -> "Secondo schermo"
+                        }
+                    }.toImmutableMap(),
+                    title = "TV su schermo esterno",
+                    subtitle = if (TvDisplayRouter.availableDisplay(context) == null) {
+                        "Nessuno schermo separato disponibile ora. Specchio resta utilizzabile."
+                    } else {
+                        "Con un secondo schermo, il telefono diventa il telecomando."
                     },
                 ),
                 Preference.PreferenceItem.ListPreference(

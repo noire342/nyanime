@@ -60,4 +60,5 @@ data class Backup(
     @ProtoNumber(505) var backupAnimeExtensionStores: List<BackupExtensionStore> = emptyList(),
     @ProtoNumber(506) var backupCustomButton: List<BackupCustomButtons> = emptyList(),
     @ProtoNumber(507) val backupHiddenResume: BackupHiddenResumeState? = null,
+    @ProtoNumber(508) val backupTvProfiles: BackupTvProfiles? = null,
 )

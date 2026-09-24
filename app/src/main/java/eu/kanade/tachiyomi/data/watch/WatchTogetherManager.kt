@@ -427,6 +427,8 @@ class WatchTogetherManager private constructor(private val application: Applicat
         pendingOpen = null
         if (activity === playerOwner.get()) {
             openInPlayer?.invoke(target.second, target.third)
+        } else if (activity is WatchRoomVideoLauncher) {
+            activity.launchWatchRoomVideo(target.second, target.third)
         } else {
             activity.startActivity(PlayerActivity.newIntent(activity, target.second, target.third))
         }
@@ -438,6 +440,11 @@ class WatchTogetherManager private constructor(private val application: Applicat
             instance ?: WatchTogetherManager(context.applicationContext as Application).also { instance = it }
         }
     }
+}
+
+/** Lets a TV surface preserve its display and local viewing profile when a room opens media. */
+interface WatchRoomVideoLauncher {
+    fun launchWatchRoomVideo(animeId: Long, episodeId: Long)
 }
 
 object WatchCatalogReference {

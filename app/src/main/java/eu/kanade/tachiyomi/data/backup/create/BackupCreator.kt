@@ -135,6 +135,11 @@ class BackupCreator(
                 backupAnimeExtensionStores = backupAnimeExtensionStores(options),
                 backupCustomButton = backupCustomButtons(options),
                 backupHiddenResume = hiddenResume,
+                backupTvProfiles = if (options.libraryEntries) {
+                    eu.kanade.tachiyomi.ui.tv.TvProfileRepository.get(context).exportForBackup()
+                } else {
+                    null
+                },
             )
 
             val byteArray = parser.encodeToByteArray(Backup.serializer(), backup)

@@ -89,6 +89,8 @@ import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
 import eu.kanade.tachiyomi.ui.player.utils.TrackSelect
 import eu.kanade.tachiyomi.ui.reader.SaveImageNotifier
+import eu.kanade.tachiyomi.ui.tv.TvPlaybackAudience
+import eu.kanade.tachiyomi.ui.tv.TvProfileRepository
 import eu.kanade.tachiyomi.util.editBackground
 import eu.kanade.tachiyomi.util.editCover
 import eu.kanade.tachiyomi.util.editThumbnail
@@ -187,6 +189,9 @@ class PlayerViewModel @JvmOverloads constructor(
     private val libraryPreferences: LibraryPreferences = Injekt.get(),
     uiPreferences: UiPreferences = Injekt.get(),
 ) : ViewModel() {
+
+    private val tvAudience by lazy { TvPlaybackAudience.from(activity.intent) }
+    private val tvProfiles by lazy { TvProfileRepository.get(activity) }
 
     private val _currentPlaylist = MutableStateFlow<List<Episode>>(emptyList())
     val currentPlaylist = _currentPlaylist.asStateFlow()
@@ -1739,6 +1744,12 @@ class PlayerViewModel @JvmOverloads constructor(
 
     private fun initEpisodeList(anime: Anime): List<Episode> {
         val episodes = runBlocking { getEpisodesByAnimeId.await(anime.id) }
+        val firstProfile = tvAudience?.profileIds?.firstOrNull()
+        val personal = if (tvAudience != null && firstProfile != "main") {
+            firstProfile?.let { runBlocking { tvProfiles.episodeStates(it, anime.source, anime.url) } }.orEmpty()
+        } else {
+            null
+        }
 
         return episodes
             .sortedWith(getEpisodeSort(anime, sortDescending = false))
@@ -1749,13 +1760,26 @@ class PlayerViewModel @JvmOverloads constructor(
                     this
                 }
             }
-            .map { it.toDbEpisode() }
+            .map { episode ->
+                val state = personal?.get(episode.url)
+                val scoped = if (personal == null) {
+                    episode
+                } else {
+                    episode.copy(
+                        seen = state?.seen ?: false,
+                        bookmark = state?.bookmark ?: false,
+                        lastSecondSeen = state?.positionMs ?: 0,
+                        totalSeconds = state?.durationMs ?: 0,
+                    )
+                }
+                scoped.toDbEpisode()
+            }
     }
 
     private var hasTrackers: Boolean = false
     private val checkTrackers: (Anime) -> Unit = { anime ->
-        val tracks = runBlocking { getTracks.await(anime.id) }
-        hasTrackers = tracks.isNotEmpty()
+        hasTrackers = (tvAudience == null || tvAudience?.writesMain == true) &&
+            runBlocking { getTracks.await(anime.id) }.isNotEmpty()
     }
 
     private var getHosterVideoLinksJob: Job? = null
@@ -2104,8 +2128,13 @@ class PlayerViewModel @JvmOverloads constructor(
 
     private suspend fun updateEpisodeProgressOnComplete(currentEp: Episode) {
         currentEp.seen = true
-        updateTrackEpisodeSeen(currentEp)
-        deleteEpisodeIfNeeded(currentEp)
+        if (tvAudience == null || tvAudience?.writesMain == true) updateTrackEpisodeSeen(currentEp)
+        // Downloads are shared across profiles; one member finishing must not remove another's file.
+        if (tvAudience == null) deleteEpisodeIfNeeded(currentEp)
+        if (tvAudience != null && tvAudience?.writesMain != true) {
+            saveWatchingProgress(currentEp)
+            return
+        }
 
         val markDuplicateAsSeen = libraryPreferences.markDuplicateSeenEpisodeAsSeen().get()
             .contains(LibraryPreferences.MARK_DUPLICATE_EPISODE_SEEN_EXISTING)
@@ -2192,6 +2221,25 @@ class PlayerViewModel @JvmOverloads constructor(
      */
     private suspend fun saveEpisodeProgress(episode: Episode) {
         if (remoteProgressOwned) return
+        val audience = tvAudience
+        if (audience != null) {
+            if (!incognitoMode && audience.secondaryIds.isNotEmpty()) {
+                val anime = currentAnime.value ?: return
+                tvProfiles.writeProgress(
+                    ids = audience.secondaryIds,
+                    source = anime.source,
+                    titleUrl = anime.url,
+                    title = anime.title,
+                    episodeUrl = episode.url,
+                    episodeName = episode.name,
+                    seen = episode.seen,
+                    bookmark = episode.bookmark,
+                    positionMs = episode.last_second_seen,
+                    durationMs = episode.total_seconds,
+                )
+            }
+            if (!audience.writesMain) return
+        }
         if (!incognitoMode || hasTrackers) {
             updateEpisode.await(
                 EpisodeUpdate(
@@ -2212,7 +2260,7 @@ class PlayerViewModel @JvmOverloads constructor(
      */
     private suspend fun saveEpisodeHistory(episode: Episode) {
         if (remoteProgressOwned) return
-        if (!incognitoMode) {
+        if (!incognitoMode && (tvAudience == null || tvAudience?.writesMain == true)) {
             val episodeId = episode.id!!
             val seenAt = Date()
             upsertHistory.await(
@@ -2226,6 +2274,19 @@ class PlayerViewModel @JvmOverloads constructor(
      */
     fun bookmarkEpisode(episodeId: Long?, bookmarked: Boolean) {
         viewModelScope.launchNonCancellable {
+            val audience = tvAudience
+            if (audience != null) {
+                val anime = currentAnime.value ?: return@launchNonCancellable
+                val episode = currentPlaylist.value.firstOrNull { it.id == episodeId } ?: return@launchNonCancellable
+                episode.bookmark = bookmarked
+                if (!incognitoMode && audience.secondaryIds.isNotEmpty()) {
+                    tvProfiles.writeProgress(
+                        audience.secondaryIds, anime.source, anime.url, anime.title, episode.url, episode.name,
+                        episode.seen, bookmarked, episode.last_second_seen, episode.total_seconds,
+                    )
+                }
+                if (!audience.writesMain) return@launchNonCancellable
+            }
             updateEpisode.await(
                 EpisodeUpdate(
                     id = episodeId!!,
@@ -2240,6 +2301,7 @@ class PlayerViewModel @JvmOverloads constructor(
      */
     fun fillermarkEpisode(episodeId: Long?, fillermarked: Boolean) {
         viewModelScope.launchNonCancellable {
+            if (tvAudience != null && tvAudience?.writesMain != true) return@launchNonCancellable
             updateEpisode.await(
                 EpisodeUpdate(
                     id = episodeId!!,
