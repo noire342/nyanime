@@ -584,4 +584,7 @@
     <string name="player_open_source">Apri fonte</string>
     <string name="personal_sync_title">I miei dispositivi</string>
     <string name="personal_sync_summary">Riprendi anime e manga sui tuoi dispositivi</string>
+    <string name="ready_update_title">Aggiornamento scaricato</string>
+    <string name="ready_update_summary">È pronto da installare. Lo ritrovi anche in Altro.</string>
+    <string name="ready_update_install">Installa ora</string>
 </resources>

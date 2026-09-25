@@ -1,8 +1,5 @@
 package eu.kanade.tachiyomi.ui.more
 
-import android.content.Intent
-import android.os.Build
-import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -10,7 +7,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.net.toUri
 import androidx.work.WorkInfo
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -18,7 +14,7 @@ import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.more.NewUpdateScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.data.updater.AppUpdateDownloadJob
-import eu.kanade.tachiyomi.util.storage.getUriCompat
+import eu.kanade.tachiyomi.data.updater.installReadyAppUpdate
 import eu.kanade.tachiyomi.util.system.openInBrowser
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -92,28 +88,7 @@ class NewUpdateScreen(
             onRejectUpdate = navigator::pop,
             onAcceptUpdate = {
                 if (installInApp && apk != null) {
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-                            !context.packageManager.canRequestPackageInstalls()
-                        ) {
-                            context.startActivity(
-                                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                                    data = "package:${context.packageName}".toUri()
-                                },
-                            )
-                            installError = "Consenti l'installazione da Nyanime, poi torna qui e premi Installa."
-                        } else {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(apk.getUriCompat(context), "application/vnd.android.package-archive")
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                },
-                            )
-                            installError = null
-                        }
-                    } catch (e: Exception) {
-                        installError = "Impossibile aprire l'installer Android: ${e.localizedMessage.orEmpty()}"
-                    }
+                    installError = installReadyAppUpdate(context, apk)
                 } else {
                     installError = null
                     AppUpdateDownloadJob.start(context, downloadLink, versionName)
