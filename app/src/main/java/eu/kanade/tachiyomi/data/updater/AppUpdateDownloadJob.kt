@@ -55,8 +55,8 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
         }
 
         return try {
-            withIOContext { downloadApk(title, url) }
-            Result.success()
+            val apkFile = withIOContext { downloadApk(title, url) }
+            Result.success(workDataOf(OUTPUT_APK_PATH to apkFile.absolutePath))
         } catch (e: CancellationException) {
             notifier.cancel()
             throw e
@@ -88,7 +88,7 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
      *
      * @param url url location of file
      */
-    private suspend fun downloadApk(title: String, url: String) {
+    private suspend fun downloadApk(title: String, url: String): File {
         // Show notification download starting.
         notifier.onDownloadStarted(title)
 
@@ -108,6 +108,7 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
                     savedProgress = progress
                     lastTick = currentTime
                     notifier.onProgressChange(progress)
+                    setProgressAsync(workDataOf(PROGRESS to progress))
                 }
             }
         }
@@ -131,6 +132,7 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
             if (!temporary.renameTo(apkFile)) throw IOException("Unable to finalize APK download")
             notifier.cancel()
             notifier.promptInstall(apkFile.getUriCompat(context))
+            return apkFile
         } finally {
             temporary.delete()
         }
@@ -141,6 +143,8 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
 
         const val EXTRA_DOWNLOAD_URL = "DOWNLOAD_URL"
         const val EXTRA_DOWNLOAD_TITLE = "DOWNLOAD_TITLE"
+        const val PROGRESS = "PROGRESS"
+        const val OUTPUT_APK_PATH = "APK_PATH"
 
         fun start(context: Context, url: String, title: String? = null) {
             val constraints = Constraints(
@@ -151,6 +155,7 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
                 .setConstraints(constraints)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
                 .addTag(TAG)
+                .addTag(updateTag(url))
                 .setInputData(
                     workDataOf(
                         EXTRA_DOWNLOAD_URL to url,
@@ -161,6 +166,10 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
 
             context.workManager.enqueueUniqueWork(TAG, ExistingWorkPolicy.REPLACE, request)
         }
+
+        fun observe(context: Context) = context.workManager.getWorkInfosForUniqueWorkFlow(TAG)
+
+        fun updateTag(url: String) = "app-update-${url.hashCode()}"
 
         fun stop(context: Context) {
             context.workManager.cancelUniqueWork(TAG)

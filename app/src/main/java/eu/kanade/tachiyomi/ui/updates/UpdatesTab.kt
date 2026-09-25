@@ -3,9 +3,11 @@ package eu.kanade.tachiyomi.ui.updates
 import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
+import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.TabOptions
@@ -20,6 +22,7 @@ import eu.kanade.tachiyomi.ui.updates.manga.mangaUpdatesTab
 import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
+import eu.kanade.presentation.util.Screen as AppScreen
 
 data object UpdatesTab : Tab {
 
@@ -47,22 +50,31 @@ data object UpdatesTab : Tab {
 
     @Composable
     override fun Content() {
-        val context = LocalContext.current
-        val fromMore = this in currentNavigationStyle().overflowTabs
-
-        TabbedScreen(
-            titleRes = MR.strings.label_recent_updates,
-            tabs = persistentListOf(
-                animeUpdatesTab(context, fromMore),
-                mangaUpdatesTab(context, fromMore),
-            ),
-        )
-
-        LaunchedEffect(Unit) {
-            (context as? MainActivity)?.ready = true
-        }
+        UpdatesContent(initialPage = 0, fromMore = this in currentNavigationStyle().overflowTabs)
     }
 }
 
-private const val TAB_ANIME = 0
-private const val TAB_MANGA = 1
+/** Opens the existing updates view directly on manga when arriving from a manga surface. */
+data object MangaUpdatesScreen : AppScreen() {
+    @Composable
+    override fun Content() {
+        UpdatesContent(initialPage = 1, fromMore = true)
+    }
+}
+
+@Composable
+private fun Screen.UpdatesContent(initialPage: Int, fromMore: Boolean) {
+    val context = LocalContext.current
+    val pagerState = rememberPagerState(initialPage = initialPage) { 2 }
+    TabbedScreen(
+        titleRes = MR.strings.label_recent_updates,
+        tabs = persistentListOf(
+            animeUpdatesTab(context, fromMore),
+            mangaUpdatesTab(context, fromMore),
+        ),
+        state = pagerState,
+    )
+    LaunchedEffect(Unit) {
+        (context as? MainActivity)?.ready = true
+    }
+}

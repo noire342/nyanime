@@ -35,7 +35,7 @@ fun ContinueWatchingRow(
     Column {
         LocalAnimeRow(
             state = state,
-            onOpen = onOpen,
+            onOpen = { onOpen(it.anime.id) },
             emptyMessage = emptyMessage,
             onHide = { item ->
                 visibility.hide(item.anime.id)

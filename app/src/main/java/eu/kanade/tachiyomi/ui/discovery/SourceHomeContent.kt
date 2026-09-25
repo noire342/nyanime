@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -27,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.discovery.ContinueWatchingRow
 import eu.kanade.presentation.discovery.DiscoveryHomeHeader
 import eu.kanade.presentation.discovery.HomeContentReveal
@@ -41,6 +43,8 @@ import eu.kanade.presentation.discovery.SourceHomePosterCard
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
+import eu.kanade.tachiyomi.ui.updates.UpdatesTab
+import eu.kanade.tachiyomi.ui.updates.dismissLibraryUpdate
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.SectionState
 import tachiyomi.domain.discovery.SourceHomeGroup
@@ -48,6 +52,8 @@ import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.discovery.homeItemKey
 import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.presentation.core.components.material.PullRefresh
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 @Composable
 fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
@@ -55,6 +61,7 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
     val state by model.state.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.currentOrThrow
     val context = LocalContext.current
+    val dismissedUpdates = remember { Injekt.get<UiPreferences>().dismissedLibraryUpdates() }
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { (context as? MainActivity)?.ready = true }
     val access = state.access
@@ -87,6 +94,8 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                 null
             },
             onRefresh = model::refresh,
+            onUpdates = { navigator.push(UpdatesTab) },
+            hasUpdates = state.updates.data?.isNotEmpty() == true,
             artworkRefreshKey = state.artworkRefreshKey,
             logo = source.providers.takeUnless { access.offline }
                 ?.distinctBy { it.id }?.singleOrNull()?.let { provider ->
@@ -160,6 +169,21 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                             onOpen = { navigator.push(AnimeScreen(it)) },
                             emptyMessage = "I titoli che guardi in questa Home compariranno qui.",
                         ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
+                    }
+                    if (state.updates.data?.isNotEmpty() == true) {
+                        item(key = "updates:" + source.id) {
+                            SectionHeader("Le tue novità") { navigator.push(UpdatesTab) }
+                            LocalAnimeRow(
+                                state.updates,
+                                onOpen = { item ->
+                                    item.updateKey?.let { dismissLibraryUpdate(dismissedUpdates, it) }
+                                    navigator.push(AnimeScreen(item.anime.id))
+                                },
+                            ) { item ->
+                                item.updateKey?.let { dismissLibraryUpdate(dismissedUpdates, it) }
+                                scope.launch { context.playDiscoveryEpisode(item.episode) }
+                            }
+                        }
                     }
                     if (access.offline) {
                         item(key = "offline") {
@@ -238,14 +262,6 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                                 )
                             }
                         }
-                    }
-                    item(key = "updates:" + source.id) {
-                        SectionHeader("Nuovi episodi della tua libreria")
-                        LocalAnimeRow(
-                            state.updates,
-                            onOpen = { navigator.push(AnimeScreen(it)) },
-                            emptyMessage = "Aggiungi i titoli alla libreria per ritrovare qui i loro aggiornamenti.",
-                        ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
                     }
                 }
             }

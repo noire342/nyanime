@@ -71,7 +71,7 @@ class DiscoveryModule(private val app: Application) : InjektModule {
         addSingletonFactory {
             LocalHomeSections { resume, sourceId ->
                 LocalHomeSectionProvider(
-                    get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
+                    get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
                     resume, sourceId, get(),
                 )
             }

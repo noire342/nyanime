@@ -136,7 +136,11 @@ getUpcomingAnime:
 SELECT *
 FROM animes
 WHERE next_update >= :startOfDay
-AND favorite = 1
+AND (favorite = 1 OR EXISTS (
+    SELECT 1 FROM episodes watched
+    WHERE watched.anime_id = animes._id
+    AND (watched.seen = 1 OR watched.last_second_seen > 0)
+))
 AND status IN :statuses
 ORDER BY next_update ASC;
 

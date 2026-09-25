@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -73,6 +74,7 @@ internal fun LazyListScope.mangaUpdatesUiItems(
     onClickCover: (MangaUpdatesItem) -> Unit,
     onClickUpdate: (MangaUpdatesItem) -> Unit,
     onDownloadChapter: (List<MangaUpdatesItem>, ChapterDownloadAction) -> Unit,
+    onIgnore: ((MangaUpdatesItem) -> Unit)? = null,
 ) {
     items(
         items = uiModels,
@@ -128,6 +130,7 @@ internal fun LazyListScope.mangaUpdatesUiItems(
                     onDownloadChapter = { action: ChapterDownloadAction ->
                         onDownloadChapter(listOf(updatesItem), action)
                     }.takeIf { !selectionMode },
+                    onIgnore = onIgnore?.let { callback -> { callback(updatesItem) } }.takeIf { !selectionMode },
                     downloadStateProvider = updatesItem.downloadStateProvider,
                     downloadProgressProvider = updatesItem.downloadProgressProvider,
                 )
@@ -145,6 +148,7 @@ private fun MangaUpdatesUiItem(
     onLongClick: () -> Unit,
     onClickCover: (() -> Unit)?,
     onDownloadChapter: ((ChapterDownloadAction) -> Unit)?,
+    onIgnore: (() -> Unit)?,
     // Download Indicator
     downloadStateProvider: () -> MangaDownload.State,
     downloadProgressProvider: () -> Int,
@@ -239,5 +243,8 @@ private fun MangaUpdatesUiItem(
             downloadProgressProvider = downloadProgressProvider,
             onClick = { onDownloadChapter?.invoke(it) },
         )
+        if (onIgnore != null) {
+            TextButton(onClick = onIgnore) { Text("Ignora") }
+        }
     }
 }

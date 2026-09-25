@@ -26,7 +26,9 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -65,6 +67,8 @@ fun DiscoveryHomeHeader(
     homes: List<SourceHomeGroup>,
     logo: SourceHomeLogo? = null,
     artworkRefreshKey: Int = 0,
+    onUpdates: (() -> Unit)? = null,
+    hasUpdates: Boolean = false,
 ) {
     if (!LocalNyanimeStyle.current) {
         return eu.kanade.presentation.discovery.legacy.DiscoveryHomeHeader(
@@ -76,23 +80,35 @@ fun DiscoveryHomeHeader(
             homes,
             logo,
             artworkRefreshKey,
+            onUpdates,
+            hasUpdates,
         )
     }
     Surface(modifier = Modifier.posterForeground(zIndex = 3f), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.statusBarsPadding()) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp).heightIn(min = 60.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (onBack != null) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val compactSearch = maxWidth < (if (onBack != null) 408.dp else 360.dp)
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp).heightIn(min = 60.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
+                    }
+                    SourceHomeWordmark(
+                        logo,
+                        Modifier.weight(1f).padding(start = 4.dp),
+                        refreshKey = artworkRefreshKey,
+                    )
+                    HomeHeaderActions(
+                        onSearch,
+                        onUpdates,
+                        selectedHome,
+                        homes,
+                        hasUpdates,
+                        compactSearch = compactSearch,
+                    )
                 }
-                SourceHomeWordmark(
-                    logo,
-                    Modifier.weight(1f).padding(start = 4.dp),
-                    refreshKey = artworkRefreshKey,
-                )
-                HomeHeaderActions(onSearch, selectedHome, homes)
             }
             HomeContentSwitch(selectedHome, homes, onSelect)
         }
@@ -102,29 +118,46 @@ fun DiscoveryHomeHeader(
 @Composable
 private fun HomeHeaderActions(
     onSearch: (() -> Unit)?,
+    onUpdates: (() -> Unit)?,
     selectedHome: String?,
     homes: List<SourceHomeGroup>,
+    hasUpdates: Boolean,
+    compactSearch: Boolean,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
+        if (onUpdates != null) {
+            Box {
+                IconButton(onClick = onUpdates) {
+                    Icon(Icons.Outlined.NotificationsNone, contentDescription = "Le tue novità")
+                }
+                if (hasUpdates) Badge(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp))
+            }
+        }
         if (onSearch != null) {
             val description = "Cerca " + (homes.firstOrNull { it.id == selectedHome }?.title ?: "anime")
-            Surface(
-                onClick = onSearch,
-                modifier = Modifier.widthIn(min = 96.dp).heightIn(min = 48.dp).semantics {
-                    role = Role.Button
-                    contentDescription = description
-                },
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
-                Row(
-                    Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            if (compactSearch) {
+                IconButton(onClick = onSearch) {
+                    Icon(Icons.Outlined.Search, contentDescription = description)
+                }
+            } else {
+                Surface(
+                    onClick = onSearch,
+                    modifier = Modifier.widthIn(min = 96.dp).heightIn(min = 48.dp).semantics {
+                        role = Role.Button
+                        contentDescription = description
+                    },
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ) {
-                    Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Text("Cerca", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                    Row(
+                        Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    ) {
+                        Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Text("Cerca", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                    }
                 }
             }
         }

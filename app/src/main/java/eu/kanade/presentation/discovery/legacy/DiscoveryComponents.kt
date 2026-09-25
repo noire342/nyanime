@@ -274,7 +274,7 @@ fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit)
 @Composable
 fun LocalAnimeRow(
     state: SectionState<List<LocalHomeItem>>,
-    onOpen: (Long) -> Unit,
+    onOpen: (LocalHomeItem) -> Unit,
     emptyMessage: String = "Gli anime che segui compariranno qui.",
     onHide: ((LocalHomeItem) -> Unit)? = null,
     onPlay: (LocalHomeItem) -> Unit,
@@ -294,7 +294,7 @@ fun LocalAnimeRow(
     LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(items, key = { it.anime.id }) { item ->
             Column(Modifier.width((160 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)) {
-                PosterCard(item.anime.title, item.anime.asAnimeCover(), item.episode.name, { onOpen(item.anime.id) })
+                PosterCard(item.anime.title, item.anime.asAnimeCover(), item.episode.name, { onOpen(item) })
                 if (item.progress > 0) {
                     LinearProgressIndicator(
                         progress = { item.progress },

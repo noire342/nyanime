@@ -1,3 +1,4 @@
+DROP VIEW animeupdatesView;
 CREATE VIEW animeupdatesView AS
 SELECT
     animes._id AS animeId,
@@ -16,8 +17,7 @@ SELECT
     animes.cover_last_modified AS coverLastModified,
     episodes.date_upload AS dateUpload,
     episodes.date_fetch AS datefetch
-FROM animes JOIN episodes
-ON animes._id = episodes.anime_id
+FROM animes JOIN episodes ON animes._id = episodes.anime_id
 WHERE (animes.favorite = 1 AND episodes.date_fetch > animes.date_added)
 OR (animes.favorite = 0 AND episodes.date_fetch > COALESCE((
     SELECT MIN(history.last_seen)
@@ -25,17 +25,3 @@ OR (animes.favorite = 0 AND episodes.date_fetch > COALESCE((
     WHERE watched.anime_id = animes._id AND history.last_seen > 0
 ), 9223372036854775807))
 ORDER BY date_fetch DESC;
-
-getRecentAnimeUpdates:
-SELECT *
-FROM animeupdatesView
-WHERE datefetch > :after
-LIMIT :limit;
-
-getUpdatesBySeenStatus:
-SELECT *
-FROM animeupdatesView
-WHERE seen = :seen
-AND datefetch > :after
-
-LIMIT :limit;

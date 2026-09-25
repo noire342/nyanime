@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
@@ -156,6 +157,15 @@ private fun UpcomingAnimeScreenSmallImpl(
                 onClickDay = onClickDay,
             )
         }
+        if (items.isEmpty()) {
+            item(key = "upcoming-empty") {
+                Text(
+                    "Qui compariranno le prossime uscite dei titoli che segui o hai guardato.",
+                    Modifier.padding(20.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         items(
             items = items,
             key = { "upcoming-${it.hashCode()}" },
@@ -207,6 +217,15 @@ private fun UpcomingAnimeScreenLargeImpl(
         },
         endContent = {
             FastScrollLazyColumn(state = listState) {
+                if (items.isEmpty()) {
+                    item(key = "upcoming-empty") {
+                        Text(
+                            "Qui compariranno le prossime uscite dei titoli che segui o hai guardato.",
+                            Modifier.padding(20.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 items(
                     items = items,
                     key = { "upcoming-${it.hashCode()}" },

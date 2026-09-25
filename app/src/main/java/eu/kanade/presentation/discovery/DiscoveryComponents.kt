@@ -330,7 +330,7 @@ fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit)
 @Composable
 fun LocalAnimeRow(
     state: SectionState<List<LocalHomeItem>>,
-    onOpen: (Long) -> Unit,
+    onOpen: (LocalHomeItem) -> Unit,
     emptyMessage: String = "Gli anime che segui compariranno qui.",
     onHide: ((LocalHomeItem) -> Unit)? = null,
     onPlay: (LocalHomeItem) -> Unit,
@@ -356,10 +356,11 @@ fun LocalAnimeRow(
         ) {
             items(items, key = { it.anime.id }) { item ->
                 val poster = rememberPosterSource(item.anime)
-                val openDetails = posterOpen(poster, item.anime.title) { onOpen(item.anime.id) }
+                val openDetails = posterOpen(poster, item.anime.title) { onOpen(item) }
                 Column(Modifier.width(cardWidth)) {
                     Box(
                         Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(4.dp))
+                            .clickable(role = Role.Button, onClickLabel = "Apri scheda", onClick = openDetails)
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                     ) {
                         SourceHomeArtwork(
