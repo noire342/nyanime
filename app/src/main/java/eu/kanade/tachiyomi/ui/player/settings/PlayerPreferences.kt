@@ -56,7 +56,7 @@ class PlayerPreferences(
         false,
     )
     fun waitingTimeIntroSkip() = preferenceStore.getInt("pref_waiting_time_aniskip", 5)
-    fun aniSkipEnabled() = preferenceStore.getBoolean("pref_enable_ani_skip", false)
+    fun aniSkipEnabled() = preferenceStore.getBoolean("pref_enable_ani_skip", true)
     fun disableAniSkipOnChapters() = preferenceStore.getBoolean("pref_disabled_ani_skip_chapters", true)
 
     // PiP

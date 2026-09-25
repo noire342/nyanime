@@ -2109,6 +2109,7 @@ class PlayerActivity : BaseActivity() {
         setupTracks()
 
         viewModel.onDevicePlaybackReady()
+        viewModel.startAutoTracking()
 
         viewModel.waitingSkipIntro = playerPreferences.waitingTimeIntroSkip().get()
         if (!viewModel.introSkipEnabled ||
@@ -2121,7 +2122,7 @@ class PlayerActivity : BaseActivity() {
         val episodeId = viewModel.currentEpisode.value?.id ?: return
         val video = viewModel.currentVideo.value ?: return
         val duration = player.duration ?: return
-        val stamps = withTimeoutOrNull(8_000L) { viewModel.aniSkipResponse(duration) } ?: return
+        val stamps = withTimeoutOrNull(15_000L) { viewModel.aniSkipResponse(duration) } ?: return
         withContext(Dispatchers.Main.immediate) {
             currentCoroutineContext().ensureActive()
             if (player.isExiting ||

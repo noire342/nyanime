@@ -69,6 +69,9 @@ import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
 import eu.kanade.tachiyomi.data.saver.Image
 import eu.kanade.tachiyomi.data.saver.ImageSaver
 import eu.kanade.tachiyomi.data.saver.Location
+import eu.kanade.tachiyomi.data.track.AniListMediaLookup
+import eu.kanade.tachiyomi.data.track.AutoTrackOnStart
+import eu.kanade.tachiyomi.data.track.SourceTrackingHints
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.data.track.anilist.Anilist
 import eu.kanade.tachiyomi.data.track.myanimelist.MyAnimeList
@@ -1752,7 +1755,32 @@ class PlayerViewModel @JvmOverloads constructor(
             .map { it.toDbEpisode() }
     }
 
-    private var hasTrackers: Boolean = false
+    @Volatile private var hasTrackers: Boolean = false
+    private var autoTrackAttemptedAnimeId: Long? = null
+    private var autoTrackAttemptedAt: Long = 0L
+    private var autoTrackJob: Job? = null
+
+    fun startAutoTracking() {
+        if (basePreferences.incognitoMode().get() || !trackPreferences.autoUpdateTrack().get()) return
+        val anime = currentAnime.value ?: return
+        val source = currentSource.value ?: return
+        if (autoTrackJob?.isActive == true) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (autoTrackAttemptedAnimeId == anime.id && now - autoTrackAttemptedAt < 60_000L) return
+        autoTrackAttemptedAnimeId = anime.id
+        autoTrackAttemptedAt = now
+        val episodeNumber = currentEpisode.value?.episode_number?.toDouble() ?: 0.0
+        autoTrackJob = viewModelScope.launchIO {
+            if (AutoTrackOnStart.anime(anime, source, episodeNumber)) {
+                if (currentAnime.value?.id != anime.id) return@launchIO
+                hasTrackers = true
+                val episode = currentEpisode.value
+                if (episode?.seen == true) {
+                    trackEpisode.await(Injekt.get<Application>(), anime.id, episode.episode_number.toDouble())
+                }
+            }
+        }
+    }
     private val checkTrackers: (Anime) -> Unit = { anime ->
         val tracks = runBlocking { getTracks.await(anime.id) }
         hasTrackers = tracks.isNotEmpty()
@@ -2448,10 +2476,7 @@ class PlayerViewModel @JvmOverloads constructor(
             filenameSuffix
     }
 
-    /**
-     * Returns the response of the AniSkipApi for this episode.
-     * just works if tracking is enabled.
-     */
+    /** Returns the AniSkip segments when a trustworthy catalog identity is available. */
     private val aniSkipApi by lazy { AniSkipApi() }
 
     suspend fun aniSkipResponse(playerDuration: Int?): List<TimeStamp>? {
@@ -2471,7 +2496,22 @@ class PlayerViewModel @JvmOverloads constructor(
             if (!requestedIds.add(malId)) continue
             aniSkipApi.getResult(malId, episodeNumber, duration)?.let { return it }
         }
-        return null
+        val anime = currentAnime.value ?: return null
+        val hints = currentSource.value?.let { AutoTrackOnStart.animeHints(anime, it) }
+            ?: SourceTrackingHints.from(anime)
+        val malId = try {
+            hints?.malId
+                ?: hints?.anilistId?.let { aniSkipApi.getMalIdFromAL(it) }
+                ?: AniListMediaLookup.resolve(anime.title, AniListMediaLookup.Type.ANIME)
+                    ?.takeIf { it.episodes == null || episodeNumber <= it.episodes }
+                    ?.malId
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        } ?: return null
+        if (!requestedIds.add(malId)) return null
+        return aniSkipApi.getResult(malId, episodeNumber, duration)
     }
 
     val introSkipEnabled = playerPreferences.enableSkipIntro().get()
