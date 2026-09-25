@@ -32,6 +32,8 @@ class UiPreferences(
 
     fun inAppUpdateInstallation() = preferenceStore.getBoolean("nyanime_in_app_update_installation", true)
 
+    fun dismissedReadyUpdate() = preferenceStore.getString("nyanime_dismissed_ready_update")
+
     fun dismissedLibraryUpdates() = preferenceStore.getStringSet("nyanime_dismissed_library_updates")
 
     fun autoAcknowledgeHomeUpdates() = preferenceStore.getBoolean("nyanime_auto_acknowledge_home_updates", true)

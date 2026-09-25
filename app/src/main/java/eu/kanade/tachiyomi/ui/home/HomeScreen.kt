@@ -61,6 +61,7 @@ import eu.kanade.tachiyomi.ui.history.HistoriesTab
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryTab
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import eu.kanade.tachiyomi.ui.more.MoreTab
+import eu.kanade.tachiyomi.ui.more.ReadyAppUpdateSurface
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
@@ -125,6 +126,9 @@ object HomeScreen : Screen() {
                                 bottomNavVisible &&
                                 tabNavigator.current !in navStyle.overflowTabs
                             Column(Modifier.posterForeground(zIndex = 3f)) {
+                                if (tabNavigator.current != MoreTab) {
+                                    ReadyAppUpdateSurface(allowDismiss = true)
+                                }
                                 eu.kanade.tachiyomi.ui.watch.WatchMiniController(
                                     includeNavigationInsets = !showNavigation,
                                 )

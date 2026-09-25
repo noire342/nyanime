@@ -24,6 +24,7 @@ import eu.kanade.presentation.more.settings.widget.TextPreferenceWidget
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.common.Constants
 import eu.kanade.tachiyomi.ui.more.DownloadQueueState
+import eu.kanade.tachiyomi.ui.more.ReadyAppUpdateSurface
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.ScrollbarLazyColumn
@@ -58,6 +59,9 @@ fun MoreScreen(
         ) {
             item {
                 LogoHeader()
+            }
+            item(key = "ready-app-update") {
+                ReadyAppUpdateSurface(allowDismiss = false)
             }
             item {
                 SwitchPreferenceWidget(

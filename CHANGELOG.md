@@ -8,6 +8,12 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 25 settembre 2026 — Installazione degli aggiornamenti
+
+- Quando il download OTA termina, un avviso nell'app offre «Installa ora» e
+  «Non ora». L'APK pronto resta accessibile in Altro anche dopo aver lasciato
+  la schermata delle novità; l'avviso scompare quando la versione è installata.
+
 ## 25 settembre 2026 — Novità nella Home
 
 - Un indicatore circolare appare nella Home anime o manga soltanto per novità non
