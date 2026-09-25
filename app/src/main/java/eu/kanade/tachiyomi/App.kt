@@ -38,6 +38,7 @@ import eu.kanade.tachiyomi.data.coil.MangaCoverKeyer
 import eu.kanade.tachiyomi.data.coil.MangaKeyer
 import eu.kanade.tachiyomi.data.coil.TachiyomiImageDecoder
 import eu.kanade.tachiyomi.data.notification.Notifications
+import eu.kanade.tachiyomi.data.track.RetroactiveTracking
 import eu.kanade.tachiyomi.di.AppModule
 import eu.kanade.tachiyomi.di.PreferenceModule
 import eu.kanade.tachiyomi.network.NetworkHelper
@@ -256,11 +257,13 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
     override fun onStart(owner: LifecycleOwner) {
         SecureActivityDelegate.onApplicationStart()
+        RetroactiveTracking.onForeground()
         eu.kanade.tachiyomi.data.community.CommunityManager.lifecycle(this, true)
     }
 
     override fun onStop(owner: LifecycleOwner) {
         SecureActivityDelegate.onApplicationStopped()
+        RetroactiveTracking.onBackground()
         eu.kanade.tachiyomi.data.community.CommunityManager.lifecycle(this, false)
     }
 

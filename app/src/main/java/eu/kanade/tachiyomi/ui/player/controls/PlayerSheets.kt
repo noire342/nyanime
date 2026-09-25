@@ -40,10 +40,12 @@ import eu.kanade.tachiyomi.ui.player.controls.components.sheets.SubtitlesSheet
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import tachiyomi.domain.custombuttons.model.CustomButton
+import tachiyomi.domain.entries.anime.model.Anime
 import java.io.InputStream
 
 @Composable
 fun PlayerSheets(
+    anime: Anime?,
     sheetShown: Sheets,
     onOpenSheet: (Sheets) -> Unit,
     isEpisodeOnline: Boolean,
@@ -188,6 +190,7 @@ fun PlayerSheets(
         )
         Sheets.More -> {
             MoreSheet(
+                anime = anime,
                 onOpenAudio = { onOpenSheet(Sheets.AudioTracks) },
                 onOpenQuality = { onOpenSheet(Sheets.QualityTracks) },
                 onOpenScreenshot = { onOpenSheet(Sheets.Screenshot) },

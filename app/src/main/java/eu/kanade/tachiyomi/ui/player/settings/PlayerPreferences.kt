@@ -4,6 +4,7 @@ import eu.kanade.tachiyomi.ui.player.PlayerOrientation
 import eu.kanade.tachiyomi.ui.player.VideoAspect
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.preference.getEnum
+import tachiyomi.domain.entries.anime.model.Anime
 
 class PlayerPreferences(
     private val preferenceStore: PreferenceStore,
@@ -51,6 +52,30 @@ class PlayerPreferences(
 
     fun enableSkipIntro() = preferenceStore.getBoolean("pref_enable_skip_intro", true)
     fun autoSkipIntro() = preferenceStore.getBoolean("pref_enable_auto_skip_ani_skip", false)
+    fun autoSkipIntroOverrides() = preferenceStore.getStringSet("player_auto_skip_intro_overrides")
+
+    fun autoSkipIntroOverride(anime: Anime?, overrides: Set<String> = autoSkipIntroOverrides().get()): Boolean? {
+        if (anime == null) return null
+        val key = "${anime.source}:${anime.url.length}:${anime.url}"
+        return when {
+            "on:$key" in overrides -> true
+            "off:$key" in overrides -> false
+            else -> null
+        }
+    }
+
+    fun setAutoSkipIntroOverride(anime: Anime, enabled: Boolean?) {
+        val key = "${anime.source}:${anime.url.length}:${anime.url}"
+        val preference = autoSkipIntroOverrides()
+        preference.set(
+            preference.get() -
+                "on:$key" -
+                "off:$key" +
+                if (enabled == null) emptySet() else setOf("${if (enabled) "on" else "off"}:$key"),
+        )
+    }
+
+    fun shouldAutoSkipIntro(anime: Anime?): Boolean = autoSkipIntroOverride(anime) ?: autoSkipIntro().get()
     fun enableNetflixStyleIntroSkip() = preferenceStore.getBoolean(
         "pref_enable_netflixStyle_aniskip",
         false,

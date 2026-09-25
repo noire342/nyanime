@@ -2577,7 +2577,6 @@ class PlayerViewModel @JvmOverloads constructor(
     }
 
     val introSkipEnabled = playerPreferences.enableSkipIntro().get()
-    private val autoSkip = playerPreferences.autoSkipIntro().get()
     private val netflixStyle = playerPreferences.enableNetflixStyleIntroSkip().get()
 
     private val defaultWaitingTime = playerPreferences.waitingTimeIntroSkip().get()
@@ -2595,9 +2594,9 @@ class PlayerViewModel @JvmOverloads constructor(
                         key,
                         "Salta " + segment.value.name,
                         target.toDouble(),
-                        if (netflixStyle) {
+                        if (playerPreferences.shouldAutoSkipIntro(currentAnime.value) && netflixStyle) {
                             defaultWaitingTime
-                        } else if (autoSkip) {
+                        } else if (playerPreferences.shouldAutoSkipIntro(currentAnime.value)) {
                             3
                         } else {
                             null
@@ -2624,7 +2623,8 @@ class PlayerViewModel @JvmOverloads constructor(
             } else {
                 val nextChapterPos = ChapterUtils.skipTarget(chapters.value, chapterIndex, pos.value, duration.value)
 
-                if (netflixStyle) {
+                val autoSkip = playerPreferences.shouldAutoSkipIntro(currentAnime.value)
+                if (autoSkip && netflixStyle) {
                     // show a toast with the seconds before the skip
                     if (waitingSkipIntro == defaultWaitingTime) {
                         activity.showToast(

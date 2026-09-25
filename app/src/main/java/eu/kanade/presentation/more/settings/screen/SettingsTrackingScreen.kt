@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +46,7 @@ import eu.kanade.domain.track.service.TrackPreferences
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.data.track.EnhancedAnimeTracker
 import eu.kanade.tachiyomi.data.track.EnhancedMangaTracker
+import eu.kanade.tachiyomi.data.track.RetroactiveTracking
 import eu.kanade.tachiyomi.data.track.Tracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.data.track.anilist.AnilistApi
@@ -67,6 +69,7 @@ import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import tachiyomi.presentation.core.util.collectAsState as collectPreferenceAsState
 
 object SettingsTrackingScreen : SearchableSettings {
 
@@ -95,6 +98,9 @@ object SettingsTrackingScreen : SearchableSettings {
         val mangaSourceManager = remember { Injekt.get<MangaSourceManager>() }
         val animeSourceManager = remember { Injekt.get<AnimeSourceManager>() }
         val autoTrackStatePref = trackPreferences.autoUpdateTrackOnMarkRead()
+        val recovery by RetroactiveTracking.state.collectAsState()
+        val hasAccount = trackerManager.loggedInTrackers().isNotEmpty()
+        val autoTrackEnabled by trackPreferences.autoUpdateTrack().collectPreferenceAsState()
 
         var dialog by remember { mutableStateOf<Any?>(null) }
         dialog?.run {
@@ -141,6 +147,26 @@ object SettingsTrackingScreen : SearchableSettings {
             Preference.PreferenceItem.SwitchPreference(
                 preference = trackPreferences.autoUpdateTrack(),
                 title = stringResource(AYMR.strings.pref_auto_update_manga_sync),
+            ),
+            Preference.PreferenceItem.TextPreference(
+                title = "Recupera titoli già iniziati",
+                subtitle = when {
+                    recovery.running ->
+                        "Collegamento in corso: " +
+                            "${recovery.processed}/${recovery.total} titoli esaminati, ${recovery.linked} collegati."
+                    recovery.completed ->
+                        "Recupero iniziale completato: ${recovery.linked} titoli collegati. " +
+                            "I nuovi titoli vengono seguiti dal primo play o dalla prima pagina."
+                    !autoTrackEnabled ->
+                        "Attiva l'aggiornamento automatico del tracking " +
+                            "per eseguire il recupero iniziale."
+                    !hasAccount -> "Accedi a un servizio di tracking per collegare anime e manga già visti o letti."
+                    else ->
+                        "Collega una sola volta, in background, gli anime e manga " +
+                            "iniziati prima di questo aggiornamento."
+                },
+                enabled = hasAccount && autoTrackEnabled && !recovery.running && !recovery.completed,
+                onClick = { RetroactiveTracking.start() },
             ),
             Preference.PreferenceItem.SwitchPreference(
                 preference = trackPreferences.trackOnAddingToLibrary(),

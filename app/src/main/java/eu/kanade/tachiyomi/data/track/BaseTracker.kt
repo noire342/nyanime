@@ -48,5 +48,6 @@ abstract class BaseTracker(
 
     override fun saveCredentials(username: String, password: String) {
         trackPreferences.setCredentials(this, username, password)
+        if (username.isNotBlank() && password.isNotBlank()) RetroactiveTracking.start(delayMs = 2_000)
     }
 }

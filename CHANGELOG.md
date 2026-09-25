@@ -8,6 +8,18 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 25 settembre 2026 — Recupero iniziale e sigle personalizzate
+
+- Se un tracker è già configurato, Nyanime collega in background anche i titoli
+  iniziati prima dell'aggiornamento. Il recupero si conclude una sola volta per
+  installazione; se viene interrotto, riprende al successivo avvio dell'app.
+- In Altro del player si sceglie se saltare la sigla automaticamente come regola
+  generale e, per l'anime aperto, se ereditarla oppure fare un'eccezione.
+  La scelta viene applicata senza riavviare il video.
+- Quando viene associato un titolo già visto o letto, il progresso locale
+  riconosciuto viene riportato al tracker anche in presenza di episodi o
+  capitoli non consecutivi.
+
 ## 25 settembre 2026 — Collegamento automatico ai tracker
 
 - Quando inizia la visione o la lettura, Nyanime collega in background il titolo
