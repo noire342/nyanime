@@ -28,7 +28,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   sono previste, anche quando il giorno scelto è vuoto.
 - Nella schermata Info si può attivare il download dell'aggiornamento nell'app:
   avanzamento visibile, possibilità di annullare o riprovare e pulsante
-  Installa aggiornamento al termine. Android chiede comunque la conferma.
+  Installa aggiornamento al termine. L'opzione è attiva inizialmente e conserva
+  la scelta di chi l'ha già disattivata. Android chiede comunque la conferma.
 
 ## 24 settembre 2026 — Stanze: avvio preparato e durate dei video
 

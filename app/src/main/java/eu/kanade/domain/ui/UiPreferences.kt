@@ -28,7 +28,7 @@ class UiPreferences(
 
     fun sourceHomeLogo() = preferenceStore.getBoolean("source_home_logo", false)
 
-    fun inAppUpdateInstallation() = preferenceStore.getBoolean("nyanime_in_app_update_installation", false)
+    fun inAppUpdateInstallation() = preferenceStore.getBoolean("nyanime_in_app_update_installation", true)
 
     fun dismissedLibraryUpdates() = preferenceStore.getStringSet("nyanime_dismissed_library_updates")
 
