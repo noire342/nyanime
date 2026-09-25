@@ -103,7 +103,6 @@ fun DiscoveryHomeHeader(
                         Icon(
                             Icons.Outlined.Adjust,
                             contentDescription = "Vai alle tue novità",
-                            tint = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }

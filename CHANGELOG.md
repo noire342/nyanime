@@ -24,7 +24,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 ## 25 settembre 2026 — Novità nella Home
 
 - Un indicatore circolare appare nella Home anime o manga soltanto per novità non
-  ancora viste. Toccandolo, la pagina scorre fino alla sezione «Le tue novità».
+  ancora viste. Ha il colore delle altre icone della barra superiore. Toccandolo,
+  la pagina scorre fino alla sezione «Le tue novità».
 - Per impostazione iniziale l'indicatore si spegne anche quando la sezione entra
   nello schermo scorrendo a mano; questa scelta si può disattivare nelle
   impostazioni Libreria. I titoli restano nella sezione finché non vengono
