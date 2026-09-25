@@ -426,22 +426,8 @@ class PlayerActivity : BaseActivity() {
     override fun onPause() {
         viewModel.endHoldSpeed()
         viewModel.saveCurrentEpisodeWatchingProgress()
-
-        if (isInPictureInPictureMode) {
-            super.onPause()
-            return
-        }
-
-        viewModel.watchTogether.hold()
-        player.isExiting = true
-        viewModel.cancelNextEpisode()
-        if (isFinishing) {
-            viewModel.deletePendingEpisodes()
-            MPVLib.command(arrayOf("stop"))
-        } else {
-            viewModel.pause()
-        }
-
+        // Android pauses the activity before reporting PiP entry. Playback must keep
+        // rendering while its SurfaceView is resized into the PiP window.
         super.onPause()
     }
 
@@ -452,7 +438,17 @@ class PlayerActivity : BaseActivity() {
             }
         }
 
-        if (isInPictureInPictureMode && powerManager.isInteractive) {
+        if (!isInPictureInPictureMode && !isChangingConfigurations) {
+            viewModel.watchTogether.hold()
+            player.isExiting = true
+            viewModel.cancelNextEpisode()
+            if (isFinishing) {
+                viewModel.deletePendingEpisodes()
+                MPVLib.command(arrayOf("stop"))
+            } else {
+                viewModel.pause()
+            }
+        } else if (isInPictureInPictureMode && powerManager.isInteractive) {
             viewModel.deletePendingEpisodes()
         }
 
@@ -460,7 +456,11 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onUserLeaveHint() {
-        if (isPipSupportedAndEnabled && player.paused == false && playerPreferences.pipOnExit().get()) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S &&
+            isPipSupportedAndEnabled &&
+            player.paused == false &&
+            playerPreferences.pipOnExit().get()
+        ) {
             enterPictureInPictureMode()
         }
         super.onUserLeaveHint()
@@ -1493,7 +1493,9 @@ class PlayerActivity : BaseActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val autoEnter = playerPreferences.pipOnExit().get()
             builder.setAutoEnterEnabled(!paused && autoEnter)
-            builder.setSeamlessResizeEnabled(!paused && autoEnter)
+            // MPV renders into a SurfaceView. Let Android swap to the resized
+            // surface instead of stretching a stale fullscreen buffer mid-transition.
+            builder.setSeamlessResizeEnabled(false)
         }
         builder.setActions(
             createPipActions(
@@ -1699,7 +1701,8 @@ class PlayerActivity : BaseActivity() {
                     override fun onStop() {
                         super.onStop()
                         isActive = false
-                        this@PlayerActivity.onStop()
+                        viewModel.cancelNextEpisode()
+                        viewModel.pauseByUser()
                     }
                 },
             )
