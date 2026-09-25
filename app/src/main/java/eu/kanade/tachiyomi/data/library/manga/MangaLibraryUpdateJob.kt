@@ -36,6 +36,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import logcat.LogPriority
@@ -49,6 +50,7 @@ import tachiyomi.domain.entries.manga.interactor.GetLibraryManga
 import tachiyomi.domain.entries.manga.interactor.GetManga
 import tachiyomi.domain.entries.manga.interactor.MangaFetchInterval
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.history.manga.interactor.GetMangaHistory
 import tachiyomi.domain.items.chapter.model.Chapter
 import tachiyomi.domain.items.chapter.model.NoChaptersException
 import tachiyomi.domain.library.manga.LibraryManga
@@ -82,6 +84,7 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
     private val coverCache: MangaCoverCache = Injekt.get()
     private val getLibraryManga: GetLibraryManga = Injekt.get()
     private val getManga: GetManga = Injekt.get()
+    private val getMangaHistory: GetMangaHistory = Injekt.get()
     private val updateManga: UpdateManga = Injekt.get()
     private val syncChaptersWithSource: SyncChaptersWithSource = Injekt.get()
     private val mangaFetchInterval: MangaFetchInterval = Injekt.get()
@@ -90,6 +93,7 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
     private val notifier = MangaLibraryUpdateNotifier(context)
 
     private var mangaToUpdate: List<LibraryManga> = mutableListOf()
+    private var readMangaIds: Set<Long> = emptySet()
 
     override suspend fun doWork(): Result {
         if (tags.contains(WORK_NAME_AUTO)) {
@@ -156,6 +160,19 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
      */
     private suspend fun addMangaToQueue(categoryId: Long) {
         val libraryManga = getLibraryManga.await()
+        val readManga = if (categoryId == -1L) {
+            val recent = Instant.now().minusSeconds(90L * 86_400).toEpochMilli()
+            getMangaHistory.subscribe("").first()
+                .filter { (it.readAt?.time ?: 0L) >= recent }
+                .distinctBy { it.mangaId }
+                .take(20)
+                .mapNotNull { getManga.await(it.mangaId) }
+                .filterNot { it.favorite }
+                .map { manga -> LibraryManga(manga, 0, 1, 1, 0, 0, 0, 0) }
+        } else {
+            emptyList()
+        }
+        readMangaIds = readManga.map { it.manga.id }.toSet()
 
         val listToUpdate = if (categoryId != -1L) {
             libraryManga.filter { it.category == categoryId }
@@ -183,7 +200,7 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         val skippedUpdates = mutableListOf<Pair<Manga, String?>>()
         val (_, fetchWindowUpperBound) = mangaFetchInterval.getWindow(ZonedDateTime.now())
 
-        mangaToUpdate = listToUpdate
+        mangaToUpdate = (listToUpdate + readManga).distinctBy { it.manga.id }
             .filter {
                 when {
                     it.manga.updateStrategy != UpdateStrategy.ALWAYS_UPDATE -> {
@@ -264,8 +281,7 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                                 val manga = libraryManga.manga
                                 ensureActive()
 
-                                // Don't continue to update if manga is not in library
-                                if (getManga.await(manga.id)?.favorite != true) {
+                                if (getManga.await(manga.id)?.favorite != true && manga.id !in readMangaIds) {
                                     return@forEach
                                 }
 
@@ -279,7 +295,11 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                                             .sortedByDescending { it.sourceOrder }
 
                                         if (newChapters.isNotEmpty()) {
-                                            val chaptersToDownload = filterChaptersForDownload.await(manga, newChapters)
+                                            val chaptersToDownload = if (manga.favorite) {
+                                                filterChaptersForDownload.await(manga, newChapters)
+                                            } else {
+                                                emptyList()
+                                            }
                                             if (chaptersToDownload.isNotEmpty()) {
                                                 downloadChapters(manga, chaptersToDownload)
                                                 hasDownloads.set(true)
@@ -354,7 +374,8 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
 
         // Get manga from database to account for if it was removed during the update and
         // to get latest data so it doesn't get overwritten later on
-        val dbManga = getManga.await(manga.id)?.takeIf { it.favorite } ?: return emptyList()
+        val dbManga = getManga.await(manga.id)?.takeIf { it.favorite || it.id in readMangaIds }
+            ?: return emptyList()
 
         return syncChaptersWithSource.await(chapters, dbManga, source, false, fetchWindow)
     }

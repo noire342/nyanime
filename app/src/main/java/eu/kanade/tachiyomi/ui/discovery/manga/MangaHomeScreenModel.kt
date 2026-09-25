@@ -7,11 +7,14 @@ import eu.kanade.domain.entries.manga.model.toSManga
 import eu.kanade.domain.items.chapter.interactor.SyncChaptersWithSource
 import eu.kanade.domain.source.manga.interactor.GetMangaIncognitoState
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.tachiyomi.data.discovery.MangaHomeChapter
 import eu.kanade.tachiyomi.data.discovery.MangaHomeItem
 import eu.kanade.tachiyomi.data.discovery.MangaHomePage
 import eu.kanade.tachiyomi.data.discovery.MangaHomeRegistry
 import eu.kanade.tachiyomi.data.discovery.MangaHomeService
+import eu.kanade.tachiyomi.ui.updates.dismissLibraryUpdate
+import eu.kanade.tachiyomi.ui.updates.inboxKey
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,8 +36,11 @@ import tachiyomi.domain.history.manga.interactor.GetNextChapters
 import tachiyomi.domain.history.manga.model.MangaHistoryWithRelations
 import tachiyomi.domain.items.chapter.interactor.GetChaptersByMangaId
 import tachiyomi.domain.source.manga.service.MangaSourceManager
+import tachiyomi.domain.updates.manga.interactor.GetMangaUpdates
+import tachiyomi.domain.updates.manga.model.MangaUpdatesWithRelations
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.time.Instant
 
 data class MangaHomeRowState(
     val page: MangaHomePage? = null,
@@ -50,6 +56,7 @@ data class MangaHomeState(
     val offline: Boolean = false,
     val rows: Map<String, MangaHomeRowState> = emptyMap(),
     val history: List<MangaHistoryWithRelations> = emptyList(),
+    val updates: List<MangaUpdatesWithRelations> = emptyList(),
     val opening: String? = null,
 )
 
@@ -60,6 +67,8 @@ class MangaHomeScreenModel(
     private val preferences: SourcePreferences = Injekt.get(),
     private val manager: MangaSourceManager = Injekt.get(),
     private val incognito: GetMangaIncognitoState = Injekt.get(),
+    private val getUpdates: GetMangaUpdates = Injekt.get(),
+    private val uiPreferences: UiPreferences = Injekt.get(),
 ) : StateScreenModel<MangaHomeState>(MangaHomeState()) {
     val events = MutableSharedFlow<Event>()
     private var loadJob: Job? = null
@@ -112,6 +121,26 @@ class MangaHomeScreenModel(
                 }
             }.collect { history -> mutableState.update { it.copy(history = history) } }
         }
+        screenModelScope.launch {
+            combine(
+                getUpdates.subscribe(Instant.now().minusSeconds(30L * 86_400)),
+                uiPreferences.dismissedLibraryUpdates().changes(),
+                base.incognitoMode().changes(),
+            ) { updates, dismissed, private ->
+                if (private) {
+                    emptyList()
+                } else {
+                    updates
+                        .distinctBy { it.mangaId }
+                        .filterNot { it.read || it.inboxKey() in dismissed }
+                        .take(30)
+                }
+            }.collect { updates -> mutableState.update { it.copy(updates = updates) } }
+        }
+    }
+
+    fun dismissUpdate(update: MangaUpdatesWithRelations) {
+        dismissLibraryUpdate(uiPreferences.dismissedLibraryUpdates(), update.inboxKey())
     }
 
     fun selectHome(key: String) {

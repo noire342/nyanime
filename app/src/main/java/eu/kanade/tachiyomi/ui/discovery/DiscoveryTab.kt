@@ -22,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,6 +36,7 @@ import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.TabOptions
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.discovery.CatalogRow
 import eu.kanade.presentation.discovery.ContinueWatchingRow
 import eu.kanade.presentation.discovery.DiscoveryHomeHeader
@@ -52,6 +54,7 @@ import eu.kanade.tachiyomi.ui.history.HistoriesTab
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
+import eu.kanade.tachiyomi.ui.updates.dismissLibraryUpdate
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogFailureReason
@@ -62,6 +65,8 @@ import tachiyomi.domain.entries.anime.model.asAnimeCover
 import tachiyomi.domain.source.anime.interactor.GetRemoteAnime
 import tachiyomi.presentation.core.components.material.PullRefresh
 import tachiyomi.presentation.core.screens.LoadingScreen
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 data object DiscoveryTab : Tab {
     override val options: TabOptions
@@ -103,6 +108,7 @@ data object DiscoveryTab : Tab {
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
+        val dismissedUpdates = remember { Injekt.get<UiPreferences>().dismissedLibraryUpdates() }
         LaunchedEffect(Unit) { (context as? MainActivity)?.ready = true }
         val openCatalog: (CatalogAnime) -> Unit = { navigator.push(CatalogDetailScreen(it.id.value, it.id.provider)) }
         var sourceMenu by rememberSaveable { mutableStateOf(false) }
@@ -120,6 +126,8 @@ data object DiscoveryTab : Tab {
                     },
                     onSearch = { navigator.push(CatalogListScreen(CatalogFeed.SEARCH)) },
                     onRefresh = model::refresh,
+                    onUpdates = { navigator.push(UpdatesTab) },
+                    hasUpdates = state.updates.data?.isNotEmpty() == true,
                 )
             },
         ) { padding ->
@@ -154,9 +162,20 @@ data object DiscoveryTab : Tab {
                                 }) { Text("Scopri cosa guardare") }
                             }
                         }
+                        if (state.updates.data?.isNotEmpty() == true) {
+                            item(key = "updates") {
+                                SectionHeader("Le tue novità") { navigator.push(UpdatesTab) }
+                                LocalAnimeRow(state.updates, { item ->
+                                    item.updateKey?.let { dismissLibraryUpdate(dismissedUpdates, it) }
+                                    navigator.push(AnimeScreen(item.anime.id))
+                                }) { item ->
+                                    item.updateKey?.let { dismissLibraryUpdate(dismissedUpdates, it) }
+                                    scope.launch { context.playDiscoveryEpisode(item.episode) }
+                                }
+                            }
+                        }
                         item(key = "shortcuts") {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                TextButton(onClick = { navigator.push(UpdatesTab) }) { Text("Aggiornamenti") }
                                 TextButton(onClick = { navigator.push(HistoriesTab) }) { Text("Cronologia") }
                             }
                             if (state.offline) {
@@ -177,14 +196,6 @@ data object DiscoveryTab : Tab {
                                     Modifier.padding(horizontal = 16.dp),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
-                            }
-                        }
-                        item(key = "updates") {
-                            SectionHeader("Nuovi episodi della tua libreria") { navigator.push(UpdatesTab) }
-                            LocalAnimeRow(state.updates, { navigator.push(AnimeScreen(it)) }) { item ->
-                                scope.launch {
-                                    context.playDiscoveryEpisode(item.episode)
-                                }
                             }
                         }
                         items(

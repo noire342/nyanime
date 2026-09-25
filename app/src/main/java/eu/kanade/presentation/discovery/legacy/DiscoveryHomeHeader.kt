@@ -18,8 +18,10 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,6 +63,8 @@ fun DiscoveryHomeHeader(
     homes: List<SourceHomeGroup>,
     logo: SourceHomeLogo? = null,
     artworkRefreshKey: Int = 0,
+    onUpdates: (() -> Unit)? = null,
+    hasUpdates: Boolean = false,
 ) {
     val branded = sourceHomeLogoEnabled() && logo != null
     Column {
@@ -81,6 +85,14 @@ fun DiscoveryHomeHeader(
             },
             actions = {
                 eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
+                if (onUpdates != null) {
+                    Box {
+                        IconButton(onClick = onUpdates) {
+                            Icon(Icons.Outlined.NotificationsNone, contentDescription = "Le tue novità")
+                        }
+                        if (hasUpdates) Badge(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp))
+                    }
+                }
                 eu.kanade.tachiyomi.ui.community.CommunityAvatarButton()
                 if (onSearch != null) {
                     IconButton(onClick = onSearch) {

@@ -33,6 +33,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import logcat.LogPriority
@@ -47,6 +48,7 @@ import tachiyomi.domain.entries.anime.interactor.AnimeFetchInterval
 import tachiyomi.domain.entries.anime.interactor.GetAnime
 import tachiyomi.domain.entries.anime.interactor.GetLibraryAnime
 import tachiyomi.domain.entries.anime.model.Anime
+import tachiyomi.domain.history.anime.interactor.GetAnimeHistory
 import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.items.episode.model.NoEpisodesException
 import tachiyomi.domain.items.season.interactor.GetAnimeSeasonsByParentId
@@ -81,6 +83,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
     private val downloadManager: AnimeDownloadManager = Injekt.get()
     private val getLibraryAnime: GetLibraryAnime = Injekt.get()
     private val getAnime: GetAnime = Injekt.get()
+    private val getAnimeHistory: GetAnimeHistory = Injekt.get()
     private val animeFetchInterval: AnimeFetchInterval = Injekt.get()
     private val filterEpisodesForDownload: FilterEpisodesForDownload = Injekt.get()
     private val getAnimeSeasonsByParentId: GetAnimeSeasonsByParentId = Injekt.get()
@@ -89,6 +92,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
     private val notifier = AnimeLibraryUpdateNotifier(context)
 
     private var animeToUpdate: List<LibraryAnime> = mutableListOf()
+    private var watchedAnimeIds: Set<Long> = emptySet()
 
     override suspend fun doWork(): Result {
         if (tags.contains(WORK_NAME_AUTO)) {
@@ -151,6 +155,19 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
      */
     private suspend fun addAnimeToQueue(categoryId: Long) {
         val libraryAnime = getLibraryAnime.await()
+        val watchedAnime = if (categoryId == -1L) {
+            val recent = Instant.now().minusSeconds(90L * 86_400).toEpochMilli()
+            getAnimeHistory.subscribe("").first()
+                .filter { (it.seenAt?.time ?: 0L) >= recent }
+                .distinctBy { it.animeId }
+                .take(20)
+                .mapNotNull { getAnime.await(it.animeId) }
+                .filterNot { it.favorite }
+                .map { anime -> LibraryAnime(anime, 0, 1, 1, 0, 0, 0, 0, 0) }
+        } else {
+            emptyList()
+        }
+        watchedAnimeIds = watchedAnime.map { it.anime.id }.toSet()
 
         val listToUpdate = if (categoryId != -1L) {
             libraryAnime.filter { it.category == categoryId }
@@ -175,7 +192,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         }
 
         val includeSeasons = libraryPreferences.updateSeasonOnLibraryUpdate().get()
-        val lastToUpdateWithSeasons = listToUpdate.flatMap { libAnime ->
+        val lastToUpdateWithSeasons = (listToUpdate + watchedAnime).distinctBy { it.anime.id }.flatMap { libAnime ->
             when (libAnime.anime.fetchType) {
                 FetchType.Seasons -> {
                     if (includeSeasons) {
@@ -278,8 +295,11 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                                 val anime = libraryAnime.anime
                                 ensureActive()
 
-                                // Don't continue to update if anime is not in library
-                                if (anime.parentId == null && getAnime.await(anime.id)?.favorite != true) {
+                                // A recently watched title remains followed even without a library entry.
+                                if (anime.parentId == null &&
+                                    getAnime.await(anime.id)?.favorite != true &&
+                                    anime.id !in watchedAnimeIds
+                                ) {
                                     return@forEach
                                 }
 
@@ -293,7 +313,11 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                                             .sortedByDescending { it.sourceOrder }
 
                                         if (newEpisodes.isNotEmpty()) {
-                                            val episodesToDownload = filterEpisodesForDownload.await(anime, newEpisodes)
+                                            val episodesToDownload = if (anime.favorite) {
+                                                filterEpisodesForDownload.await(anime, newEpisodes)
+                                            } else {
+                                                emptyList()
+                                            }
 
                                             if (episodesToDownload.isNotEmpty()) {
                                                 hasDownloads.set(true)
@@ -368,7 +392,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         )
             .getOrThrow()
 
-        return if (update.anime.favorite) update.newEpisodes else emptyList()
+        return if (update.anime.favorite || anime.id in watchedAnimeIds) update.newEpisodes else emptyList()
     }
 
     private suspend fun withUpdateNotification(

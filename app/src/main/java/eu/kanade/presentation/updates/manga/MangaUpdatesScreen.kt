@@ -1,6 +1,8 @@
 package eu.kanade.presentation.updates.manga
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.SnackbarHost
@@ -16,6 +18,8 @@ import androidx.compose.ui.util.fastAll
 import androidx.compose.ui.util.fastAny
 import eu.kanade.presentation.entries.components.EntryBottomActionMenu
 import eu.kanade.presentation.entries.manga.components.ChapterDownloadAction
+import eu.kanade.presentation.updates.UpdatesInboxEmpty
+import eu.kanade.presentation.updates.UpdatesInboxFilter
 import eu.kanade.tachiyomi.data.download.manga.model.MangaDownload
 import eu.kanade.tachiyomi.ui.updates.manga.MangaUpdatesItem
 import eu.kanade.tachiyomi.ui.updates.manga.MangaUpdatesScreenModel
@@ -45,6 +49,11 @@ fun MangaUpdateScreen(
     onMultiDeleteClicked: (List<MangaUpdatesItem>) -> Unit,
     onUpdateSelected: (MangaUpdatesItem, Boolean, Boolean, Boolean) -> Unit,
     onOpenChapter: (MangaUpdatesItem) -> Unit,
+    pendingOnly: Boolean,
+    pendingCount: Int,
+    allCount: Int,
+    onPendingChange: (Boolean) -> Unit,
+    onIgnore: (MangaUpdatesItem) -> Unit,
 ) {
     BackHandler(enabled = state.selectionMode, onBack = { onSelectAll(false) })
 
@@ -60,44 +69,54 @@ fun MangaUpdateScreen(
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { contentPadding ->
-        when {
-            state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
-            state.items.isEmpty() -> EmptyScreen(
-                stringRes = MR.strings.information_no_recent,
-                modifier = Modifier.padding(contentPadding),
-            )
-            else -> {
-                val scope = rememberCoroutineScope()
-                var isRefreshing by remember { mutableStateOf(false) }
+        Column(Modifier.fillMaxSize().padding(contentPadding)) {
+            UpdatesInboxFilter(pendingOnly, pendingCount, allCount, false, onPendingChange)
+            when {
+                state.isLoading -> LoadingScreen(Modifier.weight(1f))
+                state.items.isEmpty() && pendingOnly -> UpdatesInboxEmpty(
+                    isAnime = false,
+                    modifier = Modifier.weight(1f),
+                    onRefresh = { onUpdateLibrary() },
+                )
+                state.items.isEmpty() -> EmptyScreen(
+                    stringRes = MR.strings.information_no_recent,
+                    modifier = Modifier.weight(1f),
+                )
+                else -> {
+                    val scope = rememberCoroutineScope()
+                    var isRefreshing by remember { mutableStateOf(false) }
 
-                PullRefresh(
-                    refreshing = isRefreshing,
-                    onRefresh = {
-                        val started = onUpdateLibrary()
-                        if (!started) return@PullRefresh
-                        scope.launch {
-                            // Fake refresh status but hide it after a second as it's a long running task
-                            isRefreshing = true
-                            delay(1.seconds)
-                            isRefreshing = false
-                        }
-                    },
-                    enabled = !state.selectionMode,
-                    indicatorPadding = contentPadding,
-                ) {
-                    FastScrollLazyColumn(
-                        contentPadding = contentPadding,
+                    PullRefresh(
+                        refreshing = isRefreshing,
+                        onRefresh = {
+                            val started = onUpdateLibrary()
+                            if (!started) return@PullRefresh
+                            scope.launch {
+                                // Fake refresh status but hide it after a second as it's a long running task
+                                isRefreshing = true
+                                delay(1.seconds)
+                                isRefreshing = false
+                            }
+                        },
+                        enabled = !state.selectionMode,
+                        modifier = Modifier.weight(1f),
+                        indicatorPadding = androidx.compose.foundation.layout.PaddingValues(),
                     ) {
-                        mangaUpdatesLastUpdatedItem(lastUpdated)
+                        FastScrollLazyColumn(
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(),
+                        ) {
+                            mangaUpdatesLastUpdatedItem(lastUpdated)
 
-                        mangaUpdatesUiItems(
-                            uiModels = state.getUiModel(),
-                            selectionMode = state.selectionMode,
-                            onUpdateSelected = onUpdateSelected,
-                            onClickCover = onClickCover,
-                            onClickUpdate = onOpenChapter,
-                            onDownloadChapter = onDownloadChapter,
-                        )
+                            mangaUpdatesUiItems(
+                                uiModels = state.getUiModel(),
+                                selectionMode = state.selectionMode,
+                                onUpdateSelected = onUpdateSelected,
+                                onClickCover = onClickCover,
+                                onClickUpdate = onOpenChapter,
+                                onDownloadChapter = onDownloadChapter,
+                                onIgnore = onIgnore.takeIf { pendingOnly },
+                            )
+                        }
                     }
                 }
             }

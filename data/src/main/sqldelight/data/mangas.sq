@@ -125,7 +125,11 @@ getUpcomingManga:
 SELECT *
 FROM mangas
 WHERE next_update >= :startOfDay
-AND favorite = 1
+AND (favorite = 1 OR EXISTS (
+    SELECT 1 FROM chapters followed
+    WHERE followed.manga_id = mangas._id
+    AND (followed.read = 1 OR followed.last_page_read > 0)
+))
 AND status IN :statuses
 ORDER BY next_update ASC;
 

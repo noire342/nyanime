@@ -1,3 +1,4 @@
+DROP VIEW updatesView;
 CREATE VIEW updatesView AS
 SELECT
     mangas._id AS mangaId,
@@ -14,8 +15,7 @@ SELECT
     mangas.cover_last_modified AS coverLastModified,
     chapters.date_upload AS dateUpload,
     chapters.date_fetch AS datefetch
-FROM mangas JOIN chapters
-ON mangas._id = chapters.manga_id
+FROM mangas JOIN chapters ON mangas._id = chapters.manga_id
 WHERE (mangas.favorite = 1 AND chapters.date_fetch > mangas.date_added)
 OR (mangas.favorite = 0 AND chapters.date_fetch > COALESCE((
     SELECT MIN(history.last_read)
@@ -23,17 +23,3 @@ OR (mangas.favorite = 0 AND chapters.date_fetch > COALESCE((
     WHERE followed.manga_id = mangas._id AND history.last_read > 0
 ), 9223372036854775807))
 ORDER BY date_fetch DESC;
-
-getRecentUpdates:
-SELECT *
-FROM updatesView
-WHERE datefetch > :after
-LIMIT :limit;
-
-getUpdatesByReadStatus:
-SELECT *
-FROM updatesView
-WHERE read = :read
-AND datefetch > :after
-
-LIMIT :limit;

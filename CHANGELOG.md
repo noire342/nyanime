@@ -8,6 +8,28 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 25 settembre 2026 — Novità personali e aggiornamenti nell'app
+
+- Le schermate Aggiornamenti già esistenti mostrano per prime le novità da
+  vedere o leggere dei titoli nella libreria e di quelli guardati o letti di recente.
+  Raggruppano le novità per titolo, così molti episodi o capitoli della stessa
+  opera non riempiono l'elenco. Aprire o ignorare un titolo lo toglie dalle
+  novità correnti; la scheda Tutti mantiene la cronologia completa.
+- Nelle Home, una campanella apre Novità; la sezione orizzontale «Le tue novità»
+  compare soltanto quando ci sono episodi o capitoli pertinenti da scoprire.
+  Il controllo periodico include fino a 20 titoli recenti della cronologia anche
+  se non sono nella libreria, senza avviare download automatici per questi titoli.
+  I contenuti già presenti prima della prima visione o lettura non vengono
+  scambiati per nuove uscite.
+  La ricerca delle novità
+  usa la data in cui l'app ha rilevato episodi e capitoli nuovi, anche quando
+  la fonte non indica una data di pubblicazione affidabile.
+- Il calendario evidenzia il giorno selezionato e mostra subito quante uscite
+  sono previste, anche quando il giorno scelto è vuoto.
+- Nella schermata Info si può attivare il download dell'aggiornamento nell'app:
+  avanzamento visibile, possibilità di annullare o riprovare e pulsante
+  Installa aggiornamento al termine. Android chiede comunque la conferma.
+
 ## 24 settembre 2026 — Stanze: avvio preparato e durate dei video
 
 - L'owner può attivare nelle opzioni della stanza il precaricamento prima del

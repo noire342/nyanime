@@ -9,7 +9,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +46,8 @@ fun Calendar(
     onClickDay: (day: LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var selectedDateText by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
+    val selectedDate = LocalDate.parse(selectedDateText).takeIf { YearMonth.from(it) == selectedYearMonth }
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -59,7 +65,27 @@ fun Calendar(
         CalendarGrid(
             selectedYearMonth = selectedYearMonth,
             events = events,
-            onClickDay = onClickDay,
+            selectedDate = selectedDate,
+            onClickDay = {
+                selectedDateText = it.toString()
+                onClickDay(it)
+            },
+        )
+        Text(
+            text = if (selectedDate == null) {
+                "Scegli un giorno per vedere le uscite previste"
+            } else {
+                val count = events[selectedDate] ?: 0
+                if (count == 0) {
+                    "${selectedDate.dayOfMonth} · Nessuna uscita prevista"
+                } else {
+                    "${selectedDate.dayOfMonth} · ${if (count == 1) "1 uscita prevista" else "$count uscite previste"}"
+                }
+            },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -68,6 +94,7 @@ fun Calendar(
 private fun CalendarGrid(
     selectedYearMonth: YearMonth,
     events: ImmutableMap<LocalDate, Int>,
+    selectedDate: LocalDate?,
     onClickDay: (day: LocalDate) -> Unit,
 ) {
     val localeFirstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek.value
@@ -104,6 +131,7 @@ private fun CalendarGrid(
             val localDate = selectedYearMonth.atDay(dayIndex + 1)
             CalendarDay(
                 date = localDate,
+                selected = localDate == selectedDate,
                 onDayClick = { onClickDay(localDate) },
                 events = events[localDate] ?: 0,
             )

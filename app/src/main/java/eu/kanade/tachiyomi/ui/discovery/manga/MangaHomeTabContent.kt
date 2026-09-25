@@ -35,6 +35,7 @@ import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
+import eu.kanade.tachiyomi.ui.updates.MangaUpdatesScreen
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
@@ -113,6 +114,13 @@ fun MangaHomeTabContent(library: @Composable () -> Unit) {
                                     }
                                 },
                                 onRetry = { model.loadSection(it) },
+                                onUpdates = { navigator.push(MangaUpdatesScreen) },
+                                onUpdate = { update ->
+                                    model.dismissUpdate(update)
+                                    context.startActivity(
+                                        ReaderActivity.newIntent(context, update.mangaId, update.chapterId),
+                                    )
+                                },
                             )
                         }
                     }

@@ -1,11 +1,13 @@
 package mihon.feature.upcoming.components.calendar
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -15,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -28,6 +32,7 @@ private const val MAX_EVENTS = 3
 fun CalendarDay(
     date: LocalDate,
     events: Int,
+    selected: Boolean,
     onDayClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -35,6 +40,7 @@ fun CalendarDay(
 
     Box(
         modifier = modifier
+            .sizeIn(minWidth = 40.dp, minHeight = 40.dp)
             .then(
                 if (today == date) {
                     Modifier.border(
@@ -49,7 +55,11 @@ fun CalendarDay(
                 },
             )
             .clip(shape = CircleShape)
+            .background(
+                if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.background,
+            )
             .clickable(onClick = onDayClick)
+            .semantics { this.selected = selected }
             .circleLayout(),
         contentAlignment = Alignment.Center,
     ) {
@@ -57,7 +67,9 @@ fun CalendarDay(
             text = date.dayOfMonth.toString(),
             textAlign = TextAlign.Center,
             fontSize = 16.sp,
-            color = if (date.isBefore(today)) {
+            color = if (selected) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else if (date.isBefore(today)) {
                 MaterialTheme.colorScheme.onBackground.copy(alpha = DISABLED_ALPHA)
             } else {
                 MaterialTheme.colorScheme.onBackground

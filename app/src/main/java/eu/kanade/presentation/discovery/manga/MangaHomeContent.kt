@@ -26,9 +26,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -70,6 +72,7 @@ import eu.kanade.tachiyomi.ui.discovery.manga.MangaHomeState
 import tachiyomi.domain.discovery.SourceHomeSection
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.history.manga.model.MangaHistoryWithRelations
+import tachiyomi.domain.updates.manga.model.MangaUpdatesWithRelations
 
 @Composable
 fun MangaHomeContent(
@@ -82,10 +85,13 @@ fun MangaHomeContent(
     onArchive: (Map<String, String>) -> Unit,
     onMore: (SourceHomeSection) -> Unit,
     onRetry: (String) -> Unit,
+    onUpdates: () -> Unit,
+    onUpdate: (MangaUpdatesWithRelations) -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
     val home = state.selected
+    val personalUpdates = state.updates.filter { it.sourceId == home?.id }
     var displayedSourceKey by rememberSaveable { mutableStateOf(home?.key) }
     LaunchedEffect(home?.key) {
         if (displayedSourceKey != home?.key) {
@@ -132,6 +138,14 @@ fun MangaHomeContent(
                         if (!state.offline && home?.search != null) {
                             IconButton(onClick = { home.search?.let { onArchive(it.selections) } }) {
                                 Icon(Icons.Outlined.Search, contentDescription = "Cerca nell’archivio")
+                            }
+                        }
+                        Box {
+                            IconButton(onClick = onUpdates) {
+                                Icon(Icons.Outlined.NotificationsNone, contentDescription = "Le tue novità")
+                            }
+                            if (personalUpdates.isNotEmpty()) {
+                                Badge(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp))
                             }
                         }
                         if (!state.offline) {
@@ -188,6 +202,59 @@ fun MangaHomeContent(
                                                     "Riprendi la lettura",
                                                     style = MaterialTheme.typography.labelMedium,
                                                     color = MaterialTheme.colorScheme.primary,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if (personalUpdates.isNotEmpty()) {
+                    item("personal-updates") {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(end = 20.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                SectionTitle("Le tue novità", Modifier.weight(1f))
+                                TextButton(onClick = onUpdates) { Text("Vedi tutte") }
+                            }
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 20.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                items(personalUpdates, key = { it.chapterId }) { update ->
+                                    Surface(
+                                        onClick = { onUpdate(update) },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = MaterialTheme.colorScheme.surfaceContainer,
+                                        modifier = Modifier.width(260.dp),
+                                    ) {
+                                        Row(
+                                            Modifier.padding(10.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        ) {
+                                            Artwork(update.coverData, update.mangaTitle, Modifier.width(60.dp))
+                                            Column(Modifier.weight(1f).align(Alignment.CenterVertically)) {
+                                                Text(
+                                                    update.mangaTitle,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                )
+                                                Text(
+                                                    "Nuovo · ${update.chapterName}",
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                )
+                                                Text(
+                                                    "Leggi ora  →",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
                                             }
                                         }
