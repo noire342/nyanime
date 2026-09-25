@@ -11,7 +11,8 @@ Le release `tv-rNNNN` sono separate dalle release Android ordinarie `rNNNN`.
 - Il calendario permette di scegliere anche i giorni senza uscite e segnala
   chiaramente quando non è previsto nulla.
 - La schermata Info può scaricare l'aggiornamento nell'app e proporre
-  l'installazione con avanzamento visibile.
+  l'installazione con avanzamento visibile. L'opzione è attiva inizialmente
+  e rispetta le scelte già salvate.
 
 ## Prima versione della modalità TV Android
 
