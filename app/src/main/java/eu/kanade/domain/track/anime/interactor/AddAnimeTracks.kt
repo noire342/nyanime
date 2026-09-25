@@ -36,6 +36,7 @@ class AddAnimeTracks(
             tracker.bind(item, hasSeenEpisodes)
 
             var track = item.toDomainTrack(idRequired = false) ?: return@withIOContext
+            val initialTrack = track
 
             insertTrack.await(track)
 
@@ -77,6 +78,8 @@ class AddAnimeTracks(
                 }
             }
 
+            // Keep the local row in step with the progress and start date sent above.
+            if (track != initialTrack) insertTrack.await(track)
             syncChapterProgressWithTrack.await(animeId, track, tracker)
         }
     }
