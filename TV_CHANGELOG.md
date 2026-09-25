@@ -3,6 +3,16 @@
 Questo changelog riguarda la modalità TV sperimentale del branch `feature/android-tv`.
 Le release `tv-rNNNN` sono separate dalle release Android ordinarie `rNNNN`.
 
+## Novità personali e aggiornamenti
+
+- Le novità dei titoli seguiti, guardati o letti sono disponibili anche
+  nell'interfaccia Android accessibile dalla modalità TV. L'elenco raggruppa
+  episodi e capitoli per titolo e si può aprire dalla campanella.
+- Il calendario permette di scegliere anche i giorni senza uscite e segnala
+  chiaramente quando non è previsto nulla.
+- La schermata Info può scaricare l'aggiornamento nell'app e proporre
+  l'installazione con avanzamento visibile.
+
 ## Prima versione della modalità TV Android
 
 - Interfaccia TV nativa con Home per fonte, ricerca, categorie, sezioni, schede titolo e selezione episodi, mantenendo i contenuti nei contratti generici delle estensioni.
