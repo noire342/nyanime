@@ -4,6 +4,7 @@ import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.track.service.TrackPreferences
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -38,6 +39,8 @@ internal object RetroactiveTracking {
     data class State(
         val running: Boolean = false,
         val completed: Boolean = false,
+        val manual: Boolean = false,
+        val finished: Boolean = false,
         val processed: Int = 0,
         val total: Int = 0,
         val linked: Int = 0,
@@ -71,25 +74,43 @@ internal object RetroactiveTracking {
     }
 
     fun start(delayMs: Long = 0) {
-        if (!foreground || job?.isActive == true || completedPreference().get()) return
-        job = scope.launch {
+        launchRecovery(delayMs = delayMs, manual = false)
+    }
+
+    /** Recheck started titles without resetting the one-time automatic recovery. */
+    fun retryUnlinked() {
+        launchRecovery(delayMs = 0, manual = true)
+    }
+
+    private fun launchRecovery(delayMs: Long, manual: Boolean) {
+        if (manual && job?.isActive == true && !mutableState.value.running) {
+            // A foreground launch may have scheduled the one-time pass for later.
+            // An explicit tap should run now instead of silently doing nothing.
+            job?.cancel()
+        }
+        if (!foreground || job?.isActive == true || (!manual && completedPreference().get())) return
+        val recoveryJob = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 if (delayMs > 0) delay(delayMs)
-                run()
+                run(manual)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 logcat(LogPriority.WARN, error) { "Historical tracking recovery failed" }
             } finally {
-                mutableState.value = mutableState.value.copy(running = false)
+                if (job === currentCoroutineContext()[Job]) {
+                    mutableState.value = mutableState.value.copy(running = false)
+                }
             }
         }
+        job = recoveryJob
+        recoveryJob.start()
     }
 
-    private suspend fun run() {
+    private suspend fun run(manual: Boolean) {
         if (!foreground ||
             Injekt.get<BasePreferences>().incognitoMode().get() ||
-            !Injekt.get<TrackPreferences>().autoUpdateTrack().get()
+            (!manual && !Injekt.get<TrackPreferences>().autoUpdateTrack().get())
         ) {
             return
         }
@@ -97,6 +118,7 @@ internal object RetroactiveTracking {
         val animeServices = manager.loggedInTrackers().filterIsInstance<AnimeTracker>()
         val mangaServices = manager.loggedInTrackers().filterIsInstance<MangaTracker>()
         if (animeServices.isEmpty() && mangaServices.isEmpty()) return
+        mutableState.value = State(running = true, completed = completedPreference().get(), manual = manual)
 
         val animeHistory = Injekt.get<GetAnimeHistory>().subscribe("").first()
         val mangaHistory = Injekt.get<GetMangaHistory>().subscribe("").first()
@@ -110,7 +132,7 @@ internal object RetroactiveTracking {
             ).distinct()
         val total = (if (animeServices.isEmpty()) 0 else animeIds.size) +
             (if (mangaServices.isEmpty()) 0 else mangaIds.size)
-        mutableState.value = State(running = true, total = total)
+        mutableState.value = mutableState.value.copy(total = total)
 
         val attemptsPref = Injekt.get<PreferenceStore>().getStringSet(
             Preference.appStateKey("retroactive_tracking_scanned_v1"),
@@ -132,10 +154,10 @@ internal object RetroactiveTracking {
         val getMangaTracks = Injekt.get<GetMangaTracks>()
         val linkedPref = Injekt.get<PreferenceStore>().getInt(Preference.appStateKey("retroactive_tracking_linked_v1"))
         var processed = 0
-        var linked = linkedPref.get()
+        var linked = if (manual) 0 else linkedPref.get()
 
         suspend fun attempt(key: String, action: suspend () -> Boolean) {
-            if (key in attempted) return
+            if (!manual && key in attempted) return
             val result = try {
                 action()
             } catch (cancelled: CancellationException) {
@@ -146,10 +168,12 @@ internal object RetroactiveTracking {
             }
             if (result) {
                 linked++
-                linkedPref.set(linked)
+                linkedPref.set(if (manual) linkedPref.get() + 1 else linked)
             }
-            attempted += key
-            attemptsPref.set(attempted)
+            if (!manual) {
+                attempted += key
+                attemptsPref.set(attempted)
+            }
             delay(750)
         }
 
@@ -172,7 +196,14 @@ internal object RetroactiveTracking {
                     attempt("a:$id") { AutoTrackOnStart.anime(anime, source, highestSeen) }
                 } finally {
                     processed++
-                    mutableState.value = State(running = true, processed = processed, total = total, linked = linked)
+                    mutableState.value = State(
+                        running = true,
+                        completed = completedPreference().get(),
+                        manual = manual,
+                        processed = processed,
+                        total = total,
+                        linked = linked,
+                    )
                 }
             }
         }
@@ -191,12 +222,28 @@ internal object RetroactiveTracking {
                     attempt("m:$id") { AutoTrackOnStart.manga(manga, source) }
                 } finally {
                     processed++
-                    mutableState.value = State(running = true, processed = processed, total = total, linked = linked)
+                    mutableState.value = State(
+                        running = true,
+                        completed = completedPreference().get(),
+                        manual = manual,
+                        processed = processed,
+                        total = total,
+                        linked = linked,
+                    )
                 }
             }
         }
         completedPreference().set(true)
-        mutableState.value = State(completed = true, processed = processed, total = total, linked = linked)
-        logcat(LogPriority.INFO) { "Historical tracking recovery completed: scanned=$total linked=$linked" }
+        mutableState.value = State(
+            completed = true,
+            manual = manual,
+            finished = true,
+            processed = processed,
+            total = total,
+            linked = linked,
+        )
+        logcat(LogPriority.INFO) {
+            "Historical tracking recovery completed: manual=$manual scanned=$total linked=$linked"
+        }
     }
 }
