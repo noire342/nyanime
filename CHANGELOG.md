@@ -8,6 +8,14 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 26 settembre 2026 — Riesame manuale del tracking
+
+- In Impostazioni → Tracking, «Riesamina i titoli iniziati» riprova anime e manga
+  guardati o letti che non sono ancora collegati ai servizi configurati. Si può
+  avviare anche dopo il recupero iniziale e con il tracking automatico spento.
+- I collegamenti già presenti restano intatti. La schermata mostra l'avanzamento,
+  i nuovi collegamenti e se il controllo è stato interrotto.
+
 ## 26 settembre 2026 — Riproduzione in finestra
 
 - Il video continua a riprodursi quando si passa alla modalità picture-in-picture:

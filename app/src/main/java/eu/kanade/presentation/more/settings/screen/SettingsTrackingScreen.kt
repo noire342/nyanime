@@ -41,6 +41,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.icerock.moko.resources.StringResource
+import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.track.model.AutoTrackState
 import eu.kanade.domain.track.service.TrackPreferences
 import eu.kanade.presentation.more.settings.Preference
@@ -94,6 +95,7 @@ object SettingsTrackingScreen : SearchableSettings {
     override fun getPreferences(): List<Preference> {
         val context = LocalContext.current
         val trackPreferences = remember { Injekt.get<TrackPreferences>() }
+        val basePreferences = remember { Injekt.get<BasePreferences>() }
         val trackerManager = remember { Injekt.get<TrackerManager>() }
         val mangaSourceManager = remember { Injekt.get<MangaSourceManager>() }
         val animeSourceManager = remember { Injekt.get<AnimeSourceManager>() }
@@ -101,6 +103,7 @@ object SettingsTrackingScreen : SearchableSettings {
         val recovery by RetroactiveTracking.state.collectAsState()
         val hasAccount = trackerManager.loggedInTrackers().isNotEmpty()
         val autoTrackEnabled by trackPreferences.autoUpdateTrack().collectPreferenceAsState()
+        val incognito by basePreferences.incognitoMode().collectPreferenceAsState()
 
         var dialog by remember { mutableStateOf<Any?>(null) }
         dialog?.run {
@@ -149,24 +152,30 @@ object SettingsTrackingScreen : SearchableSettings {
                 title = stringResource(AYMR.strings.pref_auto_update_manga_sync),
             ),
             Preference.PreferenceItem.TextPreference(
-                title = "Recupera titoli già iniziati",
+                title = "Riesamina i titoli iniziati",
                 subtitle = when {
                     recovery.running ->
-                        "Collegamento in corso: " +
-                            "${recovery.processed}/${recovery.total} titoli esaminati, ${recovery.linked} collegati."
-                    recovery.completed ->
-                        "Recupero iniziale completato: ${recovery.linked} titoli collegati. " +
-                            "I nuovi titoli vengono seguiti dal primo play o dalla prima pagina."
-                    !autoTrackEnabled ->
-                        "Attiva l'aggiornamento automatico del tracking " +
-                            "per eseguire il recupero iniziale."
+                        "Controllo in corso: ${recovery.processed}/${recovery.total} titoli esaminati, " +
+                            "${recovery.linked} nuovi collegamenti."
+                    incognito -> "Disattiva la modalità Incognito per controllare il tracking."
                     !hasAccount -> "Accedi a un servizio di tracking per collegare anime e manga già visti o letti."
+                    recovery.manual && recovery.finished ->
+                        "Ultimo controllo: ${recovery.processed} titoli esaminati, " +
+                            "${recovery.linked} nuovi collegamenti. Tocca per riprovare quelli ancora senza tracking."
+                    recovery.manual ->
+                        "Il controllo si è interrotto dopo ${recovery.processed}/${recovery.total} titoli. " +
+                            "Tocca per riprovare quelli ancora senza tracking."
+                    recovery.completed ->
+                        "Il recupero iniziale è completo. Tocca per riprovare i titoli " +
+                            "ancora senza tracking, anche se un tentativo precedente non era riuscito."
+                    !autoTrackEnabled ->
+                        "Il tracking automatico è spento; puoi comunque avviare un controllo manuale."
                     else ->
-                        "Collega una sola volta, in background, gli anime e manga " +
-                            "iniziati prima di questo aggiornamento."
+                        "Controlla anime e manga già guardati o letti. I collegamenti " +
+                            "esistenti restano invariati; il recupero automatico iniziale avviene una sola volta."
                 },
-                enabled = hasAccount && autoTrackEnabled && !recovery.running && !recovery.completed,
-                onClick = { RetroactiveTracking.start() },
+                enabled = hasAccount && !incognito && !recovery.running,
+                onClick = { RetroactiveTracking.retryUnlinked() },
             ),
             Preference.PreferenceItem.SwitchPreference(
                 preference = trackPreferences.trackOnAddingToLibrary(),
