@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.DropdownMenu
@@ -47,14 +48,18 @@ import eu.kanade.presentation.discovery.LocalAnimeRow
 import eu.kanade.presentation.discovery.PosterCard
 import eu.kanade.presentation.discovery.SectionHeader
 import eu.kanade.presentation.discovery.displayTitle
+import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.history.HistoriesTab
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
+import eu.kanade.tachiyomi.ui.updates.AcknowledgeUpdateNoticeWhenVisible
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import eu.kanade.tachiyomi.ui.updates.dismissLibraryUpdate
+import eu.kanade.tachiyomi.ui.updates.hasNewLibraryUpdateNotice
+import eu.kanade.tachiyomi.ui.updates.markLibraryUpdateNoticesSeen
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogFailureReason
@@ -109,6 +114,29 @@ data object DiscoveryTab : Tab {
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
         val dismissedUpdates = remember { Injekt.get<UiPreferences>().dismissedLibraryUpdates() }
+        val seenNotices = remember { Injekt.get<UiPreferences>().lastSeenAnimeUpdateNotice() }
+        val lastSeenAt by seenNotices.changes().collectAsState(initial = seenNotices.get())
+        val autoAcknowledge = remember { Injekt.get<UiPreferences>().autoAcknowledgeHomeUpdates() }
+        val acknowledgeOnScroll by autoAcknowledge.changes().collectAsState(initial = autoAcknowledge.get())
+        val updateKeys = state.updates.data.orEmpty().mapNotNull { it.updateKey }.toSet()
+        val hasNewUpdates = hasNewLibraryUpdateNotice(updateKeys, lastSeenAt)
+        val motion = appMotionEnabled()
+        val listState = rememberLazyListState()
+        AcknowledgeUpdateNoticeWhenVisible(
+            listState,
+            "updates",
+            updateKeys,
+            hasNewUpdates && acknowledgeOnScroll,
+            seenNotices,
+        )
+        val openUpdatesScreen: () -> Unit = {
+            markLibraryUpdateNoticesSeen(seenNotices, updateKeys)
+            navigator.push(UpdatesTab)
+        }
+        val revealUpdates: () -> Unit = {
+            markLibraryUpdateNoticesSeen(seenNotices, updateKeys)
+            scope.launch { if (motion) listState.animateScrollToItem(2) else listState.scrollToItem(2) }
+        }
         LaunchedEffect(Unit) { (context as? MainActivity)?.ready = true }
         val openCatalog: (CatalogAnime) -> Unit = { navigator.push(CatalogDetailScreen(it.id.value, it.id.provider)) }
         var sourceMenu by rememberSaveable { mutableStateOf(false) }
@@ -126,8 +154,8 @@ data object DiscoveryTab : Tab {
                     },
                     onSearch = { navigator.push(CatalogListScreen(CatalogFeed.SEARCH)) },
                     onRefresh = model::refresh,
-                    onUpdates = { navigator.push(UpdatesTab) },
-                    hasUpdates = state.updates.data?.isNotEmpty() == true,
+                    onUpdates = revealUpdates,
+                    hasUpdates = hasNewUpdates,
                 )
             },
         ) { padding ->
@@ -142,6 +170,7 @@ data object DiscoveryTab : Tab {
                     modifier = Modifier.padding(padding),
                 ) {
                     LazyColumn(
+                        state = listState,
                         contentPadding = PaddingValues(bottom = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
@@ -164,7 +193,7 @@ data object DiscoveryTab : Tab {
                         }
                         if (state.updates.data?.isNotEmpty() == true) {
                             item(key = "updates") {
-                                SectionHeader("Le tue novità") { navigator.push(UpdatesTab) }
+                                SectionHeader("Le tue novità", openUpdatesScreen)
                                 LocalAnimeRow(state.updates, { item ->
                                     item.updateKey?.let { dismissLibraryUpdate(dismissedUpdates, it) }
                                     navigator.push(AnimeScreen(item.anime.id))

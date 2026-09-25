@@ -21,6 +21,8 @@
     <string name="action_display_show_continue_reading_button">Continue watching/reading button</string>
     <string name="pref_update_only_completely_read">Skip entries with unseen episode(s)/unread chapter(s)</string>
     <string name="pref_library_update_show_tab_badge">Show unseen/unread count on Updates icon</string>
+    <string name="pref_home_updates_auto_acknowledge">Clear Home update indicator when viewed</string>
+    <string name="pref_home_updates_auto_acknowledge_summary">Turn off the indicator when you scroll to “Your updates”. The indicator always clears when you tap it.</string>
     <string name="pref_category_delete_chapters">Delete chapters/episodes</string>
     <string name="pref_remove_after_marked_as_read">After manually marked as read/watched</string>
     <string name="pref_remove_after_read">After reading/watching automatically delete</string>

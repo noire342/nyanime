@@ -44,7 +44,7 @@ class SourceHomeScreenModel(
                             }
                         }
                         launch {
-                            locals.updates(source.sourceIds).observe().collect { value ->
+                            locals.updates.observe().collect { value ->
                                 mutableState.update { it.copy(updates = value) }
                             }
                         }

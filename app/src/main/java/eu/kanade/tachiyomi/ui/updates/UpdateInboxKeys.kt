@@ -25,3 +25,12 @@ fun dismissLibraryUpdates(preference: Preference<Set<String>>, keys: Set<String>
             keys,
     )
 }
+
+fun hasNewLibraryUpdateNotice(keys: Collection<String>, lastSeenAt: Long) = keys.any {
+    (it.substringBefore('|').toLongOrNull() ?: 0L) > lastSeenAt
+}
+
+fun markLibraryUpdateNoticesSeen(preference: Preference<Long>, keys: Collection<String>) {
+    val latest = keys.maxOfOrNull { it.substringBefore('|').toLongOrNull() ?: 0L } ?: 0L
+    preference.set(maxOf(preference.get(), System.currentTimeMillis(), latest))
+}

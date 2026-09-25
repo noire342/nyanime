@@ -125,8 +125,22 @@ private fun MangaPreview(firstItem: Int = 0, error: Boolean = false) {
                     Tab(selected = true, onClick = {}, text = { Text("Home") })
                     Tab(selected = false, onClick = {}, text = { Text("Biblioteca") })
                 }
-                MangaHomeContent(state, {
-                }, {}, {}, { _, _ -> }, {}, {}, {}, {}, listState = rememberLazyListState(firstItem))
+                MangaHomeContent(
+                    state = state,
+                    onRefresh = {},
+                    onSelectHome = {},
+                    onManga = {},
+                    onChapter = { _, _ -> },
+                    onResume = {},
+                    onArchive = {},
+                    onMore = {},
+                    onRetry = {},
+                    onUpdates = {},
+                    onNoticeClick = {},
+                    hasNewUpdates = false,
+                    onUpdate = {},
+                    listState = rememberLazyListState(firstItem),
+                )
             }
         }
     }

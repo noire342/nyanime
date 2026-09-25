@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.category.visualName
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.PreferenceItem
@@ -63,6 +64,7 @@ object SettingsLibraryScreen : SearchableSettings {
         val getAnimeCategories = remember { Injekt.get<GetAnimeCategories>() }
         val allAnimeCategories by getAnimeCategories.subscribe().collectAsState(initial = emptyList())
         val libraryPreferences = remember { Injekt.get<LibraryPreferences>() }
+        val uiPreferences = remember { Injekt.get<UiPreferences>() }
 
         return listOf(
             getCategoriesGroup(
@@ -71,7 +73,7 @@ object SettingsLibraryScreen : SearchableSettings {
                 allAnimeCategories,
                 libraryPreferences,
             ),
-            getGlobalUpdateGroup(allCategories, allAnimeCategories, libraryPreferences),
+            getGlobalUpdateGroup(allCategories, allAnimeCategories, libraryPreferences, uiPreferences),
             getSeasonBehaviorGroup(libraryPreferences),
             getAnimeBehaviorGroup(libraryPreferences),
             getBehaviorGroup(libraryPreferences),
@@ -159,6 +161,7 @@ object SettingsLibraryScreen : SearchableSettings {
         allMangaCategories: List<Category>,
         allAnimeCategories: List<Category>,
         libraryPreferences: LibraryPreferences,
+        uiPreferences: UiPreferences,
     ): Preference.PreferenceGroup {
         val context = LocalContext.current
 
@@ -294,6 +297,11 @@ object SettingsLibraryScreen : SearchableSettings {
                 Preference.PreferenceItem.SwitchPreference(
                     preference = libraryPreferences.newShowUpdatesCount(),
                     title = stringResource(AYMR.strings.pref_library_update_show_tab_badge),
+                ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = uiPreferences.autoAcknowledgeHomeUpdates(),
+                    title = stringResource(AYMR.strings.pref_home_updates_auto_acknowledge),
+                    subtitle = stringResource(AYMR.strings.pref_home_updates_auto_acknowledge_summary),
                 ),
             ),
         )

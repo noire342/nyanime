@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -22,6 +23,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,22 +32,61 @@ import androidx.compose.ui.platform.LocalContext
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.discovery.manga.MangaHomeContent
+import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.tachiyomi.ui.browse.manga.source.browse.BrowseMangaSourceScreen
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
+import eu.kanade.tachiyomi.ui.updates.AcknowledgeUpdateNoticeWhenVisible
 import eu.kanade.tachiyomi.ui.updates.MangaUpdatesScreen
+import eu.kanade.tachiyomi.ui.updates.hasNewLibraryUpdateNotice
+import eu.kanade.tachiyomi.ui.updates.inboxKey
+import eu.kanade.tachiyomi.ui.updates.markLibraryUpdateNoticesSeen
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 @Composable
 fun MangaHomeTabContent(library: @Composable () -> Unit) {
     val model = MangaLibraryTab.rememberScreenModel { MangaHomeScreenModel() }
     val state by model.state.collectAsState()
-    val showLibrary by MangaLibraryTab.libraryRequested.collectAsState()
-    val context = LocalContext.current
     val navigator = LocalNavigator.currentOrThrow
+    val homeKey = state.selected?.key.orEmpty()
+    val seenNotices = remember { Injekt.get<UiPreferences>().lastSeenMangaUpdateNotice() }
+    val lastSeenAt by seenNotices.changes().collectAsState(initial = seenNotices.get())
+    val autoAcknowledge = remember { Injekt.get<UiPreferences>().autoAcknowledgeHomeUpdates() }
+    val acknowledgeOnScroll by autoAcknowledge.changes().collectAsState(initial = autoAcknowledge.get())
+    val scope = rememberCoroutineScope()
+    val listState = rememberSaveable(homeKey, saver = LazyListState.Saver) { LazyListState() }
+    val updateKeys = state.updates.map { it.inboxKey() }.toSet()
+    val hasNewUpdates = hasNewLibraryUpdateNotice(updateKeys, lastSeenAt)
+    val motion = appMotionEnabled()
+    val updatesIndex = 1 +
+        (if (state.homes.size > 1) 1 else 0) +
+        (if (state.history.isNotEmpty()) 1 else 0)
+    val showLibrary by MangaLibraryTab.libraryRequested.collectAsState()
+    AcknowledgeUpdateNoticeWhenVisible(
+        listState,
+        "personal-updates",
+        updateKeys,
+        hasNewUpdates && acknowledgeOnScroll && !showLibrary,
+        seenNotices,
+    )
+    val openUpdates: () -> Unit = {
+        markLibraryUpdateNoticesSeen(seenNotices, updateKeys)
+        navigator.push(MangaUpdatesScreen)
+    }
+    val revealUpdates: () -> Unit = {
+        markLibraryUpdateNoticesSeen(seenNotices, updateKeys)
+        scope.launch {
+            if (motion) listState.animateScrollToItem(updatesIndex) else listState.scrollToItem(updatesIndex)
+        }
+    }
+    val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     val savedPages = rememberSaveableStateHolder()
     DisposableEffect(model) { onDispose { model.cancelOpening() } }
@@ -114,13 +156,16 @@ fun MangaHomeTabContent(library: @Composable () -> Unit) {
                                     }
                                 },
                                 onRetry = { model.loadSection(it) },
-                                onUpdates = { navigator.push(MangaUpdatesScreen) },
+                                onUpdates = openUpdates,
+                                onNoticeClick = revealUpdates,
+                                hasNewUpdates = hasNewUpdates,
                                 onUpdate = { update ->
                                     model.dismissUpdate(update)
                                     context.startActivity(
                                         ReaderActivity.newIntent(context, update.mangaId, update.chapterId),
                                     )
                                 },
+                                listState = listState,
                             )
                         }
                     }

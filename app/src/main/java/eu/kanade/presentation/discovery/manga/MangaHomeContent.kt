@@ -1,5 +1,13 @@
 package eu.kanade.presentation.discovery.manga
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,11 +34,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Adjust
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -65,6 +72,7 @@ import coil3.Extras
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.discovery.MangaHomeChapter
 import eu.kanade.tachiyomi.data.discovery.MangaHomeItem
@@ -86,12 +94,15 @@ fun MangaHomeContent(
     onMore: (SourceHomeSection) -> Unit,
     onRetry: (String) -> Unit,
     onUpdates: () -> Unit,
+    onNoticeClick: () -> Unit,
+    hasNewUpdates: Boolean,
     onUpdate: (MangaUpdatesWithRelations) -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
+    val motion = appMotionEnabled()
     val home = state.selected
-    val personalUpdates = state.updates.filter { it.sourceId == home?.id }
+    val personalUpdates = state.updates
     var displayedSourceKey by rememberSaveable { mutableStateOf(home?.key) }
     LaunchedEffect(home?.key) {
         if (displayedSourceKey != home?.key) {
@@ -140,12 +151,31 @@ fun MangaHomeContent(
                                 Icon(Icons.Outlined.Search, contentDescription = "Cerca nell’archivio")
                             }
                         }
-                        Box {
-                            IconButton(onClick = onUpdates) {
-                                Icon(Icons.Outlined.NotificationsNone, contentDescription = "Le tue novità")
-                            }
-                            if (personalUpdates.isNotEmpty()) {
-                                Badge(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp))
+                        AnimatedVisibility(
+                            visible = hasNewUpdates,
+                            enter = if (motion) {
+                                expandHorizontally(
+                                    tween(220),
+                                ) +
+                                    fadeIn(tween(160))
+                            } else {
+                                EnterTransition.None
+                            },
+                            exit = if (motion) {
+                                shrinkHorizontally(
+                                    tween(180),
+                                ) +
+                                    fadeOut(tween(120))
+                            } else {
+                                ExitTransition.None
+                            },
+                        ) {
+                            IconButton(onClick = onNoticeClick, enabled = hasNewUpdates) {
+                                Icon(
+                                    Icons.Outlined.Adjust,
+                                    contentDescription = "Vai alle tue novità",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
                             }
                         }
                         if (!state.offline) {
