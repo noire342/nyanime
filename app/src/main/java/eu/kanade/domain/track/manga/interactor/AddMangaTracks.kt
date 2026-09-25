@@ -43,10 +43,13 @@ class AddMangaTracks(
             // Update chapter progress if newer chapters marked read locally
             if (hasReadChapters) {
                 val latestLocalReadChapterNumber = allChapters
-                    .sortedBy { it.chapterNumber }
-                    .takeWhile { it.read }
-                    .lastOrNull()
-                    ?.chapterNumber ?: -1.0
+                    .filter {
+                        it.read &&
+                            it.chapterNumber > 0 &&
+                            it.chapterNumber.isFinite() &&
+                            (track.totalChapters <= 0 || it.chapterNumber <= track.totalChapters)
+                    }
+                    .maxOfOrNull { it.chapterNumber } ?: -1.0
 
                 if (latestLocalReadChapterNumber > track.lastChapterRead) {
                     track = track.copy(

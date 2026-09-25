@@ -70,6 +70,7 @@ import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.ImmutableList
 import tachiyomi.domain.custombuttons.model.CustomButton
+import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
@@ -79,6 +80,7 @@ import tachiyomi.presentation.core.util.collectAsState as collectPreferenceAsSta
 
 @Composable
 fun MoreSheet(
+    anime: Anime?,
     onOpenAudio: () -> Unit,
     onOpenQuality: () -> Unit,
     onOpenScreenshot: () -> Unit,
@@ -101,6 +103,9 @@ fun MoreSheet(
     val playerPreferences = remember { Injekt.get<PlayerPreferences>() }
     val showAudioShortcut by playerPreferences.showAudioShortcut().collectPreferenceAsState()
     val showQualityShortcut by playerPreferences.showQualityShortcut().collectPreferenceAsState()
+    val globalAutoSkip by playerPreferences.autoSkipIntro().collectPreferenceAsState()
+    val autoSkipOverrides by playerPreferences.autoSkipIntroOverrides().collectPreferenceAsState()
+    val animeAutoSkip = playerPreferences.autoSkipIntroOverride(anime, autoSkipOverrides)
     var customizeControls by rememberSaveable { mutableStateOf(false) }
     val statisticsPage by advancedPreferences.playerStatisticsPage().collectPreferenceAsState()
     val anime4kSelection by advancedPreferences.anime4kActiveSelection().collectAsState()
@@ -135,6 +140,32 @@ fun MoreSheet(
                 }
             }
             SleepTimerEntry(remainingTime, onOpenSleepTimer, timerAtEpisodeEnd)
+            Text("Salto della sigla", style = MaterialTheme.typography.titleMedium)
+            ShortcutPreference(
+                "Salta automaticamente (predefinito)",
+                globalAutoSkip,
+                playerPreferences.autoSkipIntro()::set,
+            )
+            if (anime != null) {
+                Text("Per questo anime", style = MaterialTheme.typography.bodyMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = animeAutoSkip == null,
+                        onClick = { playerPreferences.setAutoSkipIntroOverride(anime, null) },
+                        label = { Text("Usa impostazione generale") },
+                    )
+                    FilterChip(
+                        selected = animeAutoSkip == true,
+                        onClick = { playerPreferences.setAutoSkipIntroOverride(anime, true) },
+                        label = { Text("Salta") },
+                    )
+                    FilterChip(
+                        selected = animeAutoSkip == false,
+                        onClick = { playerPreferences.setAutoSkipIntroOverride(anime, false) },
+                        label = { Text("Non saltare") },
+                    )
+                }
+            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onOpenAudio) {
                     Icon(Icons.Default.Audiotrack, null)

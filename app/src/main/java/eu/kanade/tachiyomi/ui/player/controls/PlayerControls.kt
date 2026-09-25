@@ -746,8 +746,10 @@ fun PlayerControls(
         val currentSource by viewModel.currentSource.collectAsState()
         val showFailedHosters by playerPreferences.showFailedHosters().collectAsState()
         val emptyHosters by playerPreferences.showEmptyHosters().collectAsState()
+        val sheetAnime by viewModel.currentAnime.collectAsState()
 
         PlayerSheets(
+            anime = sheetAnime,
             sheetShown = sheetShown,
             onOpenSheet = { target ->
                 if (target == Sheets.Screenshot) viewModel.pauseByUser()
