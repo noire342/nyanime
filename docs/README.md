@@ -24,6 +24,7 @@ I documenti tecnici in inglese conservano i nomi delle API e dei componenti.
 | [Home e scoperta](discovery-home.md) | Cataloghi, associazione alle fonti, calendario, cache e ripresa. |
 | [API Home anime](extension-home-api.md) | Contratto dichiarativo generico delle estensioni. |
 | [API Home manga](manga-home-api.md) | Sezioni manga, capitoli, classifiche e identità degli elementi. |
+| [ID per il tracking](extension-tracking-metadata.md) | Contratto facoltativo e generico per identificare titoli senza indovinare la stagione. |
 | [Anime4K Smart](anime4k-smart.md) | Misure di rendering, preset, fallback e shader. |
 | [Guarda insieme](watch-together.md) | Stanze cifrate, sincronizzazione, inviti e verifiche. |
 | [I miei dispositivi (disattivato)](personal-sync.md) | Sync rimosso dall’app e pulizia dei suoi dati sul dispositivo. |

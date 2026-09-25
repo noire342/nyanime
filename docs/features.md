@@ -119,7 +119,8 @@ Gli effetti locali di mpv non vengono applicati al video via Cast.
 
 ### AniSkip, timer e fine episodio
 
-AniSkip è facoltativo e richiede un titolo associato tramite un tracker compatibile.
+AniSkip è facoltativo: usa l'identificativo del titolo quando è disponibile
+dall'estensione, da un tracker collegato oppure da una ricerca univoca nel catalogo.
 Quando il servizio dispone degli intervalli, il player può proporre o eseguire
 salti di sigla, conclusione e altri segmenti riconosciuti. Se i dati mancano,
 la riproduzione normale prosegue.
@@ -281,6 +282,10 @@ I servizi di tracking integrati sono **MyAnimeList, AniList, Kitsu, MangaUpdates
 Shikimori, Simkl e Bangumi**. Per i server personali sono presenti integrazioni con
 **Komga, Kavita, Suwayomi e Jellyfin**. Disponibilità per anime/manga e operazioni
 sincronizzabili dipendono dal servizio. L'accesso a un tracker è facoltativo.
+All'inizio della visione o lettura, i tracker configurati vengono associati in
+background quando l'identità del titolo è sufficientemente certa. Edizioni o
+stagioni ambigue non vengono collegate in modo arbitrario: resta disponibile
+la ricerca manuale. La cronologia non viene inviata a servizi senza accesso.
 
 Puoi creare o programmare backup, scegliere i dati da includere, ripristinarli,
 esportare gli elenchi della libreria e gestire spazio e cache. I backup automatici

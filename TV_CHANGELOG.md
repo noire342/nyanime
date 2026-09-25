@@ -3,6 +3,13 @@
 Questo changelog riguarda la modalità TV sperimentale del branch `feature/android-tv`.
 Le release `tv-rNNNN` sono separate dalle release Android ordinarie `rNNNN`.
 
+## Collegamento automatico ai tracker
+
+- Quando si avvia un video o si legge una pagina, i tracker già configurati
+  vengono collegati in background se il titolo è identificato senza ambiguità.
+- Le estensioni possono fornire gli ID di catalogo per distinguere stagioni
+  ed edizioni. AniSkip può usarli senza un'associazione manuale preventiva.
+
 ## Novità personali e aggiornamenti
 
 - Le novità dei titoli seguiti, guardati o letti sono disponibili anche

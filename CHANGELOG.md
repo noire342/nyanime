@@ -8,6 +8,18 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 25 settembre 2026 — Collegamento automatico ai tracker
+
+- Quando inizia la visione o la lettura, Nyanime collega in background il titolo
+  ai tracker già configurati sul dispositivo e aggiorna poi il progresso.
+  La ricerca usa prima gli identificativi forniti dall'estensione, poi titoli
+  alternativi e corrispondenze prudenti; risultati ambigui restano da confermare.
+- AniSkip può ricavare l'identificativo dell'anime senza richiedere prima un
+  collegamento manuale al tracker. Le impostazioni disattivate esplicitamente
+  restano rispettate.
+- Nelle nuove installazioni l'aggiunta alla libreria non apre più di default
+  la finestra di collegamento manuale. La scelta già salvata resta invariata.
+
 ## 25 settembre 2026 — Novità personali e aggiornamenti nell'app
 
 - Le schermate Aggiornamenti già esistenti mostrano per prime le novità da

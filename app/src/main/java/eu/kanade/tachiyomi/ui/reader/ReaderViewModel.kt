@@ -24,6 +24,7 @@ import eu.kanade.tachiyomi.data.reading.ReadingTogetherManager
 import eu.kanade.tachiyomi.data.saver.Image
 import eu.kanade.tachiyomi.data.saver.ImageSaver
 import eu.kanade.tachiyomi.data.saver.Location
+import eu.kanade.tachiyomi.data.track.AutoTrackOnStart
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.reader.loader.ChapterLoader
@@ -45,6 +46,7 @@ import eu.kanade.tachiyomi.util.storage.DiskUtil
 import eu.kanade.tachiyomi.util.storage.cacheImageDir
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -147,6 +149,9 @@ class ReaderViewModel @JvmOverloads constructor(
     private var chapterReadStartTime: Long? = null
 
     private var chapterToDownload: MangaDownload? = null
+    private var autoTrackAttemptedMangaId: Long? = null
+    private var autoTrackAttemptedAt: Long = 0L
+    private var autoTrackJob: Job? = null
 
     /**
      * Chapter list for the active manga. It's retrieved lazily and should be accessed for the first
@@ -563,6 +568,7 @@ class ReaderViewModel @JvmOverloads constructor(
         chapterPageIndex = pageIndex
 
         if (!incognitoMode && page.status != Page.State.ERROR) {
+            startAutoTracking()
             readerChapter.chapter.last_page_read = pageIndex
 
             if (readerChapter.pages?.lastIndex == pageIndex) {
@@ -576,6 +582,29 @@ class ReaderViewModel @JvmOverloads constructor(
                     lastPageRead = readerChapter.chapter.last_page_read.toLong(),
                 ),
             )
+        }
+    }
+
+    private fun startAutoTracking() {
+        if (!trackPreferences.autoUpdateTrack().get()) return
+        val currentManga = manga ?: return
+        val currentSource = sourceManager.getOrStub(currentManga.source)
+        if (autoTrackJob?.isActive == true) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (autoTrackAttemptedMangaId == currentManga.id && now - autoTrackAttemptedAt < 60_000L) return
+        autoTrackAttemptedMangaId = currentManga.id
+        autoTrackAttemptedAt = now
+        autoTrackJob = viewModelScope.launchIO {
+            if (AutoTrackOnStart.manga(currentManga, currentSource)) {
+                if (manga?.id != currentManga.id) return@launchIO
+                getCurrentChapter()?.takeIf { it.chapter.read }?.let { chapter ->
+                    trackChapter.await(
+                        Injekt.get<Application>(),
+                        currentManga.id,
+                        chapter.chapter.chapter_number.toDouble(),
+                    )
+                }
+            }
         }
     }
 

@@ -125,6 +125,8 @@ Le app TV possono diventare ricevitori tramite [Nyanime Companion](docs/companio
   dei collegamenti scaduti attraverso l'estensione; downloader esterni facoltativi.
 - Tracker **MyAnimeList, AniList, Kitsu, MangaUpdates, Shikimori, Simkl e Bangumi**;
   integrazioni con **Komga, Kavita, Suwayomi e Jellyfin** nei casi supportati.
+  Collegamento automatico quando inizi a guardare o leggere e il titolo è
+  identificato senza ambiguità; la ricerca manuale rimane disponibile.
 - Backup manuali e automatici, ripristino, esportazione degli elenchi della libreria,
   scelta dell'archiviazione e gestione delle cache.
 - Gestione di repository, estensioni, lingue e fiducia automatica configurabile;
