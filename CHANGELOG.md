@@ -8,6 +8,13 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 26 settembre 2026 — Riproduzione in finestra
+
+- Il video continua a riprodursi quando si passa alla modalità picture-in-picture:
+  la pausa avviene solo quando il player esce davvero dallo schermo.
+- Corretto il ridimensionamento che poteva lasciare metà finestra nera al primo
+  ingresso in picture-in-picture, specialmente uscendo dal player orizzontale.
+
 ## 25 settembre 2026 — Schermata Novità
 
 - Lo scorrimento orizzontale tra Anime e Manga resta continuo: il tema della
