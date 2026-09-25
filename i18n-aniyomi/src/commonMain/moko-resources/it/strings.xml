@@ -7,6 +7,8 @@
     <string name="relative_time_now">Ora</string>
     <string name="pref_library_summary">Categorie, aggiornamenti globali, azioni di scorrimento capitoli</string>
     <string name="pref_library_update_show_tab_badge">Mostra numero di elementi non letti/visti nell\'icona degli aggiornamenti</string>
+    <string name="pref_home_updates_auto_acknowledge">Spegni l’avviso quando vedi le novità nella Home</string>
+    <string name="pref_home_updates_auto_acknowledge_summary">Scorrendo fino a «Le tue novità», l’indicatore scompare. Toccandolo scompare sempre.</string>
     <string name="label_player_settings">Impostazioni del Player</string>
     <string name="action_search_player_settings">Cerca impostazioni del player</string>
     <string name="pref_player_internal">Player interno</string>

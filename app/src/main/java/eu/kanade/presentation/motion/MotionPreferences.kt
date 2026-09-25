@@ -11,5 +11,10 @@ import uy.kohesive.injekt.api.get
 @Composable
 internal fun modernMotionEnabled(): Boolean {
     if (!LocalNyanimeStyle.current) return false
+    return appMotionEnabled()
+}
+
+@Composable
+internal fun appMotionEnabled(): Boolean {
     return LocalInspectionMode.current || !Injekt.get<PlayerPreferences>().reduceMotion().collectAsState().value
 }

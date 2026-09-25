@@ -32,6 +32,12 @@ class UiPreferences(
 
     fun dismissedLibraryUpdates() = preferenceStore.getStringSet("nyanime_dismissed_library_updates")
 
+    fun autoAcknowledgeHomeUpdates() = preferenceStore.getBoolean("nyanime_auto_acknowledge_home_updates", true)
+
+    fun lastSeenAnimeUpdateNotice() = preferenceStore.getLong("nyanime_last_seen_anime_update_notice")
+
+    fun lastSeenMangaUpdateNotice() = preferenceStore.getLong("nyanime_last_seen_manga_update_notice")
+
     fun modernUi() = preferenceStore.getBoolean("nyanime_modern_ui", true)
 
     fun legacyAppTheme() = preferenceStore.getEnum("nyanime_legacy_app_theme", legacyMangaTheme().get())

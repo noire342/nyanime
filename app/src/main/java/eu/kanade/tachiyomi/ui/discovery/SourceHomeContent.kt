@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AssistChip
@@ -13,6 +14,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,11 +42,15 @@ import eu.kanade.presentation.discovery.SourceFeaturedSection
 import eu.kanade.presentation.discovery.SourceHomeDateSelector
 import eu.kanade.presentation.discovery.SourceHomeLogo
 import eu.kanade.presentation.discovery.SourceHomePosterCard
+import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
+import eu.kanade.tachiyomi.ui.updates.AcknowledgeUpdateNoticeWhenVisible
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import eu.kanade.tachiyomi.ui.updates.dismissLibraryUpdate
+import eu.kanade.tachiyomi.ui.updates.hasNewLibraryUpdateNotice
+import eu.kanade.tachiyomi.ui.updates.markLibraryUpdateNoticesSeen
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.SectionState
 import tachiyomi.domain.discovery.SourceHomeGroup
@@ -62,7 +68,13 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
     val navigator = LocalNavigator.currentOrThrow
     val context = LocalContext.current
     val dismissedUpdates = remember { Injekt.get<UiPreferences>().dismissedLibraryUpdates() }
+    val seenNotices = remember { Injekt.get<UiPreferences>().lastSeenAnimeUpdateNotice() }
+    val lastSeenAt by seenNotices.changes().collectAsState(initial = seenNotices.get())
+    val autoAcknowledge = remember { Injekt.get<UiPreferences>().autoAcknowledgeHomeUpdates() }
+    val acknowledgeOnScroll by autoAcknowledge.changes().collectAsState(initial = autoAcknowledge.get())
+    val updateKeys = state.updates.data.orEmpty().mapNotNull { it.updateKey }.toSet()
     val scope = rememberCoroutineScope()
+    val listState = rememberSaveable(homeKey, saver = LazyListState.Saver) { LazyListState() }
     LaunchedEffect(Unit) { (context as? MainActivity)?.ready = true }
     val access = state.access
     val source = access.group
@@ -74,6 +86,29 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
     }.takeIf { modern }
     val heroSection = featuredRow?.sections?.firstOrNull()
         ?: source.rows.firstOrNull()?.sections?.firstOrNull()?.takeIf { modern }
+    val hasNewUpdates = hasNewLibraryUpdateNotice(updateKeys, lastSeenAt)
+    val motion = appMotionEnabled()
+    val updatesSectionKey = "updates:" + source.id
+    val updatesIndex = (if (!access.offline && source.searchable) 1 else 0) +
+        (if (!access.offline && heroSection != null) 1 else 0) +
+        1
+    AcknowledgeUpdateNoticeWhenVisible(
+        listState,
+        updatesSectionKey,
+        updateKeys,
+        hasNewUpdates && acknowledgeOnScroll,
+        seenNotices,
+    )
+    val openUpdatesScreen: () -> Unit = {
+        markLibraryUpdateNoticesSeen(seenNotices, updateKeys)
+        navigator.push(UpdatesTab)
+    }
+    val revealUpdates: () -> Unit = {
+        markLibraryUpdateNoticesSeen(seenNotices, updateKeys)
+        scope.launch {
+            if (motion) listState.animateScrollToItem(updatesIndex) else listState.scrollToItem(updatesIndex)
+        }
+    }
     LifecycleStartEffect(access) {
         model.onResume()
         onStopOrDispose { model.onPause() }
@@ -94,8 +129,8 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                 null
             },
             onRefresh = model::refresh,
-            onUpdates = { navigator.push(UpdatesTab) },
-            hasUpdates = state.updates.data?.isNotEmpty() == true,
+            onUpdates = revealUpdates,
+            hasUpdates = hasNewUpdates,
             artworkRefreshKey = state.artworkRefreshKey,
             logo = source.providers.takeUnless { access.offline }
                 ?.distinctBy { it.id }?.singleOrNull()?.let { provider ->
@@ -124,6 +159,7 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                 modifier = Modifier.padding(padding),
             ) {
                 LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -172,7 +208,7 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                     }
                     if (state.updates.data?.isNotEmpty() == true) {
                         item(key = "updates:" + source.id) {
-                            SectionHeader("Le tue novità") { navigator.push(UpdatesTab) }
+                            SectionHeader("Le tue novità", openUpdatesScreen)
                             LocalAnimeRow(
                                 state.updates,
                                 onOpen = { item ->

@@ -1,6 +1,14 @@
 package eu.kanade.presentation.discovery.legacy
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -18,10 +26,9 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Adjust
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,6 +56,7 @@ import eu.kanade.presentation.discovery.SourceHomeArtwork
 import eu.kanade.presentation.discovery.SourceHomeLogo
 import eu.kanade.presentation.discovery.SourceHomeWordmark
 import eu.kanade.presentation.discovery.sourceHomeLogoEnabled
+import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import tachiyomi.domain.discovery.SourceHomeGroup
 
@@ -66,6 +74,7 @@ fun DiscoveryHomeHeader(
     onUpdates: (() -> Unit)? = null,
     hasUpdates: Boolean = false,
 ) {
+    val motion = appMotionEnabled()
     val branded = sourceHomeLogoEnabled() && logo != null
     Column {
         TopAppBar(
@@ -85,12 +94,17 @@ fun DiscoveryHomeHeader(
             },
             actions = {
                 eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
-                if (onUpdates != null) {
-                    Box {
-                        IconButton(onClick = onUpdates) {
-                            Icon(Icons.Outlined.NotificationsNone, contentDescription = "Le tue novità")
-                        }
-                        if (hasUpdates) Badge(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp))
+                AnimatedVisibility(
+                    visible = onUpdates != null && hasUpdates,
+                    enter = if (motion) expandHorizontally(tween(220)) + fadeIn(tween(160)) else EnterTransition.None,
+                    exit = if (motion) shrinkHorizontally(tween(180)) + fadeOut(tween(120)) else ExitTransition.None,
+                ) {
+                    IconButton(onClick = { onUpdates?.invoke() }, enabled = hasUpdates && onUpdates != null) {
+                        Icon(
+                            Icons.Outlined.Adjust,
+                            contentDescription = "Vai alle tue novità",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
                     }
                 }
                 eu.kanade.tachiyomi.ui.community.CommunityAvatarButton()

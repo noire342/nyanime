@@ -8,6 +8,15 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 25 settembre 2026 — Novità nella Home
+
+- Un indicatore circolare appare nella Home anime o manga soltanto per novità non
+  ancora viste. Toccandolo, la pagina scorre fino alla sezione «Le tue novità».
+- Per impostazione iniziale l'indicatore si spegne anche quando la sezione entra
+  nello schermo scorrendo a mano; questa scelta si può disattivare nelle
+  impostazioni Libreria. I titoli restano nella sezione finché non vengono
+  aperti o ignorati; le novità arrivate dopo riattivano l'indicatore.
+
 ## 25 settembre 2026 — Recupero iniziale e sigle personalizzate
 
 - Se un tracker è già configurato, Nyanime collega in background anche i titoli
