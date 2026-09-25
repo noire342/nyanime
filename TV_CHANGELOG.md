@@ -3,6 +3,13 @@
 Questo changelog riguarda la modalità TV sperimentale del branch `feature/android-tv`.
 Le release `tv-rNNNN` sono separate dalle release Android ordinarie `rNNNN`.
 
+## Riproduzione in finestra e tracking
+
+- Il player Android continua a riprodurre durante l'ingresso in picture-in-picture
+  e non lascia il video spostato in una metà della finestra.
+- Nelle impostazioni Tracking è possibile riesaminare manualmente i titoli
+  iniziati e non ancora collegati, anche dopo il recupero iniziale.
+
 ## Novità nella Home e aggiornamenti Android
 
 - L'indicatore delle novità nelle Home anime e manga usa il colore delle altre
