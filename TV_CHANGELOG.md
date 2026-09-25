@@ -3,6 +3,15 @@
 Questo changelog riguarda la modalità TV sperimentale del branch `feature/android-tv`.
 Le release `tv-rNNNN` sono separate dalle release Android ordinarie `rNNNN`.
 
+## Novità nella Home e aggiornamenti Android
+
+- L'indicatore delle novità nelle Home anime e manga usa il colore delle altre
+  icone, compare solo quando ci sono nuovi elementi e porta alla relativa sezione.
+- Un aggiornamento dell'app già scaricato resta installabile da Altro anche dopo
+  aver lasciato la schermata di download.
+- Il passaggio con il dito tra Anime e Manga nella schermata Novità è continuo;
+  i filtri e lo stato vuoto mostrano più chiaramente i contenuti disponibili.
+
 ## Collegamento automatico ai tracker
 
 - Quando si avvia un video o si legge una pagina, i tracker già configurati
