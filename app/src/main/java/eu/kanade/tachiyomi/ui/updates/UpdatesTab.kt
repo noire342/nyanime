@@ -73,6 +73,7 @@ private fun Screen.UpdatesContent(initialPage: Int, fromMore: Boolean) {
             mangaUpdatesTab(context, fromMore),
         ),
         state = pagerState,
+        pageScopedTheme = true,
     )
     LaunchedEffect(Unit) {
         (context as? MainActivity)?.ready = true

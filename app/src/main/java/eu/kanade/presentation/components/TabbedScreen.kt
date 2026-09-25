@@ -43,24 +43,26 @@ fun TabbedScreen(
     scrollable: Boolean = false,
     animeSearchQuery: String? = null,
     onChangeAnimeSearchQuery: (String?) -> Unit = {},
+    pageScopedTheme: Boolean = false,
 
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    MangaSectionTheme(legacy = tabs[state.currentPage].legacyManga) {
+    val chromePage = if (pageScopedTheme) state.settledPage else state.currentPage
+    MangaSectionTheme(legacy = !pageScopedTheme && tabs[chromePage].legacyManga) {
         Scaffold(
             topBar = {
                 if (titleRes != null) {
-                    val tab = tabs[state.currentPage]
+                    val tab = tabs[chromePage]
                     val searchEnabled = tab.searchEnabled
 
-                    val actualQuery = when (state.currentPage % 2) {
+                    val actualQuery = when (chromePage % 2) {
                         1 -> mangaSearchQuery // History and Browse
                         else -> animeSearchQuery
                     }
 
-                    val actualOnChange = when (state.currentPage % 2) {
+                    val actualOnChange = when (chromePage % 2) {
                         1 -> onChangeMangaSearchQuery // History and Browse
                         else -> onChangeAnimeSearchQuery
                     }
@@ -115,10 +117,12 @@ fun TabbedScreen(
                     state = state,
                     verticalAlignment = Alignment.Top,
                 ) { page ->
-                    tabs[page].content(
-                        PaddingValues(bottom = contentPadding.calculateBottomPadding()),
-                        snackbarHostState,
-                    )
+                    MangaSectionTheme(legacy = pageScopedTheme && tabs[page].legacyManga) {
+                        tabs[page].content(
+                            PaddingValues(bottom = contentPadding.calculateBottomPadding()),
+                            snackbarHostState,
+                        )
+                    }
                 }
             }
         }

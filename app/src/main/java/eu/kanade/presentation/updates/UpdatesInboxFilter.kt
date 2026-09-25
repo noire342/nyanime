@@ -1,20 +1,20 @@
 package eu.kanade.presentation.updates
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material3.FilterChip
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,24 +28,61 @@ fun UpdatesInboxFilter(
     isAnime: Boolean,
     onPendingChange: (Boolean) -> Unit,
 ) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        items(listOf(true, false)) { inbox ->
-            FilterChip(
-                selected = pending == inbox,
-                onClick = { onPendingChange(inbox) },
-                label = {
-                    Text(
-                        if (inbox) {
-                            "${if (isAnime) "Da vedere" else "Da leggere"} · $pendingCount titoli"
-                        } else {
-                            "Tutti · $allCount ${if (isAnime) "episodi" else "capitoli"}"
-                        },
-                    )
-                },
+        Text("Le tue novità", style = MaterialTheme.typography.titleLarge)
+        Text(
+            if (isAnime) {
+                "Nuovi episodi dei titoli che segui o hai guardato"
+            } else {
+                "Nuovi capitoli dei titoli che segui o hai letto"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            UpdateFilterCard(
+                label = if (isAnime) "Da vedere" else "Da leggere",
+                count = pendingCount,
+                detail = "titoli",
+                selected = pending,
+                onClick = { onPendingChange(true) },
             )
+            UpdateFilterCard(
+                label = "Tutti",
+                count = allCount,
+                detail = if (isAnime) "episodi" else "capitoli",
+                selected = !pending,
+                onClick = { onPendingChange(false) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RowScope.UpdateFilterCard(
+    label: String,
+    count: Int,
+    detail: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.weight(1f),
+        shape = MaterialTheme.shapes.large,
+        color = if (selected) colors.primaryContainer else colors.surfaceContainerLow,
+        border = BorderStroke(1.dp, if (selected) colors.primary else colors.outlineVariant),
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(label, style = MaterialTheme.typography.labelLarge)
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(count.toString(), style = MaterialTheme.typography.headlineSmall)
+                Text(detail, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(bottom = 4.dp))
+            }
         }
     }
 }
@@ -55,24 +92,26 @@ fun UpdatesInboxEmpty(isAnime: Boolean, modifier: Modifier = Modifier, onRefresh
     Column(
         modifier = modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Icon(
-            Icons.Outlined.Notifications,
-            contentDescription = null,
-            modifier = Modifier.size(40.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Text("Nessuna novità per ora", style = MaterialTheme.typography.titleLarge)
+        Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.extraLarge) {
+            Icon(
+                Icons.Outlined.AutoAwesome,
+                contentDescription = null,
+                modifier = Modifier.padding(18.dp).size(32.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+        Text("Sei al passo con tutto", style = MaterialTheme.typography.titleLarge)
         Text(
             if (isAnime) {
-                "Qui trovi i nuovi episodi dei titoli che segui o hai guardato."
+                "Quando usciranno nuovi episodi dei titoli che segui o hai guardato, li troverai qui."
             } else {
-                "Qui trovi i nuovi capitoli dei titoli che segui o hai letto."
+                "Quando usciranno nuovi capitoli dei titoli che segui o hai letto, li troverai qui."
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        TextButton(onClick = onRefresh) { Text("Controlla novità") }
+        Button(onClick = onRefresh) { Text("Controlla novità") }
     }
 }
