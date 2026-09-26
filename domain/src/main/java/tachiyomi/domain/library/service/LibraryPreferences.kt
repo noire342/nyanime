@@ -37,6 +37,10 @@ class LibraryPreferences(
     )
 
     fun lastUpdatedTimestamp() = preferenceStore.getLong(Preference.appStateKey("library_update_last_timestamp"), 0L)
+    fun lastAnimeHomeRefreshRequest() =
+        preferenceStore.getLong(Preference.appStateKey("anime_home_refresh_request"), 0L)
+    fun lastAnimeHomeRefreshSuccess() =
+        preferenceStore.getLong(Preference.appStateKey("anime_home_refresh_success"), 0L)
     fun autoUpdateInterval() = preferenceStore.getInt("pref_library_update_interval_key", 0)
 
     fun autoUpdateDeviceRestrictions() = preferenceStore.getStringSet(

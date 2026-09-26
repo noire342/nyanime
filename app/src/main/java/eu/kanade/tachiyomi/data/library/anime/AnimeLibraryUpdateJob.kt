@@ -119,6 +119,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         return withIOContext {
             try {
                 updateEpisodeList()
+                libraryPreferences.lastAnimeHomeRefreshSuccess().set(Instant.now().toEpochMilli())
                 Result.success()
             } catch (e: Exception) {
                 if (e is CancellationException) {
@@ -210,7 +211,12 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             }
         }
 
-        val restrictions = libraryPreferences.autoUpdateItemRestrictions().get()
+        val restrictionPreference = libraryPreferences.autoUpdateItemRestrictions()
+        val restrictions = if (tags.contains(WORK_NAME_HOME) && !restrictionPreference.isSet()) {
+            emptySet()
+        } else {
+            restrictionPreference.get()
+        }
         val skippedUpdates = mutableListOf<Pair<Anime, String?>>()
         val (_, fetchWindowUpperBound) = animeFetchInterval.getWindow(ZonedDateTime.now())
 
@@ -459,6 +465,9 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         private const val TAG = "AnimeLibraryUpdate"
         private const val WORK_NAME_AUTO = "AnimeLibraryUpdate-auto"
         private const val WORK_NAME_MANUAL = "AnimeLibraryUpdate-manual"
+        private const val WORK_NAME_HOME = "AnimeLibraryUpdate-home"
+        private const val HOME_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000L
+        private const val HOME_RETRY_INTERVAL_MS = 30 * 60 * 1000L
 
         private const val ERROR_LOG_HELP_URL = "https://github.com/noire342/nyanime/blob/main/docs/support.md"
 
@@ -542,6 +551,30 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             wm.enqueueUniqueWork(WORK_NAME_MANUAL, ExistingWorkPolicy.KEEP, request)
 
             return true
+        }
+
+        /** Refresh followed titles when Home becomes visible, even without periodic background updates. */
+        @Synchronized
+        fun startHomeRefreshIfDue(context: Context) {
+            val preferences = Injekt.get<LibraryPreferences>()
+            val now = Instant.now().toEpochMilli()
+            val lastSuccess = preferences.lastAnimeHomeRefreshSuccess().get()
+            val lastRequest = preferences.lastAnimeHomeRefreshRequest().get()
+            if (now - lastSuccess in 0 until HOME_REFRESH_INTERVAL_MS ||
+                now - lastRequest in 0 until HOME_RETRY_INTERVAL_MS
+            ) {
+                return
+            }
+
+            val wm = context.workManager
+            if (wm.isRunning(TAG)) return
+            val request = OneTimeWorkRequestBuilder<AnimeLibraryUpdateJob>()
+                .addTag(TAG)
+                .addTag(WORK_NAME_HOME)
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .build()
+            wm.enqueueUniqueWork(WORK_NAME_HOME, ExistingWorkPolicy.KEEP, request)
+            preferences.lastAnimeHomeRefreshRequest().set(now)
         }
 
         fun stop(context: Context) {
