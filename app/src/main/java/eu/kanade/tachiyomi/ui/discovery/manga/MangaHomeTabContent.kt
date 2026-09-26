@@ -29,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LifecycleStartEffect
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -45,6 +46,7 @@ import eu.kanade.tachiyomi.ui.updates.MangaUpdatesScreen
 import eu.kanade.tachiyomi.ui.updates.hasNewLibraryUpdateNotice
 import eu.kanade.tachiyomi.ui.updates.inboxKey
 import eu.kanade.tachiyomi.ui.updates.markLibraryUpdateNoticesSeen
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import uy.kohesive.injekt.Injekt
@@ -69,6 +71,20 @@ fun MangaHomeTabContent(library: @Composable () -> Unit) {
         (if (state.homes.size > 1) 1 else 0) +
         (if (state.history.isNotEmpty()) 1 else 0)
     val showLibrary by MangaLibraryTab.libraryRequested.collectAsState()
+    LifecycleStartEffect(showLibrary, homeKey) {
+        val refreshJob = if (!showLibrary) {
+            scope.launch {
+                model.refreshIfStale()
+                while (true) {
+                    delay(10 * 60_000L)
+                    model.refreshIfStale()
+                }
+            }
+        } else {
+            null
+        }
+        onStopOrDispose { refreshJob?.cancel() }
+    }
     AcknowledgeUpdateNoticeWhenVisible(
         listState,
         "personal-updates",
