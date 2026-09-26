@@ -8,6 +8,18 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 26 settembre 2026 — Episodi e Home sempre aggiornati
+
+- Aprire la scheda di un anime ora verifica silenziosamente gli episodi anche quando
+  ne esistono già: la lista salvata resta visibile e le nuove uscite compaiono appena
+  la fonte risponde. I controlli ripetuti sono limitati e gli errori non svuotano la lista.
+- Entrando nella Home parte, quando dovuto e con rete disponibile, l'aggiornamento
+  automatico dei titoli seguiti. Le impostazioni esplicite dei filtri restano valide;
+  senza filtri scelti, i titoli già iniziati o con episodi non visti non vengono saltati.
+- Le sezioni online della Home vengono riconvalidate dopo dieci minuti, conservando
+  quelle salvate durante il caricamento. Anche la Home manga verifica di nuovo le
+  proprie sezioni quando vi si ritorna dopo una pausa.
+
 ## 26 settembre 2026 — Riesame manuale del tracking
 
 - In Impostazioni → Tracking, «Riesamina i titoli iniziati» riprova anime e manga
