@@ -3,6 +3,15 @@
 Questo changelog riguarda la modalità TV sperimentale del branch `feature/android-tv`.
 Le release `tv-rNNNN` sono separate dalle release Android ordinarie `rNNNN`.
 
+## Episodi e Home aggiornati
+
+- Le schede anime verificano in silenzio nuovi episodi anche quando ne mostrano già
+  alcuni, mantenendo l'elenco locale mentre la fonte risponde.
+- Le Home online riconvalidano le sezioni mentre restano aperte; la Home manga
+  verifica i dati quando vi si ritorna.
+- Entrando nella Home anime, i titoli seguiti vengono aggiornati quando dovuto,
+  così «Continua a guardare» e «Le tue novità» possono mostrare i nuovi episodi.
+
 ## Riproduzione in finestra e tracking
 
 - Il player Android continua a riprodurre durante l'ingresso in picture-in-picture
