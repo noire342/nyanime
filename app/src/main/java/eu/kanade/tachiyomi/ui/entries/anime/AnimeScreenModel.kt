@@ -110,6 +110,7 @@ import tachiyomi.source.local.entries.anime.isLocal
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.Calendar
+import java.util.concurrent.TimeUnit
 import kotlin.math.floor
 
 class AnimeScreenModel(
@@ -267,14 +268,33 @@ class AnimeScreenModel(
             observeRelatedAnime()
             syncRelatedAnime()
 
-            // Fetch info-episodes when needed
+            // Fetch missing data before the first interaction. Existing episodes remain visible
+            // while a due check runs quietly, including when periodic library updates are disabled.
             if ((needRefreshInfo || needRefreshEpisode || needRefreshSeason) && screenModelScope.isActive) {
                 fetchAllFromSource(
                     manualFetch = false,
                     fetchDetails = needRefreshInfo,
-                    fetchEpisodes = needRefreshEpisode,
-                    fetchSeasons = needRefreshSeason,
+                    fetchEpisodes = needRefreshEpisode || (needRefreshInfo && anime.fetchType == FetchType.Episodes),
+                    fetchSeasons = needRefreshSeason || (needRefreshInfo && anime.fetchType == FetchType.Seasons),
                 )
+            } else if (screenModelScope.isActive && AnimeDetailRefreshGate.tryBegin(animeId, detailRefreshClock())) {
+                var completed = false
+                try {
+                    completed = fetchAllFromSource(
+                        manualFetch = false,
+                        fetchDetails = false,
+                        fetchEpisodes = anime.fetchType == FetchType.Episodes,
+                        fetchSeasons = anime.fetchType == FetchType.Seasons,
+                        showErrors = false,
+                    )
+                } finally {
+                    AnimeDetailRefreshGate.finish(
+                        animeId,
+                        detailRefreshClock(),
+                        successful = completed,
+                        cancelled = !screenModelScope.isActive,
+                    )
+                }
             }
 
             // Initial loading finished
@@ -301,8 +321,9 @@ class AnimeScreenModel(
         fetchDetails: Boolean,
         fetchEpisodes: Boolean,
         fetchSeasons: Boolean,
-    ) {
-        val state = successState ?: return
+        showErrors: Boolean = true,
+    ): Boolean {
+        val state = successState ?: return false
 
         startTorrentServer(state.source)
 
@@ -343,9 +364,15 @@ class AnimeScreenModel(
                     }
                 }
             }
+            AnimeDetailRefreshGate.recordSuccess(animeId, detailRefreshClock())
+            return true
         } catch (_: CancellationException) {
-            // ignore
+            return false
         } catch (e: Exception) {
+            if (!showErrors) {
+                logcat(LogPriority.WARN, e) { "Could not refresh the episode list in the background" }
+                return false
+            }
             val message = when (e) {
                 is NoEpisodesException -> {
                     context.stringResource(AYMR.strings.no_episodes_error)
@@ -362,8 +389,11 @@ class AnimeScreenModel(
             screenModelScope.launch {
                 snackbarHostState.showSnackbar(message = message)
             }
+            return false
         }
     }
+
+    private fun detailRefreshClock() = TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
 
     // Anime info - start
 
