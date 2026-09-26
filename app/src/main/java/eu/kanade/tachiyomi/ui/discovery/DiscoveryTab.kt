@@ -51,7 +51,7 @@ import eu.kanade.presentation.discovery.SectionHeader
 import eu.kanade.presentation.discovery.displayTitle
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.util.Tab
-import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateJob
+import eu.kanade.tachiyomi.data.discovery.ContinueWatchingRefresher
 import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.history.HistoriesTab
@@ -62,7 +62,6 @@ import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import eu.kanade.tachiyomi.ui.updates.dismissLibraryUpdate
 import eu.kanade.tachiyomi.ui.updates.hasNewLibraryUpdateNotice
 import eu.kanade.tachiyomi.ui.updates.markLibraryUpdateNoticesSeen
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogFailureReason
@@ -113,17 +112,18 @@ data object DiscoveryTab : Tab {
     private fun AnimeContent(homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
         val model = rememberScreenModel { DiscoveryScreenModel() }
         val state by model.state.collectAsState()
-        val navigator = LocalNavigator.currentOrThrow
+        val continueWatchingRefresher = remember { Injekt.get<ContinueWatchingRefresher>() }
         val scope = rememberCoroutineScope()
-        val context = LocalContext.current
         LifecycleStartEffect(state.offline, state.sources.isNotEmpty()) {
-            val refreshJob = scope.launch(Dispatchers.IO) {
-                if (!state.offline && state.sources.isNotEmpty()) {
-                    AnimeLibraryUpdateJob.startHomeRefreshIfDue(context)
-                }
+            val refreshJob = if (!state.offline && state.sources.isNotEmpty()) {
+                scope.launch { continueWatchingRefresher.refresh() }
+            } else {
+                null
             }
-            onStopOrDispose { refreshJob.cancel() }
+            onStopOrDispose { refreshJob?.cancel() }
         }
+        val navigator = LocalNavigator.currentOrThrow
+        val context = LocalContext.current
         val dismissedUpdates = remember { Injekt.get<UiPreferences>().dismissedLibraryUpdates() }
         val seenNotices = remember { Injekt.get<UiPreferences>().lastSeenAnimeUpdateNotice() }
         val lastSeenAt by seenNotices.changes().collectAsState(initial = seenNotices.get())

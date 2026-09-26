@@ -4,6 +4,7 @@ import android.app.Application
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import eu.kanade.domain.entries.anime.model.toSAnime
 import eu.kanade.tachiyomi.animesource.model.FetchType
+import eu.kanade.tachiyomi.data.library.anime.AnimeRefreshSchedule
 import eu.kanade.tachiyomi.network.NetworkHelper
 import tachiyomi.data.discovery.CachedAnimeCatalogRepository
 import tachiyomi.data.discovery.DiscoveryDatabase
@@ -68,6 +69,8 @@ class DiscoveryModule(private val app: Application) : InjektModule {
         addSingletonFactory { tachiyomi.domain.discovery.CatalogSeriesEvidence(get()) }
         addSingletonFactory { SmartSourceResolver(get(), get(), get(), get(), get(), get(), get()) }
         addSingletonFactory { ResumeVisibility(get()) }
+        addSingletonFactory { AnimeRefreshSchedule(get()) }
+        addSingletonFactory { ContinueWatchingRefresher(get(), get(), get(), get(), get(), get(), get(), get(), get()) }
         addSingletonFactory {
             LocalHomeSections { resume, sourceId ->
                 LocalHomeSectionProvider(

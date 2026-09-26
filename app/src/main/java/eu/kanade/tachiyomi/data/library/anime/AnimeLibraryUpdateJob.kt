@@ -24,6 +24,7 @@ import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.util.storage.getUriCompat
+import eu.kanade.tachiyomi.util.system.cancelNotification
 import eu.kanade.tachiyomi.util.system.createFileInCacheDir
 import eu.kanade.tachiyomi.util.system.isConnectedToWifi
 import eu.kanade.tachiyomi.util.system.isRunning
@@ -32,6 +33,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Semaphore
@@ -40,6 +42,8 @@ import logcat.LogPriority
 import mihon.domain.items.episode.interactor.FilterEpisodesForDownload
 import mihon.domain.source.interactor.UpdateAnimeFromRemote
 import tachiyomi.core.common.i18n.stringResource
+import tachiyomi.core.common.preference.Preference
+import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.preference.getAndSet
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
@@ -88,29 +92,42 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
     private val filterEpisodesForDownload: FilterEpisodesForDownload = Injekt.get()
     private val getAnimeSeasonsByParentId: GetAnimeSeasonsByParentId = Injekt.get()
     private val updateAnimeFromRemote: UpdateAnimeFromRemote = Injekt.get()
+    private val refreshSchedule: AnimeRefreshSchedule = Injekt.get()
 
     private val notifier = AnimeLibraryUpdateNotifier(context)
 
     private var animeToUpdate: List<LibraryAnime> = mutableListOf()
     private var watchedAnimeIds: Set<Long> = emptySet()
+    private var hasAutomaticBacklog = false
 
     override suspend fun doWork(): Result {
-        if (tags.contains(WORK_NAME_AUTO)) {
+        val automatic = tags.contains(WORK_NAME_AUTO)
+        if (automatic) {
+            if (libraryPreferences.autoUpdateInterval().get() <= 0) return Result.success()
+            if (!autoJobActive.compareAndSet(false, true)) return Result.retry()
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-                val preferences = Injekt.get<LibraryPreferences>()
-                val restrictions = preferences.autoUpdateDeviceRestrictions().get()
+                val restrictions = libraryPreferences.autoUpdateDeviceRestrictions().get()
                 if ((DEVICE_ONLY_ON_WIFI in restrictions) && !context.isConnectedToWifi()) {
+                    autoJobActive.set(false)
                     return Result.retry()
                 }
             }
         }
 
-        try {
-            setForeground(getForegroundInfo())
-        } catch (e: IllegalStateException) {
-            logcat(LogPriority.ERROR, e) { "Not allowed to set foreground job" }
+        return try {
+            try {
+                setForeground(getForegroundInfo())
+            } catch (e: IllegalStateException) {
+                logcat(LogPriority.ERROR, e) { "Not allowed to set foreground job" }
+            }
+            runUpdate(automatic)
+        } finally {
+            if (automatic) autoJobActive.set(false)
         }
+    }
 
+    private suspend fun runUpdate(automatic: Boolean): Result {
+        if (automatic) refreshSchedule.recordAutomaticBatch(System.currentTimeMillis())
         libraryPreferences.lastUpdatedTimestamp().set(Instant.now().toEpochMilli())
 
         val categoryId = inputData.getLong(KEY_CATEGORY, -1L)
@@ -119,7 +136,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         return withIOContext {
             try {
                 updateEpisodeList()
-                libraryPreferences.lastAnimeHomeRefreshSuccess().set(Instant.now().toEpochMilli())
+                if (automatic && hasAutomaticBacklog) scheduleAutomaticFollowUp(context)
                 Result.success()
             } catch (e: Exception) {
                 if (e is CancellationException) {
@@ -211,16 +228,11 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             }
         }
 
-        val restrictionPreference = libraryPreferences.autoUpdateItemRestrictions()
-        val restrictions = if (tags.contains(WORK_NAME_HOME) && !restrictionPreference.isSet()) {
-            emptySet()
-        } else {
-            restrictionPreference.get()
-        }
+        val restrictions = libraryPreferences.autoUpdateItemRestrictions().get()
         val skippedUpdates = mutableListOf<Pair<Anime, String?>>()
         val (_, fetchWindowUpperBound) = animeFetchInterval.getWindow(ZonedDateTime.now())
 
-        animeToUpdate = lastToUpdateWithSeasons
+        val eligible = lastToUpdateWithSeasons
             .filter {
                 when {
                     it.anime.updateStrategy != AnimeUpdateStrategy.ALWAYS_UPDATE -> {
@@ -260,7 +272,25 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                     else -> true
                 }
             }
-            .sortedBy { it.anime.title }
+
+        animeToUpdate = if (tags.contains(WORK_NAME_AUTO)) {
+            val now = System.currentTimeMillis()
+            val due = eligible.asSequence()
+                .filter { refreshSchedule.isDue(it.anime, now) }
+                .sortedWith(
+                    compareBy<LibraryAnime> { refreshSchedule.lastAttempt(it.anime.id) }
+                        .thenBy { refreshSchedule.priority(it.anime) },
+                )
+                .toList()
+            val selected = due.asSequence()
+                .filter { refreshSchedule.reserve(it.anime.source, now) }
+                .take(MAX_AUTO_UPDATE_PER_RUN)
+                .toList()
+            hasAutomaticBacklog = due.size > selected.size
+            selected
+        } else {
+            eligible.sortedBy { it.anime.title }
+        }
 
         notifier.showQueueSizeWarningNotificationIfNeeded(animeToUpdate)
 
@@ -335,7 +365,14 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                                             // Convert to the anime that contains new episodes
                                             newUpdates.add(anime to newEpisodes.toTypedArray())
                                         }
+                                        if (tags.contains(WORK_NAME_AUTO)) {
+                                            refreshSchedule.record(anime.id, System.currentTimeMillis(), true)
+                                        }
                                     } catch (e: Throwable) {
+                                        if (e is CancellationException) throw e
+                                        if (tags.contains(WORK_NAME_AUTO)) {
+                                            refreshSchedule.record(anime.id, System.currentTimeMillis(), false)
+                                        }
                                         val errorMessage = when (e) {
                                             is NoEpisodesException -> context.stringResource(
                                                 AYMR.strings.no_episodes_error,
@@ -349,6 +386,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                                         failedUpdates.add(anime to errorMessage)
                                     }
                                 }
+                                if (tags.contains(WORK_NAME_AUTO)) delay(AUTO_REQUEST_SPACING_MS)
                             }
                         }
                     }
@@ -465,13 +503,17 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         private const val TAG = "AnimeLibraryUpdate"
         private const val WORK_NAME_AUTO = "AnimeLibraryUpdate-auto"
         private const val WORK_NAME_MANUAL = "AnimeLibraryUpdate-manual"
-        private const val WORK_NAME_HOME = "AnimeLibraryUpdate-home"
-        private const val HOME_REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000L
-        private const val HOME_RETRY_INTERVAL_MS = 30 * 60 * 1000L
+        private const val WORK_NAME_CATCHUP = "AnimeLibraryUpdate-catchup"
+        private const val RETIRED_HOME_WORK_NAME = "AnimeLibraryUpdate-home"
 
         private const val ERROR_LOG_HELP_URL = "https://github.com/noire342/nyanime/blob/main/docs/support.md"
 
         private const val ANIME_PER_SOURCE_QUEUE_WARNING_THRESHOLD = 60
+        private const val MAX_AUTO_UPDATE_PER_RUN = 24
+        private const val AUTO_REQUEST_SPACING_MS = 1_500L
+        private const val CATCHUP_DELAY_HOURS = 1L
+        private const val REOPEN_CHECK_INTERVAL_MS = 24 * 60 * 60_000L
+        private val autoJobActive = AtomicBoolean(false)
 
         /**
          * Key for category to update.
@@ -482,6 +524,18 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             context.workManager.cancelAllWorkByTag(TAG)
         }
 
+        /** Stop a one-time Home job left by earlier previews without touching manual or periodic updates. */
+        fun retireHomeRefresh(context: Context) {
+            val store = Injekt.get<PreferenceStore>()
+            val retired = store.getBoolean(Preference.appStateKey("recent_anime_home_work_retired"), false)
+            if (retired.get()) return
+            context.workManager.cancelUniqueWork(RETIRED_HOME_WORK_NAME).result.get()
+            context.cancelNotification(Notifications.ID_LIBRARY_SIZE_WARNING)
+            store.getLong(Preference.appStateKey("anime_home_refresh_request"), 0L).delete()
+            store.getLong(Preference.appStateKey("anime_home_refresh_success"), 0L).delete()
+            retired.set(true)
+        }
+
         fun setupTask(
             context: Context,
             prefInterval: Int? = null,
@@ -489,26 +543,6 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             val preferences = Injekt.get<LibraryPreferences>()
             val interval = prefInterval ?: preferences.autoUpdateInterval().get()
             if (interval > 0) {
-                val restrictions = preferences.autoUpdateDeviceRestrictions().get()
-                val networkType = if (DEVICE_NETWORK_NOT_METERED in restrictions) {
-                    NetworkType.UNMETERED
-                } else {
-                    NetworkType.CONNECTED
-                }
-                val networkRequestBuilder = NetworkRequest.Builder()
-                if (DEVICE_ONLY_ON_WIFI in restrictions) {
-                    networkRequestBuilder.addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                }
-                if (DEVICE_NETWORK_NOT_METERED in restrictions) {
-                    networkRequestBuilder.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
-                }
-                val constraints = Constraints.Builder()
-                    // 'networkRequest' only applies to Android 9+, otherwise 'networkType' is used
-                    .setRequiredNetworkRequest(networkRequestBuilder.build(), networkType)
-                    .setRequiresCharging(DEVICE_CHARGING in restrictions)
-                    .setRequiresBatteryNotLow(true)
-                    .build()
-
                 val request = PeriodicWorkRequestBuilder<AnimeLibraryUpdateJob>(
                     interval.toLong(),
                     TimeUnit.HOURS,
@@ -517,7 +551,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                 )
                     .addTag(TAG)
                     .addTag(WORK_NAME_AUTO)
-                    .setConstraints(constraints)
+                    .setConstraints(automaticConstraints(preferences))
                     .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.MINUTES)
                     .build()
 
@@ -528,7 +562,59 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                 )
             } else {
                 context.workManager.cancelUniqueWork(WORK_NAME_AUTO)
+                context.workManager.cancelAllWorkByTag(WORK_NAME_CATCHUP)
             }
+        }
+
+        /** Resume a stale automatic library scan after a long absence, without flooding a source. */
+        fun catchUpAfterReopen(context: Context) {
+            val preferences = Injekt.get<LibraryPreferences>()
+            if (preferences.autoUpdateInterval().get() <= 0) return
+            val schedule = Injekt.get<AnimeRefreshSchedule>()
+            if (System.currentTimeMillis() - schedule.lastAutomaticBatch() < REOPEN_CHECK_INTERVAL_MS) return
+            if (context.workManager.isRunning(TAG)) return
+            enqueueAutomaticBatch(context, "${WORK_NAME_CATCHUP}-reopen", 0L)
+        }
+
+        private fun scheduleAutomaticFollowUp(context: Context) {
+            val nextSlot = System.currentTimeMillis() / TimeUnit.HOURS.toMillis(1) + 1L
+            enqueueAutomaticBatch(context, "${WORK_NAME_CATCHUP}-$nextSlot", CATCHUP_DELAY_HOURS)
+        }
+
+        private fun enqueueAutomaticBatch(context: Context, name: String, delayHours: Long) {
+            val preferences = Injekt.get<LibraryPreferences>()
+            if (preferences.autoUpdateInterval().get() <= 0) return
+            val request = OneTimeWorkRequestBuilder<AnimeLibraryUpdateJob>()
+                .addTag(TAG)
+                .addTag(WORK_NAME_AUTO)
+                .addTag(WORK_NAME_CATCHUP)
+                .setConstraints(automaticConstraints(preferences))
+                .setInitialDelay(delayHours, TimeUnit.HOURS)
+                .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.MINUTES)
+                .build()
+            context.workManager.enqueueUniqueWork(name, ExistingWorkPolicy.KEEP, request)
+        }
+
+        private fun automaticConstraints(preferences: LibraryPreferences): Constraints {
+            val restrictions = preferences.autoUpdateDeviceRestrictions().get()
+            val networkType = if (DEVICE_NETWORK_NOT_METERED in restrictions) {
+                NetworkType.UNMETERED
+            } else {
+                NetworkType.CONNECTED
+            }
+            val networkRequestBuilder = NetworkRequest.Builder()
+            if (DEVICE_ONLY_ON_WIFI in restrictions) {
+                networkRequestBuilder.addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            }
+            if (DEVICE_NETWORK_NOT_METERED in restrictions) {
+                networkRequestBuilder.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+            }
+            return Constraints.Builder()
+                // 'networkRequest' only applies to Android 9+, otherwise 'networkType' is used.
+                .setRequiredNetworkRequest(networkRequestBuilder.build(), networkType)
+                .setRequiresCharging(DEVICE_CHARGING in restrictions)
+                .setRequiresBatteryNotLow(true)
+                .build()
         }
         fun startNow(
             context: Context,
@@ -551,30 +637,6 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             wm.enqueueUniqueWork(WORK_NAME_MANUAL, ExistingWorkPolicy.KEEP, request)
 
             return true
-        }
-
-        /** Refresh followed titles when Home becomes visible, even without periodic background updates. */
-        @Synchronized
-        fun startHomeRefreshIfDue(context: Context) {
-            val preferences = Injekt.get<LibraryPreferences>()
-            val now = Instant.now().toEpochMilli()
-            val lastSuccess = preferences.lastAnimeHomeRefreshSuccess().get()
-            val lastRequest = preferences.lastAnimeHomeRefreshRequest().get()
-            if (now - lastSuccess in 0 until HOME_REFRESH_INTERVAL_MS ||
-                now - lastRequest in 0 until HOME_RETRY_INTERVAL_MS
-            ) {
-                return
-            }
-
-            val wm = context.workManager
-            if (wm.isRunning(TAG)) return
-            val request = OneTimeWorkRequestBuilder<AnimeLibraryUpdateJob>()
-                .addTag(TAG)
-                .addTag(WORK_NAME_HOME)
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                .build()
-            wm.enqueueUniqueWork(WORK_NAME_HOME, ExistingWorkPolicy.KEEP, request)
-            preferences.lastAnimeHomeRefreshRequest().set(now)
         }
 
         fun stop(context: Context) {

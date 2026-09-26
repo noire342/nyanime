@@ -41,7 +41,6 @@ import tachiyomi.domain.updates.manga.model.MangaUpdatesWithRelations
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.time.Instant
-import java.util.concurrent.TimeUnit
 
 data class MangaHomeRowState(
     val page: MangaHomePage? = null,
@@ -75,7 +74,6 @@ class MangaHomeScreenModel(
     private var loadJob: Job? = null
     private var openJob: Job? = null
     private var generation = 0
-    private var lastHomeRefreshMs = Long.MIN_VALUE
 
     init {
         screenModelScope.launch {
@@ -158,7 +156,6 @@ class MangaHomeScreenModel(
     fun refresh() {
         val home = state.value.selected ?: return
         if (state.value.offline) return
-        lastHomeRefreshMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
         loadJob?.cancel()
         val version = ++generation
         loadJob = screenModelScope.launch {
@@ -167,16 +164,6 @@ class MangaHomeScreenModel(
                     async { fetch(home, SourceHomeRequest(section.id), version) }
                 }.awaitAll()
             }
-        }
-    }
-
-    fun refreshIfStale() {
-        val now = TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
-        if (lastHomeRefreshMs == Long.MIN_VALUE ||
-            now - lastHomeRefreshMs >= 10 * 60_000L ||
-            (state.value.rows.values.any { it.error != null } && now - lastHomeRefreshMs >= 60_000L)
-        ) {
-            refresh()
         }
     }
 

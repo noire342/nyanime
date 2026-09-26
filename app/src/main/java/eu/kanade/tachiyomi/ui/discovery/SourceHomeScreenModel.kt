@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.ui.discovery
 
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import eu.kanade.tachiyomi.data.discovery.ContinueWatchingRefresher
 import eu.kanade.tachiyomi.data.discovery.ExtensionHomeServices
 import eu.kanade.tachiyomi.data.discovery.LocalHomeItem
 import eu.kanade.tachiyomi.data.discovery.LocalHomeSections
@@ -21,6 +22,7 @@ class SourceHomeScreenModel(
     homeKey: String,
     private val services: ExtensionHomeServices = Injekt.get(),
     private val locals: LocalHomeSections = Injekt.get(),
+    private val continueWatchingRefresher: ContinueWatchingRefresher = Injekt.get(),
 ) : StateScreenModel<SourceHomeScreenModel.State>(State()) {
     private val accessFlow = services.observeGroup(homeKey)
     private val visible = MutableStateFlow(false)
@@ -38,6 +40,7 @@ class SourceHomeScreenModel(
                 visible.collectLatest { active ->
                     if (!active) return@collectLatest
                     coroutineScope {
+                        if (!access.offline) launch { continueWatchingRefresher.refresh(source.sourceIds) }
                         launch {
                             locals.resume(source.sourceIds).observe().collect { value ->
                                 mutableState.update { it.copy(resume = value) }

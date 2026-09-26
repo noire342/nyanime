@@ -1,7 +1,7 @@
-package eu.kanade.tachiyomi.ui.entries.anime
+package eu.kanade.tachiyomi.data.library.anime
 
-/** Avoid repeated source requests when the same title is opened several times in one app session. */
-internal object AnimeDetailRefreshGate {
+/** One source check per recently viewed title, shared by its detail and Continue Watching cards. */
+internal object AnimeForegroundRefreshGate {
     private const val SUCCESS_INTERVAL_MS = 10 * 60 * 1000L
     private const val FAILURE_RETRY_MS = 60 * 1000L
     private const val MAX_ENTRIES = 256

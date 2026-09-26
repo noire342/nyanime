@@ -38,6 +38,7 @@ import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
+import eu.kanade.tachiyomi.data.library.anime.AnimeForegroundRefreshGate
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
 import eu.kanade.tachiyomi.data.track.EnhancedAnimeTracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
@@ -277,7 +278,9 @@ class AnimeScreenModel(
                     fetchEpisodes = needRefreshEpisode || (needRefreshInfo && anime.fetchType == FetchType.Episodes),
                     fetchSeasons = needRefreshSeason || (needRefreshInfo && anime.fetchType == FetchType.Seasons),
                 )
-            } else if (screenModelScope.isActive && AnimeDetailRefreshGate.tryBegin(animeId, detailRefreshClock())) {
+            } else if (screenModelScope.isActive &&
+                AnimeForegroundRefreshGate.tryBegin(animeId, detailRefreshClock())
+            ) {
                 var completed = false
                 try {
                     completed = fetchAllFromSource(
@@ -288,7 +291,7 @@ class AnimeScreenModel(
                         showErrors = false,
                     )
                 } finally {
-                    AnimeDetailRefreshGate.finish(
+                    AnimeForegroundRefreshGate.finish(
                         animeId,
                         detailRefreshClock(),
                         successful = completed,
@@ -364,7 +367,7 @@ class AnimeScreenModel(
                     }
                 }
             }
-            AnimeDetailRefreshGate.recordSuccess(animeId, detailRefreshClock())
+            AnimeForegroundRefreshGate.recordSuccess(animeId, detailRefreshClock())
             return true
         } catch (_: CancellationException) {
             return false

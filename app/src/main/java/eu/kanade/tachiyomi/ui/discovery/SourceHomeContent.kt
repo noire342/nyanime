@@ -44,7 +44,6 @@ import eu.kanade.presentation.discovery.SourceHomeLogo
 import eu.kanade.presentation.discovery.SourceHomePosterCard
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.theme.LocalNyanimeStyle
-import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateJob
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.updates.AcknowledgeUpdateNoticeWhenVisible
@@ -52,8 +51,6 @@ import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import eu.kanade.tachiyomi.ui.updates.dismissLibraryUpdate
 import eu.kanade.tachiyomi.ui.updates.hasNewLibraryUpdateNotice
 import eu.kanade.tachiyomi.ui.updates.markLibraryUpdateNoticesSeen
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.SectionState
 import tachiyomi.domain.discovery.SourceHomeGroup
@@ -114,18 +111,7 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
     }
     LifecycleStartEffect(access) {
         model.onResume()
-        val refreshJob = scope.launch {
-            if (!access.offline) launch(Dispatchers.IO) { AnimeLibraryUpdateJob.startHomeRefreshIfDue(context) }
-            while (true) {
-                delay(10 * 60_000L)
-                model.onResume()
-                if (!access.offline) launch(Dispatchers.IO) { AnimeLibraryUpdateJob.startHomeRefreshIfDue(context) }
-            }
-        }
-        onStopOrDispose {
-            refreshJob.cancel()
-            model.onPause()
-        }
+        onStopOrDispose { model.onPause() }
     }
     Scaffold(topBar = {
         DiscoveryHomeHeader(

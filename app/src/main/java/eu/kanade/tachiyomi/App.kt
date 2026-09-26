@@ -37,6 +37,7 @@ import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.coil.MangaCoverKeyer
 import eu.kanade.tachiyomi.data.coil.MangaKeyer
 import eu.kanade.tachiyomi.data.coil.TachiyomiImageDecoder
+import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateJob
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.track.RetroactiveTracking
 import eu.kanade.tachiyomi.di.AppModule
@@ -113,6 +114,14 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
         val scope = ProcessLifecycleOwner.get().lifecycleScope
         val preferencesForRetirement = basePreferences
+        scope.launch(Dispatchers.IO) {
+            try {
+                AnimeLibraryUpdateJob.retireHomeRefresh(this@App)
+                AnimeLibraryUpdateJob.catchUpAfterReopen(this@App)
+            } catch (error: Exception) {
+                logcat(LogPriority.WARN, error) { "Unable to retire an earlier Home refresh" }
+            }
+        }
         scope.launch(Dispatchers.IO) { removeRetiredTranslationData() }
         scope.launch(Dispatchers.IO) {
             eu.kanade.tachiyomi.data.community.CommunityDormancy.stopBackgroundWork(this@App)

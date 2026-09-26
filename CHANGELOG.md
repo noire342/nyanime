@@ -8,17 +8,26 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
-## 26 settembre 2026 — Episodi e Home sempre aggiornati
+## 27 settembre 2026 — Aggiornamenti progressivi di episodi e Home
 
-- Aprire la scheda di un anime ora verifica silenziosamente gli episodi anche quando
-  ne esistono già: la lista salvata resta visibile e le nuove uscite compaiono appena
-  la fonte risponde. I controlli ripetuti sono limitati e gli errori non svuotano la lista.
-- Entrando nella Home parte, quando dovuto e con rete disponibile, l'aggiornamento
-  automatico dei titoli seguiti. Le impostazioni esplicite dei filtri restano valide;
-  senza filtri scelti, i titoli già iniziati o con episodi non visti non vengono saltati.
-- Le sezioni online della Home vengono riconvalidate dopo dieci minuti, conservando
-  quelle salvate durante il caricamento. Anche la Home manga verifica di nuovo le
-  proprie sezioni quando vi si ritorna dopo una pausa.
+- Aprendo una scheda anime, l'elenco degli episodi salvato viene mostrato subito e
+  controllato in sottofondo con la sua estensione, senza dover trascinare per aggiornare.
+- Nella Home i titoli visti di recente vengono controllati a rotazione, compresi
+  quelli che aspettano un episodio per riapparire in «Continua a guardare».
+  Nessun titolo viene escluso perché la lista è lunga; quelli nascosti non
+  partecipano. I titoli mai controllati o più arretrati passano per primi;
+  a parità di attesa hanno precedenza le serie in corso. Limiti persistenti
+  per titolo e per fonte evitano raffiche di
+  richieste anche dopo il riavvio dell'app.
+- Le sezioni della Home continuano a ricevere i dati dalle estensioni. Il controllo
+  della libreria resta legato soltanto all'aggiornamento periodico configurato
+  nelle impostazioni o all'azione manuale. Il controllo automatico prosegue
+  con piccoli lotti a distanza di almeno un'ora finché ha esaurito i titoli
+  arretrati; dopo una lunga assenza riparte alla riapertura. Usa lo stesso
+  limite per fonte. Quello manuale resta completo quando viene richiesto
+  esplicitamente.
+- Un vecchio controllo generale avviato automaticamente dalla Home viene fermato
+  dopo l'aggiornamento, senza interrompere i controlli periodici o manuali.
 
 ## 26 settembre 2026 — Riesame manuale del tracking
 
