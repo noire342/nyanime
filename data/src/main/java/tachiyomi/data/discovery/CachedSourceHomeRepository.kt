@@ -106,7 +106,7 @@ class CachedSourceHomeRepository(
     }.flowOn(Dispatchers.IO)
 
     companion object {
-        const val TTL = 30 * 60_000L
+        const val TTL = 10 * 60_000L
         private const val MAX_STALE = 24 * 60 * 60_000L
     }
 
