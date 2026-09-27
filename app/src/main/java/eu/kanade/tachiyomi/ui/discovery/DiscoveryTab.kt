@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleStartEffect
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import eu.kanade.domain.ui.UiPreferences
@@ -43,6 +44,7 @@ import eu.kanade.presentation.discovery.CatalogRow
 import eu.kanade.presentation.discovery.ContinueWatchingRow
 import eu.kanade.presentation.discovery.DiscoveryHomeHeader
 import eu.kanade.presentation.discovery.FeaturedCarousel
+import eu.kanade.presentation.discovery.HomeCategories
 import eu.kanade.presentation.discovery.HomeContentReveal
 import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.LocalAnimeRow
@@ -63,6 +65,8 @@ import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import eu.kanade.tachiyomi.ui.updates.dismissLibraryUpdate
 import eu.kanade.tachiyomi.ui.updates.hasNewLibraryUpdateNotice
 import eu.kanade.tachiyomi.ui.updates.markLibraryUpdateNoticesSeen
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogFailureReason
@@ -78,6 +82,11 @@ import uy.kohesive.injekt.api.get
 
 data object DiscoveryTab : Tab {
     const val MANGA_CATEGORY = "nyanime:manga"
+    private val cycleRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    override suspend fun onReselect(navigator: Navigator) {
+        cycleRequests.emit(Unit)
+    }
 
     override val options: TabOptions
         @Composable get() = TabOptions(5u, "Home", rememberVectorPainter(Icons.Outlined.Home))
@@ -99,6 +108,14 @@ data object DiscoveryTab : Tab {
         }
         val headerHomes = remember(availability.homes) {
             availability.homes + SourceHomeGroup(MANGA_CATEGORY, "Manga", emptyList())
+        }
+        val orderPreference = remember { Injekt.get<UiPreferences>().homeCategoryOrder() }
+        val categoryOrder by orderPreference.changes().collectAsState(initial = orderPreference.get())
+        LaunchedEffect(availability, headerHomes, categoryOrder, selected) {
+            cycleRequests.collect {
+                val current = if (selected == MANGA_CATEGORY) selected else availability.selectedHome(selected)
+                selected = HomeCategories.next(current, HomeCategories.choices(headerHomes, categoryOrder))
+            }
         }
         val savedState = rememberSaveableStateHolder()
         if (availability.loading && !isManga) {

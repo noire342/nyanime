@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +29,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -42,20 +42,28 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.motion.posterForeground
@@ -63,6 +71,8 @@ import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.theme.NyanimeWordmark
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import tachiyomi.domain.discovery.SourceHomeGroup
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 @Composable
 fun DiscoveryHomeHeader(
@@ -96,7 +106,7 @@ fun DiscoveryHomeHeader(
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val compactSearch = maxWidth < (if (onBack != null) 408.dp else 360.dp)
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 12.dp).heightIn(min = 60.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp).heightIn(min = 54.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (onBack != null) {
@@ -181,62 +191,95 @@ private fun HomeHeaderActions(
 @Composable
 private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
     val motion = modernMotionEnabled()
-    val choices = (if (homes.any { it.primary }) emptyList() else listOf(null to "Anime")) +
-        homes.sortedWith(compareByDescending<SourceHomeGroup> { it.primary }.thenBy { it.title }).map { home ->
-            home.id to home.title
-        }
+    val preference = remember { Injekt.get<UiPreferences>().homeCategoryOrder() }
+    val savedOrder by preference.changes().collectAsState(initial = preference.get())
+    val choices = HomeCategories.choices(homes, savedOrder)
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val haptics = LocalHapticFeedback.current
+    val labelStyle = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val viewportWidth = maxWidth
+        val pageWidth = (maxWidth - 32.dp).coerceAtLeast(1.dp)
+        val widths = choices.map { category ->
+            (
+                with(density) {
+                    textMeasurer.measure(AnnotatedString(category.title), style = labelStyle).size.width.toDp()
+                } +
+                    24.dp
+                )
+                .coerceIn(64.dp, 220.dp)
+                .coerceAtMost(pageWidth)
+        }
+        val pages = categoryPages(widths.map { it.value }, pageWidth.value, 12f)
         Row(
-            Modifier.horizontalScroll(rememberScrollState()).widthIn(min = viewportWidth)
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
                 .selectableGroup().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
         ) {
-            choices.forEach { (value, label) ->
-                key(value) {
-                    val bringIntoView = remember { BringIntoViewRequester() }
-                    val selected = selectedHome == value
-                    val indicatorWidth by animateDpAsState(
-                        if (selected) 32.dp else 0.dp,
-                        tween(if (motion) 220 else 0),
-                        label = "homeIndicator",
-                    )
-                    val labelColor by animateColorAsState(
-                        if (selected) {
-                            MaterialTheme.colorScheme.onSurface
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        tween(if (motion) 180 else 0),
-                        label = "homeLabel",
-                    )
-                    LaunchedEffect(selected, viewportWidth) { if (selected) bringIntoView.bringIntoView() }
-                    Column(
-                        Modifier.widthIn(min = 64.dp, max = 220.dp).bringIntoViewRequester(bringIntoView)
-                            .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(value) })
-                            .semantics { contentDescription = "Home $label" },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Box(
-                            Modifier.heightIn(min = 48.dp).padding(horizontal = 4.dp),
-                            contentAlignment = Alignment.Center,
+            pages.forEach { page ->
+                Column(Modifier.width(pageWidth), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    page.forEach { row ->
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                         ) {
-                            Text(
-                                label,
-                                color = labelColor,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            row.forEach { index ->
+                                val category = choices[index]
+                                key(category.orderKey) {
+                                    val bringIntoView = remember { BringIntoViewRequester() }
+                                    val isSelected = selectedHome == category.id
+                                    val indicatorWidth by animateDpAsState(
+                                        if (isSelected) 32.dp else 0.dp,
+                                        tween(if (motion) 220 else 0),
+                                        label = "homeIndicator",
+                                    )
+                                    val labelColor by animateColorAsState(
+                                        if (isSelected) {
+                                            MaterialTheme.colorScheme.onSurface
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        tween(if (motion) 180 else 0),
+                                        label = "homeLabel",
+                                    )
+                                    LaunchedEffect(isSelected, pageWidth) {
+                                        if (isSelected) bringIntoView.bringIntoView()
+                                    }
+                                    Column(
+                                        Modifier.width(widths[index]).bringIntoViewRequester(bringIntoView)
+                                            .combinedClickable(
+                                                onClick = { onSelect(category.id) },
+                                                onLongClick = {
+                                                    if (choices.firstOrNull() != category) {
+                                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        preference.set(HomeCategories.moveFirst(savedOrder, category))
+                                                    }
+                                                },
+                                                onLongClickLabel = "Sposta ${category.title} all'inizio",
+                                            )
+                                            .semantics {
+                                                role = Role.Tab
+                                                selected = isSelected
+                                                contentDescription = "Home ${category.title}"
+                                            },
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Box(Modifier.heightIn(min = 36.dp), contentAlignment = Alignment.Center) {
+                                            Text(
+                                                category.title,
+                                                color = labelColor,
+                                                style = labelStyle,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        Box(
+                                            Modifier.width(indicatorWidth).height(3.dp)
+                                                .background(MaterialTheme.colorScheme.primary),
+                                        )
+                                    }
+                                }
+                            }
                         }
-                        Box(
-                            Modifier.width(
-                                indicatorWidth,
-                            ).height(
-                                3.dp,
-                            ).background(MaterialTheme.colorScheme.primary),
-                        )
                     }
                 }
             }

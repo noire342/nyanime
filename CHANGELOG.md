@@ -8,6 +8,14 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 27 settembre 2026 — Categorie Home adattive
+
+- Le categorie della Home si distribuiscono su una o due righe secondo la larghezza
+  dello schermo. Se sono ancora troppe, restano raggiungibili scorrendo lateralmente.
+- Una pressione lunga porta una categoria all'inizio e conserva l'ordine scelto.
+  Toccare nuovamente Home nella barra inferiore passa alla categoria successiva,
+  tornando alla prima dopo l'ultima.
+
 ## 27 settembre 2026 — Esplorazione manga e filtro lingue
 
 - La sezione personale si chiama ora «Libreria». Nella Home manga i generi sono
