@@ -45,7 +45,13 @@ class AnimeMangaContinuity(
     private val sourceManager: MangaSourceManager,
     private val toLocal: NetworkToLocalManga,
 ) {
-    data class Checkpoint(val chapter: Double, val note: String, val episode: Int?, val exactEpisode: Boolean = false)
+    data class Checkpoint(
+        val chapter: Double,
+        val note: String,
+        val episode: Int?,
+        val exactEpisode: Boolean = false,
+        val season: Int? = null,
+    )
 
     data class Choice(
         val catalogId: Long,
@@ -53,6 +59,7 @@ class AnimeMangaContinuity(
         val title: String,
         val coverUrl: String?,
         val format: String?,
+        val viaOriginalNovel: Boolean = false,
         val beginning: Checkpoint?,
         val latestAdapted: Checkpoint?,
         val matches: List<Manga>,
@@ -61,7 +68,13 @@ class AnimeMangaContinuity(
         fun continuationAfter(watchedEpisode: Double?): Double? {
             val end = latestAdapted ?: return null
             val episode = end.episode ?: return null
-            if (!end.exactEpisode || watchedEpisode == null || watchedEpisode < episode) return null
+            if (!end.exactEpisode ||
+                end.season != null ||
+                watchedEpisode == null ||
+                watchedEpisode != episode.toDouble()
+            ) {
+                return null
+            }
             // Reopen the mapped chapter: adaptations can stop midway through it.
             return end.chapter
         }
@@ -161,6 +174,7 @@ class AnimeMangaContinuity(
                 title = relation.titles.firstOrNull().orEmpty(),
                 coverUrl = catalogMetadata.coverUrl,
                 format = relation.format,
+                viaOriginalNovel = relation.viaOriginalNovel,
                 beginning = catalogMetadata.beginning ?: directBeginning,
                 latestAdapted = catalogMetadata.ending ?: directEnding,
                 matches = matches,
@@ -299,14 +313,19 @@ class AnimeMangaContinuity(
     companion object {
         private val chapterPattern = Regex("(?i)\\b(?:chap(?:ter)?|ch\\.?)[ .:#]*(\\d+(?:\\.\\d+)?)\\b")
         private val episodePattern = Regex("(?i)\\b(?:ep(?:isode)?)[ .:#]*(\\d+)\\b")
+        private val seasonEpisodePattern =
+            Regex("(?i)\\bS(?:eason)?[ .:#]*(\\d+)[ .:-]*E(?:p(?:isode)?)?[ .:#]*(\\d+)\\b")
         private val exactEpisodePattern =
             Regex("(?i)\\b(?:adapted|covered|animated)\\s+in\\s+(?:ep(?:isode)?)[ .:#]*\\d+\\b")
 
         internal fun checkpoint(raw: String?): Checkpoint? {
             val text = raw?.trim()?.takeIf { it.isNotEmpty() && it.length <= 160 } ?: return null
             val chapter = chapterPattern.find(text)?.groupValues?.get(1)?.toDoubleOrNull() ?: return null
-            val episode = episodePattern.find(text)?.groupValues?.get(1)?.toIntOrNull()
-            return Checkpoint(chapter, text, episode, exactEpisodePattern.containsMatchIn(text))
+            val seasonEpisode = seasonEpisodePattern.find(text)
+            val season = seasonEpisode?.groupValues?.get(1)?.toIntOrNull()
+            val episode = seasonEpisode?.groupValues?.get(2)?.toIntOrNull()
+                ?: episodePattern.find(text)?.groupValues?.get(1)?.toIntOrNull()
+            return Checkpoint(chapter, text, episode, exactEpisodePattern.containsMatchIn(text), season)
         }
 
         internal fun hasSameIdentity(anilistId: Long, malId: Long?, hints: SourceTrackingHints?): Boolean {

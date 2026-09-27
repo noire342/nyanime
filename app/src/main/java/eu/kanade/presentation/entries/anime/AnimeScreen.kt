@@ -112,6 +112,7 @@ fun AnimeScreen(
     state: AnimeScreenModel.State.Success,
     continuity: AnimeMangaContinuity.Result?,
     onOpenManga: (Manga, Double?) -> Unit,
+    onSearchManga: (String) -> Unit,
     snackbarHostState: SnackbarHostState,
     nextUpdate: Instant?,
     isTabletUi: Boolean,
@@ -187,6 +188,7 @@ fun AnimeScreen(
             state = state,
             continuity = continuity,
             onOpenManga = onOpenManga,
+            onSearchManga = onSearchManga,
             snackbarHostState = snackbarHostState,
             nextUpdate = nextUpdate,
             episodeSwipeStartAction = episodeSwipeStartAction,
@@ -234,6 +236,7 @@ fun AnimeScreen(
             state = state,
             continuity = continuity,
             onOpenManga = onOpenManga,
+            onSearchManga = onSearchManga,
             snackbarHostState = snackbarHostState,
             nextUpdate = nextUpdate,
             episodeSwipeStartAction = episodeSwipeStartAction,
@@ -285,6 +288,7 @@ private fun AnimeScreenSmallImpl(
     state: AnimeScreenModel.State.Success,
     continuity: AnimeMangaContinuity.Result?,
     onOpenManga: (Manga, Double?) -> Unit,
+    onSearchManga: (String) -> Unit,
     snackbarHostState: SnackbarHostState,
     nextUpdate: Instant?,
     episodeSwipeStartAction: LibraryPreferences.EpisodeSwipeAction,
@@ -567,7 +571,7 @@ private fun AnimeScreenSmallImpl(
 
                     if (continuity is AnimeMangaContinuity.Result.Found) {
                         item(key = "anime-manga-continuity", span = { GridItemSpan(maxLineSpan) }) {
-                            AnimeMangaContinuityCard(continuity, onOpenManga)
+                            AnimeMangaContinuityCard(continuity, onOpenManga, onSearchManga)
                         }
                     }
 
@@ -657,6 +661,7 @@ fun AnimeScreenLargeImpl(
     state: AnimeScreenModel.State.Success,
     continuity: AnimeMangaContinuity.Result?,
     onOpenManga: (Manga, Double?) -> Unit,
+    onSearchManga: (String) -> Unit,
     snackbarHostState: SnackbarHostState,
     nextUpdate: Instant?,
     episodeSwipeStartAction: LibraryPreferences.EpisodeSwipeAction,
@@ -902,7 +907,7 @@ fun AnimeScreenLargeImpl(
                                 relatedDisplayMode = relatedAnimeDisplayMode,
                             )
                             if (continuity is AnimeMangaContinuity.Result.Found) {
-                                AnimeMangaContinuityCard(continuity, onOpenManga)
+                                AnimeMangaContinuityCard(continuity, onOpenManga, onSearchManga)
                             }
                         }
                     },

@@ -26,6 +26,7 @@ internal object AniListMediaLookup {
         val malId: Long?,
         val titles: List<String>,
         val format: String?,
+        val viaOriginalNovel: Boolean = false,
     )
 
     private val client = OkHttpClient.Builder()
@@ -63,15 +64,54 @@ internal object AniListMediaLookup {
             put("query", query)
             putJsonObject("variables") { put("id", animeId) }
         }.toString().toRequestBody(jsonMime)
-        client.newCall(POST("https://graphql.anilist.co", body = body)).awaitSuccess().use { response ->
+        val edges = client.newCall(POST("https://graphql.anilist.co", body = body)).awaitSuccess().use { response ->
+            json.decodeFromString<RelationResponse>(response.body.string()).data?.media?.relations?.edges.orEmpty()
+        }
+        val direct = edges.mapNotNull { edge ->
+            val node = edge.node ?: return@mapNotNull null
+            if (edge.relationType != "ADAPTATION" || node.type != "MANGA" || node.format == "NOVEL") {
+                return@mapNotNull null
+            }
+            MangaRelation(node.id, node.idMal, node.names, node.format)
+        }.distinctBy { it.id }
+        if (direct.isNotEmpty()) return@withContext direct
+
+        // Some anime adapt a novel that has its own manga adaptations. Keep that relationship indirect.
+        val novelIds = edges.asSequence()
+            .filter { it.relationType == "ADAPTATION" && it.node?.format == "NOVEL" }
+            .mapNotNull { it.node?.id }
+            .distinct()
+            .take(2)
+            .toList()
+        val indirect = mutableListOf<MangaRelation>()
+        for (novelId in novelIds) indirect += fetchNovelMangaAdaptations(novelId)
+        indirect.distinctBy { it.id }
+    }
+
+    private suspend fun fetchNovelMangaAdaptations(novelId: Long): List<MangaRelation> {
+        val query = """
+            query NovelAdaptations(${'$'}id: Int) {
+              Media(id: ${'$'}id, type: MANGA) {
+                relations {
+                  edges { relationType node { id idMal type format title { romaji english native } synonyms } }
+                }
+              }
+            }
+        """.trimIndent()
+        val body = buildJsonObject {
+            put("query", query)
+            putJsonObject("variables") { put("id", novelId) }
+        }.toString().toRequestBody(jsonMime)
+        return client.newCall(POST("https://graphql.anilist.co", body = body)).awaitSuccess().use { response ->
             json.decodeFromString<RelationResponse>(response.body.string())
                 .data?.media?.relations?.edges.orEmpty()
                 .mapNotNull { edge ->
                     val node = edge.node ?: return@mapNotNull null
-                    if (edge.relationType != "ADAPTATION" || node.type != "MANGA") return@mapNotNull null
-                    MangaRelation(node.id, node.idMal, node.names, node.format)
+                    if (edge.relationType != "ADAPTATION" || node.type != "MANGA" || node.format == "NOVEL") {
+                        return@mapNotNull null
+                    }
+                    MangaRelation(node.id, node.idMal, node.names, node.format, viaOriginalNovel = true)
                 }
-                .distinctBy { it.id }
         }
     }
 

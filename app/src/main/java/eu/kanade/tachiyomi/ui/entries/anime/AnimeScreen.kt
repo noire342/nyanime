@@ -61,6 +61,7 @@ import eu.kanade.tachiyomi.ui.browse.anime.migration.search.MigrateAnimeDialogSc
 import eu.kanade.tachiyomi.ui.browse.anime.migration.search.MigrateAnimeSearchScreen
 import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.GlobalAnimeSearchScreen
+import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.GlobalMangaSearchScreen
 import eu.kanade.tachiyomi.ui.category.CategoriesTab
 import eu.kanade.tachiyomi.ui.entries.anime.track.AnimeTrackInfoDialogHomeScreen
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
@@ -183,6 +184,7 @@ class AnimeScreen(
             onOpenManga = { manga, chapter ->
                 navigator.push(MangaScreen(manga.id, fromSource = !manga.favorite, chapterTarget = chapter))
             },
+            onSearchManga = { title -> navigator.push(GlobalMangaSearchScreen(title)) },
             snackbarHostState = screenModel.snackbarHostState,
             nextUpdate = successState.anime.expectedNextUpdate,
             isTabletUi = isTabletUi(),

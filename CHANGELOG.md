@@ -8,6 +8,13 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Manga per archi delle opere nate come novel
+
+- Quando un anime deriva da una novel, Nyanime mostra anche i manga collegati
+  alla stessa opera, distinguendo il rapporto indiretto da un adattamento diretto.
+  Gli intervalli stagione/episodio documentati aiutano a scegliere l'arco, senza
+  usarli per indovinare un capitolo esatto.
+
 ## 28 settembre 2026 — Dall'anime al manga
 
 - La scheda anime riconosce i manga collegati tramite ID di catalogo e, quando

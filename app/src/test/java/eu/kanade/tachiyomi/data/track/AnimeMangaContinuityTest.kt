@@ -18,10 +18,15 @@ class AnimeMangaContinuityTest {
         assertEquals(1180, end?.episode)
         assertFalse(end?.exactEpisode == true)
         assertNull(AnimeMangaContinuity.checkpoint("Anime covers the early arc"))
+
+        val arc = AnimeMangaContinuity.checkpoint("Vol 5, Chap 31 (S1E11)")
+        assertEquals(1, arc?.season)
+        assertEquals(11, arc?.episode)
+        assertFalse(arc?.exactEpisode == true)
     }
 
     @Test
-    fun `does not guess a chapter for an earlier episode`() {
+    fun `does not guess a chapter outside the documented episode`() {
         val choice = AnimeMangaContinuity.Choice(
             catalogId = 42,
             catalogMalId = null,
@@ -33,8 +38,10 @@ class AnimeMangaContinuityTest {
             matches = emptyList(),
         )
         assertNull(choice.continuationAfter(11.0))
+        assertNull(choice.continuationAfter(13.0))
         assertNull(choice.continuationAfter(null))
         assertEquals(30.0, choice.continuationAfter(12.0))
+        assertNull(choice.copy(latestAdapted = choice.latestAdapted?.copy(season = 2)).continuationAfter(12.0))
     }
 
     @Test
