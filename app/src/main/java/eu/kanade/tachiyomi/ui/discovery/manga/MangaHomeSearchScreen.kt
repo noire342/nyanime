@@ -69,7 +69,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
 /** Search only among the installed manga Home providers currently allowed by the language toggle. */
-class MangaHomeSearchScreen : Screen() {
+class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen() {
     @Composable
     override fun Content() {
         val registry = remember { Injekt.get<MangaHomeRegistry>() }
@@ -80,7 +80,7 @@ class MangaHomeSearchScreen : Screen() {
         val context = LocalContext.current
         var query by rememberSaveable { mutableStateOf("") }
         var selectedSource by rememberSaveable { mutableStateOf<String?>(null) }
-        var selectedGenre by rememberSaveable { mutableStateOf<String?>(null) }
+        var selectedGenre by rememberSaveable { mutableStateOf(initialGenre) }
         var page by rememberSaveable { mutableIntStateOf(1) }
         var items by remember { mutableStateOf<List<MangaHomeItem>>(emptyList()) }
         var hasMore by remember { mutableStateOf(false) }

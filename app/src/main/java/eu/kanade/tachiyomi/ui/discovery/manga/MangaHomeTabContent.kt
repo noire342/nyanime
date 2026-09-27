@@ -120,6 +120,8 @@ fun MangaHomeTabContent(homes: List<SourceHomeGroup>, onSelectCategory: (String?
                 onArchive = { filters ->
                     state.selected?.let { navigator.push(BrowseMangaSourceScreen(it.id, "", filters)) }
                 },
+                onExplore = { navigator.push(MangaHomeSearchScreen()) },
+                onGenre = { genre -> navigator.push(MangaHomeSearchScreen(genre)) },
                 onMore = { section ->
                     val filters = section.moreSelections
                     if (filters != null) {

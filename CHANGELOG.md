@@ -21,6 +21,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 - Il tracking manga continua ad avviarsi dalla lettura del primo capitolo;
   i tentativi simultanei sullo stesso titolo vengono serializzati per evitare
   associazioni duplicate.
+- L'interfaccia generica delle estensioni manga ora conserva i metadati
+  temporanei richiesti dai client più recenti per caricare titoli e capitoli.
 
 ## 27 settembre 2026 — Prossima uscita nella scheda del titolo
 

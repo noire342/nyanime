@@ -84,6 +84,8 @@ fun MangaHomeContent(
     onChapter: (MangaHomeItem, MangaHomeChapter) -> Unit,
     onResume: (MangaHistoryWithRelations) -> Unit,
     onArchive: (Map<String, String>) -> Unit,
+    onExplore: () -> Unit,
+    onGenre: (String) -> Unit,
     onMore: (SourceHomeSection) -> Unit,
     onRetry: (String) -> Unit,
     onUpdates: () -> Unit,
@@ -358,7 +360,12 @@ fun MangaHomeContent(
                         )
                     }
                 } else if (home != null) {
-                    if (home.categories.isNotEmpty()) {
+                    val categories = if (state.mixed) {
+                        state.homes.flatMap { it.categories }.distinctBy { it.title }
+                    } else {
+                        home.categories
+                    }
+                    if (categories.isNotEmpty()) {
                         item("categories") {
                             var genresOpen by remember { mutableStateOf(false) }
                             Row(
@@ -372,19 +379,15 @@ fun MangaHomeContent(
                                         onDismissRequest = { genresOpen = false },
                                         modifier = Modifier.heightIn(max = 400.dp),
                                     ) {
-                                        home.categories.forEach { category ->
+                                        categories.forEach { category ->
                                             DropdownMenuItem(text = { Text(category.title) }, onClick = {
                                                 genresOpen = false
-                                                onArchive(category.selections)
+                                                onGenre(category.title)
                                             })
                                         }
                                     }
                                 }
-                                home.search?.let { search ->
-                                    AssistChip(onClick = {
-                                        onArchive(search.selections)
-                                    }, label = { Text(search.title) })
-                                }
+                                AssistChip(onClick = onExplore, label = { Text("Esplora tutti") })
                             }
                         }
                     }

@@ -60,8 +60,20 @@ data object LibrariesTab : AppTab {
                     style = MaterialTheme.typography.headlineMedium,
                 )
                 PrimaryTabRow(selectedTabIndex = if (manga) 1 else 0) {
-                    Tab(selected = !manga, onClick = ::showAnime, text = { Text("Anime") })
-                    Tab(selected = manga, onClick = ::showManga, text = { Text("Manga") })
+                    Tab(
+                        selected = !manga,
+                        onClick = ::showAnime,
+                        selectedContentColor = MaterialTheme.colorScheme.primary,
+                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = { Text("Anime") },
+                    )
+                    Tab(
+                        selected = manga,
+                        onClick = ::showManga,
+                        selectedContentColor = MaterialTheme.colorScheme.primary,
+                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = { Text("Manga") },
+                    )
                 }
                 AnimatedContent(
                     targetState = manga,

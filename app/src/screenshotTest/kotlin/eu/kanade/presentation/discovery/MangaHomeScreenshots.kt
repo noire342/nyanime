@@ -123,6 +123,8 @@ private fun MangaPreview(firstItem: Int = 0, error: Boolean = false) {
                 onChapter = { _, _ -> },
                 onResume = {},
                 onArchive = {},
+                onExplore = {},
+                onGenre = {},
                 onMore = {},
                 onRetry = {},
                 onUpdates = {},

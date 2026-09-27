@@ -107,6 +107,18 @@ class MangaHomeIntegrationTest {
     }
 
     @Test
+    fun searchQueriesTheSourceCatalogueBeyondHomeRows() = runBlocking {
+        val local = Manga.create().copy(id = 7, source = 42, url = "/series", title = "Search result")
+        coEvery { toLocal.await(any()) } returns local
+        coEvery { engine.getSearchManga(1, "search term", any()) } returns MangasPage(listOf(remote("found")), false)
+
+        val page = service.fetch(key, SourceHomeRequest(SourceHomeRequest.SEARCH, query = "search term"))
+
+        assertEquals(1, page.items.size)
+        coVerify(exactly = 1) { engine.getSearchManga(1, "search term", any()) }
+    }
+
+    @Test
     fun removedDisabledUntrustedAndNotInitializedSourcesHaveNoHome() {
         assertEquals(1, registry.current().homes.size)
         every { preferences.disabledMangaSources().get() } returns setOf("42")
@@ -198,6 +210,7 @@ class MangaHomeIntegrationTest {
                 ),
                 ExtensionHomeManifest.Section("new", "New", mapOf("Home" to "New"), "updates"),
             ),
+            search = ExtensionHomeManifest.Section("search", "Archive", mapOf("Home" to "Archive")),
         )
     }
 }

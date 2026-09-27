@@ -2,10 +2,15 @@
 
 package eu.kanade.tachiyomi.source.model
 
+import kotlinx.serialization.json.JsonObject
+import mihon.core.common.extensions.EMPTY
+
 class SMangaImpl : SManga, SMangaHomeMetadata, SMangaTrackingMetadata {
 
     override var homePresentation: String? = null
     override var trackingMetadata: String? = null
+
+    override var memo: JsonObject = JsonObject.EMPTY
 
     override lateinit var url: String
 
