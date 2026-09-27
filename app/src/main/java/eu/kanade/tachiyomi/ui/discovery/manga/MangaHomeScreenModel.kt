@@ -14,6 +14,7 @@ import eu.kanade.tachiyomi.data.discovery.MangaHomeMerge
 import eu.kanade.tachiyomi.data.discovery.MangaHomePage
 import eu.kanade.tachiyomi.data.discovery.MangaHomeRegistry
 import eu.kanade.tachiyomi.data.discovery.MangaHomeService
+import eu.kanade.tachiyomi.source.MangaSourceUpdateGate
 import eu.kanade.tachiyomi.ui.updates.dismissLibraryUpdate
 import eu.kanade.tachiyomi.ui.updates.inboxKey
 import kotlinx.coroutines.CancellationException
@@ -366,7 +367,13 @@ class MangaHomeScreenModel(
                         if (local != null) return@withTimeout local
                         check(access == registry.access(home.key)) { "Fonte non disponibile" }
                         val source = requireNotNull(manager.get(item.manga.source))
-                        val remote = source.getChapterList(item.manga.toSManga())
+                        val remote = MangaSourceUpdateGate.await(
+                            source,
+                            item.manga.toSManga(),
+                            emptyList(),
+                            fetchDetails = false,
+                            fetchChapters = true,
+                        ).chapters
                         check(access == registry.access(home.key)) { "Fonte non disponibile" }
                         Injekt.get<SyncChaptersWithSource>().await(remote, item.manga, source)
                         chapters.await(item.manga.id).firstOrNull { it.url == chapter.url }

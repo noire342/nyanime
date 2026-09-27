@@ -8,6 +8,7 @@ import eu.kanade.domain.items.chapter.interactor.SyncChaptersWithSource
 import eu.kanade.domain.source.manga.interactor.GetMangaIncognitoState
 import eu.kanade.tachiyomi.data.watch.WatchCatalogReference
 import eu.kanade.tachiyomi.data.watch.WatchTogetherManager
+import eu.kanade.tachiyomi.source.MangaSourceUpdateGate
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
@@ -303,7 +304,14 @@ class ReadingTogetherManager private constructor(context: Context) {
         val chapters = Injekt.get<GetChaptersByMangaId>()
         var chapter = chapters.await(manga.id).singleOrNull { it.url == position.chapter }
         if (chapter == null) {
-            Injekt.get<SyncChaptersWithSource>().await(source.getChapterList(manga.toSManga()), manga, source)
+            val update = MangaSourceUpdateGate.await(
+                source,
+                manga.toSManga(),
+                emptyList(),
+                fetchDetails = false,
+                fetchChapters = true,
+            )
+            Injekt.get<SyncChaptersWithSource>().await(update.chapters, manga, source)
             chapter = chapters.await(manga.id).singleOrNull { it.url == position.chapter }
         }
         requireNotNull(chapter) {

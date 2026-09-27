@@ -11,6 +11,7 @@ import eu.kanade.tachiyomi.data.track.model.AnimeTrackSearch
 import eu.kanade.tachiyomi.data.track.model.MangaTrackSearch
 import eu.kanade.tachiyomi.data.track.myanimelist.MyAnimeList
 import eu.kanade.tachiyomi.source.MangaSource
+import eu.kanade.tachiyomi.source.MangaSourceUpdateGate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -131,7 +132,15 @@ internal object AutoTrackOnStart {
                 .filter { (it as Tracker).id !in linkedIds }
             if (services.isEmpty()) return@supervisorScope false
             val hints = try {
-                SourceTrackingHints.from(source.getMangaDetails(manga.toSManga()))
+                SourceTrackingHints.from(
+                    MangaSourceUpdateGate.await(
+                        source,
+                        manga.toSManga(),
+                        emptyList(),
+                        fetchDetails = true,
+                        fetchChapters = false,
+                    ).manga,
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {

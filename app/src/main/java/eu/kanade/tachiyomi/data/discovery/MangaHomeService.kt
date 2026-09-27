@@ -4,6 +4,7 @@ import eu.kanade.domain.entries.manga.model.toDomainManga
 import eu.kanade.domain.entries.manga.model.toSManga
 import eu.kanade.tachiyomi.data.track.SourceTrackingHints
 import eu.kanade.tachiyomi.source.CatalogueSource
+import eu.kanade.tachiyomi.source.MangaSourceUpdateGate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.sync.Semaphore
@@ -32,7 +33,13 @@ class MangaHomeService(
         val ids = identityCache[key] ?: identityRequests.withPermit {
             identityCache[key] ?: withTimeoutOrNull(6_000) {
                 val source = manager.get(item.manga.source) ?: return@withTimeoutOrNull emptyMap()
-                val details = source.getMangaDetails(item.manga.toSManga())
+                val details = MangaSourceUpdateGate.await(
+                    source,
+                    item.manga.toSManga(),
+                    emptyList(),
+                    fetchDetails = true,
+                    fetchChapters = false,
+                ).manga
                 SourceTrackingHints.from(details).catalogIds()
             }.orEmpty().also { found ->
                 if (identityCache.size > 512) identityCache.clear()

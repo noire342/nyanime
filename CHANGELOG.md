@@ -8,6 +8,17 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 27 settembre 2026 — Compatibilità completa con le estensioni manga 1.6
+
+- Le schede manga, la biblioteca, il tracking, la ricerca e le stanze usano ora
+  l'aggiornamento combinato di dettagli e capitoli delle estensioni 1.6.
+  L'apertura di un titolo non invia più richieste ai vecchi endpoint separati.
+- Le estensioni meno recenti continuano a funzionare tramite il contratto
+  precedente. Il modello e i metodi delle nuove estensioni sono disponibili
+  nell'API generica dell'app, senza logica legata a una fonte.
+- Le richieste simultanee per lo stesso manga vengono coordinate, evitando
+  aggiornamenti concorrenti tra scheda, Home e tracking.
+
 ## 27 settembre 2026 — Home Manga e librerie unite
 
 - Manga entra nella Home moderna accanto alle categorie video, con sezioni, ricerca

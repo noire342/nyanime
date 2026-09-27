@@ -24,6 +24,7 @@ import eu.kanade.domain.items.chapter.interactor.SyncChaptersWithSource
 import eu.kanade.tachiyomi.data.cache.MangaCoverCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
 import eu.kanade.tachiyomi.data.notification.Notifications
+import eu.kanade.tachiyomi.source.MangaSourceUpdateGate
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.UpdateStrategy
 import eu.kanade.tachiyomi.util.storage.getUriCompat
@@ -364,20 +365,24 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
     private suspend fun updateManga(manga: Manga, fetchWindow: Pair<Long, Long>): List<Chapter> {
         val source = sourceManager.getOrStub(manga.source)
 
-        // Update manga metadata if needed
-        if (libraryPreferences.autoUpdateMetadata().get()) {
-            val networkManga = source.getMangaDetails(manga.toSManga())
-            updateManga.awaitUpdateFromSource(manga, networkManga, manualFetch = false, coverCache)
+        val fetchDetails = libraryPreferences.autoUpdateMetadata().get()
+        val update = MangaSourceUpdateGate.await(
+            source,
+            manga.toSManga(),
+            emptyList(),
+            fetchDetails,
+            fetchChapters = true,
+        )
+        if (fetchDetails) {
+            updateManga.awaitUpdateFromSource(manga, update.manga, manualFetch = false, coverCache)
         }
-
-        val chapters = source.getChapterList(manga.toSManga())
 
         // Get manga from database to account for if it was removed during the update and
         // to get latest data so it doesn't get overwritten later on
         val dbManga = getManga.await(manga.id)?.takeIf { it.favorite || it.id in readMangaIds }
             ?: return emptyList()
 
-        return syncChaptersWithSource.await(chapters, dbManga, source, false, fetchWindow)
+        return syncChaptersWithSource.await(update.chapters, dbManga, source, false, fetchWindow)
     }
 
     private suspend fun withUpdateNotification(

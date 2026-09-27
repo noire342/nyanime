@@ -15,6 +15,7 @@ import eu.kanade.domain.entries.manga.model.copyFrom
 import eu.kanade.domain.entries.manga.model.toSManga
 import eu.kanade.tachiyomi.data.cache.MangaCoverCache
 import eu.kanade.tachiyomi.data.notification.Notifications
+import eu.kanade.tachiyomi.source.MangaSourceUpdateGate
 import eu.kanade.tachiyomi.util.prepUpdateCover
 import eu.kanade.tachiyomi.util.system.isRunning
 import eu.kanade.tachiyomi.util.system.workManager
@@ -120,7 +121,13 @@ class MangaMetadataUpdateJob(private val context: Context, workerParams: WorkerP
                                 ) {
                                     val source = sourceManager.get(manga.source) ?: return@withUpdateNotification
                                     try {
-                                        val networkManga = source.getMangaDetails(manga.toSManga())
+                                        val networkManga = MangaSourceUpdateGate.await(
+                                            source,
+                                            manga.toSManga(),
+                                            emptyList(),
+                                            fetchDetails = true,
+                                            fetchChapters = false,
+                                        ).manga
                                         val updatedManga = manga.prepUpdateCover(coverCache, networkManga, true)
                                             .copyFrom(networkManga)
                                         try {

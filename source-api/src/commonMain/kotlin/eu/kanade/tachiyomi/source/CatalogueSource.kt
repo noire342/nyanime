@@ -2,10 +2,11 @@ package eu.kanade.tachiyomi.source
 
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
+import eu.kanade.tachiyomi.source.model.SManga
 import rx.Observable
 import tachiyomi.core.common.util.lang.awaitSingle
 
-interface CatalogueSource : MangaSource {
+interface CatalogueSource : Source {
 
     /**
      * An ISO 639-1 compliant language code (two letters in lower case).
@@ -15,7 +16,7 @@ interface CatalogueSource : MangaSource {
     /**
      * Whether the source has support for latest updates.
      */
-    val supportsLatest: Boolean
+    override val supportsLatest: Boolean
 
     /**
      * Get a page with a list of manga.
@@ -24,7 +25,7 @@ interface CatalogueSource : MangaSource {
      * @param page the page number to retrieve.
      */
     @Suppress("DEPRECATION")
-    suspend fun getPopularManga(page: Int): MangasPage {
+    override suspend fun getPopularManga(page: Int): MangasPage {
         return fetchPopularManga(page).awaitSingle()
     }
 
@@ -37,7 +38,7 @@ interface CatalogueSource : MangaSource {
      * @param filters the list of filters to apply.
      */
     @Suppress("DEPRECATION")
-    suspend fun getSearchManga(page: Int, query: String, filters: FilterList): MangasPage {
+    override suspend fun getSearchManga(page: Int, query: String, filters: FilterList): MangasPage {
         return fetchSearchManga(page, query, filters).awaitSingle()
     }
 
@@ -48,14 +49,22 @@ interface CatalogueSource : MangaSource {
      * @param page the page number to retrieve.
      */
     @Suppress("DEPRECATION")
-    suspend fun getLatestUpdates(page: Int): MangasPage {
+    override suspend fun getLatestUpdates(page: Int): MangasPage {
         return fetchLatestUpdates(page).awaitSingle()
     }
 
     /**
      * Returns the list of filters for the source.
      */
-    fun getFilterList(): FilterList
+    override fun getFilterList(): FilterList
+
+    val supportsRelatedMangas: Boolean get() = false
+
+    val disableRelatedMangasBySearch: Boolean get() = true
+
+    val disableRelatedMangas: Boolean get() = false
+
+    suspend fun fetchRelatedMangaList(manga: SManga): List<SManga> = emptyList()
 
     @Deprecated(
         "Use the non-RxJava API instead",

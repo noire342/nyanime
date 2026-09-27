@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.source
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
+import eu.kanade.tachiyomi.source.model.SMangaUpdate
 import eu.kanade.tachiyomi.util.awaitSingle
 import rx.Observable
 
@@ -23,6 +24,18 @@ interface MangaSource {
 
     val lang: String
         get() = ""
+
+    /** Newer extensions may fetch details and chapters together without duplicate requests. */
+    suspend fun getMangaUpdate(
+        manga: SManga,
+        chapters: List<SChapter>,
+        fetchDetails: Boolean,
+        fetchChapters: Boolean,
+    ): SMangaUpdate {
+        val details = if (fetchDetails) getMangaDetails(manga) else manga
+        val updatedChapters = if (fetchChapters) getChapterList(manga) else chapters
+        return SMangaUpdate(details, updatedChapters)
+    }
 
     /**
      * Get the updated details for a manga.

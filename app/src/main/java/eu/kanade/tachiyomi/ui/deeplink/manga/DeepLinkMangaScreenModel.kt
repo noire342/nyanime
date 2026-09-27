@@ -7,6 +7,7 @@ import eu.kanade.domain.entries.manga.model.toDomainManga
 import eu.kanade.domain.entries.manga.model.toSManga
 import eu.kanade.domain.items.chapter.interactor.SyncChaptersWithSource
 import eu.kanade.tachiyomi.source.MangaSource
+import eu.kanade.tachiyomi.source.MangaSourceUpdateGate
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.ResolvableSource
@@ -65,7 +66,13 @@ class DeepLinkMangaScreenModel(
         val localChapter = getChapterByUrlAndMangaId.await(sChapter.url, manga.id)
 
         return if (localChapter == null) {
-            val sourceChapters = source.getChapterList(manga.toSManga())
+            val sourceChapters = MangaSourceUpdateGate.await(
+                source,
+                manga.toSManga(),
+                emptyList(),
+                fetchDetails = false,
+                fetchChapters = true,
+            ).chapters
             val newChapters = syncChaptersWithSource.await(sourceChapters, manga, source, false)
             newChapters.find { it.url == sChapter.url }
         } else {

@@ -38,13 +38,13 @@ import eu.kanade.tachiyomi.data.track.EnhancedMangaTracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.network.HttpException
 import eu.kanade.tachiyomi.source.MangaSource
+import eu.kanade.tachiyomi.source.MangaSourceUpdateGate
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.chapter.getNextUnread
 import eu.kanade.tachiyomi.util.removeCovers
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
@@ -243,11 +243,9 @@ class MangaScreenModel(
 
             // Fetch info-chapters when needed
             if (screenModelScope.isActive) {
-                val fetchFromSourceTasks = listOf(
-                    async { if (needRefreshInfo) fetchMangaFromSource() },
-                    async { if (needRefreshChapter) fetchChaptersFromSource() },
-                )
-                fetchFromSourceTasks.awaitAll()
+                if (needRefreshInfo || needRefreshChapter) {
+                    fetchUpdateFromSource(needRefreshInfo, needRefreshChapter)
+                }
             }
 
             // Initial loading finished
@@ -258,11 +256,7 @@ class MangaScreenModel(
     fun fetchAllFromSource(manualFetch: Boolean = true) {
         screenModelScope.launch {
             updateSuccessState { it.copy(isRefreshingData = true) }
-            val fetchFromSourceTasks = listOf(
-                async { fetchMangaFromSource(manualFetch) },
-                async { fetchChaptersFromSource(manualFetch) },
-            )
-            fetchFromSourceTasks.awaitAll()
+            fetchUpdateFromSource(fetchDetails = true, fetchChapters = true, manualFetch = manualFetch)
             updateSuccessState { it.copy(isRefreshingData = false) }
         }
     }
@@ -272,20 +266,48 @@ class MangaScreenModel(
     /**
      * Fetch manga information from source.
      */
-    private suspend fun fetchMangaFromSource(manualFetch: Boolean = false) {
+    private suspend fun fetchUpdateFromSource(
+        fetchDetails: Boolean,
+        fetchChapters: Boolean,
+        manualFetch: Boolean = false,
+    ) {
         val state = successState ?: return
         try {
             withIOContext {
-                val networkManga = state.source.getMangaDetails(state.manga.toSManga())
-                updateManga.awaitUpdateFromSource(state.manga, networkManga, manualFetch)
+                val update = MangaSourceUpdateGate.await(
+                    state.source,
+                    state.manga.toSManga(),
+                    emptyList(),
+                    fetchDetails,
+                    fetchChapters,
+                )
+                if (fetchDetails) {
+                    updateManga.awaitUpdateFromSource(state.manga, update.manga, manualFetch)
+                }
+                if (fetchChapters) {
+                    val newChapters = syncChaptersWithSource.await(
+                        update.chapters,
+                        state.manga,
+                        state.source,
+                        manualFetch,
+                    )
+                    if (manualFetch) downloadNewChapters(newChapters)
+                }
             }
         } catch (e: Throwable) {
             // Ignore early hints "errors" that aren't handled by OkHttp
             if (e is HttpException && e.code == 103) return
 
-            logcat(LogPriority.ERROR, e)
-            screenModelScope.launch {
-                snackbarHostState.showSnackbar(message = with(context) { e.formattedMessage })
+            val message = if (e is NoChaptersException) {
+                context.stringResource(MR.strings.no_chapters_error)
+            } else {
+                logcat(LogPriority.ERROR, e)
+                with(context) { e.formattedMessage }
+            }
+            screenModelScope.launch { snackbarHostState.showSnackbar(message = message) }
+            if (fetchChapters) {
+                val newManga = mangaRepository.getMangaById(mangaId)
+                updateSuccessState { it.copy(manga = newManga, isRefreshingData = false) }
             }
         }
     }
@@ -566,38 +588,6 @@ class MangaScreenModel(
     /**
      * Requests an updated list of chapters from the source.
      */
-    private suspend fun fetchChaptersFromSource(manualFetch: Boolean = false) {
-        val state = successState ?: return
-        try {
-            withIOContext {
-                val chapters = state.source.getChapterList(state.manga.toSManga())
-
-                val newChapters = syncChaptersWithSource.await(
-                    chapters,
-                    state.manga,
-                    state.source,
-                    manualFetch,
-                )
-
-                if (manualFetch) {
-                    downloadNewChapters(newChapters)
-                }
-            }
-        } catch (e: Throwable) {
-            val message = if (e is NoChaptersException) {
-                context.stringResource(MR.strings.no_chapters_error)
-            } else {
-                logcat(LogPriority.ERROR, e)
-                with(context) { e.formattedMessage }
-            }
-
-            screenModelScope.launch {
-                snackbarHostState.showSnackbar(message = message)
-            }
-            val newManga = mangaRepository.getMangaById(mangaId)
-            updateSuccessState { it.copy(manga = newManga, isRefreshingData = false) }
-        }
-    }
 
     /**
      * @throws IllegalStateException if the swipe action is [LibraryPreferences.ChapterSwipeAction.Disabled]

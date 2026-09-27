@@ -29,6 +29,7 @@ import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
 import eu.kanade.tachiyomi.data.track.EnhancedMangaTracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.source.MangaSource
+import eu.kanade.tachiyomi.source.MangaSourceUpdateGate
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.ui.browse.manga.migration.MangaMigrationFlags
 import kotlinx.coroutines.flow.update
@@ -183,7 +184,13 @@ internal class MigrateMangaDialogScreenModel(
         mutableState.update { it.copy(isMigrating = true) }
 
         try {
-            val chapters = source.getChapterList(newManga.toSManga())
+            val chapters = MangaSourceUpdateGate.await(
+                source,
+                newManga.toSManga(),
+                emptyList(),
+                fetchDetails = false,
+                fetchChapters = true,
+            ).chapters
 
             migrateMangaInternal(
                 oldSource = prevSource,
