@@ -34,6 +34,7 @@ import eu.kanade.domain.track.manga.model.toDbTrack as toMangaDbTrack
 /** Runs away from the player/reader loading path and only writes verified, unique matches. */
 internal object AutoTrackOnStart {
     private val hintMutex = Mutex()
+    private val mangaBindMutex = Mutex()
     private val animeHintsCache = LinkedHashMap<Long, Pair<Long, SourceTrackingHints>>(64, 0.75f, true)
 
     suspend fun animeHints(anime: Anime, source: AnimeSource): SourceTrackingHints? {
@@ -120,73 +121,75 @@ internal object AutoTrackOnStart {
         }.awaitAll().any { it }
     }
 
-    suspend fun manga(manga: Manga, source: MangaSource, started: Boolean = true): Boolean = supervisorScope {
-        val manager = Injekt.get<TrackerManager>()
-        val getTracks = Injekt.get<GetMangaTracks>()
-        val addTracks = Injekt.get<AddMangaTracks>()
-        val linkedIds = getTracks.await(manga.id).mapTo(mutableSetOf()) { it.trackerId }
-        val services = manager.loggedInTrackers().filterIsInstance<MangaTracker>()
-            .filter { (it as Tracker).id !in linkedIds }
-        if (services.isEmpty()) return@supervisorScope false
-        val hints = try {
-            SourceTrackingHints.from(source.getMangaDetails(manga.toSManga()))
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            null
-        }
-        val catalog = try {
-            when {
-                hints?.anilistId != null && hints.malId != null ->
-                    AniListMediaLookup.Match(hints.anilistId, hints.malId, hints.titles, null)
-                hints?.anilistId != null ->
-                    AniListMediaLookup.resolveId(hints.anilistId, AniListMediaLookup.Type.MANGA, malId = false)
-                hints?.malId != null ->
-                    AniListMediaLookup.resolveId(hints.malId, AniListMediaLookup.Type.MANGA, malId = true)
-                else -> AniListMediaLookup.resolve(manga.title, AniListMediaLookup.Type.MANGA)
+    suspend fun manga(manga: Manga, source: MangaSource, started: Boolean = true): Boolean = mangaBindMutex.withLock {
+        supervisorScope {
+            val manager = Injekt.get<TrackerManager>()
+            val getTracks = Injekt.get<GetMangaTracks>()
+            val addTracks = Injekt.get<AddMangaTracks>()
+            val linkedIds = getTracks.await(manga.id).mapTo(mutableSetOf()) { it.trackerId }
+            val services = manager.loggedInTrackers().filterIsInstance<MangaTracker>()
+                .filter { (it as Tracker).id !in linkedIds }
+            if (services.isEmpty()) return@supervisorScope false
+            val hints = try {
+                SourceTrackingHints.from(source.getMangaDetails(manga.toSManga()))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
             }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            null
-        }
-        services.map { service ->
-            async {
-                val tracker = service as Tracker
-                if (getTracks.await(manga.id).any { it.trackerId == tracker.id }) return@async false
-                try {
-                    val result = if (tracker is EnhancedMangaTracker) {
-                        if (!tracker.accept(source)) return@async false
-                        tracker.match(manga)
-                    } else {
-                        findManga(service, manga.title, catalog, hints)
-                    } ?: return@async false
-                    if (!tracker.isLoggedIn ||
-                        getTracks.await(manga.id).any { it.trackerId == tracker.id }
-                    ) {
-                        return@async false
-                    }
-                    result.manga_id = manga.id
-                    addTracks.bind(service, result, manga.id)
-                    getTracks.await(manga.id).firstOrNull { it.trackerId == tracker.id }?.let { bound ->
-                        if (started &&
-                            bound.lastChapterRead <= 0 &&
-                            bound.status != service.getReadingStatus() &&
-                            bound.status != service.getCompletionStatus() &&
-                            bound.status != service.getRereadingStatus()
-                        ) {
-                            service.setRemoteMangaStatus(bound.toMangaDbTrack(), service.getReadingStatus())
-                        }
-                    }
-                    true
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (error: Exception) {
-                    logcat(LogPriority.WARN, error) { "Automatic manga tracking failed for ${tracker.name}" }
-                    false
+            val catalog = try {
+                when {
+                    hints?.anilistId != null && hints.malId != null ->
+                        AniListMediaLookup.Match(hints.anilistId, hints.malId, hints.titles, null)
+                    hints?.anilistId != null ->
+                        AniListMediaLookup.resolveId(hints.anilistId, AniListMediaLookup.Type.MANGA, malId = false)
+                    hints?.malId != null ->
+                        AniListMediaLookup.resolveId(hints.malId, AniListMediaLookup.Type.MANGA, malId = true)
+                    else -> AniListMediaLookup.resolve(manga.title, AniListMediaLookup.Type.MANGA)
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
             }
-        }.awaitAll().any { it }
+            services.map { service ->
+                async {
+                    val tracker = service as Tracker
+                    if (getTracks.await(manga.id).any { it.trackerId == tracker.id }) return@async false
+                    try {
+                        val result = if (tracker is EnhancedMangaTracker) {
+                            if (!tracker.accept(source)) return@async false
+                            tracker.match(manga)
+                        } else {
+                            findManga(service, manga.title, catalog, hints)
+                        } ?: return@async false
+                        if (!tracker.isLoggedIn ||
+                            getTracks.await(manga.id).any { it.trackerId == tracker.id }
+                        ) {
+                            return@async false
+                        }
+                        result.manga_id = manga.id
+                        addTracks.bind(service, result, manga.id)
+                        getTracks.await(manga.id).firstOrNull { it.trackerId == tracker.id }?.let { bound ->
+                            if (started &&
+                                bound.lastChapterRead <= 0 &&
+                                bound.status != service.getReadingStatus() &&
+                                bound.status != service.getCompletionStatus() &&
+                                bound.status != service.getRereadingStatus()
+                            ) {
+                                service.setRemoteMangaStatus(bound.toMangaDbTrack(), service.getReadingStatus())
+                            }
+                        }
+                        true
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        logcat(LogPriority.WARN, error) { "Automatic manga tracking failed for ${tracker.name}" }
+                        false
+                    }
+                }
+            }.awaitAll().any { it }
+        }
     }
 
     private suspend fun findAnime(

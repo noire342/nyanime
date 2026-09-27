@@ -8,6 +8,20 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 27 settembre 2026 — Home Manga e librerie unite
+
+- Manga entra nella Home moderna accanto alle categorie video, con sezioni, ricerca
+  nel catalogo completo e filtri forniti dalle estensioni installate. I risultati
+  di fonti diverse si uniscono soltanto quando condividono ID pubblici concordi;
+  i titoli ambigui restano separati e la fonte predefinita si può cambiare.
+- La barra inferiore riunisce la libreria anime e la biblioteca manga in
+  «Biblioteca & Libreria». La vecchia interfaccia manga viene disattivata.
+- Una preferenza nasconde dalla Home Manga i cataloghi non italiani, senza
+  rimuovere titoli già presenti nella biblioteca personale.
+- Il tracking manga continua ad avviarsi dalla lettura del primo capitolo;
+  i tentativi simultanei sullo stesso titolo vengono serializzati per evitare
+  associazioni duplicate.
+
 ## 27 settembre 2026 — Prossima uscita nella scheda del titolo
 
 - Il tempo che manca al prossimo episodio compare anche sotto lo studio,
