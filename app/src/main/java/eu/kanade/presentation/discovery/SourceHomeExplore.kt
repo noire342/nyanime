@@ -57,7 +57,36 @@ fun SourceHomeExploreBar(
     categories: List<SourceHomeGroup.Section>,
     onBrowse: () -> Unit,
     onCategory: (SourceHomeGroup.Section) -> Unit,
+    onSurprise: (() -> Unit)? = null,
+    onRandomEpisode: (() -> Unit)? = null,
 ) {
+    var genresOpen by remember { mutableStateOf(false) }
+    var genreQuery by remember { mutableStateOf("") }
+    if (genresOpen) {
+        ModalBottomSheet(onDismissRequest = { genresOpen = false }) {
+            Column(Modifier.imePadding().padding(horizontal = 20.dp)) {
+                Text("Tutti i generi", style = MaterialTheme.typography.headlineSmall)
+                OutlinedTextField(
+                    value = genreQuery,
+                    onValueChange = { genreQuery = it },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    placeholder = { Text("Cerca un genere") },
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                )
+                LazyColumn(contentPadding = PaddingValues(bottom = 36.dp)) {
+                    items(categories.filter { it.title.contains(genreQuery.trim(), ignoreCase = true) }, key = { it.id }) { category ->
+                        TextButton(onClick = {
+                            genresOpen = false
+                            onCategory(category)
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text(category.title, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            }
+        }
+    }
     LazyRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -69,7 +98,16 @@ fun SourceHomeExploreBar(
                 leadingIcon = { Icon(Icons.Outlined.Tune, null) },
             )
         }
-        items(categories, key = { it.id }) { category ->
+        if (onSurprise != null) item {
+            AssistChip(onClick = onSurprise, label = { Text("Sorprendimi") })
+        }
+        if (onRandomEpisode != null) item {
+            AssistChip(onClick = onRandomEpisode, label = { Text("Episodio casuale") })
+        }
+        if (categories.size > 8) item {
+            AssistChip(onClick = { genresOpen = true }, label = { Text("Tutti i generi") })
+        }
+        items(categories.take(8), key = { it.id }) { category ->
             AssistChip(onClick = { onCategory(category) }, label = { Text(category.title) })
         }
     }

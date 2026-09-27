@@ -13,7 +13,7 @@ object ExtensionHomeFilters {
             it.id,
             it.title,
             manifest.defaults + it.filters,
-            it.layout.takeIf { it == "featured" } ?: "posters",
+            it.layout.takeIf { it in setOf("featured", "ranking") } ?: "posters",
             it.group?.let { group -> SourceHomeSectionGroup(group.id, group.title, group.tab) },
             it.dateFilter?.takeIf { label -> textFilter(filters, label) != null },
             it.moreFilters?.let { values -> manifest.defaults + values },
@@ -41,6 +41,14 @@ object ExtensionHomeFilters {
     }
 
     fun search(manifest: ExtensionHomeManifest, filters: AnimeFilterList) = manifest.search?.let {
+        SourceHomeSection(it.id, it.title, manifest.defaults + it.filters)
+    }?.takeIf { supports(filters, it) }
+
+    fun random(manifest: ExtensionHomeManifest, filters: AnimeFilterList) = manifest.random?.let {
+        SourceHomeSection(it.id, it.title, manifest.defaults + it.filters)
+    }?.takeIf { supports(filters, it) }
+
+    fun randomEpisode(manifest: ExtensionHomeManifest, filters: AnimeFilterList) = manifest.randomEpisode?.let {
         SourceHomeSection(it.id, it.title, manifest.defaults + it.filters)
     }?.takeIf { supports(filters, it) }
 

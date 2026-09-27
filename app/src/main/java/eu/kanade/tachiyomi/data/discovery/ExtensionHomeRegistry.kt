@@ -81,6 +81,8 @@ class ExtensionHomeRegistry(
                         homeId = manifest.id,
                         primary = manifest.primary,
                         browseFilters = ExtensionHomeFilters.browseFilters(manifest, filters),
+                        random = ExtensionHomeFilters.random(manifest, filters),
+                        randomEpisode = ExtensionHomeFilters.randomEpisode(manifest, filters),
                     )
                 }
             } catch (e: CancellationException) {

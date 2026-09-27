@@ -17,7 +17,6 @@ import tachiyomi.domain.discovery.SourceHomePage
 import tachiyomi.domain.discovery.SourceHomeRepository
 import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.discovery.SourceHomeSource
-import tachiyomi.domain.discovery.homeItemKey
 
 /** Independent feeds are interleaved fairly; one failing extension never empties its peers. */
 class MergedSourceHomeRepository(
@@ -36,10 +35,16 @@ class MergedSourceHomeRepository(
         if (group == null || access.offline || access != currentAccess(group.id)) {
             return@run flowOf(SectionState<SourceHomePage>(loading = false, error = "Home non disponibile"))
         }
-        val providers = access.providers.filter { provider ->
+        val eligible = access.providers.sortedByDescending { it.source?.primary == true }.filter { provider ->
             provider.source?.let {
                 if (request.sectionId == SourceHomeRequest.SEARCH) {
-                    it.search != null
+                    it.search != null && request.filters.all { (name, values) ->
+                        it.browseFilters.any { filter -> filter.name == name && filter.accepts(values) }
+                    }
+                } else if (request.sectionId == SourceHomeRequest.RANDOM) {
+                    it.random != null
+                } else if (request.sectionId == SourceHomeRequest.RANDOM_EPISODE) {
+                    it.randomEpisode != null
                 } else {
                     (it.sections + it.categories).any { section ->
                         section.id == request.sectionId && (request.date == null || section.dateFilter != null)
@@ -47,10 +52,18 @@ class MergedSourceHomeRepository(
                 }
             } == true
         }
-        if (providers.isEmpty()) {
+        if (eligible.isEmpty()) {
+            if (request.sectionId == SourceHomeRequest.SEARCH && request.filters.isNotEmpty()) {
+                return@run flowOf(SectionState(SourceHomePage(emptyList(), false), loading = false))
+            }
             return@run flowOf(
                 SectionState<SourceHomePage>(loading = false, error = "Sezione non supportata"),
             )
+        }
+        val providers = if (request.sectionId in setOf(SourceHomeRequest.RANDOM, SourceHomeRequest.RANDOM_EPISODE)) {
+            eligible.shuffled().take(1)
+        } else {
+            eligible
         }
         val feeds = providers.map { provider ->
             val source = requireNotNull(provider.source)
@@ -93,7 +106,7 @@ class MergedSourceHomeRepository(
             val lists = pages.map { it.items }
             val items = (0 until (lists.maxOfOrNull { it.size } ?: 0)).flatMap { row ->
                 lists.mapNotNull { it.getOrNull(row) }
-            }.distinctBy { it.homeItemKey }
+            }.let(::mergeHomeCards)
             SectionState(
                 data = if (pages.isEmpty()) {
                     null

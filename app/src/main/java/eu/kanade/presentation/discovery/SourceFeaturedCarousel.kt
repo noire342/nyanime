@@ -25,6 +25,7 @@ fun SourceFeaturedCarousel(
     refreshKey: Int = 0,
     title: String = "In evidenza",
     onBrowse: (() -> Unit)? = null,
+    onSources: ((Anime) -> Unit)? = null,
     onClick: (Anime) -> Unit,
 ) {
     if (!LocalNyanimeStyle.current) {
@@ -55,6 +56,9 @@ fun SourceFeaturedCarousel(
                     description = anime.description,
                     actionLabel = "Apri episodi",
                     onOpen = openDetails,
+                    onSources = onSources?.takeIf { presentation?.choices.orEmpty().size > 1 }?.let { action ->
+                        { action(anime) }
+                    },
                     poster = poster,
                 ) {
                     SourceHomeArtwork(

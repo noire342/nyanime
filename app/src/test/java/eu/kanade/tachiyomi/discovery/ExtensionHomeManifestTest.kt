@@ -51,6 +51,20 @@ class ExtensionHomeManifestTest {
         val unknown = manifest.copy(sections = manifest.sections.map { it.copy(layout = "future-layout") })
         assertEquals("posters", ExtensionHomeFilters.sections(unknown, AnimeFilterList()).single().layout)
         assertEquals(false, ExtensionHomeManifest.parse(wrap(film)).single().primary)
+        val ranking = manifest.copy(sections = manifest.sections.map { it.copy(layout = "ranking") })
+        assertEquals("ranking", ExtensionHomeFilters.sections(ranking, AnimeFilterList()).single().layout)
+    }
+
+    @Test fun optionalSurpriseActionsRequireReservedIds() {
+        val declared = film.replace(
+            "\"sections\":",
+            "\"random\":{\"id\":\"random\",\"title\":\"Sorprendimi\"}," +
+                "\"randomEpisode\":{\"id\":\"random-episode\",\"title\":\"Episodio casuale\"},\"sections\":",
+        )
+        val parsed = ExtensionHomeManifest.parse(wrap(declared)).single()
+        assertEquals("random", ExtensionHomeFilters.random(parsed, AnimeFilterList())?.id)
+        assertEquals("random-episode", ExtensionHomeFilters.randomEpisode(parsed, AnimeFilterList())?.id)
+        assertTrue(ExtensionHomeManifest.parse(wrap(declared.replace("\"id\":\"random\"", "\"id\":\"search\""))).isEmpty())
     }
     private val film = """{"id":"films","title":"Film","source":{"name":"Ciao","lang":"it"},
         "sections":[{"id":"popular","title":"Più visti"}]}"""

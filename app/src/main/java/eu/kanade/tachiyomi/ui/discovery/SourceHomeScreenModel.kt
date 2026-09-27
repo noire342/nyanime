@@ -9,12 +9,14 @@ import eu.kanade.tachiyomi.data.discovery.LocalHomeSections
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.SectionState
 import tachiyomi.domain.discovery.SourceHomeGroupAccess
 import tachiyomi.domain.discovery.SourceHomePage
 import tachiyomi.domain.discovery.SourceHomeRequest
+import tachiyomi.domain.entries.anime.model.Anime
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -47,7 +49,7 @@ class SourceHomeScreenModel(
                             }
                         }
                         launch {
-                            locals.updates.observe().collect { value ->
+                            locals.updates(source.sourceIds).observe().collect { value ->
                                 mutableState.update { it.copy(updates = value) }
                             }
                         }
@@ -66,6 +68,17 @@ class SourceHomeScreenModel(
         if (state.value.access.offline) return
         restartArtwork()
         feeds.refresh(force = true)
+    }
+
+    suspend fun surprise(episode: Boolean): Anime? {
+        val access = state.value.access
+        if (access.offline || access.group == null) return null
+        val request = SourceHomeRequest(
+            if (episode) SourceHomeRequest.RANDOM_EPISODE else SourceHomeRequest.RANDOM,
+        )
+        return services.merged.observe(access, request, refresh = true)
+            .first { it.data != null || it.error != null }
+            .data?.items?.firstOrNull()
     }
 
     private fun restartArtwork() = mutableState.update { it.copy(artworkRefreshKey = it.artworkRefreshKey + 1) }

@@ -129,6 +129,24 @@ interface AnimeSource {
     suspend fun getRelatedAnimeList(anime: SAnime): List<AnimeRelation>
 
     /**
+     * Stream related groups from extensions using the newer callback API.
+     * The default keeps extensions implementing the older list API working.
+     */
+    suspend fun getRelatedAnimeList(
+        anime: SAnime,
+        exceptionHandler: (Throwable) -> Unit,
+        pushResults: suspend (Pair<String, List<SAnime>>, Boolean) -> Unit,
+    ) {
+        try {
+            getRelatedAnimeList(anime).forEach { relation ->
+                pushResults(relation.name to relation.animes, true)
+            }
+        } catch (error: Throwable) {
+            exceptionHandler(error)
+        }
+    }
+
+    /**
      * Get the list of hoster for an episode. The first hoster in the list should
      * be the preferred hoster.
      *

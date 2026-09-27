@@ -41,12 +41,16 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.SourceHomeActiveFilters
+import eu.kanade.presentation.discovery.SourceHomeChoiceDialog
 import eu.kanade.presentation.discovery.SourceHomeFilterSheet
 import eu.kanade.presentation.discovery.SourceHomePosterCard
+import eu.kanade.presentation.discovery.SourceHomeRankingCard
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
+import eu.kanade.tachiyomi.data.discovery.SourceHomeSourceChoice
 import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.discovery.homeItemKey
+import tachiyomi.domain.discovery.homePresentation
 
 class SourceHomeListScreen(
     private val homeKey: String,
@@ -61,6 +65,7 @@ class SourceHomeListScreen(
         val model = rememberScreenModel { SourceHomeListScreenModel(homeKey, sectionId, date = date) }
         val state by model.state.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
+        val context = androidx.compose.ui.platform.LocalContext.current
         var query by rememberSaveable { mutableStateOf("") }
         var showFilters by rememberSaveable { mutableStateOf(false) }
         val isCatalogue = sectionId == SourceHomeRequest.SEARCH || sectionId.startsWith("category:")
@@ -76,6 +81,22 @@ class SourceHomeListScreen(
                 Box(Modifier.padding(padding)) { LoadNotice(availability.loading, null) }
             }
             return
+        }
+        val ranking = source.sections.firstOrNull { it.id == sectionId }?.layout == "ranking"
+        val playEpisode = source.sections.firstOrNull { it.id == sectionId }?.layout != "featured"
+        var pendingChoice by rememberSaveable { mutableStateOf<Long?>(null) }
+        val chosenCard = state.items.firstOrNull { it.id == pendingChoice }
+        chosenCard?.let { anime ->
+            SourceHomeChoiceDialog(
+                anime,
+                source,
+                SourceHomeSourceChoice.preferredAnimeId(context, anime),
+                { pendingChoice = null },
+            ) { id, remember ->
+                if (remember) SourceHomeSourceChoice.remember(context, anime, id)
+                pendingChoice = null
+                navigator.push(AnimeScreen(id, true, SourceHomeSourceChoice.episodeTarget(anime, id).takeIf { playEpisode }))
+            }
         }
         LaunchedEffect(query) { if (isCatalogue) model.search(query) }
         LaunchedEffect(selectedDate) { model.selectDate(selectedDate) }
@@ -162,12 +183,27 @@ class SourceHomeListScreen(
                         model.load(reset = state.items.isEmpty())
                     }
                 }
-                items(state.items, key = { it.homeItemKey }) { anime ->
-                    SourceHomePosterCard(
+                items(state.items, key = { it.homeItemKey }, span = { if (ranking) GridItemSpan(maxLineSpan) else GridItemSpan(1) }) { anime ->
+                    if (ranking) {
+                        SourceHomeRankingCard(
+                            anime,
+                            state.items.indexOf(anime) + 1,
+                            source.sourceLabel(anime.source),
+                            {
+                                val id = SourceHomeSourceChoice.preferredAnimeId(context, anime)
+                                navigator.push(AnimeScreen(id, true, SourceHomeSourceChoice.episodeTarget(anime, id).takeIf { playEpisode }))
+                            },
+                            { pendingChoice = anime.id },
+                        )
+                    } else SourceHomePosterCard(
                         anime,
                         source.sourceLabel(anime.source),
-                        { navigator.push(AnimeScreen(anime.id, true)) },
+                        {
+                            val id = SourceHomeSourceChoice.preferredAnimeId(context, anime)
+                            navigator.push(AnimeScreen(id, true, SourceHomeSourceChoice.episodeTarget(anime, id).takeIf { playEpisode }))
+                        },
                         Modifier.padding(6.dp),
+                        onSources = { pendingChoice = anime.id },
                     )
                 }
                 if (!state.loading &&

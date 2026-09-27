@@ -24,9 +24,18 @@ class SyncRelatedAnimeWithSource(
             if (lastFetchedAt != null && now - lastFetchedAt < TTL) return
         }
 
-        val groups = source.getRelatedAnimeList(anime.toSAnime())
-            .map { relation ->
-                relation.name to relation.animes
+        val received = mutableListOf<Pair<String, List<eu.kanade.tachiyomi.animesource.model.SAnime>>>()
+        var fetchError: Throwable? = null
+        source.getRelatedAnimeList(
+            anime = anime.toSAnime(),
+            exceptionHandler = { fetchError = it },
+            pushResults = { group, _ -> received += group },
+        )
+        fetchError?.let { throw it }
+
+        val groups = received
+            .map { (name, related) ->
+                name to related
                     .distinctBy { it.url }
                     .filterNot { it.url == anime.url }
                     .take(MAX_PER_GROUP)

@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -82,6 +83,7 @@ import tachiyomi.presentation.core.screens.LoadingScreen
 class AnimeScreen(
     private val animeId: Long,
     val fromSource: Boolean = false,
+    private val episodeTarget: String? = null,
 ) : Screen(), AssistContentScreen, PosterDetailsScreen {
 
     private var assistUrl: String? = null
@@ -111,6 +113,15 @@ class AnimeScreen(
         }
 
         val successState = state as AnimeScreenModel.State.Success
+        var targetOpened by remember(animeId, episodeTarget) { androidx.compose.runtime.mutableStateOf(false) }
+        LaunchedEffect(episodeTarget, successState.episodes) {
+            if (!targetOpened && episodeTarget != null) {
+                successState.episodes.firstOrNull { it.episode.url == episodeTarget }?.let { item ->
+                    targetOpened = true
+                    openEpisode(context, item.episode, screenModel.alwaysUseExternalPlayer)
+                }
+            }
+        }
         val isAnimeHttpSource = remember { successState.source is AnimeHttpSource }
 
         LaunchedEffect(successState.anime, screenModel.source) {

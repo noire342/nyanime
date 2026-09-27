@@ -32,10 +32,12 @@ class ExtensionHomeGateway(
             check(!access.offline && access == currentAccess()) { "Fonte non disponibile" }
             val definition = requireNotNull(access.source)
             val source = manager.get(definition.id) ?: error("Fonte non disponibile")
-            val section = if (request.sectionId == SourceHomeRequest.SEARCH) {
-                requireNotNull(definition.search) { "Ricerca non supportata" }
-            } else {
-                (definition.sections + definition.categories).firstOrNull { it.id == request.sectionId }
+            val section = when (request.sectionId) {
+                SourceHomeRequest.SEARCH -> requireNotNull(definition.search) { "Ricerca non supportata" }
+                SourceHomeRequest.RANDOM -> requireNotNull(definition.random) { "Titolo casuale non supportato" }
+                SourceHomeRequest.RANDOM_EPISODE ->
+                    requireNotNull(definition.randomEpisode) { "Episodio casuale non supportato" }
+                else -> (definition.sections + definition.categories).firstOrNull { it.id == request.sectionId }
                     ?: error("La sezione non è più supportata: aggiorna la Home")
             }
             val requestedSection = if (request.browse && section.moreSelections != null) {

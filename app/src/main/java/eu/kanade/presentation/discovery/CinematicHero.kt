@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,9 +21,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,6 +56,7 @@ internal fun CinematicHero(
     description: String?,
     actionLabel: String,
     onOpen: () -> Unit,
+    onSources: (() -> Unit)? = null,
     poster: PosterSource? = null,
     artwork: @Composable BoxScope.() -> Unit,
 ) {
@@ -130,30 +132,28 @@ internal fun CinematicHero(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(
-                        16.dp,
-                        if (compact) Alignment.CenterHorizontally else Alignment.Start,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                Row(
+                    modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Button(
                         onClick = onOpen,
-                        modifier = Modifier.widthIn(min = 168.dp).heightIn(min = 48.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                         shape = RoundedCornerShape(4.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                     ) {
-                        Text(actionLabel, style = MaterialTheme.typography.labelLarge)
+                        Text(actionLabel, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(Modifier.size(10.dp))
                         Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(20.dp))
                     }
-                    TextButton(
-                        onClick = { showInformation = true },
-                        colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
-                    ) {
-                        Icon(Icons.Outlined.Info, null, Modifier.size(20.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text("Info")
+                    if (onSources != null) {
+                        IconButton(onClick = onSources) {
+                            Icon(Icons.Outlined.SwapHoriz, "Scegli la fonte", tint = Color.White)
+                        }
+                    }
+                    IconButton(onClick = { showInformation = true }) {
+                        Icon(Icons.Outlined.Info, "Informazioni", tint = Color.White)
                     }
                 }
             }

@@ -19,6 +19,7 @@ import tachiyomi.domain.discovery.SourceHomeAccess
 import tachiyomi.domain.discovery.SourceHomeGroup
 import tachiyomi.domain.discovery.SourceHomeGroupAccess
 import tachiyomi.domain.discovery.SourceHomePage
+import tachiyomi.domain.discovery.SourceHomeFilter
 import tachiyomi.domain.discovery.SourceHomePresentation
 import tachiyomi.domain.discovery.SourceHomeRepository
 import tachiyomi.domain.discovery.SourceHomeRequest
@@ -122,6 +123,71 @@ class MergedSourceHomeRepositoryTest {
         val result = merged.observe(access, SourceHomeRequest("popular")).last()
         assertEquals(listOf(a, c, b), result.data!!.items)
         assertFalse(result.loading)
+    }
+
+    @Test fun matchingCatalogueIdsMergeDifferentTitlesAndKeepBothSources() = runBlocking {
+        val a = item(11, 1).copy(title = "Name: Season 2")
+        val b = item(21, 2).copy(title = "Name Season Two")
+        val left = a.copy(memo = SourceHomePresentation(catalogIds = mapOf("catalog" to 42)).attachTo(a.memo))
+        val right = b.copy(memo = SourceHomePresentation(catalogIds = mapOf("catalog" to 42)).attachTo(b.memo))
+        val merged = MergedSourceHomeRepository({ source ->
+            provider { flowOf(page(if (source.id == 1L) left else right)) }
+        }, { access })
+        val cards = merged.observe(access, SourceHomeRequest("popular")).last().data!!.items
+        assertEquals(1, cards.size)
+        assertEquals(listOf(1L, 2L), cards.single().homePresentation!!.choices.map { it.sourceId })
+    }
+
+    @Test fun conflictingCatalogueIdsNeverMergeHomonymousSeasons() = runBlocking {
+        val a = item(11, 1).copy(memo = SourceHomePresentation(catalogIds = mapOf("catalog" to 42))
+            .attachTo(item(11, 1).memo))
+        val b = item(21, 2).copy(memo = SourceHomePresentation(catalogIds = mapOf("catalog" to 43))
+            .attachTo(item(21, 2).memo))
+        val merged = MergedSourceHomeRepository({ source ->
+            provider { flowOf(page(if (source.id == 1L) a else b)) }
+        }, { access })
+        assertEquals(2, merged.observe(access, SourceHomeRequest("popular")).last().data!!.items.size)
+    }
+
+    @Test fun aSharedSecondaryIdCannotBridgeConflictingPrimaryIds() = runBlocking {
+        fun card(id: Long, source: Long, ids: Map<String, Long>): Anime {
+            val anime = item(id, source)
+            return anime.copy(memo = SourceHomePresentation(catalogIds = ids).attachTo(anime.memo))
+        }
+        val firstCard = card(11, 1, mapOf("primary" to 10L))
+        val bridge = card(21, 2, mapOf("primary" to 10L, "secondary" to 20L))
+        val conflicting = card(31, 3, mapOf("primary" to 11L, "secondary" to 20L))
+        val third = second.copy(id = 3, key = "three", sourceName = "Tre")
+        val group = access.copy(
+            group = access.group!!.copy(providers = listOf(first, second, third)),
+            providers = listOf(SourceHomeAccess(first), SourceHomeAccess(second), SourceHomeAccess(third)),
+        )
+        val merged = MergedSourceHomeRepository({ source ->
+            provider { flowOf(page(when (source.id) {
+                1L -> firstCard
+                2L -> bridge
+                else -> conflicting
+            })) }
+        }, { group })
+        val cards = merged.observe(group, SourceHomeRequest("popular")).last().data!!.items
+        assertEquals(2, cards.size)
+        assertEquals(listOf(1L, 2L), cards.first().homePresentation!!.choices.map { it.sourceId })
+    }
+
+    @Test fun searchOnlyQueriesProvidersThatAcceptChosenFilter() = runBlocking {
+        val filter = SourceHomeFilter("Genre", SourceHomeFilter.Kind.MULTIPLE, listOf("Fantasy"))
+        val limited = first.copy(search = shelf, browseFilters = listOf(filter))
+        val other = second.copy(search = shelf, browseFilters = emptyList())
+        val group = access.copy(
+            group = SourceHomeGroup("cartoons", "Cartoni", listOf(limited, other)),
+            providers = listOf(SourceHomeAccess(limited), SourceHomeAccess(other)),
+        )
+        val queried = mutableListOf<Long>()
+        val merged = MergedSourceHomeRepository({ source ->
+            provider { queried += source.id; flowOf(page(item(source.id, source.id))) }
+        }, { group })
+        merged.observe(group, SourceHomeRequest(SourceHomeRequest.SEARCH, filters = mapOf("Genre" to listOf("Fantasy")))).last()
+        assertEquals(listOf(1L), queried)
     }
 
     @Test fun failingProviderKeepsHealthyResultsAndNamesOnlyTheFailedSource() = runBlocking {

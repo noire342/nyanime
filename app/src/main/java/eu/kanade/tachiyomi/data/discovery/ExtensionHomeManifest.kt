@@ -20,6 +20,8 @@ data class ExtensionHomeManifest(
     val categories: Categories? = null,
     val primary: Boolean = false,
     val browseFilters: List<String> = emptyList(),
+    val random: Section? = null,
+    val randomEpisode: Section? = null,
 ) {
     @Serializable
     data class Source(val name: String, val lang: String)
@@ -59,6 +61,9 @@ data class ExtensionHomeManifest(
             variants.map { it.title }.distinct().size == 1 && variants.map { it.tab }.distinct().size == variants.size
         } &&
         (search == null || (search.id == "search" && text(search.title) && selections(search.filters))) &&
+        (random == null || (random.id == "random" && text(random.title) && selections(random.filters))) &&
+        (randomEpisode == null ||
+            (randomEpisode.id == "random-episode" && text(randomEpisode.title) && selections(randomEpisode.filters))) &&
         (
             categories == null ||
                 (text(categories.filter) && categories.exclude.size <= 100 && categories.exclude.all(::text))

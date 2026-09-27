@@ -25,11 +25,12 @@ fun SourceFeaturedSection(
     onBrowse: (() -> Unit)? = null,
     onRetry: () -> Unit,
     onOpen: (Anime) -> Unit,
+    onSources: ((Anime) -> Unit)? = null,
 ) {
     val items = state.data?.items.orEmpty().let { if (limit == null) it else it.take(limit) }
     Column {
         if (items.isNotEmpty()) {
-            SourceFeaturedCarousel(items, refreshKey, state.data?.title ?: title, onBrowse, onOpen)
+            SourceFeaturedCarousel(items, refreshKey, state.data?.title ?: title, onBrowse, onSources, onOpen)
         } else if (state.loading) {
             Box(Modifier.fillMaxWidth().height(320.dp).background(MaterialTheme.colorScheme.surfaceVariant))
         } else if (state.error == null) {

@@ -31,11 +31,13 @@ data class SourceHomeSource(
     val homeId: String = key,
     val primary: Boolean = false,
     val browseFilters: List<SourceHomeFilter> = emptyList(),
+    val random: SourceHomeSection? = null,
+    val randomEpisode: SourceHomeSection? = null,
 )
 
 data class SourceHomeListing(val loading: Boolean = true, val homes: List<SourceHomeSource> = emptyList()) {
     val groups: List<SourceHomeGroup> get() = homes.groupBy { it.homeId }.map { (id, providers) ->
-        val ordered = providers.sortedBy { it.key }
+        val ordered = providers.sortedWith(compareByDescending<SourceHomeSource> { it.primary }.thenBy { it.key })
         SourceHomeGroup(id, ordered.first().title, ordered)
     }.sortedWith(compareBy({ it.title }, { it.id }))
 }
@@ -81,14 +83,21 @@ data class SourceHomeGroup(val id: String, val title: String, val providers: Lis
         }
     }.map { Section(it.id, it.title) }
 
-    // Only controls understood by every searchable provider are offered for a merged catalogue.
+    // Expose the union; a filtered request only visits providers that can honor every selection.
     val browseFilters get(): List<SourceHomeFilter> {
         val searchable = providers.filter { it.search != null }
-        return searchable.firstOrNull()?.browseFilters.orEmpty().filter { filter ->
-            searchable.all { source -> source.browseFilters.any { it == filter } }
+        return searchable.flatMap { it.browseFilters }.groupBy { it.name }.mapNotNull { (_, definitions) ->
+            val first = definitions.first()
+            if (definitions.any { it.kind != first.kind }) return@mapNotNull null
+            first.copy(
+                options = definitions.flatMap { it.options }.distinct().take(200),
+                defaults = definitions.map { it.defaults }.distinct().singleOrNull().orEmpty(),
+            )
         }
     }
     val searchable get() = providers.any { it.search != null }
+    val hasRandom get() = providers.any { it.random != null }
+    val hasRandomEpisode get() = providers.any { it.randomEpisode != null }
     val sourceIds get() = providers.map { it.id }.toSet()
     fun sourceLabel(sourceId: Long) = providers.firstOrNull { it.id == sourceId }?.let {
         "${it.sourceName} · ${it.language.uppercase()}"
@@ -147,6 +156,8 @@ data class SourceHomeRequest(
 
     companion object {
         const val SEARCH = "search"
+        const val RANDOM = "random"
+        const val RANDOM_EPISODE = "random-episode"
     }
 }
 
