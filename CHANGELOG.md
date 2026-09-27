@@ -8,6 +8,14 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 27 settembre 2026 — Prossima uscita nella scheda del titolo
+
+- Il tempo che manca al prossimo episodio compare anche sotto lo studio,
+  prima dello stato e della fonte. Usa lo stesso conto alla rovescia della lista
+  episodi e rispetta la preferenza che ne controlla la visibilità.
+- Un refresh conserva la data nota se il tracker non è ancora disponibile o la
+  richiesta alla rete fallisce. La aggiorna soltanto dopo una risposta valida.
+
 ## 27 settembre 2026 — Prossima uscita degli episodi
 
 - La previsione del prossimo episodio è ora una scheda discreta nella lista:

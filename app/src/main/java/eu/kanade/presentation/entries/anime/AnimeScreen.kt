@@ -489,6 +489,15 @@ private fun AnimeScreenSmallImpl(
                             appBarPadding = topPadding,
                             anime = state.anime,
                             sourceName = remember { state.source.getNameForAnimeInfo() },
+                            nextAiringAtMillis = if (
+                                showNextEpisodeAirTime &&
+                                state.airingTime > 0L &&
+                                state.anime.status.toInt() != SAnime.COMPLETED
+                            ) {
+                                state.nextAiringEpisode.second * 1000L
+                            } else {
+                                null
+                            },
                             isStubSource = remember { state.source is StubAnimeSource },
                             onCoverClick = onCoverClicked,
                             doSearch = onSearch,
@@ -829,6 +838,15 @@ fun AnimeScreenLargeImpl(
                                 appBarPadding = contentPadding.calculateTopPadding(),
                                 anime = state.anime,
                                 sourceName = remember { state.source.getNameForAnimeInfo() },
+                                nextAiringAtMillis = if (
+                                    showNextEpisodeAirTime &&
+                                    state.airingTime > 0L &&
+                                    state.anime.status.toInt() != SAnime.COMPLETED
+                                ) {
+                                    state.nextAiringEpisode.second * 1000L
+                                } else {
+                                    null
+                                },
                                 isStubSource = remember { state.source is StubAnimeSource },
                                 onCoverClick = onCoverClicked,
                                 doSearch = onSearch,

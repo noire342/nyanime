@@ -121,6 +121,7 @@ fun AnimeInfoBox(
     appBarPadding: Dp,
     anime: Anime,
     sourceName: String,
+    nextAiringAtMillis: Long?,
     isStubSource: Boolean,
     onCoverClick: () -> Unit,
     doSearch: (query: String, global: Boolean) -> Unit,
@@ -132,6 +133,7 @@ fun AnimeInfoBox(
             appBarPadding,
             anime,
             sourceName,
+            nextAiringAtMillis,
             isStubSource,
             onCoverClick,
             doSearch,
@@ -165,6 +167,7 @@ fun AnimeInfoBox(
                 artist = anime.artist,
                 status = anime.status,
                 sourceName = sourceName,
+                nextAiringAtMillis = nextAiringAtMillis,
                 isStubSource = isStubSource,
                 doSearch = doSearch,
             )
@@ -178,6 +181,7 @@ private fun LegacyAnimeInfoBox(
     appBarPadding: Dp,
     anime: Anime,
     sourceName: String,
+    nextAiringAtMillis: Long?,
     isStubSource: Boolean,
     onCoverClick: () -> Unit,
     doSearch: (query: String, global: Boolean) -> Unit,
@@ -216,6 +220,7 @@ private fun LegacyAnimeInfoBox(
                     appBarPadding = appBarPadding,
                     anime = anime,
                     sourceName = sourceName,
+                    nextAiringAtMillis = nextAiringAtMillis,
                     isStubSource = isStubSource,
                     onCoverClick = onCoverClick,
                     doSearch = doSearch,
@@ -225,6 +230,7 @@ private fun LegacyAnimeInfoBox(
                     appBarPadding = appBarPadding,
                     anime = anime,
                     sourceName = sourceName,
+                    nextAiringAtMillis = nextAiringAtMillis,
                     isStubSource = isStubSource,
                     onCoverClick = onCoverClick,
                     doSearch = doSearch,
@@ -448,6 +454,7 @@ private fun AnimeAndSourceTitlesLarge(
     appBarPadding: Dp,
     anime: Anime,
     sourceName: String,
+    nextAiringAtMillis: Long?,
     isStubSource: Boolean,
     onCoverClick: () -> Unit,
     doSearch: (query: String, global: Boolean) -> Unit,
@@ -474,6 +481,7 @@ private fun AnimeAndSourceTitlesLarge(
             artist = anime.artist,
             status = anime.status,
             sourceName = sourceName,
+            nextAiringAtMillis = nextAiringAtMillis,
             isStubSource = isStubSource,
             doSearch = doSearch,
             textAlign = TextAlign.Center,
@@ -486,6 +494,7 @@ private fun AnimeAndSourceTitlesSmall(
     appBarPadding: Dp,
     anime: Anime,
     sourceName: String,
+    nextAiringAtMillis: Long?,
     isStubSource: Boolean,
     onCoverClick: () -> Unit,
     doSearch: (query: String, global: Boolean) -> Unit,
@@ -517,6 +526,7 @@ private fun AnimeAndSourceTitlesSmall(
                 artist = anime.artist,
                 status = anime.status,
                 sourceName = sourceName,
+                nextAiringAtMillis = nextAiringAtMillis,
                 isStubSource = isStubSource,
                 doSearch = doSearch,
             )
@@ -531,6 +541,7 @@ private fun ColumnScope.AnimeContentInfo(
     artist: String?,
     status: Long,
     sourceName: String,
+    nextAiringAtMillis: Long?,
     isStubSource: Boolean,
     doSearch: (query: String, global: Boolean) -> Unit,
     textAlign: TextAlign? = LocalTextStyle.current.textAlign,
@@ -611,6 +622,31 @@ private fun ColumnScope.AnimeContentInfo(
                     ),
                 textAlign = textAlign,
             )
+        }
+    }
+
+    if (nextAiringAtMillis != null) {
+        val duration = upcomingAiringDuration(nextAiringAtMillis)
+        if (duration != null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.secondaryItemAlpha(),
+                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.extraSmall),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Schedule,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = stringResource(AYMR.strings.next_episode_airing_summary, duration),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = textAlign,
+                )
+            }
         }
     }
 

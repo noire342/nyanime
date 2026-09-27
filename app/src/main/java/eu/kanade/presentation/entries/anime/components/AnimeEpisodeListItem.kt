@@ -314,6 +314,23 @@ fun NextEpisodeAiringListItem(
     airingAtMillis: Long,
     modifier: Modifier = Modifier,
 ) {
+    val duration = upcomingAiringDuration(airingAtMillis) ?: return
+    val locale = LocalConfiguration.current.locales[0]
+    val scheduledDate = remember(airingAtMillis, locale) {
+        DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.SHORT, locale)
+            .format(Date(airingAtMillis))
+    }
+
+    NextEpisodeAiringCard(
+        title = title,
+        scheduledDate = scheduledDate,
+        countdown = stringResource(AYMR.strings.next_episode_airing_relative, duration),
+        modifier = modifier,
+    )
+}
+
+@Composable
+internal fun upcomingAiringDuration(airingAtMillis: Long): String? {
     var remainingMillis by remember(airingAtMillis) {
         mutableLongStateOf(airingAtMillis - System.currentTimeMillis())
     }
@@ -324,13 +341,8 @@ fun NextEpisodeAiringListItem(
             remainingMillis = airingAtMillis - System.currentTimeMillis()
         }
     }
-    if (remainingMillis <= 0L) return
+    if (remainingMillis <= 0L) return null
 
-    val locale = LocalConfiguration.current.locales[0]
-    val scheduledDate = remember(airingAtMillis, locale) {
-        DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.SHORT, locale)
-            .format(Date(airingAtMillis))
-    }
     val minutesRemaining = ((remainingMillis + 59_999L) / 60_000L).coerceAtLeast(1L)
     val days = minutesRemaining / (24L * 60L)
     val hours = (minutesRemaining / 60L) % 24L
@@ -338,37 +350,22 @@ fun NextEpisodeAiringListItem(
     val dayCount = days.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     val hourCount = (minutesRemaining / 60L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     val minuteCount = minutesRemaining.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-    val countdown = when {
+    return when {
         days > 0L && hours > 0L -> stringResource(
-            AYMR.strings.next_episode_airing_in_two,
+            AYMR.strings.next_episode_airing_duration_two,
             pluralStringResource(AYMR.plurals.next_episode_airing_days, dayCount, dayCount),
             pluralStringResource(AYMR.plurals.next_episode_airing_hours, hours.toInt(), hours.toInt()),
         )
-        days > 0L -> stringResource(
-            AYMR.strings.next_episode_airing_in_one,
-            pluralStringResource(AYMR.plurals.next_episode_airing_days, dayCount, dayCount),
-        )
+        days > 0L -> pluralStringResource(AYMR.plurals.next_episode_airing_days, dayCount, dayCount)
         minutesRemaining >= 60L && minutes > 0L -> stringResource(
-            AYMR.strings.next_episode_airing_in_two,
+            AYMR.strings.next_episode_airing_duration_two,
             pluralStringResource(AYMR.plurals.next_episode_airing_hours, hourCount, hourCount),
             pluralStringResource(AYMR.plurals.next_episode_airing_minutes, minutes.toInt(), minutes.toInt()),
         )
-        minutesRemaining >= 60L -> stringResource(
-            AYMR.strings.next_episode_airing_in_one,
-            pluralStringResource(AYMR.plurals.next_episode_airing_hours, hourCount, hourCount),
-        )
-        else -> stringResource(
-            AYMR.strings.next_episode_airing_in_one,
-            pluralStringResource(AYMR.plurals.next_episode_airing_minutes, minuteCount, minuteCount),
-        )
+        minutesRemaining >= 60L ->
+            pluralStringResource(AYMR.plurals.next_episode_airing_hours, hourCount, hourCount)
+        else -> pluralStringResource(AYMR.plurals.next_episode_airing_minutes, minuteCount, minuteCount)
     }
-
-    NextEpisodeAiringCard(
-        title = title,
-        scheduledDate = scheduledDate,
-        countdown = countdown,
-        modifier = modifier,
-    )
 }
 
 @Composable

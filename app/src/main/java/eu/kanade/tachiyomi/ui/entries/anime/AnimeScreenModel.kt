@@ -1560,7 +1560,8 @@ class AnimeScreenModel(
             }
                 .distinctUntilChanged()
                 .collectLatest { trackItems ->
-                    updateAiringTime(anime, trackItems, manualFetch = false)
+                    updateSuccessState { it.copy(trackItems = trackItems) }
+                    updateAiringTime(successState?.anime ?: anime, trackItems, manualFetch = false)
                 }
         }
     }
@@ -1570,7 +1571,10 @@ class AnimeScreenModel(
         trackItems: List<AnimeTrackItem>,
         manualFetch: Boolean,
     ) {
-        val airingEpisodeData = AniChartApi().loadAiringTime(anime, trackItems, manualFetch)
+        val airingEpisodeData = AniChartApi().loadAiringTime(anime, trackItems, manualFetch) ?: return
+        val current = successState?.nextAiringEpisode ?: return
+        if (airingEpisodeData == current) return
+
         setAnimeViewerFlags.awaitSetNextEpisodeAiring(anime.id, airingEpisodeData)
         updateSuccessState { it.copy(nextAiringEpisode = airingEpisodeData) }
     }
