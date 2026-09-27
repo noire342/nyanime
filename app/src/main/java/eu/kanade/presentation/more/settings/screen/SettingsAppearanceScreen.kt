@@ -1,7 +1,6 @@
 package eu.kanade.presentation.more.settings.screen
 
 import android.app.Activity
-import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
@@ -11,8 +10,6 @@ import androidx.core.app.ActivityCompat
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.domain.ui.UiPreferences
-import eu.kanade.domain.ui.model.AppTheme
-import eu.kanade.domain.ui.model.NavStyle
 import eu.kanade.domain.ui.model.StartScreen
 import eu.kanade.domain.ui.model.TabletUiMode
 import eu.kanade.domain.ui.model.ThemeMode
@@ -20,9 +17,6 @@ import eu.kanade.domain.ui.model.setAppCompatDelegateThemeMode
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.screen.appearance.AppLanguageScreen
 import eu.kanade.presentation.more.settings.widget.AppThemeModePreferenceWidget
-import eu.kanade.presentation.more.settings.widget.AppThemePreferenceWidget
-import eu.kanade.tachiyomi.util.system.DeviceUtil
-import eu.kanade.tachiyomi.util.system.isDynamicColorAvailable
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableMap
@@ -60,26 +54,11 @@ object SettingsAppearanceScreen : SearchableSettings {
         val themeModePref = uiPreferences.themeMode()
         val themeMode by themeModePref.collectAsState()
 
-        val modernUi by uiPreferences.modernUi().collectAsState()
-        val appThemePref = if (modernUi) uiPreferences.appTheme() else uiPreferences.legacyAppTheme()
-        val appTheme by appThemePref.collectAsState()
-
         val amoledPref = uiPreferences.themeDarkAmoled()
-        val amoled by amoledPref.collectAsState()
 
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_theme),
             preferenceItems = persistentListOf(
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = uiPreferences.modernUi(),
-                    title = "ModernUI",
-                    subtitle = "Disattiva per tornare alla UI legacy. Manga resta sempre legacy.",
-                    onValueChanged = {
-                        uiPreferences.modernUi().set(it)
-                        (context as? Activity)?.let { ActivityCompat.recreate(it) }
-                        true
-                    },
-                ),
                 Preference.PreferenceItem.SwitchPreference(
                     preference = uiPreferences.sourceHomeLogo(),
                     title = "Logo della fonte nella Home",
@@ -89,35 +68,14 @@ object SettingsAppearanceScreen : SearchableSettings {
                 Preference.PreferenceItem.CustomPreference(
                     title = stringResource(MR.strings.pref_app_theme),
                 ) {
-                    Column {
-                        AppThemeModePreferenceWidget(
-                            value = themeMode,
-                            onItemClick = {
-                                themeModePref.set(it)
-                                setAppCompatDelegateThemeMode(it)
-                            },
-                        )
-
-                        AppThemePreferenceWidget(
-                            value = appTheme,
-                            amoled = amoled,
-                            onItemClick = { appThemePref.set(it) },
-                        )
-                    }
+                    AppThemeModePreferenceWidget(
+                        value = themeMode,
+                        onItemClick = {
+                            themeModePref.set(it)
+                            setAppCompatDelegateThemeMode(it)
+                        },
+                    )
                 },
-                Preference.PreferenceItem.ListPreference(
-                    preference = uiPreferences.legacyMangaTheme(),
-                    title = "Tema della sezione manga",
-                    entries = AppTheme.entries.filter {
-                        it.titleRes != null &&
-                            it != AppTheme.NYANIME &&
-                            (it != AppTheme.MONET || DeviceUtil.isDynamicColorAvailable)
-                    }.associateWith { stringResource(it.titleRes!!) }.toImmutableMap(),
-                    onValueChanged = {
-                        (context as? Activity)?.let { ActivityCompat.recreate(it) }
-                        true
-                    },
-                ),
                 Preference.PreferenceItem.SwitchPreference(
                     preference = amoledPref,
                     title = stringResource(MR.strings.pref_dark_theme_pure_black),
@@ -152,6 +110,11 @@ object SettingsAppearanceScreen : SearchableSettings {
                     title = stringResource(MR.strings.pref_app_language),
                     onClick = { navigator.push(AppLanguageScreen()) },
                 ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = uiPreferences.showNonItalianMangaHome(),
+                    title = "Manga in altre lingue nella Home",
+                    subtitle = "Di base mostra solo le fonti italiane. La tua biblioteca personale non viene filtrata.",
+                ),
                 Preference.PreferenceItem.ListPreference(
                     preference = uiPreferences.tabletUiMode(),
                     entries = TabletUiMode.entries
@@ -173,14 +136,6 @@ object SettingsAppearanceScreen : SearchableSettings {
                         context.toast(MR.strings.requires_app_restart)
                         true
                     },
-                ),
-                Preference.PreferenceItem.ListPreference(
-                    preference = uiPreferences.navStyle(),
-                    entries = NavStyle.entries
-                        .associateWith { stringResource(it.titleRes) }
-                        .toImmutableMap(),
-                    title = "Navigation Style",
-                    onValueChanged = { true },
                 ),
                 Preference.PreferenceItem.ListPreference(
                     preference = uiPreferences.dateFormat(),

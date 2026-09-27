@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.data.discovery
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.source.manga.interactor.GetMangaIncognitoState
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.tachiyomi.extension.manga.MangaExtensionManager
 import eu.kanade.tachiyomi.extension.manga.model.MangaExtension
 import eu.kanade.tachiyomi.source.CatalogueSource
@@ -27,6 +28,7 @@ class MangaHomeRegistry(
     private val base: BasePreferences,
     private val incognito: GetMangaIncognitoState,
     private val manifests: MangaHomeManifestReader,
+    private val uiPreferences: UiPreferences,
 ) {
     private val cached = IdentityHashMap<MangaExtension.Installed, List<ExtensionHomeManifest>>()
 
@@ -38,7 +40,8 @@ class MangaHomeRegistry(
             preferences.disabledMangaSources().changes(),
             preferences.enabledLanguages().changes(),
             preferences.showNsfwSource().changes(),
-        ) { _, _, _ -> Unit },
+            uiPreferences.showNonItalianMangaHome().changes(),
+        ) { _, _, _, _ -> Unit },
         combine(
             base.downloadedOnly().changes(),
             base.incognitoMode().changes(),
@@ -98,7 +101,11 @@ class MangaHomeRegistry(
 
     private fun isEnabled(id: Long, language: String, extension: MangaExtension.Installed): Boolean =
         id.toString() !in preferences.disabledMangaSources().get() &&
-            language in preferences.enabledLanguages().get() &&
+            (language == "it" || uiPreferences.showNonItalianMangaHome().get()) &&
+            (
+                language in preferences.enabledLanguages().get() ||
+                    (uiPreferences.showNonItalianMangaHome().get() && language != "it")
+                ) &&
             (preferences.showNsfwSource().get() || !extension.isNsfw)
 
     fun access(key: String): SourceHomeAccess {

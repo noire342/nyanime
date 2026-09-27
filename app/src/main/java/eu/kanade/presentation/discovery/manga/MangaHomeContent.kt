@@ -1,13 +1,5 @@
 package eu.kanade.presentation.discovery.manga
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,13 +26,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.outlined.Adjust
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -87,6 +78,8 @@ fun MangaHomeContent(
     state: MangaHomeState,
     onRefresh: () -> Unit,
     onSelectHome: (String) -> Unit,
+    onSelectAll: () -> Unit,
+    onPreferredSource: (Long) -> Unit,
     onManga: (Manga) -> Unit,
     onChapter: (MangaHomeItem, MangaHomeChapter) -> Unit,
     onResume: (MangaHistoryWithRelations) -> Unit,
@@ -94,14 +87,20 @@ fun MangaHomeContent(
     onMore: (SourceHomeSection) -> Unit,
     onRetry: (String) -> Unit,
     onUpdates: () -> Unit,
-    onNoticeClick: () -> Unit,
-    hasNewUpdates: Boolean,
     onUpdate: (MangaUpdatesWithRelations) -> Unit,
+    onLibrary: () -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
-    val motion = appMotionEnabled()
     val home = state.selected
+    val sections = if (state.mixed) {
+        state.homes.flatMap {
+            it.sections
+        }.distinctBy { it.id }
+    } else {
+        home?.sections.orEmpty()
+    }
+    val featuredItem = sections.firstOrNull()?.let { state.rows[it.id]?.page?.items?.firstOrNull() }
     val personalUpdates = state.updates
     var displayedSourceKey by rememberSaveable { mutableStateOf(home?.key) }
     LaunchedEffect(home?.key) {
@@ -140,48 +139,99 @@ fun MangaHomeContent(
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                home?.title ?: "Manga",
+                                if (state.mixed) "Manga" else home?.title ?: "Manga",
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
                             )
-                            home?.let { Text(it.sourceName, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        }
-                        if (!state.offline && home?.search != null) {
-                            IconButton(onClick = { home.search?.let { onArchive(it.selections) } }) {
-                                Icon(Icons.Outlined.Search, contentDescription = "Cerca nell’archivio")
-                            }
-                        }
-                        AnimatedVisibility(
-                            visible = hasNewUpdates,
-                            enter = if (motion) {
-                                expandHorizontally(
-                                    tween(220),
-                                ) +
-                                    fadeIn(tween(160))
-                            } else {
-                                EnterTransition.None
-                            },
-                            exit = if (motion) {
-                                shrinkHorizontally(
-                                    tween(180),
-                                ) +
-                                    fadeOut(tween(120))
-                            } else {
-                                ExitTransition.None
-                            },
-                        ) {
-                            IconButton(onClick = onNoticeClick, enabled = hasNewUpdates) {
-                                Icon(
-                                    Icons.Outlined.Adjust,
-                                    contentDescription = "Vai alle tue novità",
+                            home?.let {
+                                Text(
+                                    if (state.mixed) "Dalle tue fonti" else it.sourceName,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
-                        if (!state.offline) {
-                            IconButton(onClick = onRefresh, enabled = !refreshing) {
-                                Icon(Icons.Outlined.Refresh, contentDescription = "Aggiorna Home")
+                    }
+                }
+                item("library-shortcut") {
+                    FilledTonalButton(
+                        onClick = onLibrary,
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                    ) {
+                        Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Vai alla tua biblioteca")
+                    }
+                }
+                if (home != null) {
+                    item("hero") {
+                        Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(222.dp),
+                        ) {
+                            if (featuredItem == null) {
+                                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh))
+                            } else {
+                                Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    Artwork(
+                                        featuredItem.manga.copy(favorite = false),
+                                        featuredItem.manga.title,
+                                        Modifier.width(128.dp).clickable { onManga(featuredItem.manga) },
+                                    )
+                                    Column(
+                                        Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Text(
+                                            "IN PRIMO PIANO",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        Text(
+                                            featuredItem.manga.title,
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 3,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        if (featuredItem.alternateSources.isNotEmpty()) {
+                                            Text(
+                                                "${featuredItem.alternateSources.size + 1} fonti disponibili",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Spacer(Modifier.weight(1f))
+                                        Button(onClick = {
+                                            featuredItem.presentation?.chapters?.firstOrNull()?.let {
+                                                onChapter(featuredItem, it)
+                                            } ?: onManga(featuredItem.manga)
+                                        }) {
+                                            Text(
+                                                if (featuredItem.presentation?.chapters?.isNotEmpty() ==
+                                                    true
+                                                ) {
+                                                    "Leggi ora"
+                                                } else {
+                                                    "Apri manga"
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
+                    }
+                }
+                if (!state.initializing && state.homes.isEmpty()) {
+                    item("missing-source") {
+                        Text(
+                            "Installa e abilita un’estensione manga per esplorare la Home. " +
+                                "La tua biblioteca resta disponibile qui sopra.",
+                            Modifier.padding(horizontal = 20.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
                 if (state.homes.size > 1) {
@@ -190,9 +240,16 @@ fun MangaHomeContent(
                             contentPadding = PaddingValues(horizontal = 20.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
+                            item(key = "all") {
+                                FilterChip(
+                                    selected = state.mixed,
+                                    onClick = onSelectAll,
+                                    label = { Text("Per te") },
+                                )
+                            }
                             items(state.homes, key = { it.key }) {
                                 FilterChip(
-                                    selected = it.key == home?.key,
+                                    selected = !state.mixed && it.key == home?.key,
                                     onClick = { onSelectHome(it.key) },
                                     label = { Text(it.sourceName) },
                                 )
@@ -331,7 +388,7 @@ fun MangaHomeContent(
                             }
                         }
                     }
-                    home.sections.forEach { section ->
+                    sections.forEach { section ->
                         val row = state.rows[section.id]
                         item("heading:" + section.id) {
                             Row(
@@ -402,6 +459,7 @@ fun MangaHomeContent(
                                                 fontWeight = FontWeight.SemiBold,
 
                                             )
+                                            MangaSourceSelector(entry, state, onManga, onPreferredSource)
                                             entry.presentation?.chapters.orEmpty().forEach { chapter ->
                                                 ChapterButton(
                                                     chapter,
@@ -436,7 +494,7 @@ fun MangaHomeContent(
                                     group.forEach { entry ->
                                         MangaUpdateCard(entry, state.opening, {
                                             onManga(entry.manga)
-                                        }, Modifier.weight(1f)) {
+                                        }, state, onManga, onPreferredSource, Modifier.weight(1f)) {
                                             onChapter(entry, it)
                                         }
                                     }
@@ -477,6 +535,9 @@ private fun MangaUpdateCard(
     item: MangaHomeItem,
     opening: String?,
     onManga: () -> Unit,
+    state: MangaHomeState,
+    onSourceManga: (Manga) -> Unit,
+    onPreferredSource: (Long) -> Unit,
     modifier: Modifier = Modifier,
     onChapter: (MangaHomeChapter) -> Unit,
 ) {
@@ -512,6 +573,7 @@ private fun MangaUpdateCard(
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.titleMedium,
                 )
+                MangaSourceSelector(item, state, onSourceManga, onPreferredSource)
                 item.presentation?.badges?.takeIf { it.isNotEmpty() }?.let {
                     Text(
                         it.joinToString(" · "),
@@ -535,6 +597,43 @@ private fun MangaUpdateCard(
                         contentPadding = PaddingValues(horizontal = 0.dp),
                     ) { Text("Apri manga") }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MangaSourceSelector(
+    item: MangaHomeItem,
+    state: MangaHomeState,
+    onManga: (Manga) -> Unit,
+    onPreferredSource: (Long) -> Unit,
+) {
+    if (item.alternateSources.isEmpty()) return
+    var expanded by remember(item.key) { mutableStateOf(false) }
+    Box {
+        AssistChip(
+            onClick = { expanded = true },
+            label = { Text("${item.alternateSources.size + 1} fonti · scegli") },
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            (listOf(item.manga) + item.alternateSources).forEach { manga ->
+                val source = state.homes.firstOrNull { it.id == manga.source }?.sourceName
+                    ?: "Fonte ${manga.source}"
+                DropdownMenuItem(
+                    text = { Text("Apri da $source") },
+                    onClick = {
+                        expanded = false
+                        onManga(manga)
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Preferisci $source") },
+                    onClick = {
+                        expanded = false
+                        onPreferredSource(manga.source)
+                    },
+                )
             }
         }
     }

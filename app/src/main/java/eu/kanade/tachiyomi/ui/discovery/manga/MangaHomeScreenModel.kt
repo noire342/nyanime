@@ -10,6 +10,7 @@ import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.tachiyomi.data.discovery.MangaHomeChapter
 import eu.kanade.tachiyomi.data.discovery.MangaHomeItem
+import eu.kanade.tachiyomi.data.discovery.MangaHomeMerge
 import eu.kanade.tachiyomi.data.discovery.MangaHomePage
 import eu.kanade.tachiyomi.data.discovery.MangaHomeRegistry
 import eu.kanade.tachiyomi.data.discovery.MangaHomeService
@@ -53,6 +54,7 @@ data class MangaHomeState(
     val initializing: Boolean = true,
     val homes: List<SourceHomeSource> = emptyList(),
     val selected: SourceHomeSource? = null,
+    val mixed: Boolean = true,
     val offline: Boolean = false,
     val rows: Map<String, MangaHomeRowState> = emptyMap(),
     val history: List<MangaHistoryWithRelations> = emptyList(),
@@ -94,6 +96,7 @@ class MangaHomeScreenModel(
                         initializing = listing.loading,
                         homes = listing.homes,
                         selected = selected,
+                        mixed = if (previous == null) true else it.mixed,
                         offline = offline,
                         rows = emptyMap(),
                         opening = null,
@@ -145,12 +148,25 @@ class MangaHomeScreenModel(
 
     fun selectHome(key: String) {
         val selected = state.value.homes.firstOrNull { it.key == key } ?: return
-        if (selected == state.value.selected) return
+        if (selected == state.value.selected && !state.value.mixed) return
         loadJob?.cancel()
         openJob?.cancel()
         generation++
-        mutableState.update { it.copy(selected = selected, rows = emptyMap(), opening = null) }
+        mutableState.update { it.copy(selected = selected, mixed = false, rows = emptyMap(), opening = null) }
         refresh()
+    }
+
+    fun selectAll() {
+        if (state.value.mixed) return
+        loadJob?.cancel()
+        generation++
+        mutableState.update { it.copy(mixed = true, rows = emptyMap()) }
+        refresh()
+    }
+
+    fun preferSource(id: Long) {
+        uiPreferences.preferredMangaHomeSource().set(id)
+        if (state.value.mixed) refresh()
     }
 
     fun refresh() {
@@ -160,8 +176,19 @@ class MangaHomeScreenModel(
         val version = ++generation
         loadJob = screenModelScope.launch {
             coroutineScope {
-                home.sections.map { section ->
-                    async { fetch(home, SourceHomeRequest(section.id), version) }
+                val sections = if (state.value.mixed) {
+                    state.value.homes.flatMap { it.sections }.distinctBy { it.id }
+                } else {
+                    home.sections
+                }
+                sections.map { section ->
+                    async {
+                        if (state.value.mixed) {
+                            fetchMixed(SourceHomeRequest(section.id), version)
+                        } else {
+                            fetch(home, SourceHomeRequest(section.id), version)
+                        }
+                    }
                 }.awaitAll()
             }
         }
@@ -173,7 +200,113 @@ class MangaHomeScreenModel(
         if (row?.loading == true || state.value.offline) return
         val page = if (next) (row?.loadedPages ?: 0) + 1 else 1
         val version = generation
-        screenModelScope.launch { fetch(home, SourceHomeRequest(sectionId, page), version) }
+        screenModelScope.launch {
+            if (state.value.mixed) {
+                fetchMixed(SourceHomeRequest(sectionId, page), version)
+            } else {
+                fetch(home, SourceHomeRequest(sectionId, page), version)
+            }
+        }
+    }
+
+    private suspend fun fetchMixed(request: SourceHomeRequest, version: Int) {
+        if (version != generation) return
+        val providers = state.value.homes.filter { home -> home.sections.any { it.id == request.sectionId } }
+            .sortedWith(compareByDescending<SourceHomeSource> { it.primary }.thenBy { it.key })
+        if (providers.isEmpty()) return
+        mutableState.update { current ->
+            current.copy(
+                rows = current.rows +
+                    (
+                        request.sectionId to
+                            (current.rows[request.sectionId] ?: MangaHomeRowState()).copy(loading = true, error = null)
+                        ),
+            )
+        }
+        val results = coroutineScope {
+            providers.map { home ->
+                async {
+                    try {
+                        Result.success(service.fetch(home.key, request))
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        Result.failure(failure)
+                    }
+                }
+            }.awaitAll()
+        }
+        if (version != generation) return
+        val pages = results.mapNotNull { it.getOrNull() }
+        val error = if (pages.isEmpty()) {
+            results.firstNotNullOfOrNull { it.exceptionOrNull()?.message }
+                ?: "Caricamento non riuscito"
+        } else {
+            null
+        }
+        mutableState.update { current ->
+            val previous = if (request.page > 1) current.rows[request.sectionId]?.page?.items.orEmpty() else emptyList()
+            val merged = MangaHomeMerge.merge(
+                pages,
+                uiPreferences.preferredMangaHomeSource().get().takeIf { it != 0L },
+            )
+            current.copy(
+                rows = current.rows +
+                    (
+                        request.sectionId to MangaHomeRowState(
+                            merged.copy(items = (previous + merged.items).distinctBy(MangaHomeItem::key)),
+                            request.page,
+                            false,
+                            error,
+                        )
+                        ),
+            )
+        }
+        if (pages.size < 2 || version != generation) return
+        val enriched = coroutineScope {
+            pages.map { page ->
+                async {
+                    page.copy(
+                        items = page.items.mapIndexed { index, item ->
+                            if (index >= 8 || item.presentation?.catalogIds?.isNotEmpty() == true) {
+                                item
+                            } else {
+                                try {
+                                    service.enrichIdentity(item)
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (_: Exception) {
+                                    item
+                                }
+                            }
+                        },
+                    )
+                }
+            }.awaitAll()
+        }
+        if (version != generation) return
+        val richer = MangaHomeMerge.merge(
+            enriched,
+            uiPreferences.preferredMangaHomeSource().get().takeIf { it != 0L },
+        )
+        mutableState.update { current ->
+            val before = if (request.page > 1) {
+                current.rows[request.sectionId]?.page?.items.orEmpty()
+                    .filterNot { old -> richer.items.any { it.key == old.key } }
+            } else {
+                emptyList()
+            }
+            current.copy(
+                rows = current.rows +
+                    (
+                        request.sectionId to MangaHomeRowState(
+                            richer.copy(items = (before + richer.items).distinctBy(MangaHomeItem::key)),
+                            request.page,
+                            false,
+                        )
+                        ),
+            )
+        }
     }
 
     private suspend fun fetch(home: SourceHomeSource, request: SourceHomeRequest, version: Int) {
@@ -220,7 +353,7 @@ class MangaHomeScreenModel(
 
     fun openChapter(item: MangaHomeItem, chapter: MangaHomeChapter) {
         if (openJob?.isActive == true) return
-        val home = state.value.selected ?: return
+        val home = state.value.homes.firstOrNull { it.id == item.manga.source } ?: return
         val access = registry.access(home.key)
         if (access.offline || access.source == null || item.manga.source != home.id) return
         openJob = screenModelScope.launch {

@@ -53,6 +53,7 @@ import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.data.discovery.ContinueWatchingRefresher
 import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
+import eu.kanade.tachiyomi.ui.discovery.manga.MangaHomeTabContent
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.history.HistoriesTab
 import eu.kanade.tachiyomi.ui.home.HomeScreen
@@ -76,6 +77,8 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
 data object DiscoveryTab : Tab {
+    const val MANGA_CATEGORY = "nyanime:manga"
+
     override val options: TabOptions
         @Composable get() = TabOptions(5u, "Home", rememberVectorPainter(Icons.Outlined.Home))
 
@@ -89,19 +92,27 @@ data object DiscoveryTab : Tab {
                 restore = DiscoveryHomeAvailability::restoreSelection,
             ),
         ) { mutableStateOf<String?>(null) }
-        val homeKey = availability.selectedHome(selected)
-        LaunchedEffect(availability) { selected = availability.reconcileSelection(selected) }
+        val isManga = selected == MANGA_CATEGORY
+        val homeKey = if (isManga) null else availability.selectedHome(selected)
+        LaunchedEffect(availability) {
+            if (selected != MANGA_CATEGORY) selected = availability.reconcileSelection(selected)
+        }
+        val headerHomes = remember(availability.homes) {
+            availability.homes + SourceHomeGroup(MANGA_CATEGORY, "Manga", emptyList())
+        }
         val savedState = rememberSaveableStateHolder()
-        if (availability.loading) {
+        if (availability.loading && !isManga) {
             LoadingScreen()
             return
         }
-        savedState.SaveableStateProvider(homeKey?.let { "source:$it" } ?: "catalog") {
-            if (homeKey != null) {
-                SourceHomeContent(homeKey, availability.homes, onSelect = { selected = it })
+        savedState.SaveableStateProvider(if (isManga) "manga" else homeKey?.let { "source:$it" } ?: "catalog") {
+            if (isManga) {
+                MangaHomeTabContent(headerHomes) { selected = it }
+            } else if (homeKey != null) {
+                SourceHomeContent(homeKey, headerHomes, onSelect = { selected = it })
             } else {
                 AnimeContent(
-                    homes = availability.homes,
+                    homes = headerHomes,
                     onSelect = { selected = it },
                 )
             }

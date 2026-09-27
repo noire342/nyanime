@@ -18,6 +18,7 @@ data class MangaHomePresentation(
     val rank: Int? = null,
     val chapters: List<MangaHomeChapter> = emptyList(),
     val sectionTitle: String? = null,
+    val catalogIds: Map<String, Long> = emptyMap(),
 ) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
@@ -38,6 +39,9 @@ data class MangaHomePresentation(
                     it.label.isNotBlank() && it.label.length <= 200 && validChapterUrl(it.url)
                 }.take(5).map { it.copy(date = it.date?.take(100)) },
                 sectionTitle = value.sectionTitle?.takeIf { it.isNotBlank() && it.length <= 100 },
+                catalogIds = value.catalogIds.filter { (kind, id) ->
+                    kind.matches(Regex("[a-z0-9_-]{1,40}")) && id > 0
+                }.toList().take(8).toMap(),
             )
         }
 
@@ -49,7 +53,12 @@ data class MangaHomePresentation(
     }
 }
 
-data class MangaHomeItem(val manga: Manga, val presentation: MangaHomePresentation? = null) {
+data class MangaHomeItem(
+    val manga: Manga,
+    val presentation: MangaHomePresentation? = null,
+    val sourceTitle: String = manga.title,
+    val alternateSources: List<Manga> = emptyList(),
+) {
     val key: String get() = manga.source.toString() + ":" + manga.url + ":" + presentation?.id.orEmpty()
 }
 

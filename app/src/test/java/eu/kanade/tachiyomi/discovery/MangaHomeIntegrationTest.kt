@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.discovery
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.source.manga.interactor.GetMangaIncognitoState
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.tachiyomi.data.discovery.ExtensionHomeManifest
 import eu.kanade.tachiyomi.data.discovery.MangaHomeFilters
 import eu.kanade.tachiyomi.data.discovery.MangaHomeManifestReader
@@ -17,6 +18,7 @@ import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaHomeMetadata
+import eu.kanade.tachiyomi.source.model.SMangaTrackingMetadata
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -39,6 +41,7 @@ class MangaHomeIntegrationTest {
     private val manager = mockk<MangaSourceManager>()
     private val extensions = mockk<MangaExtensionManager>()
     private val preferences = mockk<SourcePreferences>()
+    private val uiPreferences = mockk<UiPreferences>()
     private val base = mockk<BasePreferences>()
     private val incognito = mockk<GetMangaIncognitoState>()
     private val reader = mockk<MangaHomeManifestReader>()
@@ -46,7 +49,7 @@ class MangaHomeIntegrationTest {
     private val extension = mockk<MangaExtension.Installed>()
     private val installed = MutableStateFlow(listOf(extension))
     private val toLocal = mockk<NetworkToLocalManga>()
-    private val registry = MangaHomeRegistry(manager, extensions, preferences, base, incognito, reader)
+    private val registry = MangaHomeRegistry(manager, extensions, preferences, base, incognito, reader, uiPreferences)
     private val service = MangaHomeService(registry, manager, toLocal)
     private val key = "test.extension:manga:42"
 
@@ -66,6 +69,7 @@ class MangaHomeIntegrationTest {
         every { preferences.disabledMangaSources().get() } returns emptySet()
         every { preferences.enabledLanguages().get() } returns setOf("it")
         every { preferences.showNsfwSource().get() } returns true
+        every { uiPreferences.showNonItalianMangaHome().get() } returns false
         every { base.downloadedOnly().get() } returns false
         every { incognito.await(any()) } returns false
         every { reader.read(extension) } returns listOf(manifest())
@@ -84,6 +88,22 @@ class MangaHomeIntegrationTest {
         assertEquals(listOf("chapter-2", "chapter-1"), page.items.map { it.presentation?.id })
         assertTrue(page.items.all { it.manga.id == 7L && it.manga.favorite && it.manga.title == "Personal title" })
         assertTrue(page.items.all { it.manga.thumbnailUrl == "https://images.test/volume.jpg" })
+    }
+
+    @Test
+    fun trackingIdsArePreservedEvenWithoutHomePresentation() = runBlocking {
+        val local = Manga.create().copy(id = 7, source = 42, url = "/series", title = "Personal title")
+        coEvery { toLocal.await(any()) } returns local
+        val remote = SManga.create().apply {
+            url = "/series"
+            title = "Source title"
+            (this as SMangaTrackingMetadata).trackingMetadata = """{"ids":{"anilist":176740}}"""
+        }
+        coEvery { engine.getSearchManga(1, "", any()) } returns MangasPage(listOf(remote), false)
+
+        val page = service.fetch(key, SourceHomeRequest("trending"))
+
+        assertEquals(mapOf("anilist" to 176740L), page.items.single().presentation?.catalogIds)
     }
 
     @Test

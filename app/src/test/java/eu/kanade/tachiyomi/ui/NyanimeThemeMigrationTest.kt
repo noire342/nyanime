@@ -19,7 +19,7 @@ import tachiyomi.core.common.preference.InMemoryPreferenceStore.InMemoryPreferen
 import tachiyomi.core.common.preference.PreferenceStore
 
 class NyanimeThemeMigrationTest {
-    @Test fun modernUiDefaultsOnAndTurningItOffSurvivesRestartWithoutChangingThemes() {
+    @Test fun modernUiIsAlwaysActiveAfterMigrationWhileOldThemeChoicesRemainStored() {
         val store = store()
         val preferences = UiPreferences(store)
         preferences.appTheme().set(AppTheme.DOOM)
@@ -27,12 +27,12 @@ class NyanimeThemeMigrationTest {
         assertTrue(preferences.modernUi().get())
         assertEquals(AppTheme.NYANIME, preferences.activeAppTheme())
         preferences.modernUi().set(false)
-        assertEquals(AppTheme.DOOM, preferences.activeAppTheme())
+        assertEquals(AppTheme.NYANIME, preferences.activeAppTheme())
         preferences.legacyAppTheme().set(AppTheme.LAVENDER)
         val recreated = UiPreferences(store)
         recreated.installNyanimeThemeOnce()
         assertFalse(recreated.modernUi().get())
-        assertEquals(AppTheme.LAVENDER, recreated.activeAppTheme())
+        assertEquals(AppTheme.NYANIME, recreated.activeAppTheme())
         assertEquals(AppTheme.DOOM, recreated.legacyMangaTheme().get())
         recreated.modernUi().set(true)
         assertEquals(AppTheme.NYANIME, recreated.activeAppTheme())

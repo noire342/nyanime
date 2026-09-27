@@ -1,6 +1,8 @@
 package eu.kanade.tachiyomi.data.discovery
 
 import eu.kanade.domain.entries.manga.model.toDomainManga
+import eu.kanade.domain.entries.manga.model.toSManga
+import eu.kanade.tachiyomi.data.track.SourceTrackingHints
 import eu.kanade.tachiyomi.source.CatalogueSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
@@ -8,10 +10,12 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.entries.manga.interactor.NetworkToLocalManga
 import tachiyomi.domain.source.manga.service.MangaSourceManager
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 
 class MangaHomeService(
     private val registry: MangaHomeRegistry,
@@ -19,6 +23,36 @@ class MangaHomeService(
     private val toLocal: NetworkToLocalManga,
 ) {
     private val requests = Semaphore(2)
+    private val identityRequests = Semaphore(2)
+    private val identityCache = ConcurrentHashMap<String, Map<String, Long>>()
+
+    suspend fun enrichIdentity(item: MangaHomeItem): MangaHomeItem {
+        if (item.presentation?.catalogIds?.isNotEmpty() == true) return item
+        val key = "${item.manga.source}:${item.manga.url}"
+        val ids = identityCache[key] ?: identityRequests.withPermit {
+            identityCache[key] ?: withTimeoutOrNull(6_000) {
+                val source = manager.get(item.manga.source) ?: return@withTimeoutOrNull emptyMap()
+                val details = source.getMangaDetails(item.manga.toSManga())
+                SourceTrackingHints.from(details).catalogIds()
+            }.orEmpty().also { found ->
+                if (identityCache.size > 512) identityCache.clear()
+                if (found.isNotEmpty()) identityCache[key] = found
+            }
+        }
+        return if (ids.isEmpty()) {
+            item
+        } else {
+            item.copy(
+                presentation = (item.presentation ?: MangaHomePresentation()).copy(catalogIds = ids),
+            )
+        }
+    }
+
+    private fun SourceTrackingHints?.catalogIds(): Map<String, Long> = buildMap {
+        this@catalogIds?.anilistId?.let { put("anilist", it) }
+        this@catalogIds?.malId?.let { put("myanimelist", it) }
+        this@catalogIds?.mangaUpdatesId?.let { put("mangaupdates", it) }
+    }
 
     suspend fun fetch(key: String, request: SourceHomeRequest): MangaHomePage = withContext(Dispatchers.IO) {
         requests.withPermit {
@@ -38,7 +72,13 @@ class MangaHomeService(
                     val result = source.getSearchManga(request.page, request.query.trim(), filters)
                     check(access == registry.access(key)) { "La fonte è stata disabilitata" }
                     val items = result.mangas.take(100).map { remote ->
-                        val presentation = MangaHomePresentation.from(remote)
+                        val home = MangaHomePresentation.from(remote)
+                        val catalogIds = SourceTrackingHints.from(remote).catalogIds()
+                        val presentation = if (catalogIds.isEmpty()) {
+                            home
+                        } else {
+                            (home ?: MangaHomePresentation()).copy(catalogIds = home?.catalogIds.orEmpty() + catalogIds)
+                        }
                         val local = toLocal.await(remote.toDomainManga(source.id))
                         MangaHomeItem(
                             local.copy(
@@ -46,6 +86,7 @@ class MangaHomeService(
                                 remote.thumbnail_url?.takeIf(String::isNotBlank) ?: local.thumbnailUrl,
                             ),
                             presentation,
+                            remote.title,
                         )
                     }.distinctBy(MangaHomeItem::key)
                     check(access == registry.access(key)) { "La fonte è stata disabilitata" }

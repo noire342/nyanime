@@ -375,6 +375,7 @@ class MangaScreen(
         when (val previousController = navigator.items[navigator.size - 2]) {
             is HomeScreen -> {
                 navigator.pop()
+                HomeScreen.openTab(HomeScreen.Tab.Library())
                 MangaLibraryTab.search(query)
             }
             is BrowseMangaSourceScreen -> {

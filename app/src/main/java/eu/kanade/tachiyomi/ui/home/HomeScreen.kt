@@ -58,6 +58,7 @@ import eu.kanade.tachiyomi.ui.download.DownloadsTab
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.history.HistoriesTab
+import eu.kanade.tachiyomi.ui.library.LibrariesTab
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryTab
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import eu.kanade.tachiyomi.ui.more.MoreTab
@@ -94,15 +95,20 @@ object HomeScreen : Screen() {
 
     @Composable
     override fun Content() {
-        remember { uiPreferences.installDiscoveryNavigationOnce() }
-        val defaultTab = uiPreferences.startScreen().get().tab
-        val navStyle by uiPreferences.navStyle().collectAsState()
+        remember { uiPreferences.installModernNavigationOnce() }
+        val startScreen = uiPreferences.startScreen().get()
+        val defaultTab = startScreen.tab
+        remember(startScreen) {
+            if (startScreen == eu.kanade.domain.ui.model.StartScreen.MANGA) LibrariesTab.showManga()
+            if (startScreen == eu.kanade.domain.ui.model.StartScreen.ANIME) LibrariesTab.showAnime()
+        }
+        val navStyle = eu.kanade.domain.ui.model.NavStyle.DISCOVERY
         val navigator = LocalNavigator.currentOrThrow
         TabNavigator(
             tab = defaultTab,
             key = TAB_NAVIGATOR_KEY,
         ) { tabNavigator ->
-            MangaSectionTheme(legacy = tabNavigator.current == MangaLibraryTab) {
+            MangaSectionTheme(legacy = false) {
                 val modern = LocalNyanimeStyle.current
                 val motion = modernMotionEnabled()
                 // Provide usable navigator to content screen
@@ -209,11 +215,13 @@ object HomeScreen : Screen() {
             LaunchedEffect(Unit) {
                 launch {
                     librarySearchEvent.receiveAsFlow().collectLatest {
-                        tabNavigator.current = if (defaultTab == MangaLibraryTab) MangaLibraryTab else AnimeLibraryTab
-                        when (defaultTab) {
-                            AnimeLibraryTab -> AnimeLibraryTab.search(it)
-                            MangaLibraryTab -> MangaLibraryTab.search(it)
-                            else -> AnimeLibraryTab.search(it)
+                        tabNavigator.current = LibrariesTab
+                        if (startScreen == eu.kanade.domain.ui.model.StartScreen.MANGA) {
+                            LibrariesTab.showManga()
+                            MangaLibraryTab.search(it)
+                        } else {
+                            LibrariesTab.showAnime()
+                            AnimeLibraryTab.search(it)
                         }
                     }
                 }
@@ -221,8 +229,8 @@ object HomeScreen : Screen() {
                     openTabEvent.receiveAsFlow().collectLatest {
                         tabNavigator.current = when (it) {
                             is Tab.Home -> eu.kanade.tachiyomi.ui.discovery.DiscoveryTab
-                            is Tab.AnimeLib -> AnimeLibraryTab
-                            is Tab.Library -> MangaLibraryTab.also { tab -> tab.libraryRequested.value = true }
+                            is Tab.AnimeLib -> LibrariesTab.also { LibrariesTab.showAnime() }
+                            is Tab.Library -> LibrariesTab.also { LibrariesTab.showManga() }
                             is Tab.Updates -> UpdatesTab
                             is Tab.History -> HistoriesTab
                             is Tab.Browse -> {
@@ -289,7 +297,7 @@ object HomeScreen : Screen() {
                     } else {
                         MaterialTheme.typography.labelLarge
                     },
-                    maxLines = 1,
+                    maxLines = if (tab == LibrariesTab) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             },
@@ -331,7 +339,7 @@ object HomeScreen : Screen() {
                     } else {
                         MaterialTheme.typography.labelLarge
                     },
-                    maxLines = 1,
+                    maxLines = if (tab == LibrariesTab) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             },
@@ -407,6 +415,7 @@ object HomeScreen : Screen() {
     }
 
     private fun navigationTag(tab: cafe.adriel.voyager.navigator.tab.Tab) = when (tab) {
+        LibrariesTab -> "libraries"
         AnimeLibraryTab -> "library_anime"
         MangaLibraryTab -> "library_manga"
         BrowseTab -> "browse"

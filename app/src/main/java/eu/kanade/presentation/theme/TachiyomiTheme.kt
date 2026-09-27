@@ -44,25 +44,15 @@ import uy.kohesive.injekt.api.get
 val LocalNyanimeStyle = staticCompositionLocalOf { false }
 internal val LocalMangaSurfaces = staticCompositionLocalOf<SnapshotStateMap<Any, Color>?> { null }
 
-/** Manga retains the theme selected before the anime interface was redesigned. */
+/** Compatibility wrapper for existing manga screens; the app now has one visual theme. */
 @Composable
 fun LegacyMangaTheme(content: @Composable () -> Unit) {
-    val preferences = Injekt.get<UiPreferences>()
-    BaseTachiyomiTheme(preferences.legacyMangaTheme().get(), preferences.themeDarkAmoled().get(), modernUi = false) {
-        val surfaces = LocalMangaSurfaces.current
-        val surface = MaterialTheme.colorScheme.surface
-        DisposableEffect(surfaces, surface) {
-            val owner = Any()
-            surfaces?.set(owner, surface)
-            onDispose { surfaces?.remove(owner) }
-        }
-        content()
-    }
+    content()
 }
 
 @Composable
 fun MangaSectionTheme(legacy: Boolean, content: @Composable () -> Unit) {
-    if (legacy) LegacyMangaTheme(content) else content()
+    content()
 }
 
 @Composable
@@ -75,7 +65,7 @@ fun TachiyomiTheme(
     BaseTachiyomiTheme(
         appTheme = appTheme ?: uiPreferences.activeAppTheme(),
         isAmoled = amoled ?: uiPreferences.themeDarkAmoled().get(),
-        modernUi = appTheme?.let { it == AppTheme.NYANIME } ?: uiPreferences.modernUi().get(),
+        modernUi = appTheme?.let { it == AppTheme.NYANIME } ?: true,
         content = content,
     )
 }

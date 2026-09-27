@@ -28,6 +28,10 @@ class UiPreferences(
 
     fun sourceHomeLogo() = preferenceStore.getBoolean("source_home_logo", false)
 
+    fun showNonItalianMangaHome() = preferenceStore.getBoolean("nyanime_manga_home_other_languages", false)
+
+    fun preferredMangaHomeSource() = preferenceStore.getLong("nyanime_manga_home_preferred_source", 0L)
+
     fun inAppUpdateInstallation() = preferenceStore.getBoolean("nyanime_in_app_update_installation", true)
 
     fun dismissedReadyUpdate() = preferenceStore.getString("nyanime_dismissed_ready_update")
@@ -44,7 +48,7 @@ class UiPreferences(
 
     fun legacyAppTheme() = preferenceStore.getEnum("nyanime_legacy_app_theme", legacyMangaTheme().get())
 
-    fun activeAppTheme() = if (modernUi().get()) appTheme().get() else legacyAppTheme().get()
+    fun activeAppTheme() = AppTheme.NYANIME
 
     private val legacyDefaultTheme get() = if (DeviceUtil.isDynamicColorAvailable) AppTheme.MONET else AppTheme.DEFAULT
 
@@ -73,6 +77,16 @@ class UiPreferences(
         val migrated = preferenceStore.getBoolean("fork_discovery_navigation_v1", false)
         if (migrated.get()) return
         startScreen().set(StartScreen.HOME)
+        navStyle().set(NavStyle.DISCOVERY)
+        migrated.set(true)
+    }
+
+    fun installModernNavigationOnce() {
+        installDiscoveryNavigationOnce()
+        val migrated = preferenceStore.getBoolean("nyanime_modern_navigation_v2", false)
+        if (migrated.get()) return
+        modernUi().set(true)
+        appTheme().set(AppTheme.NYANIME)
         navStyle().set(NavStyle.DISCOVERY)
         migrated.set(true)
     }

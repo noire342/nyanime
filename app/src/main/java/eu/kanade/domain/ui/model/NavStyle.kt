@@ -13,6 +13,7 @@ import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.browse.BrowseTab
 import eu.kanade.tachiyomi.ui.history.HistoriesTab
+import eu.kanade.tachiyomi.ui.library.LibrariesTab
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryTab
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import eu.kanade.tachiyomi.ui.more.MoreTab
@@ -60,8 +61,7 @@ enum class NavStyle(
             if (this == DISCOVERY) {
                 return listOf(
                     eu.kanade.tachiyomi.ui.discovery.DiscoveryTab,
-                    AnimeLibraryTab,
-                    MangaLibraryTab,
+                    LibrariesTab,
                     BrowseTab,
                     MoreTab,
                 )

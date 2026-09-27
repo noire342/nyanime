@@ -1,17 +1,10 @@
 package eu.kanade.presentation.discovery
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.android.tools.screenshot.PreviewTest
-import eu.kanade.domain.ui.model.AppTheme
 import eu.kanade.presentation.discovery.manga.MangaHomeContent
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import eu.kanade.tachiyomi.data.discovery.MangaHomeChapter
@@ -118,30 +111,25 @@ private fun MangaPreview(firstItem: Int = 0, error: Boolean = false) {
             }
         },
     )
-    TachiyomiPreviewTheme(appTheme = AppTheme.DEFAULT, modernUi = false) {
+    TachiyomiPreviewTheme {
         Surface {
-            Column(Modifier.fillMaxSize()) {
-                PrimaryTabRow(selectedTabIndex = 0) {
-                    Tab(selected = true, onClick = {}, text = { Text("Home") })
-                    Tab(selected = false, onClick = {}, text = { Text("Biblioteca") })
-                }
-                MangaHomeContent(
-                    state = state,
-                    onRefresh = {},
-                    onSelectHome = {},
-                    onManga = {},
-                    onChapter = { _, _ -> },
-                    onResume = {},
-                    onArchive = {},
-                    onMore = {},
-                    onRetry = {},
-                    onUpdates = {},
-                    onNoticeClick = {},
-                    hasNewUpdates = false,
-                    onUpdate = {},
-                    listState = rememberLazyListState(firstItem),
-                )
-            }
+            MangaHomeContent(
+                state = state,
+                onRefresh = {},
+                onSelectHome = {},
+                onSelectAll = {},
+                onPreferredSource = {},
+                onManga = {},
+                onChapter = { _, _ -> },
+                onResume = {},
+                onArchive = {},
+                onMore = {},
+                onRetry = {},
+                onUpdates = {},
+                onUpdate = {},
+                onLibrary = {},
+                listState = rememberLazyListState(firstItem),
+            )
         }
     }
 }
