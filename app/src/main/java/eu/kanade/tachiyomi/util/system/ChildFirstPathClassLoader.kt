@@ -21,6 +21,9 @@ class ChildFirstPathClassLoader(
     private val systemClassLoader: ClassLoader? = getSystemClassLoader()
 
     override fun loadClass(name: String?, resolve: Boolean): Class<*> {
+        // Optional APIs can be bundled as stubs by extensions. Their runtime identity belongs to the host.
+        if (name in HOST_SOURCE_CONTRACTS) return super.loadClass(name, resolve)
+
         var c = findLoadedClass(name)
 
         if (c == null && systemClassLoader != null) {
@@ -82,5 +85,14 @@ class ChildFirstPathClassLoader(
         } catch (_: IOException) {
             return null
         }
+    }
+
+    private companion object {
+        val HOST_SOURCE_CONTRACTS = setOf(
+            "eu.kanade.tachiyomi.animesource.AnimeCatalogIdResolver",
+            "eu.kanade.tachiyomi.animesource.RelatedMangaLinks",
+            "eu.kanade.tachiyomi.source.MangaCatalogIdResolver",
+            "eu.kanade.tachiyomi.source.MangaCatalogLinkResolver",
+        )
     }
 }

@@ -23,6 +23,10 @@ I contratti sono facoltativi e mantengono nell'estensione ogni regola del sito:
 - `MangaCatalogLinkResolver.findMangaByCatalogLink(url)` accetta soltanto link
   appartenenti al catalogo che l'estensione gestisce.
 
+Queste interfacce mantengono nome e firme nella build ottimizzata. Se un APK
+include stub con gli stessi nomi, il caricamento usa le definizioni dell'app:
+l'identità del contratto resta unica anche tra class loader distinti.
+
 L'app passa un identificativo di catalogo, non costruisce URL del sito e non
 interpreta il suo HTML. I dettagli restituiti devono contenere gli ID secondo il
 [contratto dei metadati](extension-tracking-metadata.md). Nyanime controlla che

@@ -17,6 +17,9 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 - Corretto il mantenimento dei contratti di ricerca nelle build ottimizzate:
   i collegamenti forniti dalle estensioni possono aprire anche manga mai aggiunti
   alla libreria e senza un tracking già impostato.
+- Le estensioni che includono copie delle interfacce facoltative usano ora la
+  definizione fornita dall'app, così la ricerca per ID e i link diretti vengono
+  riconosciuti anche dopo il caricamento degli APK.
 
 ## 28 settembre 2026 — Dall'anime al manga
 
