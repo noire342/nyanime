@@ -14,6 +14,9 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   alla stessa opera, distinguendo il rapporto indiretto da un adattamento diretto.
   Gli intervalli stagione/episodio documentati aiutano a scegliere l'arco, senza
   usarli per indovinare un capitolo esatto.
+- Corretto il mantenimento dei contratti di ricerca nelle build ottimizzate:
+  i collegamenti forniti dalle estensioni possono aprire anche manga mai aggiunti
+  alla libreria e senza un tracking già impostato.
 
 ## 28 settembre 2026 — Dall'anime al manga
 
