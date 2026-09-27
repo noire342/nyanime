@@ -40,6 +40,7 @@ import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
 import eu.kanade.tachiyomi.data.library.anime.AnimeForegroundRefreshGate
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
+import eu.kanade.tachiyomi.data.track.AnimeMangaContinuity
 import eu.kanade.tachiyomi.data.track.EnhancedAnimeTracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.source.anime.isSourceForTorrents
@@ -55,6 +56,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.ensureActive
@@ -66,6 +68,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import logcat.LogPriority
 import mihon.domain.items.episode.interactor.FilterEpisodesForDownload
 import mihon.domain.source.interactor.UpdateAnimeFromRemote
@@ -75,6 +78,7 @@ import tachiyomi.core.common.preference.TriState
 import tachiyomi.core.common.preference.mapAsCheckboxState
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.launchNonCancellable
+import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
@@ -152,11 +156,51 @@ class AnimeScreenModel(
     private val updateAnimeFromRemote: UpdateAnimeFromRemote = Injekt.get(),
     private val torrentServerUtils: TorrentServerUtils = Injekt.get(),
     internal val setAnimeViewerFlags: SetAnimeViewerFlags = Injekt.get(),
+    private val mangaContinuity: AnimeMangaContinuity = Injekt.get(),
     val snackbarHostState: SnackbarHostState = SnackbarHostState(),
 ) : StateScreenModel<AnimeScreenModel.State>(State.Loading) {
 
     private val successState: State.Success?
         get() = state.value as? State.Success
+
+    private data class ContinuityRequest(
+        val metadata: JsonObject,
+        val trackedAniListId: Long?,
+        val trackedMalId: Long?,
+        val watchedEpisode: Double?,
+    )
+
+    private var continuityRequest: ContinuityRequest? = null
+    private var continuityJob: Job? = null
+
+    fun updateMangaContinuity(trackedAniListId: Long?, trackedMalId: Long?, watchedEpisode: Double?) {
+        val current = successState ?: return
+        val request = ContinuityRequest(current.anime.memo, trackedAniListId, trackedMalId, watchedEpisode)
+        if (request == continuityRequest) return
+        continuityRequest = request
+        continuityJob?.cancel()
+        continuityJob = screenModelScope.launch {
+            try {
+                val result = withIOContext {
+                    mangaContinuity.resolve(
+                        current.anime,
+                        current.source,
+                        trackedAniListId,
+                        trackedMalId,
+                        watchedEpisode,
+                    )
+                }
+                if (continuityRequest == request) {
+                    updateSuccessState { it.copy(mangaContinuity = result) }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                logcat(LogPriority.WARN, error) { "Manga continuity metadata unavailable" }
+                if (continuityRequest == request) continuityRequest = null
+            }
+        }
+    }
 
     val anime: Anime?
         get() = successState?.anime
@@ -1651,6 +1695,7 @@ class AnimeScreenModel(
             val hasLoggedInTrackers: Boolean = false,
             val relatedAnime: List<AnimeRelationGroup> = emptyList(),
             val isLoadingRelatedAnime: Boolean = false,
+            val mangaContinuity: AnimeMangaContinuity.Result? = null,
             val isRefreshingData: Boolean = false,
             val dialog: Dialog? = null,
             val hasPromptedToAddBefore: Boolean = false,

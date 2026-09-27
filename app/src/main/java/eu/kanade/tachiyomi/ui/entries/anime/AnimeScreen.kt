@@ -51,7 +51,6 @@ import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
-import eu.kanade.tachiyomi.data.track.AnimeMangaContinuity
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.source.anime.isLocalOrStub
 import eu.kanade.tachiyomi.source.anime.isSourceForTorrents
@@ -73,7 +72,6 @@ import eu.kanade.tachiyomi.ui.webview.WebViewScreen
 import eu.kanade.tachiyomi.util.system.copyToClipboard
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
@@ -146,24 +144,8 @@ class AnimeScreen(
         val watchedEpisode = successState.episodes.map { it.episode }
             .filter { it.episodeNumber > 0 && (it.seen || it.lastSecondSeen > 0) }
             .maxOfOrNull { it.episodeNumber }
-        var continuity by remember(successState.anime.id) {
-            mutableStateOf<AnimeMangaContinuity.Result?>(null)
-        }
-        LaunchedEffect(successState.anime.id, trackedAniListId, trackedMalId, watchedEpisode) {
-            try {
-                continuity = Injekt.get<AnimeMangaContinuity>().resolve(
-                    successState.anime,
-                    successState.source,
-                    trackedAniListId,
-                    trackedMalId,
-                    watchedEpisode,
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                logcat(LogPriority.WARN, error) { "Manga continuity metadata unavailable" }
-                continuity = null
-            }
+        LaunchedEffect(successState.anime.memo, trackedAniListId, trackedMalId, watchedEpisode) {
+            screenModel.updateMangaContinuity(trackedAniListId, trackedMalId, watchedEpisode)
         }
 
         LaunchedEffect(successState.anime, screenModel.source) {
@@ -180,7 +162,7 @@ class AnimeScreen(
 
         AnimeScreen(
             state = successState,
-            continuity = continuity,
+            continuity = successState.mangaContinuity,
             onOpenManga = { manga, chapter ->
                 navigator.push(MangaScreen(manga.id, fromSource = !manga.favorite, chapterTarget = chapter))
             },

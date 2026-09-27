@@ -43,3 +43,9 @@ esplicita di recupero; non sceglie automaticamente un risultato simile.
 L'apertura di una copia non la aggiunge alla libreria e non modifica il progresso
 anime. I servizi di catalogo ricevono ID; non ricevono cookie della fonte,
 credenziali del tracker o URL di riproduzione.
+
+Il risultato resta nello stato della scheda durante il passaggio al manga e il
+ritorno. La richiesta segue il ciclo di vita della scheda, non quello della sua
+composizione: non ricomincia a ogni ritorno e non sparisce durante un aggiornamento
+del tracking o del punto raggiunto. Una risposta superata non sostituisce quella
+relativa alla richiesta corrente; un errore conserva il risultato precedente.

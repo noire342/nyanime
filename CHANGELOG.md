@@ -20,6 +20,9 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 - Le estensioni che includono copie delle interfacce facoltative usano ora la
   definizione fornita dall'app, così la ricerca per ID e i link diretti vengono
   riconosciuti anche dopo il caricamento degli APK.
+- Tornando dal manga, la card dell'anime conserva copertina, copie e riferimenti
+  già caricati. Le richieste in corso proseguono con la scheda e gli aggiornamenti
+  non rimuovono temporaneamente i risultati precedenti.
 
 ## 28 settembre 2026 — Dall'anime al manga
 
