@@ -23,6 +23,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   Home usa più fonti, il logo di un singolo sito non sostituisce Nyanime.
 - La barra dei generi mostra di nuovo tutte le categorie disponibili. Le due
   scelte casuali sono raccolte in Esplora, fuori dalla barra dei generi.
+- Uscendo dal player dopo l'apertura diretta di un episodio, la scheda conserva
+  lo stato dell'avvio e non rilancia una seconda volta il player.
 
 ## 27 settembre 2026 — Tracking dei titoli nella libreria
 

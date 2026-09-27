@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -113,7 +114,11 @@ class AnimeScreen(
         }
 
         val successState = state as AnimeScreenModel.State.Success
-        var targetOpened by remember(animeId, episodeTarget) { androidx.compose.runtime.mutableStateOf(false) }
+        // Returning from the landscape player can recreate MainActivity. Keep this one-shot
+        // launch consumed across that recreation or a second player races mpv teardown.
+        var targetOpened by rememberSaveable(animeId, episodeTarget) {
+            androidx.compose.runtime.mutableStateOf(false)
+        }
         LaunchedEffect(episodeTarget, successState.episodes) {
             if (!targetOpened && episodeTarget != null) {
                 successState.episodes.firstOrNull { it.episode.url == episodeTarget }?.let { item ->
