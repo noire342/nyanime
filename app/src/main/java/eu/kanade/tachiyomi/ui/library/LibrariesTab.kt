@@ -44,7 +44,7 @@ data object LibrariesTab : AppTab {
     override val options: TabOptions
         @Composable get() = TabOptions(
             index = 1u,
-            title = "Biblioteca & Libreria",
+            title = "Libreria",
             icon = rememberVectorPainter(Icons.Outlined.CollectionsBookmark),
         )
 
@@ -55,7 +55,7 @@ data object LibrariesTab : AppTab {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 Text(
-                    "Biblioteca & Libreria",
+                    "Libreria",
                     Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),
                     style = MaterialTheme.typography.headlineMedium,
                 )

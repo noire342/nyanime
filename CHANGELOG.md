@@ -8,6 +8,18 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 27 settembre 2026 — Esplorazione manga e filtro lingue
+
+- La sezione personale si chiama ora «Libreria». Nella Home manga i generi sono
+  subito disponibili sotto l'intestazione, con chip e ricerca nell'elenco completo.
+- Etichette equivalenti in italiano e inglese confluiscono in un solo genere;
+  ogni fonte riceve comunque il proprio filtro originale.
+- La ricerca usa una corsia separata dai caricamenti della Home e presenta i
+  risultati di ogni fonte appena arrivano, senza attendere le altre.
+- La preferenza già presente per le altre lingue ora vale anche in ricerca,
+  elenco fonti, Libreria, cronologia e novità manga. Nascondere un titolo non
+  cancella letture, download o dati salvati.
+
 ## 27 settembre 2026 — Compatibilità completa con le estensioni manga 1.6
 
 - Le schede manga, la biblioteca, il tracking, la ricerca e le stanze usano ora

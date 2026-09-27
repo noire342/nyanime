@@ -1,6 +1,7 @@
 package eu.kanade.domain.source.manga.interactor
 
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.domain.ui.UiPreferences
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -13,6 +14,7 @@ import tachiyomi.source.local.entries.manga.LocalMangaSource
 class GetEnabledMangaSources(
     private val repository: MangaSourceRepository,
     private val preferences: SourcePreferences,
+    private val uiPreferences: UiPreferences,
 ) {
 
     fun subscribe(): Flow<List<Source>> {
@@ -26,10 +28,18 @@ class GetEnabledMangaSources(
                 preferences.dataSaverExcludedSources().changes(),
                 // SY <--
             ) { a, b, c -> Triple(a, b, c) },
-            repository.getMangaSources(),
-        ) { pinnedSourceIds, enabledLanguages, (disabledSources, lastUsedSource, excludedFromDataSaver), sources ->
+            combine(repository.getMangaSources(), uiPreferences.showMangaInOtherLanguages().changes()) { a, b ->
+                a to b
+            },
+        ) {
+                pinnedSourceIds,
+                enabledLanguages,
+                (disabledSources, lastUsedSource, excludedFromDataSaver),
+                (sources, showOtherLanguages),
+            ->
             sources
                 .filter { it.lang in enabledLanguages || it.id == LocalMangaSource.ID }
+                .filter { showOtherLanguages || it.lang == "it" || it.id == LocalMangaSource.ID }
                 .filterNot { it.id.toString() in disabledSources }
                 .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
                 .flatMap {

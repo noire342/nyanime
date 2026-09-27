@@ -112,14 +112,18 @@ class MangaHomeScreenModel(
                 preferences.disabledMangaSources().changes(),
                 preferences.enabledLanguages().changes(),
                 base.incognitoMode().changes(),
-                preferences.incognitoMangaExtensions().changes(),
-            ) { history, disabled, languages, private, _ ->
+                combine(
+                    preferences.incognitoMangaExtensions().changes(),
+                    uiPreferences.showMangaInOtherLanguages().changes(),
+                ) { _, showOtherLanguages -> showOtherLanguages },
+            ) { history, disabled, languages, private, showOtherLanguages ->
                 if (private) {
                     emptyList()
                 } else {
                     history.filter {
                         it.coverData.sourceId.toString() !in disabled &&
                             manager.get(it.coverData.sourceId)?.lang in languages &&
+                            (showOtherLanguages || manager.get(it.coverData.sourceId)?.lang == "it") &&
                             !incognito.await(it.coverData.sourceId)
                     }.distinctBy { it.mangaId }.take(20)
                 }
@@ -130,12 +134,14 @@ class MangaHomeScreenModel(
                 getUpdates.subscribe(Instant.now().minusSeconds(30L * 86_400)),
                 uiPreferences.dismissedLibraryUpdates().changes(),
                 base.incognitoMode().changes(),
-            ) { updates, dismissed, private ->
+                uiPreferences.showMangaInOtherLanguages().changes(),
+            ) { updates, dismissed, private, showOtherLanguages ->
                 if (private) {
                     emptyList()
                 } else {
                     updates
                         .distinctBy { it.mangaId }
+                        .filter { showOtherLanguages || manager.get(it.sourceId)?.lang == "it" }
                         .filterNot { it.read || it.inboxKey() in dismissed }
                         .take(30)
                 }

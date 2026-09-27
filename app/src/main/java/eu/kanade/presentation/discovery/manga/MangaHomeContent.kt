@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,6 +28,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -37,7 +40,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,6 +70,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
+import eu.kanade.tachiyomi.data.discovery.MangaGenreLabels
 import eu.kanade.tachiyomi.data.discovery.MangaHomeChapter
 import eu.kanade.tachiyomi.data.discovery.MangaHomeItem
 import eu.kanade.tachiyomi.ui.discovery.manga.MangaHomeState
@@ -102,6 +108,10 @@ fun MangaHomeContent(
     } else {
         home?.sections.orEmpty()
     }
+    val categories = MangaGenreLabels.distinct(
+        (if (state.mixed) state.homes.flatMap { it.categories } else home?.categories.orEmpty())
+            .map { it.title },
+    )
     val featuredItem = sections.firstOrNull()?.let { state.rows[it.id]?.page?.items?.firstOrNull() }
     val personalUpdates = state.updates
     var displayedSourceKey by rememberSaveable { mutableStateOf(home?.key) }
@@ -112,6 +122,33 @@ fun MangaHomeContent(
         }
     }
     var pulled by remember { mutableStateOf(false) }
+    var genresOpen by remember { mutableStateOf(false) }
+    var genreQuery by remember { mutableStateOf("") }
+    if (genresOpen) {
+        ModalBottomSheet(onDismissRequest = { genresOpen = false }) {
+            Column(Modifier.imePadding().padding(horizontal = 20.dp)) {
+                Text("Tutti i generi", style = MaterialTheme.typography.headlineSmall)
+                OutlinedTextField(
+                    value = genreQuery,
+                    onValueChange = { genreQuery = it },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    placeholder = { Text("Cerca un genere") },
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                )
+                LazyColumn(contentPadding = PaddingValues(bottom = 36.dp)) {
+                    items(categories.filter { it.contains(genreQuery.trim(), ignoreCase = true) }) { category ->
+                        TextButton(onClick = {
+                            genresOpen = false
+                            onGenre(category)
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text(category, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            }
+        }
+    }
     val refreshing = state.rows.values.any { it.loading }
     LaunchedEffect(refreshing) { if (!refreshing) pulled = false }
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -162,6 +199,30 @@ fun MangaHomeContent(
                         Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text("Vai alla tua biblioteca")
+                    }
+                }
+                if (categories.isNotEmpty()) {
+                    item("categories") {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 20.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            item {
+                                AssistChip(
+                                    onClick = onExplore,
+                                    label = { Text("Esplora e filtra") },
+                                    leadingIcon = { Icon(Icons.Outlined.Tune, null) },
+                                )
+                            }
+                            if (categories.size > 8) {
+                                item {
+                                    AssistChip(onClick = { genresOpen = true }, label = { Text("Tutti i generi") })
+                                }
+                            }
+                            items(categories, key = { MangaGenreLabels.key(it) }) { category ->
+                                AssistChip(onClick = { onGenre(category) }, label = { Text(category) })
+                            }
+                        }
                     }
                 }
                 if (home != null) {
@@ -360,37 +421,6 @@ fun MangaHomeContent(
                         )
                     }
                 } else if (home != null) {
-                    val categories = if (state.mixed) {
-                        state.homes.flatMap { it.categories }.distinctBy { it.title }
-                    } else {
-                        home.categories
-                    }
-                    if (categories.isNotEmpty()) {
-                        item("categories") {
-                            var genresOpen by remember { mutableStateOf(false) }
-                            Row(
-                                Modifier.padding(horizontal = 20.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                Box {
-                                    AssistChip(onClick = { genresOpen = true }, label = { Text("Generi") })
-                                    DropdownMenu(
-                                        expanded = genresOpen,
-                                        onDismissRequest = { genresOpen = false },
-                                        modifier = Modifier.heightIn(max = 400.dp),
-                                    ) {
-                                        categories.forEach { category ->
-                                            DropdownMenuItem(text = { Text(category.title) }, onClick = {
-                                                genresOpen = false
-                                                onGenre(category.title)
-                                            })
-                                        }
-                                    }
-                                }
-                                AssistChip(onClick = onExplore, label = { Text("Esplora tutti") })
-                            }
-                        }
-                    }
                     sections.forEach { section ->
                         val row = state.rows[section.id]
                         item("heading:" + section.id) {

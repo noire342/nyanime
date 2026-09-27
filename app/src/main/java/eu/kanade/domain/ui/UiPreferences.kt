@@ -28,7 +28,7 @@ class UiPreferences(
 
     fun sourceHomeLogo() = preferenceStore.getBoolean("source_home_logo", false)
 
-    fun showNonItalianMangaHome() = preferenceStore.getBoolean("nyanime_manga_home_other_languages", false)
+    fun showMangaInOtherLanguages() = preferenceStore.getBoolean("nyanime_manga_home_other_languages", false)
 
     fun preferredMangaHomeSource() = preferenceStore.getLong("nyanime_manga_home_preferred_source", 0L)
 

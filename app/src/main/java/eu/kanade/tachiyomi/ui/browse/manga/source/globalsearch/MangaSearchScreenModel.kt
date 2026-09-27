@@ -7,6 +7,7 @@ import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.domain.entries.manga.model.toDomainManga
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.util.ioCoroutineScope
 import eu.kanade.tachiyomi.extension.manga.MangaExtensionManager
 import eu.kanade.tachiyomi.source.CatalogueSource
@@ -34,6 +35,7 @@ abstract class MangaSearchScreenModel(
     private val networkToLocalManga: NetworkToLocalManga = Injekt.get(),
     private val getManga: GetManga = Injekt.get(),
     private val preferences: SourcePreferences = Injekt.get(),
+    private val uiPreferences: UiPreferences = Injekt.get(),
 ) : StateScreenModel<MangaSearchScreenModel.State>(initialState) {
 
     private val searches = SourceSearchRunner<CatalogueSource>(ioCoroutineScope)
@@ -61,6 +63,12 @@ abstract class MangaSearchScreenModel(
                 mutableState.update { it.copy(onlyShowHasResults = state) }
             }
         }
+        screenModelScope.launch {
+            uiPreferences.showMangaInOtherLanguages().changes().collectLatest {
+                lastQuery = null
+                search()
+            }
+        }
     }
 
     @Composable
@@ -76,7 +84,11 @@ abstract class MangaSearchScreenModel(
 
     open fun getEnabledSources(): List<CatalogueSource> {
         return sourceManager.getCatalogueSources()
-            .filter { it.lang in enabledLanguages && "${it.id}" !in disabledSources }
+            .filter {
+                it.lang in enabledLanguages &&
+                    "${it.id}" !in disabledSources &&
+                    (uiPreferences.showMangaInOtherLanguages().get() || it.lang == "it")
+            }
             .sortedWith(
                 compareBy(
                     { "${it.id}" !in pinnedSources },

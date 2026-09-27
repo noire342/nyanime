@@ -51,6 +51,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.util.Screen
+import eu.kanade.tachiyomi.data.discovery.MangaGenreLabels
 import eu.kanade.tachiyomi.data.discovery.MangaHomeItem
 import eu.kanade.tachiyomi.data.discovery.MangaHomeMerge
 import eu.kanade.tachiyomi.data.discovery.MangaHomePage
@@ -60,8 +61,10 @@ import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.SourceHomeListing
 import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.entries.manga.model.Manga
@@ -87,10 +90,12 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
         var loading by remember { mutableStateOf(false) }
         var error by remember { mutableStateOf<String?>(null) }
         val homes = listing.homes.filter { it.search != null }
-        val genres = homes.flatMap { it.categories }.map { it.title }.distinct().sorted()
+        val genres = MangaGenreLabels.distinct(homes.flatMap { it.categories }.map { it.title })
         val selectedHomes = homes.filter { selectedSource == null || it.key == selectedSource }
         val eligible = selectedHomes.mapNotNull { home ->
-            val section = selectedGenre?.let { genre -> home.categories.firstOrNull { it.title == genre } }
+            val section = selectedGenre?.let { genre ->
+                home.categories.firstOrNull { MangaGenreLabels.key(it.title) == MangaGenreLabels.key(genre) }
+            }
             if (selectedGenre != null && section == null) null else home to section
         }
         val revision = eligible.joinToString("|") { it.first.key + ":" + it.first.revision }
@@ -98,12 +103,20 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
         LaunchedEffect(query, selectedSource, selectedGenre, page, revision) {
             loading = true
             error = null
-            if (page == 1) items = emptyList()
+            if (page == 1) {
+                items = emptyList()
+                hasMore = false
+            }
             if (query.isNotBlank()) delay(320)
-            val results = coroutineScope {
-                eligible.map { (home, section) ->
-                    async {
-                        try {
+            val previousItems = if (page > 1) items else emptyList()
+            val pagesBySource = mutableMapOf<String, MangaHomePage>()
+            val failures = mutableListOf<Throwable>()
+            val preferredSource = uiPreferences.preferredMangaHomeSource().get().takeIf { it != 0L }
+            coroutineScope {
+                val completed = Channel<Pair<String, Result<MangaHomePage>>>(eligible.size.coerceAtLeast(1))
+                eligible.forEach { (home, section) ->
+                    launch {
+                        val result = try {
                             Result.success(
                                 service.fetch(
                                     home.key,
@@ -115,17 +128,24 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
                         } catch (failure: Exception) {
                             Result.failure(failure)
                         }
+                        completed.send(home.key to result)
                     }
-                }.awaitAll()
+                }
+                repeat(eligible.size) {
+                    val (sourceKey, result) = completed.receive()
+                    result.onSuccess { pagesBySource[sourceKey] = it }
+                        .onFailure { failures += it }
+                    val available = eligible.mapNotNull { (home, _) -> pagesBySource[home.key] }
+                    if (available.isNotEmpty()) {
+                        val merged = MangaHomeMerge.merge(available, preferredSource)
+                        items = (previousItems + merged.items).distinctBy(MangaHomeItem::key)
+                        hasMore = merged.hasNextPage
+                    }
+                }
             }
-            val pages = results.mapNotNull { it.getOrNull() }
-            val preferredSource = uiPreferences.preferredMangaHomeSource().get().takeIf { it != 0L }
-            val merged = MangaHomeMerge.merge(pages, preferredSource)
-            val previousItems = if (page > 1) items else emptyList()
-            items = (previousItems + merged.items).distinctBy(MangaHomeItem::key)
-            hasMore = merged.hasNextPage
+            val pages = eligible.mapNotNull { (home, _) -> pagesBySource[home.key] }
             error = if (pages.isEmpty() && eligible.isNotEmpty()) {
-                results.firstNotNullOfOrNull { it.exceptionOrNull()?.message } ?: "Ricerca non riuscita"
+                failures.firstNotNullOfOrNull { it.message } ?: "Ricerca non riuscita"
             } else {
                 null
             }

@@ -69,7 +69,7 @@ class MangaHomeIntegrationTest {
         every { preferences.disabledMangaSources().get() } returns emptySet()
         every { preferences.enabledLanguages().get() } returns setOf("it")
         every { preferences.showNsfwSource().get() } returns true
-        every { uiPreferences.showNonItalianMangaHome().get() } returns false
+        every { uiPreferences.showMangaInOtherLanguages().get() } returns false
         every { base.downloadedOnly().get() } returns false
         every { incognito.await(any()) } returns false
         every { reader.read(extension) } returns listOf(manifest())

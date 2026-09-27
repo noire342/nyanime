@@ -111,9 +111,9 @@ object SettingsAppearanceScreen : SearchableSettings {
                     onClick = { navigator.push(AppLanguageScreen()) },
                 ),
                 Preference.PreferenceItem.SwitchPreference(
-                    preference = uiPreferences.showNonItalianMangaHome(),
-                    title = "Manga in altre lingue nella Home",
-                    subtitle = "Di base mostra solo le fonti italiane. La tua biblioteca personale non viene filtrata.",
+                    preference = uiPreferences.showMangaInOtherLanguages(),
+                    title = "Mostra manga in altre lingue",
+                    subtitle = "Vale per Home, ricerca, fonti, Libreria e novità. I manga nascosti restano salvati.",
                 ),
                 Preference.PreferenceItem.ListPreference(
                     preference = uiPreferences.tabletUiMode(),

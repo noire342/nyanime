@@ -17,6 +17,7 @@ import eu.kanade.core.util.fastPartition
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.entries.manga.interactor.UpdateManga
 import eu.kanade.domain.items.chapter.interactor.SetReadStatus
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.components.SEARCH_DEBOUNCE_MILLIS
 import eu.kanade.presentation.entries.DownloadAction
 import eu.kanade.presentation.library.components.LibraryToolbarTitle
@@ -90,6 +91,7 @@ class MangaLibraryScreenModel(
     private val setMangaCategories: SetMangaCategories = Injekt.get(),
     private val preferences: BasePreferences = Injekt.get(),
     private val libraryPreferences: LibraryPreferences = Injekt.get(),
+    private val uiPreferences: UiPreferences = Injekt.get(),
     private val coverCache: MangaCoverCache = Injekt.get(),
     private val sourceManager: MangaSourceManager = Injekt.get(),
     private val downloadManager: MangaDownloadManager = Injekt.get(),
@@ -367,8 +369,14 @@ class MangaLibraryScreenModel(
             getLibraryManga.subscribe(),
             getLibraryItemPreferencesFlow(),
             downloadCache.changes,
-        ) { libraryMangaList, prefs, _ ->
+            uiPreferences.showMangaInOtherLanguages().changes(),
+        ) { libraryMangaList, prefs, _, showOtherLanguages ->
             libraryMangaList
+                .filter { libraryManga ->
+                    showOtherLanguages ||
+                        libraryManga.manga.isLocal() ||
+                        sourceManager.get(libraryManga.manga.source)?.lang.let { it == null || it == "it" }
+                }
                 .map { libraryManga ->
                     // Display mode based on user preference: take it from global library setting or category
                     MangaLibraryItem(

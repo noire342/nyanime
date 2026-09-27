@@ -24,6 +24,7 @@ class MangaHomeService(
     private val toLocal: NetworkToLocalManga,
 ) {
     private val requests = Semaphore(2)
+    private val interactiveRequests = Semaphore(2)
     private val identityRequests = Semaphore(2)
     private val identityCache = ConcurrentHashMap<String, Map<String, Long>>()
 
@@ -62,7 +63,12 @@ class MangaHomeService(
     }
 
     suspend fun fetch(key: String, request: SourceHomeRequest): MangaHomePage = withContext(Dispatchers.IO) {
-        requests.withPermit {
+        val permits = if (request.sectionId == SourceHomeRequest.SEARCH || request.sectionId.startsWith("category:")) {
+            interactiveRequests
+        } else {
+            requests
+        }
+        permits.withPermit {
             val access = registry.access(key)
             check(!access.offline) { "La Home online non è disponibile in modalità Solo scaricati" }
             val definition = requireNotNull(access.source) { "Fonte non disponibile" }

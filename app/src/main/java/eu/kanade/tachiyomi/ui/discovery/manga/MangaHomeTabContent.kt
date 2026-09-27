@@ -59,6 +59,7 @@ fun MangaHomeTabContent(homes: List<SourceHomeGroup>, onSelectCategory: (String?
     val hasNewUpdates = hasNewLibraryUpdateNotice(updateKeys, lastSeenAt)
     val motion = appMotionEnabled()
     val updatesIndex = 2 +
+        (if (state.homes.flatMap { it.categories }.isNotEmpty()) 1 else 0) +
         (if (state.selected != null) 1 else 0) +
         (if (state.homes.size > 1) 1 else 0) +
         (if (state.history.isNotEmpty()) 1 else 0) +

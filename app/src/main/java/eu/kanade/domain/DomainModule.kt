@@ -372,7 +372,7 @@ class DomainModule : InjektModule {
 
         addSingletonFactory<MangaSourceRepository> { MangaSourceRepositoryImpl(get(), get()) }
         addSingletonFactory<MangaStubSourceRepository> { MangaStubSourceRepositoryImpl(get()) }
-        addFactory { GetEnabledMangaSources(get(), get()) }
+        addFactory { GetEnabledMangaSources(get(), get(), get()) }
         addFactory { GetLanguagesWithMangaSources(get(), get()) }
         addFactory { GetRemoteManga(get()) }
         addFactory { GetMangaSourcesWithFavoriteCount(get(), get()) }

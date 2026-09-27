@@ -7,6 +7,7 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.core.util.insertSeparators
 import eu.kanade.domain.entries.manga.interactor.UpdateManga
 import eu.kanade.domain.track.manga.interactor.AddMangaTracks
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.history.manga.MangaHistoryUiModel
 import eu.kanade.tachiyomi.util.lang.toLocalDate
 import kotlinx.collections.immutable.ImmutableList
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -60,6 +62,7 @@ class MangaHistoryScreenModel(
     private val updateManga: UpdateManga = Injekt.get(),
     val snackbarHostState: SnackbarHostState = SnackbarHostState(),
     private val sourceManager: MangaSourceManager = Injekt.get(),
+    private val uiPreferences: UiPreferences = Injekt.get(),
 ) : StateScreenModel<MangaHistoryScreenModel.State>(State()) {
 
     private val _events: Channel<Event> = Channel(Channel.UNLIMITED)
@@ -71,7 +74,15 @@ class MangaHistoryScreenModel(
     init {
         screenModelScope.launch {
             _query.collectLatest { query ->
-                getHistory.subscribe(query ?: "")
+                combine(
+                    getHistory.subscribe(query ?: ""),
+                    uiPreferences.showMangaInOtherLanguages().changes(),
+                ) { history, showOtherLanguages ->
+                    history.filter { entry ->
+                        showOtherLanguages ||
+                            sourceManager.get(entry.coverData.sourceId)?.lang.let { it == null || it == "it" }
+                    }
+                }
                     .distinctUntilChanged()
                     .catch { error ->
                         logcat(LogPriority.ERROR, error)

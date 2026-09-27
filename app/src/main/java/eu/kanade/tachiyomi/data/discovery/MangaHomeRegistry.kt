@@ -40,7 +40,7 @@ class MangaHomeRegistry(
             preferences.disabledMangaSources().changes(),
             preferences.enabledLanguages().changes(),
             preferences.showNsfwSource().changes(),
-            uiPreferences.showNonItalianMangaHome().changes(),
+            uiPreferences.showMangaInOtherLanguages().changes(),
         ) { _, _, _, _ -> Unit },
         combine(
             base.downloadedOnly().changes(),
@@ -101,10 +101,10 @@ class MangaHomeRegistry(
 
     private fun isEnabled(id: Long, language: String, extension: MangaExtension.Installed): Boolean =
         id.toString() !in preferences.disabledMangaSources().get() &&
-            (language == "it" || uiPreferences.showNonItalianMangaHome().get()) &&
+            (language == "it" || uiPreferences.showMangaInOtherLanguages().get()) &&
             (
                 language in preferences.enabledLanguages().get() ||
-                    (uiPreferences.showNonItalianMangaHome().get() && language != "it")
+                    (uiPreferences.showMangaInOtherLanguages().get() && language != "it")
                 ) &&
             (preferences.showNsfwSource().get() || !extension.isNsfw)
 

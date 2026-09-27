@@ -10,6 +10,7 @@ import eu.kanade.core.preference.asState
 import eu.kanade.core.util.addOrRemove
 import eu.kanade.core.util.insertSeparators
 import eu.kanade.domain.items.chapter.interactor.SetReadStatus
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.entries.manga.components.ChapterDownloadAction
 import eu.kanade.presentation.updates.manga.MangaUpdatesUiModel
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadCache
@@ -57,6 +58,7 @@ class MangaUpdatesScreenModel(
     private val getManga: GetManga = Injekt.get(),
     private val getChapter: GetChapter = Injekt.get(),
     private val libraryPreferences: LibraryPreferences = Injekt.get(),
+    private val uiPreferences: UiPreferences = Injekt.get(),
     val snackbarHostState: SnackbarHostState = SnackbarHostState(),
 ) : StateScreenModel<MangaUpdatesScreenModel.State>(State()) {
 
@@ -78,7 +80,12 @@ class MangaUpdatesScreenModel(
                 getUpdates.subscribe(limit).distinctUntilChanged(),
                 downloadCache.changes,
                 downloadManager.queueState,
-            ) { updates, _, _ -> updates }
+                uiPreferences.showMangaInOtherLanguages().changes(),
+            ) { updates, _, _, showOtherLanguages ->
+                updates.filter { update ->
+                    showOtherLanguages || sourceManager.get(update.sourceId)?.lang.let { it == null || it == "it" }
+                }
+            }
                 .catch {
                     logcat(LogPriority.ERROR, it)
                     _events.send(Event.InternalError)
