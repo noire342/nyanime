@@ -143,7 +143,12 @@ internal fun CinematicHero(
                         shape = RoundedCornerShape(4.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                     ) {
-                        Text(actionLabel, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            actionLabel,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                         Spacer(Modifier.size(10.dp))
                         Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(20.dp))
                     }

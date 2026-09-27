@@ -38,9 +38,10 @@ class MergedSourceHomeRepository(
         val eligible = access.providers.sortedByDescending { it.source?.primary == true }.filter { provider ->
             provider.source?.let {
                 if (request.sectionId == SourceHomeRequest.SEARCH) {
-                    it.search != null && request.filters.all { (name, values) ->
-                        it.browseFilters.any { filter -> filter.name == name && filter.accepts(values) }
-                    }
+                    it.search != null &&
+                        request.filters.all { (name, values) ->
+                            it.browseFilters.any { filter -> filter.name == name && filter.accepts(values) }
+                        }
                 } else if (request.sectionId == SourceHomeRequest.RANDOM) {
                     it.random != null
                 } else if (request.sectionId == SourceHomeRequest.RANDOM_EPISODE) {

@@ -8,6 +8,22 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 27 settembre 2026 — Home Anime con più fonti
+
+- Le sezioni e la ricerca della Home Anime combinano i risultati delle estensioni
+  installate. Le schede dello stesso titolo vengono unite quando condividono
+  un identificatore di catalogo affidabile; le fonti restano selezionabili
+  anche quando le schede arrivano in pagine diverse. Identificatori in
+  conflitto impediscono la fusione.
+- Un tocco apre subito la fonte predefinita. Il selettore sulla scheda permette
+  di cambiarla e, se desiderato, ricordarla per quel titolo. I filtri mostrano
+  le opzioni disponibili nelle fonti attive.
+- Le estensioni possono fornire classifiche, un indice dei generi, titoli ed
+  episodi casuali, l'episodio preciso di una scheda e titoli simili. Quando una
+  Home usa più fonti, il logo di un singolo sito non sostituisce Nyanime.
+- La barra dei generi mostra di nuovo tutte le categorie disponibili. Le due
+  scelte casuali sono raccolte in Esplora, fuori dalla barra dei generi.
+
 ## 27 settembre 2026 — Tracking dei titoli nella libreria
 
 - Un anime o manga aggiunto alla libreria viene cercato in background nei

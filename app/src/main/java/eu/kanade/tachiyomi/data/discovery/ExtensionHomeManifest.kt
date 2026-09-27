@@ -62,8 +62,10 @@ data class ExtensionHomeManifest(
         } &&
         (search == null || (search.id == "search" && text(search.title) && selections(search.filters))) &&
         (random == null || (random.id == "random" && text(random.title) && selections(random.filters))) &&
-        (randomEpisode == null ||
-            (randomEpisode.id == "random-episode" && text(randomEpisode.title) && selections(randomEpisode.filters))) &&
+        (
+            randomEpisode == null ||
+                (randomEpisode.id == "random-episode" && text(randomEpisode.title) && selections(randomEpisode.filters))
+            ) &&
         (
             categories == null ||
                 (text(categories.filter) && categories.exclude.size <= 100 && categories.exclude.all(::text))

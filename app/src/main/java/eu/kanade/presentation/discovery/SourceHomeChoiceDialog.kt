@@ -58,7 +58,11 @@ fun SourceHomeChoiceDialog(
                         onClick = { onChoose(choice.animeId, rememberSource) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
                     ) {
                         Row(
                             Modifier.padding(horizontal = 14.dp, vertical = 14.dp),

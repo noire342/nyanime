@@ -45,14 +45,24 @@ fun SourceHomeRankingCard(
             SourceHomeArtwork(anime, Modifier.matchParentSize())
         }
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(anime.title, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+            Text(
+                anime.title,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleSmall,
+            )
             Text(
                 presentation?.details?.firstOrNull().orEmpty(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.labelSmall,
             )
-            Text(sourceLabel, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall)
+            Text(
+                sourceLabel,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelSmall,
+            )
             if (onSources != null && presentation?.choices.orEmpty().size > 1) {
                 TextButton(onClick = onSources) { Text("Fonti") }
             }

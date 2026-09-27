@@ -14,12 +14,13 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import tachiyomi.data.discovery.MergedSourceHomeRepository
+import tachiyomi.data.discovery.mergeHomeCards
 import tachiyomi.domain.discovery.SectionState
 import tachiyomi.domain.discovery.SourceHomeAccess
+import tachiyomi.domain.discovery.SourceHomeFilter
 import tachiyomi.domain.discovery.SourceHomeGroup
 import tachiyomi.domain.discovery.SourceHomeGroupAccess
 import tachiyomi.domain.discovery.SourceHomePage
-import tachiyomi.domain.discovery.SourceHomeFilter
 import tachiyomi.domain.discovery.SourceHomePresentation
 import tachiyomi.domain.discovery.SourceHomeRepository
 import tachiyomi.domain.discovery.SourceHomeRequest
@@ -139,10 +140,14 @@ class MergedSourceHomeRepositoryTest {
     }
 
     @Test fun conflictingCatalogueIdsNeverMergeHomonymousSeasons() = runBlocking {
-        val a = item(11, 1).copy(memo = SourceHomePresentation(catalogIds = mapOf("catalog" to 42))
-            .attachTo(item(11, 1).memo))
-        val b = item(21, 2).copy(memo = SourceHomePresentation(catalogIds = mapOf("catalog" to 43))
-            .attachTo(item(21, 2).memo))
+        val a = item(11, 1).copy(
+            memo = SourceHomePresentation(catalogIds = mapOf("catalog" to 42))
+                .attachTo(item(11, 1).memo),
+        )
+        val b = item(21, 2).copy(
+            memo = SourceHomePresentation(catalogIds = mapOf("catalog" to 43))
+                .attachTo(item(21, 2).memo),
+        )
         val merged = MergedSourceHomeRepository({ source ->
             provider { flowOf(page(if (source.id == 1L) a else b)) }
         }, { access })
@@ -163,15 +168,37 @@ class MergedSourceHomeRepositoryTest {
             providers = listOf(SourceHomeAccess(first), SourceHomeAccess(second), SourceHomeAccess(third)),
         )
         val merged = MergedSourceHomeRepository({ source ->
-            provider { flowOf(page(when (source.id) {
-                1L -> firstCard
-                2L -> bridge
-                else -> conflicting
-            })) }
+            provider {
+                flowOf(
+                    page(
+                        when (source.id) {
+                            1L -> firstCard
+                            2L -> bridge
+                            else -> conflicting
+                        },
+                    ),
+                )
+            }
         }, { group })
         val cards = merged.observe(group, SourceHomeRequest("popular")).last().data!!.items
         assertEquals(2, cards.size)
         assertEquals(listOf(1L, 2L), cards.first().homePresentation!!.choices.map { it.sourceId })
+    }
+
+    @Test fun laterPagesMergeChoicesWithoutLosingEarlierSources() {
+        fun card(id: Long, source: Long, catalogueId: Long): Anime {
+            val anime = item(id, source)
+            return anime.copy(
+                memo = SourceHomePresentation(catalogIds = mapOf("catalog" to catalogueId))
+                    .attachTo(anime.memo),
+            )
+        }
+        val firstPage = mergeHomeCards(listOf(card(11, 1, 42)))
+        val secondPage = mergeHomeCards(firstPage + card(21, 2, 42))
+        val thirdPage = mergeHomeCards(secondPage + card(31, 3, 42))
+        assertEquals(1, thirdPage.size)
+        assertEquals(listOf(1L, 2L, 3L), thirdPage.single().homePresentation!!.choices.map { it.sourceId })
+        assertEquals(3, mergeHomeCards(thirdPage + card(32, 3, 42) + card(41, 4, 43)).size)
     }
 
     @Test fun searchOnlyQueriesProvidersThatAcceptChosenFilter() = runBlocking {
@@ -184,9 +211,15 @@ class MergedSourceHomeRepositoryTest {
         )
         val queried = mutableListOf<Long>()
         val merged = MergedSourceHomeRepository({ source ->
-            provider { queried += source.id; flowOf(page(item(source.id, source.id))) }
+            provider {
+                queried += source.id
+                flowOf(page(item(source.id, source.id)))
+            }
         }, { group })
-        merged.observe(group, SourceHomeRequest(SourceHomeRequest.SEARCH, filters = mapOf("Genre" to listOf("Fantasy")))).last()
+        merged.observe(
+            group,
+            SourceHomeRequest(SourceHomeRequest.SEARCH, filters = mapOf("Genre" to listOf("Fantasy"))),
+        ).last()
         assertEquals(listOf(1L), queried)
     }
 

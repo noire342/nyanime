@@ -5,11 +5,12 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.tachiyomi.data.discovery.ExtensionHomeServices
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import tachiyomi.data.discovery.mergeHomeCards
 import tachiyomi.domain.discovery.SourceHomeGroupAccess
 import tachiyomi.domain.discovery.SourceHomeRequest
-import tachiyomi.domain.discovery.homeItemKey
 import tachiyomi.domain.entries.anime.model.Anime
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -81,6 +82,18 @@ class SourceHomeListScreenModel(
         load(reset = true)
     }
 
+    suspend fun surprise(episode: Boolean): Anime? {
+        val access = state.value.access
+        val group = access.group ?: return null
+        if (access.offline || if (episode) !group.hasRandomEpisode else !group.hasRandom) return null
+        val request = SourceHomeRequest(
+            if (episode) SourceHomeRequest.RANDOM_EPISODE else SourceHomeRequest.RANDOM,
+        )
+        return repository.observe(access, request, refresh = true)
+            .first { it.data != null || it.error != null }
+            .data?.items?.firstOrNull()
+    }
+
     fun load(reset: Boolean = false, debounce: Boolean = false) {
         val current = state.value
         if (current.access.loading || current.access.group == null || current.access.offline) return
@@ -100,7 +113,7 @@ class SourceHomeListScreenModel(
                 mutableState.update {
                     it.copy(
                         items = if (result != null) {
-                            (previous + result.items).distinctBy { anime -> anime.homeItemKey }
+                            mergeHomeCards(previous + result.items)
                         } else {
                             it.items
                         },

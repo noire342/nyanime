@@ -15,7 +15,7 @@ import tachiyomi.domain.discovery.SourceHomePresentation
 import tachiyomi.domain.discovery.SourceHomeSource
 
 class ExtensionHomeBrowseTest {
-    @Test fun mergedCataloguesDoNotOfferCategoriesThatWouldSilentlyLoseTheirSelection() {
+    @Test fun mergedCataloguesKeepCategoriesSupportedByAtLeastOneSource() {
         val definitions = ExtensionHomeFilters.browseFilters(manifest, controls())
         val provider = SourceHomeSource(
             1,
@@ -28,7 +28,7 @@ class ExtensionHomeBrowseTest {
         assertEquals(2, SourceHomeGroup("video", "Video", listOf(provider)).categories.size)
         val incompatible = provider.copy(id = 2, browseFilters = definitions.filterNot { it.name == "Categories" })
         val merged = SourceHomeGroup("video", "Video", listOf(provider, incompatible))
-        assertEquals(emptyList<SourceHomeGroup.Section>(), merged.categories)
+        assertEquals(SourceHomeGroup("video", "Video", listOf(provider)).categories, merged.categories)
     }
 
     private fun controls() = AnimeFilterList(

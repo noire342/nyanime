@@ -64,7 +64,9 @@ class ExtensionHomeManifestTest {
         val parsed = ExtensionHomeManifest.parse(wrap(declared)).single()
         assertEquals("random", ExtensionHomeFilters.random(parsed, AnimeFilterList())?.id)
         assertEquals("random-episode", ExtensionHomeFilters.randomEpisode(parsed, AnimeFilterList())?.id)
-        assertTrue(ExtensionHomeManifest.parse(wrap(declared.replace("\"id\":\"random\"", "\"id\":\"search\""))).isEmpty())
+        assertTrue(
+            ExtensionHomeManifest.parse(wrap(declared.replace("\"id\":\"random\"", "\"id\":\"search\""))).isEmpty(),
+        )
     }
     private val film = """{"id":"films","title":"Film","source":{"name":"Ciao","lang":"it"},
         "sections":[{"id":"popular","title":"Più visti"}]}"""

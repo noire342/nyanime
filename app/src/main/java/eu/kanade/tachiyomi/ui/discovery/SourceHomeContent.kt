@@ -39,15 +39,15 @@ import eu.kanade.presentation.discovery.LocalAnimeRow
 import eu.kanade.presentation.discovery.SectionHeader
 import eu.kanade.presentation.discovery.SourceFeaturedCarousel
 import eu.kanade.presentation.discovery.SourceFeaturedSection
-import eu.kanade.presentation.discovery.SourceHomeDateSelector
 import eu.kanade.presentation.discovery.SourceHomeChoiceDialog
+import eu.kanade.presentation.discovery.SourceHomeDateSelector
 import eu.kanade.presentation.discovery.SourceHomeLogo
 import eu.kanade.presentation.discovery.SourceHomePosterCard
 import eu.kanade.presentation.discovery.SourceHomeRankingCard
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.theme.LocalNyanimeStyle
-import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.data.discovery.SourceHomeSourceChoice
+import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.updates.AcknowledgeUpdateNoticeWhenVisible
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
@@ -89,18 +89,6 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
         val id = SourceHomeSourceChoice.preferredAnimeId(context, anime)
         navigator.push(AnimeScreen(id, true, SourceHomeSourceChoice.episodeTarget(anime, id).takeIf { playEpisode }))
     }
-    var surpriseLoading by remember { mutableStateOf(false) }
-    val surprise: (Boolean) -> Unit = { episode ->
-        if (!surpriseLoading) scope.launch {
-            surpriseLoading = true
-            try {
-                model.surprise(episode)?.let { openCard(it, episode) }
-                    ?: android.widget.Toast.makeText(context, "Nessun risultato: riprova", android.widget.Toast.LENGTH_SHORT).show()
-            } finally {
-                surpriseLoading = false
-            }
-        }
-    }
     pendingChoice?.let { (anime, playEpisode) ->
         SourceHomeChoiceDialog(
             anime,
@@ -110,7 +98,15 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
         ) { id, remember ->
             if (remember) SourceHomeSourceChoice.remember(context, anime, id)
             pendingChoice = null
-            navigator.push(AnimeScreen(id, true, SourceHomeSourceChoice.episodeTarget(anime, id).takeIf { playEpisode }))
+            navigator.push(
+                AnimeScreen(
+                    id,
+                    true,
+                    SourceHomeSourceChoice.episodeTarget(anime, id).takeIf {
+                        playEpisode
+                    },
+                ),
+            )
         }
     }
     val modern = LocalNyanimeStyle.current
@@ -210,8 +206,6 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                                     )
                                 },
                                 onCategory = { navigator.push(SourceHomeListScreen(homeKey, it.id, it.title)) },
-                                onSurprise = if (source.hasRandom) ({ surprise(false) }) else null,
-                                onRandomEpisode = if (source.hasRandomEpisode) ({ surprise(true) }) else null,
                             )
                         }
                     }
@@ -320,17 +314,19 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
                                                         { openCard(anime, true) },
                                                         { pendingChoice = anime to true },
                                                     )
-                                                } else SourceHomePosterCard(
-                                                    anime,
-                                                    source.sourceLabel(
-                                                        anime.source,
-                                                    ),
-                                                    {
-                                                        openCard(anime, true)
-                                                    },
-                                                    refreshKey = state.artworkRefreshKey,
-                                                    onSources = { pendingChoice = anime to true },
-                                                )
+                                                } else {
+                                                    SourceHomePosterCard(
+                                                        anime,
+                                                        source.sourceLabel(
+                                                            anime.source,
+                                                        ),
+                                                        {
+                                                            openCard(anime, true)
+                                                        },
+                                                        refreshKey = state.artworkRefreshKey,
+                                                        onSources = { pendingChoice = anime to true },
+                                                    )
+                                                }
                                             }
                                         }
                                     }

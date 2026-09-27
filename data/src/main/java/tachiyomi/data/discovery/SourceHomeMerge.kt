@@ -8,12 +8,14 @@ import tachiyomi.domain.entries.anime.model.Anime
 import java.text.Normalizer
 import java.util.Locale
 
-/** Merge public cards, while keeping every concrete source choice available to open. */
-internal fun mergeHomeCards(cards: List<Anime>): List<Anime> {
+/** Merge public cards, including cards already merged on an earlier catalogue page. */
+fun mergeHomeCards(cards: List<Anime>): List<Anime> {
     val groups = mutableListOf<MutableList<Anime>>()
     cards.distinctBy { it.homeItemKey }.forEach { card ->
         val group = groups.firstOrNull { members ->
-            members.none { it.source == card.source || catalogueConflict(it, card) } &&
+            members.none { member ->
+                memberSources(member).any { it in memberSources(card) } || catalogueConflict(member, card)
+            } &&
                 members.any { sameWork(it, card) }
         }
         if (group == null) groups.add(mutableListOf(card)) else group.add(card)
@@ -21,11 +23,29 @@ internal fun mergeHomeCards(cards: List<Anime>): List<Anime> {
     return groups.map { members ->
         val first = members.first()
         if (members.size == 1) return@map first
-        val choices = members.map { SourceHomeChoice(it.id, it.source, it.title, it.homePresentation?.episodeTarget) }
-        val presentation = (first.homePresentation ?: SourceHomePresentation()).copy(choices = choices)
+        val choices = members.flatMap { member ->
+            member.homePresentation?.choices?.takeIf { it.isNotEmpty() }
+                ?: listOf(
+                    SourceHomeChoice(member.id, member.source, member.title, member.homePresentation?.episodeTarget),
+                )
+        }
+        val ids = members.flatMap { it.homePresentation?.catalogIds.orEmpty().entries }
+            .associate { it.key to it.value }
+        val years = members.mapNotNull { it.homePresentation?.releaseYear }.distinct()
+        val aliases = members.flatMap { member -> listOf(member.title) + member.homePresentation?.aliases.orEmpty() }
+            .distinct()
+        val presentation = (first.homePresentation ?: SourceHomePresentation()).copy(
+            catalogIds = ids,
+            aliases = aliases,
+            releaseYear = years.singleOrNull(),
+            choices = choices,
+        )
         first.copy(memo = presentation.attachTo(first.memo))
     }
 }
+
+private fun memberSources(card: Anime): Set<Long> = card.homePresentation?.choices
+    ?.map(SourceHomeChoice::sourceId)?.toSet()?.takeIf { it.isNotEmpty() } ?: setOf(card.source)
 
 private fun sameWork(left: Anime, right: Anime): Boolean {
     if (left.source == right.source) return false
