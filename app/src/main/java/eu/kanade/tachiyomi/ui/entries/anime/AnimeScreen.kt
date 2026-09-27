@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -50,6 +51,8 @@ import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
+import eu.kanade.tachiyomi.data.track.AnimeMangaContinuity
+import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.source.anime.isLocalOrStub
 import eu.kanade.tachiyomi.source.anime.isSourceForTorrents
 import eu.kanade.tachiyomi.ui.browse.anime.migration.anime.season.MigrateSeasonSelectScreen
@@ -60,6 +63,7 @@ import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.GlobalAnimeSearchScreen
 import eu.kanade.tachiyomi.ui.category.CategoriesTab
 import eu.kanade.tachiyomi.ui.entries.anime.track.AnimeTrackInfoDialogHomeScreen
+import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryTab
 import eu.kanade.tachiyomi.ui.main.MainActivity
@@ -68,6 +72,7 @@ import eu.kanade.tachiyomi.ui.webview.WebViewScreen
 import eu.kanade.tachiyomi.util.system.copyToClipboard
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
@@ -80,6 +85,8 @@ import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.LoadingScreen
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 class AnimeScreen(
     private val animeId: Long,
@@ -129,6 +136,35 @@ class AnimeScreen(
         }
         val isAnimeHttpSource = remember { successState.source is AnimeHttpSource }
 
+        val trackedAniListId = successState.trackItems.firstOrNull {
+            it.tracker.id == TrackerManager.ANILIST
+        }?.track?.remoteId
+        val trackedMalId = successState.trackItems.firstOrNull {
+            it.tracker.id == 1L
+        }?.track?.remoteId
+        val watchedEpisode = successState.episodes.map { it.episode }
+            .filter { it.episodeNumber > 0 && (it.seen || it.lastSecondSeen > 0) }
+            .maxOfOrNull { it.episodeNumber }
+        var continuity by remember(successState.anime.id) {
+            mutableStateOf<AnimeMangaContinuity.Result?>(null)
+        }
+        LaunchedEffect(successState.anime.id, trackedAniListId, trackedMalId, watchedEpisode) {
+            try {
+                continuity = Injekt.get<AnimeMangaContinuity>().resolve(
+                    successState.anime,
+                    successState.source,
+                    trackedAniListId,
+                    trackedMalId,
+                    watchedEpisode,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                logcat(LogPriority.WARN, error) { "Manga continuity metadata unavailable" }
+                continuity = null
+            }
+        }
+
         LaunchedEffect(successState.anime, screenModel.source) {
             if (isAnimeHttpSource) {
                 try {
@@ -143,6 +179,10 @@ class AnimeScreen(
 
         AnimeScreen(
             state = successState,
+            continuity = continuity,
+            onOpenManga = { manga, chapter ->
+                navigator.push(MangaScreen(manga.id, fromSource = !manga.favorite, chapterTarget = chapter))
+            },
             snackbarHostState = screenModel.snackbarHostState,
             nextUpdate = successState.anime.expectedNextUpdate,
             isTabletUi = isTabletUi(),

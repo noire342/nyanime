@@ -5,6 +5,7 @@ import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import eu.kanade.domain.entries.anime.model.toSAnime
 import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.data.library.anime.AnimeRefreshSchedule
+import eu.kanade.tachiyomi.data.track.AnimeMangaContinuity
 import eu.kanade.tachiyomi.network.NetworkHelper
 import tachiyomi.data.discovery.CachedAnimeCatalogRepository
 import tachiyomi.data.discovery.DiscoveryDatabase
@@ -39,6 +40,7 @@ class DiscoveryModule(private val app: Application) : InjektModule {
         addSingletonFactory<MangaHomeManifestReader> { ApkMangaHomeManifestReader(app) }
         addSingletonFactory { MangaHomeRegistry(get(), get(), get(), get(), get(), get(), get()) }
         addSingletonFactory { MangaHomeService(get(), get(), get()) }
+        addSingletonFactory { AnimeMangaContinuity(get(), get(), get(), get()) }
         addSingletonFactory { ExtensionHomeRegistry(get(), get(), get(), get(), get(), get(), get()) }
         addSingletonFactory<tachiyomi.domain.discovery.SourceHomeCache> {
             tachiyomi.data.discovery.SqlSourceHomeCache(get(), get())

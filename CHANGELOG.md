@@ -8,6 +8,17 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Dall'anime al manga
+
+- La scheda anime riconosce i manga collegati tramite ID di catalogo e, quando
+  l'estensione lo fornisce, apre direttamente una copia verificata senza cercarla
+  per titolo.
+- I punti di inizio e fine adattamento compaiono quando sono documentati. Il
+  passaggio a un capitolo preciso è proposto soltanto se il riferimento
+  all'episodio è esplicito; non vengono stimate corrispondenze mancanti.
+- Le estensioni possono fornire ricerca per ID e link correlati tramite contratti
+  generici, mantenendo nell'estensione ogni logica del rispettivo sito.
+
 ## 27 settembre 2026 — Categorie Home adattive
 
 - Le categorie della Home si distribuiscono su una o due righe secondo la larghezza

@@ -21,6 +21,12 @@ internal object AniListMediaLookup {
     enum class Type { ANIME, MANGA }
 
     data class Match(val id: Long, val malId: Long?, val titles: List<String>, val episodes: Int?)
+    data class MangaRelation(
+        val id: Long,
+        val malId: Long?,
+        val titles: List<String>,
+        val format: String?,
+    )
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
@@ -31,6 +37,43 @@ internal object AniListMediaLookup {
     private val cacheMutex = Mutex()
     private data class CacheEntry(val expiresAt: Long, val match: Match?)
     private val cache = LinkedHashMap<Pair<Type, String>, CacheEntry>(128, 0.75f, true)
+    private val relationCache = LinkedHashMap<Long, Pair<Long, List<MangaRelation>>>(64, 0.75f, true)
+
+    /** Only catalog IDs are sent. A title match never establishes an adaptation relationship. */
+    suspend fun mangaAdaptations(animeId: Long): List<MangaRelation> = cacheMutex.withLock {
+        if (animeId !in 1..Int.MAX_VALUE.toLong()) return@withLock emptyList()
+        relationCache[animeId]?.takeIf { it.first > System.currentTimeMillis() }?.let { return@withLock it.second }
+        val relations = fetchMangaAdaptations(animeId)
+        relationCache[animeId] = (System.currentTimeMillis() + 24 * 60 * 60 * 1000L) to relations
+        if (relationCache.size > 64) relationCache.remove(relationCache.keys.first())
+        relations
+    }
+
+    private suspend fun fetchMangaAdaptations(animeId: Long): List<MangaRelation> = withContext(Dispatchers.IO) {
+        val query = """
+            query Adaptations(${'$'}id: Int) {
+              Media(id: ${'$'}id, type: ANIME) {
+                relations {
+                  edges { relationType node { id idMal type format title { romaji english native } synonyms } }
+                }
+              }
+            }
+        """.trimIndent()
+        val body = buildJsonObject {
+            put("query", query)
+            putJsonObject("variables") { put("id", animeId) }
+        }.toString().toRequestBody(jsonMime)
+        client.newCall(POST("https://graphql.anilist.co", body = body)).awaitSuccess().use { response ->
+            json.decodeFromString<RelationResponse>(response.body.string())
+                .data?.media?.relations?.edges.orEmpty()
+                .mapNotNull { edge ->
+                    val node = edge.node ?: return@mapNotNull null
+                    if (edge.relationType != "ADAPTATION" || node.type != "MANGA") return@mapNotNull null
+                    MangaRelation(node.id, node.idMal, node.names, node.format)
+                }
+                .distinctBy { it.id }
+        }
+    }
 
     suspend fun resolve(title: String, type: Type): Match? = cacheMutex.withLock {
         val key = type to TrackTitleMatcher.normalize(title)
@@ -112,6 +155,21 @@ internal object AniListMediaLookup {
     private data class IdData(@kotlinx.serialization.SerialName("Media") val media: Media? = null)
 
     @Serializable
+    private data class RelationResponse(val data: RelationData? = null)
+
+    @Serializable
+    private data class RelationData(@kotlinx.serialization.SerialName("Media") val media: RelationMedia? = null)
+
+    @Serializable
+    private data class RelationMedia(val relations: RelationConnection? = null)
+
+    @Serializable
+    private data class RelationConnection(val edges: List<RelationEdge> = emptyList())
+
+    @Serializable
+    private data class RelationEdge(val relationType: String? = null, val node: Media? = null)
+
+    @Serializable
     private data class SearchPage(
         val pageInfo: PageInfo? = null,
         val media: List<Media> = emptyList(),
@@ -125,6 +183,8 @@ internal object AniListMediaLookup {
         val id: Long,
         val idMal: Long? = null,
         val episodes: Int? = null,
+        val type: String? = null,
+        val format: String? = null,
         val title: MediaTitles? = null,
         val synonyms: List<String> = emptyList(),
     ) {

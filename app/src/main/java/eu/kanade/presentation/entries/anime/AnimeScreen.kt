@@ -65,6 +65,7 @@ import eu.kanade.presentation.entries.EntryScreenItem
 import eu.kanade.presentation.entries.anime.components.AnimeActionRow
 import eu.kanade.presentation.entries.anime.components.AnimeEpisodeListItem
 import eu.kanade.presentation.entries.anime.components.AnimeInfoBox
+import eu.kanade.presentation.entries.anime.components.AnimeMangaContinuityCard
 import eu.kanade.presentation.entries.anime.components.AnimeSeasonListItem
 import eu.kanade.presentation.entries.anime.components.AnimeWatchButton
 import eu.kanade.presentation.entries.anime.components.EpisodeDownloadAction
@@ -79,6 +80,7 @@ import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
 import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
+import eu.kanade.tachiyomi.data.track.AnimeMangaContinuity
 import eu.kanade.tachiyomi.source.anime.getNameForAnimeInfo
 import eu.kanade.tachiyomi.ui.browse.anime.extension.details.AnimeSourcePreferencesScreen
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreenModel
@@ -86,6 +88,7 @@ import eu.kanade.tachiyomi.ui.entries.anime.AnimeSeasonItem
 import eu.kanade.tachiyomi.ui.entries.anime.EpisodeList
 import eu.kanade.tachiyomi.util.system.copyToClipboard
 import tachiyomi.domain.entries.anime.model.Anime
+import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.items.episode.service.missingEntriesCount
 import tachiyomi.domain.library.model.LibraryDisplayMode
@@ -107,6 +110,8 @@ import java.util.concurrent.TimeUnit
 @Composable
 fun AnimeScreen(
     state: AnimeScreenModel.State.Success,
+    continuity: AnimeMangaContinuity.Result?,
+    onOpenManga: (Manga, Double?) -> Unit,
     snackbarHostState: SnackbarHostState,
     nextUpdate: Instant?,
     isTabletUi: Boolean,
@@ -180,6 +185,8 @@ fun AnimeScreen(
     if (!isTabletUi) {
         AnimeScreenSmallImpl(
             state = state,
+            continuity = continuity,
+            onOpenManga = onOpenManga,
             snackbarHostState = snackbarHostState,
             nextUpdate = nextUpdate,
             episodeSwipeStartAction = episodeSwipeStartAction,
@@ -225,6 +232,8 @@ fun AnimeScreen(
     } else {
         AnimeScreenLargeImpl(
             state = state,
+            continuity = continuity,
+            onOpenManga = onOpenManga,
             snackbarHostState = snackbarHostState,
             nextUpdate = nextUpdate,
             episodeSwipeStartAction = episodeSwipeStartAction,
@@ -274,6 +283,8 @@ fun AnimeScreen(
 @Composable
 private fun AnimeScreenSmallImpl(
     state: AnimeScreenModel.State.Success,
+    continuity: AnimeMangaContinuity.Result?,
+    onOpenManga: (Manga, Double?) -> Unit,
     snackbarHostState: SnackbarHostState,
     nextUpdate: Instant?,
     episodeSwipeStartAction: LibraryPreferences.EpisodeSwipeAction,
@@ -554,6 +565,12 @@ private fun AnimeScreenSmallImpl(
                         )
                     }
 
+                    if (continuity is AnimeMangaContinuity.Result.Found) {
+                        item(key = "anime-manga-continuity", span = { GridItemSpan(maxLineSpan) }) {
+                            AnimeMangaContinuityCard(continuity, onOpenManga)
+                        }
+                    }
+
                     item(
                         key = EntryScreenItem.ITEM_HEADER,
                         contentType = EntryScreenItem.ITEM_HEADER,
@@ -638,6 +655,8 @@ private fun AnimeScreenSmallImpl(
 @Composable
 fun AnimeScreenLargeImpl(
     state: AnimeScreenModel.State.Success,
+    continuity: AnimeMangaContinuity.Result?,
+    onOpenManga: (Manga, Double?) -> Unit,
     snackbarHostState: SnackbarHostState,
     nextUpdate: Instant?,
     episodeSwipeStartAction: LibraryPreferences.EpisodeSwipeAction,
@@ -882,6 +901,9 @@ fun AnimeScreenLargeImpl(
                                 onRelatedLongClick = onRelatedAnimeLongClicked,
                                 relatedDisplayMode = relatedAnimeDisplayMode,
                             )
+                            if (continuity is AnimeMangaContinuity.Result.Found) {
+                                AnimeMangaContinuityCard(continuity, onOpenManga)
+                            }
                         }
                     },
                     endContent = {

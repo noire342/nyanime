@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -72,6 +73,7 @@ import tachiyomi.presentation.core.screens.LoadingScreen
 class MangaScreen(
     private val mangaId: Long,
     val fromSource: Boolean = false,
+    private val chapterTarget: Double? = null,
 ) : Screen(), AssistContentScreen {
 
     private var assistUrl: String? = null
@@ -106,6 +108,17 @@ class MangaScreen(
         }
 
         val successState = state as MangaScreenModel.State.Success
+        var targetOpened by rememberSaveable(mangaId, chapterTarget) { mutableStateOf(false) }
+        LaunchedEffect(chapterTarget, successState.chapters) {
+            if (!targetOpened && chapterTarget != null) {
+                successState.chapters.firstOrNull {
+                    it.chapter.chapterNumber == chapterTarget
+                }?.let { item ->
+                    targetOpened = true
+                    openChapter(context, item.chapter)
+                }
+            }
+        }
         val isHttpSource = remember { successState.source is HttpSource }
 
         LaunchedEffect(successState.manga, screenModel.source) {

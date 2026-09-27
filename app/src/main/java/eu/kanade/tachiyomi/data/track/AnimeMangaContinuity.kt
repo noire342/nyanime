@@ -1,0 +1,319 @@
+package eu.kanade.tachiyomi.data.track
+
+import eu.kanade.domain.entries.manga.model.toDomainManga
+import eu.kanade.domain.entries.manga.model.toSManga
+import eu.kanade.tachiyomi.animesource.AnimeSource
+import eu.kanade.tachiyomi.animesource.RelatedMangaLinks
+import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.network.awaitSuccess
+import eu.kanade.tachiyomi.source.CatalogueSource
+import eu.kanade.tachiyomi.source.MangaCatalogIdResolver
+import eu.kanade.tachiyomi.source.MangaCatalogLinkResolver
+import eu.kanade.tachiyomi.source.MangaSourceUpdateGate
+import eu.kanade.tachiyomi.source.model.SManga
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
+import okhttp3.OkHttpClient
+import tachiyomi.domain.entries.anime.model.Anime
+import tachiyomi.domain.entries.manga.interactor.NetworkToLocalManga
+import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.entries.manga.repository.MangaRepository
+import tachiyomi.domain.source.manga.service.MangaSourceManager
+import tachiyomi.domain.track.manga.model.MangaTrack
+import tachiyomi.domain.track.manga.repository.MangaTrackRepository
+import java.util.concurrent.TimeUnit
+
+/** Verified catalog relationships and source-independent continuation checkpoints. */
+class AnimeMangaContinuity(
+    private val mangaRepository: MangaRepository,
+    private val mangaTracks: MangaTrackRepository,
+    private val sourceManager: MangaSourceManager,
+    private val toLocal: NetworkToLocalManga,
+) {
+    data class Checkpoint(val chapter: Double, val note: String, val episode: Int?, val exactEpisode: Boolean = false)
+
+    data class Choice(
+        val catalogId: Long,
+        val catalogMalId: Long?,
+        val title: String,
+        val coverUrl: String?,
+        val format: String?,
+        val beginning: Checkpoint?,
+        val latestAdapted: Checkpoint?,
+        val matches: List<Manga>,
+    ) {
+        /** Never interpolate episode numbers into chapter numbers. */
+        fun continuationAfter(watchedEpisode: Double?): Double? {
+            val end = latestAdapted ?: return null
+            val episode = end.episode ?: return null
+            if (!end.exactEpisode || watchedEpisode == null || watchedEpisode < episode) return null
+            // Reopen the mapped chapter: adaptations can stop midway through it.
+            return end.chapter
+        }
+    }
+
+    sealed interface Result {
+        data class Found(val choices: List<Choice>, val watchedEpisode: Double?) : Result
+        data object NoCatalogId : Result
+        data object NoMangaRelation : Result
+    }
+
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .callTimeout(12, TimeUnit.SECONDS)
+        .build()
+    private val json = Json { ignoreUnknownKeys = true }
+    private data class CatalogMetadata(
+        val beginning: Checkpoint?,
+        val ending: Checkpoint?,
+        val coverUrl: String?,
+    )
+    private data class LinkedManga(val manga: SManga, val source: CatalogueSource, val hints: SourceTrackingHints)
+    private val bridgeCache = LinkedHashMap<Long, Pair<Long, CatalogMetadata>>(64, 0.75f, true)
+
+    suspend fun resolve(
+        anime: Anime,
+        source: AnimeSource,
+        trackedAniListId: Long?,
+        trackedMalId: Long?,
+        watchedEpisode: Double?,
+    ): Result {
+        val hints = AutoTrackOnStart.animeHints(anime, source)
+        val animeId = hints?.anilistId ?: trackedAniListId ?: hints?.malId?.let {
+            AniListMediaLookup.resolveId(it, AniListMediaLookup.Type.ANIME, malId = true)?.id
+        } ?: trackedMalId?.let {
+            AniListMediaLookup.resolveId(it, AniListMediaLookup.Type.ANIME, malId = true)?.id
+        } ?: return Result.NoCatalogId
+
+        val allRelations = AniListMediaLookup.mangaAdaptations(animeId)
+        val relations = allRelations.filter { it.format == "MANGA" }
+            .ifEmpty { allRelations.filter { it.format == "ONE_SHOT" } }
+        if (relations.isEmpty()) return Result.NoMangaRelation
+
+        val relatedLinks = (source as? RelatedMangaLinks)?.let { resolver ->
+            withTimeoutOrNull(6_000) {
+                runCatching { resolver.relatedMangaLinks(anime.url) }.getOrDefault(emptyList())
+            }
+        }.orEmpty()
+        val linkResolvers = sourceManager.getCatalogueSources().filterIsInstance<MangaCatalogLinkResolver>()
+        val linkedManga = relatedLinks.take(3).flatMap { link ->
+            linkResolvers.mapNotNull { resolver ->
+                val manga = withTimeoutOrNull(6_000) {
+                    runCatching { resolver.findMangaByCatalogLink(link) }.getOrNull()
+                } ?: return@mapNotNull null
+                val hints = SourceTrackingHints.from(manga) ?: return@mapNotNull null
+                LinkedManga(manga, resolver as CatalogueSource, hints)
+            }
+        }
+        val prioritizedRelations = relations.sortedWith(
+            compareByDescending<AniListMediaLookup.MangaRelation> { relation ->
+                linkedManga.any { hasSameIdentity(relation.id, relation.malId, it.hints) }
+            }.thenByDescending { relation ->
+                relation.titles.any { TrackTitleMatcher.normalize(it) == TrackTitleMatcher.normalize(anime.title) }
+            }.thenBy { it.id },
+        ).take(12)
+
+        val favorites = mangaRepository.getMangaFavorites()
+        val tracksByMangaId = mangaTracks.getMangaTracksAsFlow().first().groupBy { it.mangaId }
+        val metadata = coroutineScope {
+            val permits = Semaphore(3)
+            prioritizedRelations.map { relation ->
+                async(Dispatchers.IO) {
+                    permits.withPermit {
+                        runCatching { bridge(relation.id) }.getOrElse { error ->
+                            if (error is CancellationException) throw error
+                            CatalogMetadata(null, null, null)
+                        }
+                    }
+                }
+            }.awaitAll()
+        }
+        val choices = prioritizedRelations.mapIndexed { index, relation ->
+            val catalogMetadata = metadata[index]
+            val matches = findVerifiedManga(relation, favorites, tracksByMangaId, linkedManga)
+            val (directBeginning, directEnding) = if (catalogMetadata.beginning == null ||
+                catalogMetadata.ending == null
+            ) {
+                matches.firstOrNull()?.let { readMangaUpdatesCheckpoint(it, tracksByMangaId[it.id].orEmpty()) }
+                    ?: (null to null)
+            } else {
+                null to null
+            }
+            Choice(
+                catalogId = relation.id,
+                catalogMalId = relation.malId,
+                title = relation.titles.firstOrNull().orEmpty(),
+                coverUrl = catalogMetadata.coverUrl,
+                format = relation.format,
+                beginning = catalogMetadata.beginning ?: directBeginning,
+                latestAdapted = catalogMetadata.ending ?: directEnding,
+                matches = matches,
+            )
+        }
+        return Result.Found(choices, watchedEpisode)
+    }
+
+    private suspend fun bridge(id: Long): CatalogMetadata = withContext(Dispatchers.IO) {
+        synchronized(bridgeCache) {
+            bridgeCache[id]?.takeIf { it.first > System.currentTimeMillis() }?.second
+        }?.let { return@withContext it }
+        val raw = client.newCall(GET("https://api.mangabaka.org/v1/source/anilist/$id"))
+            .awaitSuccess().use { json.parseToJsonElement(it.body.string()).jsonObject }
+        val series = raw.obj("data")?.get("series")?.jsonArray.orEmpty()
+            .mapNotNull { runCatching { it.jsonObject }.getOrNull() }
+            .filter { it.obj("source")?.obj("anilist")?.get("id")?.jsonPrimitive?.longOrNull == id }
+        // A merged or duplicated catalog mapping must not supply a silent checkpoint.
+        val adaptation = series.singleOrNull()?.obj("anime")
+        val result = CatalogMetadata(
+            checkpoint(adaptation?.string("start")),
+            checkpoint(adaptation?.string("end")),
+            series.singleOrNull()?.obj("cover")?.obj("x250")?.string("x1")
+                ?: series.singleOrNull()?.obj("cover")?.obj("raw")?.string("url"),
+        )
+        synchronized(bridgeCache) {
+            bridgeCache[id] = (System.currentTimeMillis() + 24 * 60 * 60 * 1000L) to result
+            if (bridgeCache.size > 64) bridgeCache.remove(bridgeCache.keys.first())
+        }
+        result
+    }
+
+    private suspend fun findVerifiedManga(
+        relation: AniListMediaLookup.MangaRelation,
+        favorites: List<Manga>,
+        tracksByMangaId: Map<Long, List<MangaTrack>>,
+        linkedManga: List<LinkedManga>,
+    ): List<Manga> = withContext(Dispatchers.IO) {
+        val verified = mutableListOf<Manga>()
+        for (manga in favorites) {
+            val tracks = tracksByMangaId[manga.id].orEmpty()
+            val conflicts = tracks.any {
+                (it.trackerId == TrackerManager.ANILIST && it.remoteId != relation.id) ||
+                    (it.trackerId == 1L && relation.malId != null && it.remoteId != relation.malId)
+            }
+            if (!conflicts &&
+                tracks.any {
+                    (it.trackerId == TrackerManager.ANILIST && it.remoteId == relation.id) ||
+                        (it.trackerId == 1L && it.remoteId == relation.malId)
+                }
+            ) {
+                verified += manga
+            }
+        }
+        // A direct link still needs an independent catalog ID match before it can open automatically.
+        for (linked in linkedManga) {
+            if (!hasSameIdentity(relation.id, relation.malId, linked.hints)) continue
+            val local = toLocal.await(linked.manga.toDomainManga(linked.source.id))
+            if (verified.none { it.id == local.id }) verified += local
+        }
+        if (verified.isEmpty()) {
+            // Titles only narrow which existing entries need an ID check; they never establish identity.
+            val names = relation.titles.map(TrackTitleMatcher::normalize).toSet()
+            val candidates = favorites.filter { TrackTitleMatcher.normalize(it.title) in names }.take(3)
+            for (manga in candidates) {
+                val source = sourceManager.get(manga.source) ?: continue
+                val hints = withTimeoutOrNull(6_000) {
+                    runCatching {
+                        val details = MangaSourceUpdateGate.await(
+                            source,
+                            manga.toSManga(),
+                            emptyList(),
+                            fetchDetails = true,
+                            fetchChapters = false,
+                        ).manga
+                        SourceTrackingHints.from(details)
+                    }.getOrNull()
+                }
+                if (hasSameIdentity(relation.id, relation.malId, hints)) verified += manga
+            }
+        }
+        // Sources with real ID lookup can resolve titles previously indexed in the extension.
+        for (source in sourceManager.getCatalogueSources().filterIsInstance<MangaCatalogIdResolver>()) {
+            if (verified.isNotEmpty()) break
+            val mangaSource = source as CatalogueSource
+            val remote = withTimeoutOrNull(6_000) {
+                runCatching { source.findMangaByCatalogId("anilist", relation.id) }.getOrNull()
+            } ?: continue
+            val details = withTimeoutOrNull(6_000) {
+                runCatching { mangaSource.getMangaDetails(remote) }.getOrNull()
+            } ?: continue
+            if (!hasSameIdentity(relation.id, relation.malId, SourceTrackingHints.from(details))) continue
+            val local = toLocal.await(details.toDomainManga(mangaSource.id))
+            if (verified.none { it.id == local.id }) verified += local
+        }
+        verified
+    }
+
+    private suspend fun readMangaUpdatesCheckpoint(
+        manga: Manga,
+        tracks: List<MangaTrack>,
+    ): Pair<Checkpoint?, Checkpoint?> {
+        val trackedId = tracks
+            .firstOrNull { it.trackerId == 7L && it.remoteId > 0 }?.remoteId
+        val id = trackedId ?: withTimeoutOrNull(6_000) {
+            val source = sourceManager.get(manga.source) ?: return@withTimeoutOrNull null
+            val details = MangaSourceUpdateGate.await(
+                source,
+                manga.toSManga(),
+                emptyList(),
+                fetchDetails = true,
+                fetchChapters = false,
+            ).manga
+            SourceTrackingHints.from(details)?.mangaUpdatesId
+        } ?: return null to null
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                client.newCall(GET("https://api.mangaupdates.com/v1/series/$id"))
+                    .awaitSuccess().use {
+                        val record = json.parseToJsonElement(it.body.string()).jsonObject
+                        val anime = record.obj("anime")
+                        checkpoint(anime?.string("start")) to checkpoint(anime?.string("end"))
+                    }
+            }
+        }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            null to null
+        }
+    }
+
+    private fun JsonObject.obj(key: String): JsonObject? = runCatching { get(key)?.jsonObject }.getOrNull()
+    private fun JsonObject.string(
+        key: String,
+    ): String? = runCatching { get(key)?.jsonPrimitive?.contentOrNull }.getOrNull()
+
+    companion object {
+        private val chapterPattern = Regex("(?i)\\b(?:chap(?:ter)?|ch\\.?)[ .:#]*(\\d+(?:\\.\\d+)?)\\b")
+        private val episodePattern = Regex("(?i)\\b(?:ep(?:isode)?)[ .:#]*(\\d+)\\b")
+        private val exactEpisodePattern =
+            Regex("(?i)\\b(?:adapted|covered|animated)\\s+in\\s+(?:ep(?:isode)?)[ .:#]*\\d+\\b")
+
+        internal fun checkpoint(raw: String?): Checkpoint? {
+            val text = raw?.trim()?.takeIf { it.isNotEmpty() && it.length <= 160 } ?: return null
+            val chapter = chapterPattern.find(text)?.groupValues?.get(1)?.toDoubleOrNull() ?: return null
+            val episode = episodePattern.find(text)?.groupValues?.get(1)?.toIntOrNull()
+            return Checkpoint(chapter, text, episode, exactEpisodePattern.containsMatchIn(text))
+        }
+
+        internal fun hasSameIdentity(anilistId: Long, malId: Long?, hints: SourceTrackingHints?): Boolean {
+            if (hints == null) return false
+            if (hints.anilistId != null && hints.anilistId != anilistId) return false
+            if (malId != null && hints.malId != null && hints.malId != malId) return false
+            return hints.anilistId == anilistId || (malId != null && hints.malId == malId)
+        }
+    }
+}
