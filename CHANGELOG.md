@@ -8,6 +8,14 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 27 settembre 2026 — Prossima uscita degli episodi
+
+- La previsione del prossimo episodio è ora una scheda discreta nella lista:
+  mette in primo piano data e ora locali, seguite dal tempo rimanente; il numero
+  e il titolo dell'episodio restano leggibili sotto, senza la vecchia scritta rossa.
+  Il tempo si aggiorna quando cambia il minuto e la scheda si adatta agli
+  schermi stretti e alle griglie della UI moderna e legacy.
+
 ## 27 settembre 2026 — Home Anime con più fonti
 
 - Le sezioni e la ricerca della Home Anime combinano i risultati delle estensioni

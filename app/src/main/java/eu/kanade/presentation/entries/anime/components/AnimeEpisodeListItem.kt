@@ -1,5 +1,6 @@
 package eu.kanade.presentation.entries.anime.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,7 +11,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.outlined.LabelOff
@@ -23,14 +26,19 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FileDownloadOff
 import androidx.compose.material.icons.outlined.NewLabel
 import androidx.compose.material.icons.outlined.RemoveDone
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,15 +60,19 @@ import coil3.request.crossfade
 import eu.kanade.presentation.entries.components.DotSeparatorText
 import eu.kanade.presentation.entries.components.ItemCover
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
+import kotlinx.coroutines.delay
 import me.saket.swipe.SwipeableActionsBox
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.DISABLED_ALPHA
 import tachiyomi.presentation.core.components.material.SECONDARY_ALPHA
+import tachiyomi.presentation.core.i18n.pluralStringResource
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.secondaryItemAlpha
 import tachiyomi.presentation.core.util.selectedBackground
+import java.text.DateFormat
+import java.util.Date
 
 @Composable
 fun AnimeEpisodeListItem(
@@ -299,36 +311,123 @@ private fun getSwipeAction(
 @Composable
 fun NextEpisodeAiringListItem(
     title: String,
-    date: String,
+    airingAtMillis: Long,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.padding(start = 16.dp, top = 12.dp, end = 8.dp, bottom = 12.dp),
+    var remainingMillis by remember(airingAtMillis) {
+        mutableLongStateOf(airingAtMillis - System.currentTimeMillis())
+    }
+    LaunchedEffect(airingAtMillis) {
+        while (remainingMillis > 0L) {
+            val nextMinuteBoundary = (remainingMillis % 60_000L).takeIf { it > 0L } ?: 60_000L
+            delay(minOf(nextMinuteBoundary, remainingMillis))
+            remainingMillis = airingAtMillis - System.currentTimeMillis()
+        }
+    }
+    if (remainingMillis <= 0L) return
+
+    val locale = LocalConfiguration.current.locales[0]
+    val scheduledDate = remember(airingAtMillis, locale) {
+        DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.SHORT, locale)
+            .format(Date(airingAtMillis))
+    }
+    val minutesRemaining = ((remainingMillis + 59_999L) / 60_000L).coerceAtLeast(1L)
+    val days = minutesRemaining / (24L * 60L)
+    val hours = (minutesRemaining / 60L) % 24L
+    val minutes = minutesRemaining % 60L
+    val dayCount = days.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    val hourCount = (minutesRemaining / 60L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    val minuteCount = minutesRemaining.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    val countdown = when {
+        days > 0L && hours > 0L -> stringResource(
+            AYMR.strings.next_episode_airing_in_two,
+            pluralStringResource(AYMR.plurals.next_episode_airing_days, dayCount, dayCount),
+            pluralStringResource(AYMR.plurals.next_episode_airing_hours, hours.toInt(), hours.toInt()),
+        )
+        days > 0L -> stringResource(
+            AYMR.strings.next_episode_airing_in_one,
+            pluralStringResource(AYMR.plurals.next_episode_airing_days, dayCount, dayCount),
+        )
+        minutesRemaining >= 60L && minutes > 0L -> stringResource(
+            AYMR.strings.next_episode_airing_in_two,
+            pluralStringResource(AYMR.plurals.next_episode_airing_hours, hourCount, hourCount),
+            pluralStringResource(AYMR.plurals.next_episode_airing_minutes, minutes.toInt(), minutes.toInt()),
+        )
+        minutesRemaining >= 60L -> stringResource(
+            AYMR.strings.next_episode_airing_in_one,
+            pluralStringResource(AYMR.plurals.next_episode_airing_hours, hourCount, hourCount),
+        )
+        else -> stringResource(
+            AYMR.strings.next_episode_airing_in_one,
+            pluralStringResource(AYMR.plurals.next_episode_airing_minutes, minuteCount, minuteCount),
+        )
+    }
+
+    NextEpisodeAiringCard(
+        title = title,
+        scheduledDate = scheduledDate,
+        countdown = countdown,
+        modifier = modifier,
+    )
+}
+
+@Composable
+internal fun NextEpisodeAiringCard(
+    title: String,
+    scheduledDate: String,
+    countdown: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Schedule,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 14.sp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.alpha(SECONDARY_ALPHA),
-                    color = MaterialTheme.colorScheme.primary,
+                    text = stringResource(AYMR.strings.next_episode_airing_label),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(modifier = Modifier.alpha(SECONDARY_ALPHA)) {
-                ProvideTextStyle(
-                    value = MaterialTheme.typography.bodySmall,
-                ) {
-                    Text(
-                        text = date,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
+            Text(
+                text = scheduledDate,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = countdown,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

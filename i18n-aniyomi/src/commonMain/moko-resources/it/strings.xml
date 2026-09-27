@@ -319,6 +319,9 @@
     <string name="action_previous_episode">Episodio precedente</string>
     <string name="action_play">Play</string>
     <string name="action_next_episode">Prossimo episodio</string>
+    <string name="next_episode_airing_label">Prossima uscita</string>
+    <string name="next_episode_airing_in_one">Tra %1$s</string>
+    <string name="next_episode_airing_in_two">Tra %1$s e %2$s</string>
     <string name="action_screen_fit">Modalità adatta allo schermo</string>
     <string name="action_show_anime">Mostra anime</string>
     <string name="action_display_download_badge_anime">Episodi scaricati</string>

@@ -34,11 +34,9 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -87,7 +85,6 @@ import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreenModel
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeSeasonItem
 import eu.kanade.tachiyomi.ui.entries.anime.EpisodeList
 import eu.kanade.tachiyomi.util.system.copyToClipboard
-import kotlinx.coroutines.delay
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.items.episode.service.missingEntriesCount
@@ -586,33 +583,23 @@ private fun AnimeScreenSmallImpl(
                         }
 
                         FetchType.Episodes -> {
-                            if (state.airingTime > 0L) {
+                            if (state.airingTime > 0L &&
+                                showNextEpisodeAirTime &&
+                                state.anime.status.toInt() != SAnime.COMPLETED
+                            ) {
                                 item(
                                     key = EntryScreenItem.AIRING_TIME,
                                     contentType = EntryScreenItem.AIRING_TIME,
                                     span = { GridItemSpan(maxLineSpan) },
                                 ) {
-                                    // Handles the second by second countdown
-                                    var timer by remember { mutableLongStateOf(state.airingTime) }
-                                    LaunchedEffect(key1 = timer) {
-                                        if (timer > 0L) {
-                                            delay(1000L)
-                                            timer -= 1000L
-                                        }
-                                    }
-                                    if (timer > 0L &&
-                                        showNextEpisodeAirTime &&
-                                        state.anime.status.toInt() != SAnime.COMPLETED
-                                    ) {
-                                        NextEpisodeAiringListItem(
-                                            title = stringResource(
-                                                AYMR.strings.display_mode_episode,
-                                                formatEpisodeNumber(state.airingEpisodeNumber),
-                                            ),
-                                            date = formatTime(state.airingTime, useDayFormat = true),
-                                            modifier = Modifier.ignorePadding(offsetGridPaddingPx),
-                                        )
-                                    }
+                                    NextEpisodeAiringListItem(
+                                        title = stringResource(
+                                            AYMR.strings.display_mode_episode,
+                                            formatEpisodeNumber(state.airingEpisodeNumber),
+                                        ),
+                                        airingAtMillis = state.nextAiringEpisode.second * 1000L,
+                                        modifier = Modifier.ignorePadding(offsetGridPaddingPx),
+                                    )
                                 }
                             }
 
@@ -929,32 +916,23 @@ fun AnimeScreenLargeImpl(
                                 }
 
                                 FetchType.Episodes -> {
-                                    if (state.airingTime > 0L) {
+                                    if (state.airingTime > 0L &&
+                                        showNextEpisodeAirTime &&
+                                        state.anime.status.toInt() != SAnime.COMPLETED
+                                    ) {
                                         item(
                                             key = EntryScreenItem.AIRING_TIME,
                                             contentType = EntryScreenItem.AIRING_TIME,
+                                            span = { GridItemSpan(maxLineSpan) },
                                         ) {
-                                            // Handles the second by second countdown reseting
-                                            var timer by remember { mutableLongStateOf(state.airingTime) }
-                                            LaunchedEffect(key1 = timer) {
-                                                if (timer > 0L) {
-                                                    delay(1000L)
-                                                    timer -= 1000L
-                                                }
-                                            }
-                                            if (timer > 0L &&
-                                                showNextEpisodeAirTime &&
-                                                state.anime.status.toInt() != SAnime.COMPLETED
-                                            ) {
-                                                NextEpisodeAiringListItem(
-                                                    title = stringResource(
-                                                        AYMR.strings.display_mode_episode,
-                                                        formatEpisodeNumber(state.airingEpisodeNumber),
-                                                    ),
-                                                    date = formatTime(state.airingTime, useDayFormat = true),
-                                                    modifier = Modifier.ignorePadding(offsetGridPaddingPx),
-                                                )
-                                            }
+                                            NextEpisodeAiringListItem(
+                                                title = stringResource(
+                                                    AYMR.strings.display_mode_episode,
+                                                    formatEpisodeNumber(state.airingEpisodeNumber),
+                                                ),
+                                                airingAtMillis = state.nextAiringEpisode.second * 1000L,
+                                                modifier = Modifier.ignorePadding(offsetGridPaddingPx),
+                                            )
                                         }
                                     }
 
@@ -1190,19 +1168,8 @@ private fun onEpisodeItemClick(
     }
 }
 
-private fun formatTime(milliseconds: Long, useDayFormat: Boolean = false): String {
-    return if (useDayFormat) {
-        String.format(
-            "Airing in %02dd %02dh %02dm %02ds",
-            TimeUnit.MILLISECONDS.toDays(milliseconds),
-            TimeUnit.MILLISECONDS.toHours(milliseconds) -
-                TimeUnit.DAYS.toHours(TimeUnit.MILLISECONDS.toDays(milliseconds)),
-            TimeUnit.MILLISECONDS.toMinutes(milliseconds) -
-                TimeUnit.HOURS.toMinutes(TimeUnit.MILLISECONDS.toHours(milliseconds)),
-            TimeUnit.MILLISECONDS.toSeconds(milliseconds) -
-                TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(milliseconds)),
-        )
-    } else if (milliseconds > 3600000L) {
+private fun formatTime(milliseconds: Long): String {
+    return if (milliseconds > 3600000L) {
         String.format(
             "%d:%02d:%02d",
             TimeUnit.MILLISECONDS.toHours(milliseconds),

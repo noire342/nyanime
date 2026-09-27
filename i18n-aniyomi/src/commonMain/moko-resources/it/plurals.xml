@@ -35,4 +35,16 @@
         <item quantity="many">Episodi %1$s e altri %2$d</item>
         <item quantity="other">Episodi %1$s e altri %2$d</item>
     </plurals>
+    <plurals name="next_episode_airing_days">
+        <item quantity="one">%d giorno</item>
+        <item quantity="other">%d giorni</item>
+    </plurals>
+    <plurals name="next_episode_airing_hours">
+        <item quantity="one">%d ora</item>
+        <item quantity="other">%d ore</item>
+    </plurals>
+    <plurals name="next_episode_airing_minutes">
+        <item quantity="one">%d minuto</item>
+        <item quantity="other">%d minuti</item>
+    </plurals>
 </resources>
