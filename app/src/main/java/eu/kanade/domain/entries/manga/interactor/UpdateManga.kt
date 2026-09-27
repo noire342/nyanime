@@ -2,6 +2,7 @@ package eu.kanade.domain.entries.manga.interactor
 
 import eu.kanade.domain.entries.manga.model.hasCustomCover
 import eu.kanade.tachiyomi.data.cache.MangaCoverCache
+import eu.kanade.tachiyomi.data.track.LibraryAutoTracking
 import eu.kanade.tachiyomi.source.model.SManga
 import tachiyomi.domain.entries.manga.interactor.MangaFetchInterval
 import tachiyomi.domain.entries.manga.model.Manga
@@ -99,8 +100,10 @@ class UpdateManga(
             true -> Instant.now().toEpochMilli()
             false -> 0
         }
-        return mangaRepository.updateManga(
+        val updated = mangaRepository.updateManga(
             MangaUpdate(id = mangaId, favorite = favorite, dateAdded = dateAdded),
         )
+        if (updated && favorite) LibraryAutoTracking.mangaAdded(mangaId)
+        return updated
     }
 }

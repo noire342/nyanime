@@ -8,6 +8,18 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 27 settembre 2026 — Tracking dei titoli nella libreria
+
+- Un anime o manga aggiunto alla libreria viene cercato in background nei
+  tracker configurati, anche prima del primo episodio o capitolo. Quando
+  l'associazione è certa, lo stato iniziale resta «Da vedere» o «Da leggere»
+  nei tracker che lo supportano e il progresso resta a zero finché non inizi
+  davvero. Le associazioni già presenti non vengono duplicate.
+- Un controllo correttivo, eseguito una sola volta, esamina anche i titoli
+  non ancora iniziati che erano già in libreria. La voce «Riesamina la
+  libreria» permette di riprovare manualmente i titoli rimasti senza un
+  collegamento certo.
+
 ## 27 settembre 2026 — Aggiornamenti progressivi di episodi e Home
 
 - Aprendo una scheda anime, l'elenco degli episodi salvato viene mostrato subito e

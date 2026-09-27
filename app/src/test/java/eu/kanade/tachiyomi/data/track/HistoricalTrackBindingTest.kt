@@ -26,6 +26,56 @@ import tachiyomi.domain.track.manga.model.MangaTrack as DomainMangaTrack
 
 class HistoricalTrackBindingTest {
     @Test
+    fun `binding an unstarted library anime does not send progress to the tracker`() = runTest {
+        val episodes = mockk<GetEpisodesByAnimeId>()
+        coEvery { episodes.await(5) } returns listOf(
+            Episode.create().copy(animeId = 5, seen = false, episodeNumber = 1.0),
+        )
+        val repository = mockk<AnimeTrackRepository>()
+        coJustRun { repository.insertAnime(any()) }
+        val sync = mockk<SyncEpisodeProgressWithTrack>()
+        coJustRun { sync.await(any(), any(), any()) }
+        val tracker = mockk<AnimeTracker>()
+        val item = AnimeTrack.create(7).apply {
+            anime_id = 5
+            remote_id = 23
+            title = "Example"
+        }
+        coEvery { tracker.bind(item, false) } returns item
+
+        AddAnimeTracks(InsertAnimeTrack(repository), sync, episodes, mockk())
+            .bind(tracker, item, 5)
+
+        coVerify(exactly = 1) { tracker.bind(item, false) }
+        coVerify(exactly = 0) { tracker.setRemoteLastEpisodeSeen(any(), any()) }
+    }
+
+    @Test
+    fun `binding an unstarted library manga does not send progress to the tracker`() = runTest {
+        val chapters = mockk<GetChaptersByMangaId>()
+        coEvery { chapters.await(5, any()) } returns listOf(
+            Chapter.create().copy(mangaId = 5, read = false, chapterNumber = 1.0),
+        )
+        val repository = mockk<MangaTrackRepository>()
+        coJustRun { repository.insertManga(any()) }
+        val sync = mockk<SyncChapterProgressWithTrack>()
+        coJustRun { sync.await(any(), any(), any()) }
+        val tracker = mockk<MangaTracker>()
+        val item = MangaTrack.create(7).apply {
+            manga_id = 5
+            remote_id = 23
+            title = "Example"
+        }
+        coEvery { tracker.bind(item, false) } returns item
+
+        AddMangaTracks(InsertMangaTrack(repository), sync, chapters, mockk())
+            .bind(tracker, item, 5)
+
+        coVerify(exactly = 1) { tracker.bind(item, false) }
+        coVerify(exactly = 0) { tracker.setRemoteLastChapterRead(any(), any()) }
+    }
+
+    @Test
     fun `binding an older anime keeps remote and local progress aligned across gaps`() = runTest {
         val episodes = mockk<GetEpisodesByAnimeId>()
         coEvery { episodes.await(5) } returns listOf(

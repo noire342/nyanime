@@ -1,5 +1,6 @@
 package eu.kanade.domain.entries.anime.interactor
 
+import eu.kanade.tachiyomi.data.track.LibraryAutoTracking
 import tachiyomi.domain.entries.anime.interactor.AnimeFetchInterval
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.anime.model.AnimeUpdate
@@ -51,8 +52,10 @@ class UpdateAnime(
             true -> Instant.now().toEpochMilli()
             false -> 0
         }
-        return animeRepository.updateAnime(
+        val updated = animeRepository.updateAnime(
             AnimeUpdate(id = animeId, favorite = favorite, dateAdded = dateAdded),
         )
+        if (updated && favorite) LibraryAutoTracking.animeAdded(animeId)
+        return updated
     }
 }

@@ -100,7 +100,8 @@ internal object AutoTrackOnStart {
                     result.anime_id = anime.id
                     addTracks.bind(service, result, anime.id)
                     getTracks.await(anime.id).firstOrNull { it.trackerId == tracker.id }?.let { bound ->
-                        if (bound.lastEpisodeSeen <= 0 &&
+                        if (episodeNumber > 0 &&
+                            bound.lastEpisodeSeen <= 0 &&
                             bound.status != service.getWatchingStatus() &&
                             bound.status != service.getCompletionStatus() &&
                             bound.status != service.getRewatchingStatus()
@@ -119,7 +120,7 @@ internal object AutoTrackOnStart {
         }.awaitAll().any { it }
     }
 
-    suspend fun manga(manga: Manga, source: MangaSource): Boolean = supervisorScope {
+    suspend fun manga(manga: Manga, source: MangaSource, started: Boolean = true): Boolean = supervisorScope {
         val manager = Injekt.get<TrackerManager>()
         val getTracks = Injekt.get<GetMangaTracks>()
         val addTracks = Injekt.get<AddMangaTracks>()
@@ -168,7 +169,8 @@ internal object AutoTrackOnStart {
                     result.manga_id = manga.id
                     addTracks.bind(service, result, manga.id)
                     getTracks.await(manga.id).firstOrNull { it.trackerId == tracker.id }?.let { bound ->
-                        if (bound.lastChapterRead <= 0 &&
+                        if (started &&
+                            bound.lastChapterRead <= 0 &&
                             bound.status != service.getReadingStatus() &&
                             bound.status != service.getCompletionStatus() &&
                             bound.status != service.getRereadingStatus()

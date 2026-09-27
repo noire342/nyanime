@@ -34,7 +34,7 @@ import tachiyomi.domain.track.manga.interactor.GetMangaTracks
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
-/** Recovers older watched/read titles without delaying player or reader startup. */
+/** Recovers library and previously started titles without delaying player or reader startup. */
 internal object RetroactiveTracking {
     data class State(
         val running: Boolean = false,
@@ -55,7 +55,7 @@ internal object RetroactiveTracking {
     @Volatile private var foreground = false
 
     private fun completedPreference() = Injekt.get<PreferenceStore>()
-        .getBoolean(Preference.appStateKey("retroactive_tracking_completed_v1"))
+        .getBoolean(Preference.appStateKey("retroactive_tracking_completed_v2"))
 
     fun onForeground() {
         foreground = true
@@ -77,9 +77,14 @@ internal object RetroactiveTracking {
         launchRecovery(delayMs = delayMs, manual = false)
     }
 
-    /** Recheck started titles without resetting the one-time automatic recovery. */
+    /** Recheck unlinked titles without resetting the one-time automatic recovery. */
     fun retryUnlinked() {
         launchRecovery(delayMs = 0, manual = true)
+    }
+
+    /** A newly connected tracking account needs its own links even after the initial pass. */
+    fun onTrackerLogin() {
+        if (completedPreference().get()) retryUnlinked() else start(delayMs = 2_000)
     }
 
     private fun launchRecovery(delayMs: Long, manual: Boolean) {
@@ -124,11 +129,11 @@ internal object RetroactiveTracking {
         val mangaHistory = Injekt.get<GetMangaHistory>().subscribe("").first()
         val animeIds = (
             animeHistory.sortedByDescending { it.seenAt?.time ?: 0L }.map { it.animeId } +
-                Injekt.get<GetLibraryAnime>().await().filter { it.hasStarted }.map { it.id }
+                Injekt.get<GetLibraryAnime>().await().map { it.id }
             ).distinct()
         val mangaIds = (
             mangaHistory.sortedByDescending { it.readAt?.time ?: 0L }.map { it.mangaId } +
-                Injekt.get<GetLibraryManga>().await().filter { it.hasStarted }.map { it.id }
+                Injekt.get<GetLibraryManga>().await().map { it.id }
             ).distinct()
         val total = (if (animeServices.isEmpty()) 0 else animeIds.size) +
             (if (mangaServices.isEmpty()) 0 else mangaIds.size)
@@ -192,7 +197,7 @@ internal object RetroactiveTracking {
                             it.animeId == id && it.episodeNumber > 0 && it.episodeNumber.isFinite()
                         }
                             .maxOfOrNull { it.episodeNumber }
-                        ?: continue
+                        ?: if (anime.favorite) 0.0 else continue
                     attempt("a:$id") { AutoTrackOnStart.anime(anime, source, highestSeen) }
                 } finally {
                     processed++
@@ -218,8 +223,8 @@ internal object RetroactiveTracking {
                     val hasRead = Injekt.get<tachiyomi.domain.items.chapter.interactor.GetChaptersByMangaId>()
                         .await(id).any { it.read } ||
                         mangaHistory.any { it.mangaId == id }
-                    if (!hasRead) continue
-                    attempt("m:$id") { AutoTrackOnStart.manga(manga, source) }
+                    if (!hasRead && !manga.favorite) continue
+                    attempt("m:$id") { AutoTrackOnStart.manga(manga, source, started = hasRead) }
                 } finally {
                     processed++
                     mutableState.value = State(

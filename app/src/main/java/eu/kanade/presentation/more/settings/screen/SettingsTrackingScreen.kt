@@ -22,6 +22,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,6 +48,7 @@ import eu.kanade.domain.track.service.TrackPreferences
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.data.track.EnhancedAnimeTracker
 import eu.kanade.tachiyomi.data.track.EnhancedMangaTracker
+import eu.kanade.tachiyomi.data.track.LibraryAutoTracking
 import eu.kanade.tachiyomi.data.track.RetroactiveTracking
 import eu.kanade.tachiyomi.data.track.Tracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
@@ -104,6 +106,12 @@ object SettingsTrackingScreen : SearchableSettings {
         val hasAccount = trackerManager.loggedInTrackers().isNotEmpty()
         val autoTrackEnabled by trackPreferences.autoUpdateTrack().collectPreferenceAsState()
         val incognito by basePreferences.incognitoMode().collectPreferenceAsState()
+        LaunchedEffect(autoTrackEnabled, incognito) {
+            if (autoTrackEnabled && !incognito) {
+                RetroactiveTracking.start()
+                LibraryAutoTracking.onForeground()
+            }
+        }
 
         var dialog by remember { mutableStateOf<Any?>(null) }
         dialog?.run {
@@ -152,13 +160,13 @@ object SettingsTrackingScreen : SearchableSettings {
                 title = stringResource(AYMR.strings.pref_auto_update_manga_sync),
             ),
             Preference.PreferenceItem.TextPreference(
-                title = "Riesamina i titoli iniziati",
+                title = "Riesamina la libreria",
                 subtitle = when {
                     recovery.running ->
                         "Controllo in corso: ${recovery.processed}/${recovery.total} titoli esaminati, " +
                             "${recovery.linked} nuovi collegamenti."
                     incognito -> "Disattiva la modalità Incognito per controllare il tracking."
-                    !hasAccount -> "Accedi a un servizio di tracking per collegare anime e manga già visti o letti."
+                    !hasAccount -> "Accedi a un servizio di tracking per collegare i titoli della libreria."
                     recovery.manual && recovery.finished ->
                         "Ultimo controllo: ${recovery.processed} titoli esaminati, " +
                             "${recovery.linked} nuovi collegamenti. Tocca per riprovare quelli ancora senza tracking."
@@ -171,7 +179,7 @@ object SettingsTrackingScreen : SearchableSettings {
                     !autoTrackEnabled ->
                         "Il tracking automatico è spento; puoi comunque avviare un controllo manuale."
                     else ->
-                        "Controlla anime e manga già guardati o letti. I collegamenti " +
+                        "Controlla anime e manga nella libreria, anche se non li hai ancora iniziati. I collegamenti " +
                             "esistenti restano invariati; il recupero automatico iniziale avviene una sola volta."
                 },
                 enabled = hasAccount && !incognito && !recovery.running,

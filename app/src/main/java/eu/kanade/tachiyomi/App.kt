@@ -39,6 +39,7 @@ import eu.kanade.tachiyomi.data.coil.MangaKeyer
 import eu.kanade.tachiyomi.data.coil.TachiyomiImageDecoder
 import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateJob
 import eu.kanade.tachiyomi.data.notification.Notifications
+import eu.kanade.tachiyomi.data.track.LibraryAutoTracking
 import eu.kanade.tachiyomi.data.track.RetroactiveTracking
 import eu.kanade.tachiyomi.di.AppModule
 import eu.kanade.tachiyomi.di.PreferenceModule
@@ -267,6 +268,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
     override fun onStart(owner: LifecycleOwner) {
         SecureActivityDelegate.onApplicationStart()
         RetroactiveTracking.onForeground()
+        LibraryAutoTracking.onForeground()
         eu.kanade.tachiyomi.data.community.CommunityManager.lifecycle(this, true)
     }
 
