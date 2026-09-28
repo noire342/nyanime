@@ -59,6 +59,7 @@ fun cafe.adriel.voyager.core.screen.Screen.ReleaseCalendar(
     val navigator = LocalNavigator.currentOrThrow
     val context = LocalContext.current
     var choice by remember { mutableStateOf<ReleaseAgendaItem?>(null) }
+    var showIssues by rememberSaveable { mutableStateOf(false) }
     fun open(item: ReleaseAgendaItem) {
         when (item.medium) {
             ReleaseMedium.ANIME -> if (item.itemId == null) {
@@ -91,7 +92,18 @@ fun cafe.adriel.voyager.core.screen.Screen.ReleaseCalendar(
             }
         },
         allowAllMedia = unified,
+        onStatus = { showIssues = true },
     )
+    if (showIssues) {
+        AiringIssuesSheet(
+            state.issues,
+            onDismiss = { showIssues = false },
+            onEntry = {
+                showIssues = false
+                navigator.push(AnimeScreen(it))
+            },
+        )
+    }
     choice?.let { item ->
         ModalBottomSheet(onDismissRequest = { choice = null }) {
             Column(

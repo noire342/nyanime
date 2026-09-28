@@ -34,4 +34,9 @@ internal class ReleaseAgendaTimeline(
     }
 
     fun indexOf(date: LocalDate): Int = rows.indexOfFirst { it is Row.Day && it.date == date }.coerceAtLeast(0)
+
+    fun terminalEmptyDay(focusDate: LocalDate): LocalDate? {
+        val empty = rows.lastOrNull() as? Row.Empty ?: return null
+        return empty.date.takeIf { it == focusDate }
+    }
 }

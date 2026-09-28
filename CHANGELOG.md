@@ -8,6 +8,20 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 29 settembre 2026 — Agenda futura e verifica degli orari
+
+- Verifiche degli orari in una coda indipendente dagli aggiornamenti degli
+  episodi: il primo controllo prosegue a piccoli gruppi fino a raggiungere
+  tutti i titoli con identificatori, anche senza aprire le loro schede.
+- Uscite future conservate nell’agenda anche quando il numero dell’episodio
+  è già registrato localmente; date lontane e deduplicazione fra edizioni mantenute.
+- Titoli senza ID esclusi dal controllo del catalogo degli orari e dai relativi
+  avvisi. Il monitoraggio dei contenuti disponibili nella fonte continua.
+- Verifiche in attesa distinte dagli ID non confermati e dagli errori di rete;
+  i titoli coinvolti possono essere consultati direttamente dall’agenda.
+- Fine agenda con un messaggio esplicito, senza una schermata vuota aggiunta
+  allo scorrimento. Apertura su oggi mantenuta anche quando ci sono solo uscite passate.
+
 ## 29 settembre 2026 - Estensioni e distribuzioni protette
 
 - Schermate Estensioni anime e manga con viste Installate e Catalogo, schede

@@ -11,6 +11,7 @@ internal object ReleaseAgendaMerge {
         works: List<Anime>,
         present: Map<Long, Set<Double>> = emptyMap(),
         watched: Map<Long, Set<Double>> = emptyMap(),
+        now: Long = System.currentTimeMillis(),
     ): List<ReleaseAgendaItem> {
         val groups = mergeHomeCards(works.sortedBy { it.id }, mergeSourceVariants = true)
         val members = groups.associate { work ->
@@ -26,9 +27,19 @@ internal object ReleaseAgendaMerge {
             val group = groupOf[first.entryId] ?: first.entryId
             val ids = members[group] ?: listOf(first.entryId)
             val number = first.number
-            if (number != null && ids.any { number in watched[it].orEmpty() }) return@mapNotNull null
+            val futureBroadcast = options.any { it.itemId == null && it.at > now }
+            if (!futureBroadcast &&
+                number != null &&
+                ids.any { number in watched[it].orEmpty() }
+            ) {
+                return@mapNotNull null
+            }
             val available = options.filter { it.itemId != null }
-            if (available.isEmpty() && number != null && ids.any { number in present[it].orEmpty() }) {
+            if (!futureBroadcast &&
+                available.isEmpty() &&
+                number != null &&
+                ids.any { number in present[it].orEmpty() }
+            ) {
                 return@mapNotNull null
             }
             val choices = (available.ifEmpty { options }).sortedWith(

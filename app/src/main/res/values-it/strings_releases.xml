@@ -53,5 +53,13 @@
     <string name="release_choose_source">Scegli fonte ed edizione</string>
     <string name="release_timeline">Passate e in arrivo</string>
     <string name="release_today">Oggi</string>
+    <string name="release_calendar_pending">Verifica degli orari in attesa.</string>
+    <string name="release_airing_details">Titoli da verificare</string>
+    <string name="release_airing_details_description">Le date salvate restano visibili. Tocca un titolo per aprire la scheda. Il controllo dei nuovi episodi continua anche senza un calendario annunciato.</string>
+    <string name="release_airing_all_verified">Le verifiche in attesa sono terminate.</string>
+    <string name="release_airing_identity_unverified">La corrispondenza nel catalogo degli orari non è stata confermata.</string>
+    <string name="release_airing_connection_failed">Connessione non riuscita. Riproveremo conservando le date salvate.</string>
+    <string name="release_timeline_end">Per ora non ci sono altre uscite annunciate.</string>
+    <string name="release_timeline_end_description">Le nuove date compariranno qui quando saranno disponibili.</string>
     <string name="release_timeline_empty">Nessuna uscita da mostrare. Le nuove uscite vengono comunque controllate automaticamente.</string>
 </resources>

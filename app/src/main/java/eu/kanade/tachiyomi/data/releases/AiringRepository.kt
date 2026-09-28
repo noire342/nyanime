@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.data.releases
 
-import eu.kanade.tachiyomi.data.track.SourceTrackingHints
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.network.NetworkHelper
 import kotlinx.coroutines.CancellationException
@@ -76,14 +75,8 @@ class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
             return@withLock cached
         }
         try {
-            val hints = SourceTrackingHints.from(anime)
             val tracks = Injekt.get<AnimeTrackRepository>().getTracksByAnimeId(anime.id)
-            val reference = AiringCatalogReference.choose(
-                hints?.anilistId,
-                hints?.malId,
-                tracks.firstOrNull { it.trackerId == TrackerManager.ANILIST }?.remoteId,
-                tracks.firstOrNull { it.trackerId == 1L }?.remoteId,
-            )
+            val reference = AiringCatalogReference.from(anime, tracks)
             if (reference.anilistId == null && reference.malId == null) {
                 // Preserve the existing calendar integration for a verified alternative tracker ID.
                 val manager = Injekt.get<TrackerManager>()
@@ -172,6 +165,13 @@ class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
 
     suspend fun reminded(event: AiringEvent) = db.await {
         airingQueries.markReminded(System.currentTimeMillis(), event.entryId, event.episode.toLong())
+    }
+
+    internal suspend fun markUnavailable(id: Long, startedAt: Long) = locks[id.hashCode() and 63].withLock {
+        val cache = cache(id)
+        if (cache.verifiedAt < startedAt) {
+            saveCache(id, cache.copy(attemptedAt = System.currentTimeMillis(), status = "UNAVAILABLE"))
+        }
     }
 
     private suspend fun saveCache(id: Long, cache: AiringCache) = db.await {

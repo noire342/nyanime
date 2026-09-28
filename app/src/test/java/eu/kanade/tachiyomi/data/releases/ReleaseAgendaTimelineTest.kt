@@ -4,6 +4,7 @@ import eu.kanade.presentation.components.releases.ReleaseAgendaItem
 import eu.kanade.presentation.components.releases.ReleaseAgendaTimeline
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
@@ -64,6 +65,14 @@ class ReleaseAgendaTimelineTest {
             listOf(ReleaseAgendaTimeline.Row.Day(today), ReleaseAgendaTimeline.Row.Empty(today)),
             ReleaseAgendaTimeline(emptyList(), today).rows,
         )
+    }
+
+    @Test fun aTerminalEmptyAnchorCanFillOneScreenWithoutAddingAnEmptyScrollableTail() {
+        val timeline = ReleaseAgendaTimeline(listOf(item("past", -10)), today)
+        assertEquals(today, timeline.terminalEmptyDay(today))
+        assertEquals(timeline.rows.size - 2, timeline.indexOf(today))
+        assertNull(ReleaseAgendaTimeline(listOf(item("future", 96)), today).terminalEmptyDay(today))
+        assertNull(ReleaseAgendaTimeline(listOf(item("today", 0)), today).terminalEmptyDay(today))
     }
 
     @Test fun calendarSelectionAnchorsTheWholeAgendaIncludingAnEmptyPastDay() {

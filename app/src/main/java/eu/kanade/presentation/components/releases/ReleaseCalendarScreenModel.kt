@@ -4,6 +4,8 @@ import android.app.Application
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.releases.AiringCatalogReference
+import eu.kanade.tachiyomi.data.releases.AiringIssue
 import eu.kanade.tachiyomi.data.releases.AiringRepository
 import eu.kanade.tachiyomi.data.releases.ChapterScheduleRepository
 import eu.kanade.tachiyomi.data.releases.ReleaseEligibility
@@ -47,12 +49,13 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
     private data class Snapshot(
         val items: List<ReleaseAgendaItem>,
         val warnings: Map<ReleaseMedium, String> = emptyMap(),
+        val issues: List<AiringIssue> = emptyList(),
     )
 
     init {
         screenModelScope.launch(Dispatchers.IO) {
             val snapshots = if (scope == null) {
-                combine(anime(), manga()) { a, m -> Snapshot(a.items + m.items, a.warnings + m.warnings) }
+                combine(anime(), manga()) { a, m -> Snapshot(a.items + m.items, a.warnings + m.warnings, a.issues) }
             } else if (scope == ReleaseMedium.ANIME) {
                 anime()
             } else {
@@ -70,7 +73,7 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
             }.collectLatest {
                 allItems = it.items.sortedBy { item -> item.at }
                 val warnings = it.warnings
-                publish { state -> state.copy(loading = false, warnings = warnings) }
+                publish { state -> state.copy(loading = false, warnings = warnings, issues = it.issues) }
             }
         }
         refresh()
@@ -87,8 +90,7 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
             val items = mutableListOf<ReleaseAgendaItem>()
             val anime: AnimeRepository = Injekt.get()
             val episodes: EpisodeRepository = Injekt.get()
-            var unresolved = false
-            var unavailable = false
+            val issues = mutableListOf<AiringIssue>()
             val works = mutableListOf<Anime>()
             val presentByEntry = mutableMapOf<Long, Set<Double>>()
             val watchedByEntry = mutableMapOf<Long, Set<Double>>()
@@ -97,14 +99,17 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
             for (id in ids) {
                 if (ReleaseEligibility.source(ReleaseMedium.ANIME, id) == null) continue
                 val cache = caches[id]
-                unresolved = unresolved || cache == null || cache.status == "UNRESOLVED"
-                unavailable = unavailable || cache?.status == "UNAVAILABLE"
                 val entryEvents = groupedEvents[id].orEmpty()
                 val entryNotices = groupedNotices[id].orEmpty()
                 val entry = anime.getAnimeById(id)
                 val presentation = entry.homePresentation ?: SourceHomePresentation()
                 val hints = SourceTrackingHints.from(entry)
                 val tracks = Injekt.get<AnimeTrackRepository>().getTracksByAnimeId(id)
+                val hasId = AiringCatalogReference.from(entry, tracks).hasId ||
+                    tracks.any { it.trackerId == TrackerManager.SIMKL && it.remoteId > 0 }
+                AiringIssue.reason(cache, hasId)?.let { reason ->
+                    issues += AiringIssue(id, entry.title, entry.asAnimeCover(), reason)
+                }
                 val trackIds = buildMap {
                     tracks.forEach { track ->
                         when (track.trackerId) {
@@ -137,7 +142,7 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
                 watchedByEntry[id] = present.filter { it.seen }.map { it.episodeNumber }.toSet()
                 val byId = present.associateBy { it.id }
                 for (event in entryEvents) {
-                    if (event.episode.toDouble() in numbers) continue
+                    if (event.airingAt <= System.currentTimeMillis() && event.episode.toDouble() in numbers) continue
                     items += ReleaseAgendaItem(
                         "anime-planned-$id-${event.episode}",
                         id,
@@ -170,13 +175,18 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
                 }
             }
             val warning = when {
-                unavailable -> app.getString(R.string.release_calendar_error)
-                unresolved -> app.getString(R.string.release_calendar_unresolved)
+                issues.any {
+                    it.reason == AiringIssue.Reason.UNAVAILABLE
+                } -> app.getString(R.string.release_calendar_error)
+                issues.any { it.reason == AiringIssue.Reason.UNVERIFIED_ID } ->
+                    app.getString(R.string.release_calendar_unresolved)
+                issues.isNotEmpty() -> app.getString(R.string.release_calendar_pending)
                 else -> null
             }
             Snapshot(
                 ReleaseAgendaMerge.merge(items, works, presentByEntry, watchedByEntry),
                 warning?.let { mapOf(ReleaseMedium.ANIME to it) }.orEmpty(),
+                issues,
             )
         }
     }
@@ -201,7 +211,7 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
             val numbers = present.map { it.chapterNumber }.toSet()
             val byId = present.associateBy { it.id }
             for (event in entryEvents) {
-                if (event.release.number in numbers) continue
+                if (event.release.releaseAt <= System.currentTimeMillis() && event.release.number in numbers) continue
                 items += ReleaseAgendaItem(
                     "manga-planned-$id-${event.release.number}",
                     id,
@@ -268,6 +278,7 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
         val events: ImmutableMap<LocalDate, Int> = persistentMapOf(),
         val loading: Boolean = true,
         val warnings: Map<ReleaseMedium, String> = emptyMap(),
+        val issues: List<AiringIssue> = emptyList(),
     ) {
         val warning: String? get() = if (medium == null) warnings.values.firstOrNull() else warnings[medium]
     }

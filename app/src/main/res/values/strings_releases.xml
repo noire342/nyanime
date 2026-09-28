@@ -53,5 +53,13 @@
     <string name="release_choose_source">Choose source or edition</string>
     <string name="release_timeline">Past and upcoming</string>
     <string name="release_today">Today</string>
+    <string name="release_calendar_pending">Schedule verification is pending.</string>
+    <string name="release_airing_details">Titles to verify</string>
+    <string name="release_airing_details_description">Saved dates remain visible. Tap a title to open its details. New episode checks continue even without an announced schedule.</string>
+    <string name="release_airing_all_verified">Pending checks have finished.</string>
+    <string name="release_airing_identity_unverified">The match in the schedule catalog has not been confirmed.</string>
+    <string name="release_airing_connection_failed">Connection failed. We will retry and keep saved dates.</string>
+    <string name="release_timeline_end">No more releases are announced for now.</string>
+    <string name="release_timeline_end_description">New dates will appear here when available.</string>
     <string name="release_timeline_empty">No releases to show. New content is still checked automatically.</string>
 </resources>

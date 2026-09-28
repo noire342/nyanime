@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -101,6 +103,7 @@ fun ReleaseCalendarContent(
     onMedium: (ReleaseMedium?) -> Unit = {},
     allowAllMedia: Boolean = true,
     today: LocalDate = LocalDate.now(),
+    onStatus: (() -> Unit)? = null,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val locale = LocalConfiguration.current.locales[0]
@@ -207,7 +210,9 @@ fun ReleaseCalendarContent(
                         } else {
                             timeline.rows
                         }
-                        items(rows, key = { it.key }, contentType = {
+                        val terminal = timeline.terminalEmptyDay(focusDate).takeUnless { calendarVisible }
+                        val regularRows = if (terminal == null) rows else rows.dropLast(2)
+                        items(regularRows, key = { it.key }, contentType = {
                             when (it) {
                                 is ReleaseAgendaTimeline.Row.Day -> "day"
                                 is ReleaseAgendaTimeline.Row.Empty -> "empty"
@@ -215,26 +220,8 @@ fun ReleaseCalendarContent(
                             }
                         }) { row ->
                             when (row) {
-                                is ReleaseAgendaTimeline.Row.Day -> Text(
-                                    relativeDateText(row.date),
-                                    Modifier.padding(horizontal = 20.dp),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                                is ReleaseAgendaTimeline.Row.Empty -> Card(
-                                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                                ) {
-                                    Text(
-                                        stringResource(
-                                            if (items.isEmpty()) {
-                                                R.string.release_timeline_empty
-                                            } else {
-                                                R.string.release_calendar_empty
-                                            },
-                                        ),
-                                        Modifier.padding(20.dp),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
+                                is ReleaseAgendaTimeline.Row.Day -> ReleaseDayHeading(row.date)
+                                is ReleaseAgendaTimeline.Row.Empty -> EmptyReleaseDay(items.isEmpty())
                                 is ReleaseAgendaTimeline.Row.Release -> ReleaseCard(
                                     row.item,
                                     showMediaFilter,
@@ -244,23 +231,82 @@ fun ReleaseCalendarContent(
                                 )
                             }
                         }
-                        if (warning != null) {
+                        if (terminal != null) {
+                            // One meaningful last-day screen keeps the anchor at the top;
+                            // it does not append an empty viewport beyond the final release.
+                            item(key = "day-$terminal", contentType = "terminal-day") {
+                                Column(
+                                    Modifier.fillParentMaxHeight(),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    ReleaseDayHeading(terminal)
+                                    EmptyReleaseDay(items.isEmpty())
+                                    if (warning != null) AiringStatusNotice(warning, onStatus)
+                                    Spacer(Modifier.weight(1f))
+                                    ReleaseTimelineEnd()
+                                }
+                            }
+                        } else if (warning != null) {
                             item(key = "warning") {
-                                Text(
-                                    warning,
-                                    Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                AiringStatusNotice(warning, onStatus)
                             }
                         }
-                        // A full viewport after the final day allows today's header to start
-                        // at the top even when all known releases are in the past.
-                        item(key = "bottom-space") { Spacer(Modifier.fillParentMaxHeight()) }
+                        if (!calendarVisible && terminal == null) {
+                            item(key = "timeline-end", contentType = "timeline-end") { ReleaseTimelineEnd() }
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ReleaseDayHeading(date: LocalDate) {
+    Text(relativeDateText(date), Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.titleMedium)
+}
+
+@Composable
+private fun EmptyReleaseDay(emptyTimeline: Boolean) {
+    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Text(
+            stringResource(if (emptyTimeline) R.string.release_timeline_empty else R.string.release_calendar_empty),
+            Modifier.padding(20.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun AiringStatusNotice(warning: String, onStatus: (() -> Unit)?) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Text(warning, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (onStatus != null) {
+            TextButton(onClick = onStatus) { Text(stringResource(R.string.release_airing_details)) }
+        }
+    }
+}
+
+@Composable
+private fun ReleaseTimelineEnd() {
+    Column(
+        Modifier.fillMaxWidth().heightIn(min = 104.dp).padding(horizontal = 24.dp, vertical = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+    ) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
+        Text(
+            stringResource(R.string.release_timeline_end),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Text(
+            stringResource(R.string.release_timeline_end_description),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
     }
 }
 

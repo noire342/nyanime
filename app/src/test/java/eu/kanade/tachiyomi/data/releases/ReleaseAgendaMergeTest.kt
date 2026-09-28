@@ -129,4 +129,19 @@ class ReleaseAgendaMergeTest {
             ).isEmpty(),
         )
     }
+
+    @Test fun distantFutureBroadcastSurvivesLocalEpisodePlaceholdersAndWatchHistory() {
+        val now = 100 * ReleasePolicy.DAY
+        val future = item(1, number = 800.0).copy(at = now + 96 * ReleasePolicy.DAY)
+        val result = ReleaseAgendaMerge.merge(
+            listOf(future, future.copy(key = "other", entryId = 2)),
+            listOf(work(1), work(2)),
+            present = mapOf(1L to setOf(800.0)),
+            watched = mapOf(2L to setOf(800.0)),
+            now = now,
+        )
+        assertEquals(1, result.size)
+        assertEquals(future.at, result.single().at)
+        assertEquals(2, result.single().choices.size)
+    }
 }
