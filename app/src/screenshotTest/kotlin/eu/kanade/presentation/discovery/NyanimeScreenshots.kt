@@ -215,7 +215,16 @@ fun NyanimeDetailsScreenshot() {
     TachiyomiPreviewTheme {
         Surface {
             Column {
-                AnimeInfoBox(false, 56.dp, previewAnime.first(), "Fonte installata", false, {}, { _, _ -> })
+                AnimeInfoBox(
+                    isTabletUi = false,
+                    appBarPadding = 56.dp,
+                    anime = previewAnime.first(),
+                    sourceName = "Fonte installata",
+                    nextAiringAtMillis = null,
+                    isStubSource = false,
+                    onCoverClick = {},
+                    doSearch = { _, _ -> },
+                )
                 AnimeWatchButton(true, {})
             }
         }

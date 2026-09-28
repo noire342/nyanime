@@ -8,6 +8,16 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Home continua e caricamenti più morbidi
+
+- Le categorie della Home condividono una sola testata: cambia soltanto il
+  contenuto sottostante con una dissolvenza, senza scorrimento laterale della pagina.
+- Hero e righe in caricamento usano skeleton con una pulsazione discreta e
+  dimensioni adattate allo schermo e al testo. I dati già disponibili restano
+  visibili durante gli aggiornamenti; errori e sezioni vuote non restano in caricamento.
+- Conservati posizione di scorrimento, ricerca, loghi delle estensioni, ripresa
+  e novità di ogni Home, inclusa Manga. La riduzione delle animazioni è rispettata.
+
 ## 28 settembre 2026 — Scegliere la stagione dal manga
 
 - La scelta degli anime collegati a un manga mostra i capitoli documentati di

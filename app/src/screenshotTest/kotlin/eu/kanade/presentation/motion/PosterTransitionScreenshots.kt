@@ -199,7 +199,16 @@ private fun ReadyAnimeHeader(title: String) {
             ),
         ) {
             val header: @Composable () -> Unit = {
-                AnimeInfoBox(tablet, padding.calculateTopPadding(), anime, "Fonte installata", false, {}, { _, _ -> })
+                AnimeInfoBox(
+                    isTabletUi = tablet,
+                    appBarPadding = padding.calculateTopPadding(),
+                    anime = anime,
+                    sourceName = "Fonte installata",
+                    nextAiringAtMillis = null,
+                    isStubSource = false,
+                    onCoverClick = {},
+                    doSearch = { _, _ -> },
+                )
             }
             if (tablet) TwoPanelBox(startContent = { header() }, endContent = {}) else header()
         }

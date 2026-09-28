@@ -1,12 +1,7 @@
 package eu.kanade.presentation.discovery
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -29,13 +24,18 @@ fun SourceFeaturedSection(
 ) {
     val items = state.data?.items.orEmpty().let { if (limit == null) it else it.take(limit) }
     Column {
-        if (items.isNotEmpty()) {
-            SourceFeaturedCarousel(items, refreshKey, state.data?.title ?: title, onBrowse, onSources, onOpen)
-        } else if (state.loading) {
-            Box(Modifier.fillMaxWidth().height(320.dp).background(MaterialTheme.colorScheme.surfaceVariant))
-        } else if (state.error == null) {
-            Text("Nessun titolo in evidenza al momento", Modifier.padding(16.dp))
+        HomeLoadingTransition(
+            loading = state.awaitingContent,
+            placeholder = {
+                HomeHeroSkeleton(withBrowseAction = onBrowse != null, withSourceAction = onSources != null)
+            },
+        ) {
+            if (items.isNotEmpty()) {
+                SourceFeaturedCarousel(items, refreshKey, state.data?.title ?: title, onBrowse, onSources, onOpen)
+            } else if (!state.loading && state.error == null) {
+                Text("Nessun titolo in evidenza al momento", Modifier.padding(16.dp))
+            }
         }
-        LoadNotice(state.loading, state.error, state.stale, onRetry)
+        LoadNotice(state.loading, state.error, state.stale, showLoadingIndicator = false, retry = onRetry)
     }
 }

@@ -1,5 +1,6 @@
 package eu.kanade.presentation.discovery.manga
 
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +69,10 @@ import coil3.Extras
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import eu.kanade.presentation.discovery.HomeLoadingTransition
+import eu.kanade.presentation.discovery.HomeMotion
+import eu.kanade.presentation.discovery.HomePosterRowSkeleton
+import eu.kanade.presentation.discovery.HomeSkeleton
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.discovery.MangaGenreLabels
@@ -100,6 +105,7 @@ fun MangaHomeContent(
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
+    val motionDuration = if (appMotionEnabled()) HomeMotion.CONTENT_MILLIS else 0
     val home = state.selected
     val sections = if (state.mixed) {
         state.homes.flatMap {
@@ -112,7 +118,9 @@ fun MangaHomeContent(
         (if (state.mixed) state.homes.flatMap { it.categories } else home?.categories.orEmpty())
             .map { it.title },
     )
-    val featuredItem = sections.firstOrNull()?.let { state.rows[it.id]?.page?.items?.firstOrNull() }
+    val featuredRow = sections.firstOrNull()?.let { state.rows[it.id] }
+    val featuredItem = featuredRow?.page?.items?.firstOrNull()
+    val awaitingFeatured = featuredRow?.page == null && featuredRow?.error == null && featuredRow?.loading != false
     val personalUpdates = state.updates
     var displayedSourceKey by rememberSaveable { mutableStateOf(home?.key) }
     LaunchedEffect(home?.key) {
@@ -230,56 +238,74 @@ fun MangaHomeContent(
                         Surface(
                             shape = RoundedCornerShape(18.dp),
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(222.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                         ) {
-                            if (featuredItem == null) {
-                                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHigh))
-                            } else {
-                                Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                    Artwork(
-                                        featuredItem.manga.copy(favorite = false),
-                                        featuredItem.manga.title,
-                                        Modifier.width(128.dp).clickable { onManga(featuredItem.manga) },
-                                    )
-                                    Column(
-                                        Modifier.weight(1f),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        Text(
-                                            "IN PRIMO PIANO",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontWeight = FontWeight.Bold,
+                            HomeLoadingTransition(
+                                loading = awaitingFeatured,
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = {
+                                    HomeSkeleton(Modifier.fillMaxWidth().height(222.dp)) {
+                                        Box(
+                                            Modifier.fillMaxSize().background(
+                                                MaterialTheme.colorScheme.surfaceContainerHigh,
+                                            ),
                                         )
-                                        Text(
-                                            featuredItem.manga.title,
-                                            style = MaterialTheme.typography.titleLarge,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 3,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        if (featuredItem.alternateSources.isNotEmpty()) {
-                                            Text(
-                                                "${featuredItem.alternateSources.size + 1} fonti disponibili",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    }
+                                },
+                            ) {
+                                if (featuredItem != null) {
+                                    BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = 222.dp)) {
+                                        val posterWidth = (maxWidth * 0.34f).coerceIn(72.dp, 128.dp)
+                                        Row(
+                                            Modifier.padding(14.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        ) {
+                                            Artwork(
+                                                featuredItem.manga.copy(favorite = false),
+                                                featuredItem.manga.title,
+                                                Modifier.width(posterWidth).clickable { onManga(featuredItem.manga) },
                                             )
-                                        }
-                                        Spacer(Modifier.weight(1f))
-                                        Button(onClick = {
-                                            featuredItem.presentation?.chapters?.firstOrNull()?.let {
-                                                onChapter(featuredItem, it)
-                                            } ?: onManga(featuredItem.manga)
-                                        }) {
-                                            Text(
-                                                if (featuredItem.presentation?.chapters?.isNotEmpty() ==
-                                                    true
-                                                ) {
-                                                    "Leggi ora"
-                                                } else {
-                                                    "Apri manga"
-                                                },
-                                            )
+                                            Column(
+                                                Modifier.weight(1f),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                            ) {
+                                                Text(
+                                                    "IN PRIMO PIANO",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    fontWeight = FontWeight.Bold,
+                                                )
+                                                Text(
+                                                    featuredItem.manga.title,
+                                                    style = MaterialTheme.typography.titleLarge,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 3,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                if (featuredItem.alternateSources.isNotEmpty()) {
+                                                    Text(
+                                                        "${featuredItem.alternateSources.size + 1} fonti disponibili",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+                                                Spacer(Modifier.weight(1f))
+                                                Button(onClick = {
+                                                    featuredItem.presentation?.chapters?.firstOrNull()?.let {
+                                                        onChapter(featuredItem, it)
+                                                    } ?: onManga(featuredItem.manga)
+                                                }) {
+                                                    Text(
+                                                        if (featuredItem.presentation?.chapters?.isNotEmpty() ==
+                                                            true
+                                                        ) {
+                                                            "Leggi ora"
+                                                        } else {
+                                                            "Apri manga"
+                                                        },
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -423,6 +449,8 @@ fun MangaHomeContent(
                 } else if (home != null) {
                     sections.forEach { section ->
                         val row = state.rows[section.id]
+                        val rail = section.layout in listOf("chapters", "featured", "posters")
+                        val awaitingContent = row?.page == null && row?.error == null && row?.loading != false
                         item("heading:" + section.id) {
                             Row(
                                 Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -439,19 +467,15 @@ fun MangaHomeContent(
                                 }
                             }
                         }
-                        if (row?.page == null && (row == null || row.loading)) {
+                        if (!rail && awaitingContent) {
                             item("loading:" + section.id) {
-                                Row(
-                                    Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                ) {
-                                    repeat(3) {
-                                        Box(
-                                            Modifier.weight(1f).height(150.dp).clip(RoundedCornerShape(10.dp))
-                                                .background(MaterialTheme.colorScheme.surfaceContainer),
-                                        )
-                                    }
-                                }
+                                HomePosterRowSkeleton(
+                                    modifier = Modifier.animateItem(
+                                        fadeInSpec = tween(motionDuration),
+                                        fadeOutSpec = tween(motionDuration),
+                                        placementSpec = tween(motionDuration),
+                                    ),
+                                )
                             }
                         }
                         if (row?.error != null) {
@@ -468,47 +492,52 @@ fun MangaHomeContent(
                                 Text("Nessun contenuto in questa sezione.", Modifier.padding(horizontal = 20.dp))
                             }
                         }
-                        if (section.layout in listOf("chapters", "featured", "posters")) {
+                        if (rail) {
                             item("rail:" + section.id) {
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 20.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                HomeLoadingTransition(
+                                    loading = awaitingContent,
+                                    placeholder = { HomePosterRowSkeleton() },
                                 ) {
-                                    items(entries, key = { it.key }) { entry ->
-                                        Column(
-                                            Modifier.width(152.dp),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                                        ) {
-                                            Artwork(
-                                                entry.manga.copy(favorite = false),
-                                                entry.manga.title,
-                                                Modifier.fillMaxWidth().clickable { onManga(entry.manga) },
-                                            )
-                                            Text(
-                                                entry.manga.title,
-                                                Modifier.clickable { onManga(entry.manga) },
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis,
-                                                fontWeight = FontWeight.SemiBold,
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 20.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                    ) {
+                                        items(entries, key = { it.key }) { entry ->
+                                            Column(
+                                                Modifier.width(152.dp),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                            ) {
+                                                Artwork(
+                                                    entry.manga.copy(favorite = false),
+                                                    entry.manga.title,
+                                                    Modifier.fillMaxWidth().clickable { onManga(entry.manga) },
+                                                )
+                                                Text(
+                                                    entry.manga.title,
+                                                    Modifier.clickable { onManga(entry.manga) },
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    fontWeight = FontWeight.SemiBold,
 
-                                            )
-                                            MangaSourceSelector(entry, state, onManga, onPreferredSource)
-                                            entry.presentation?.chapters.orEmpty().forEach { chapter ->
-                                                ChapterButton(
-                                                    chapter,
-                                                    state.opening == chapter.url,
-                                                ) {
-                                                    onChapter(
-                                                        entry,
+                                                )
+                                                MangaSourceSelector(entry, state, onManga, onPreferredSource)
+                                                entry.presentation?.chapters.orEmpty().forEach { chapter ->
+                                                    ChapterButton(
                                                         chapter,
+                                                        state.opening == chapter.url,
+                                                    ) {
+                                                        onChapter(
+                                                            entry,
+                                                            chapter,
+                                                        )
+                                                    }
+                                                }
+                                                entry.presentation?.details.orEmpty().forEach {
+                                                    Text(
+                                                        it,
+                                                        style = MaterialTheme.typography.bodySmall,
                                                     )
                                                 }
-                                            }
-                                            entry.presentation?.details.orEmpty().forEach {
-                                                Text(
-                                                    it,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                )
                                             }
                                         }
                                     }
@@ -521,7 +550,11 @@ fun MangaHomeContent(
                                 contentType = { section.layout },
                             ) { group ->
                                 Row(
-                                    Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                                    Modifier.animateItem(
+                                        fadeInSpec = tween(motionDuration),
+                                        fadeOutSpec = tween(motionDuration),
+                                        placementSpec = tween(motionDuration),
+                                    ).fillMaxWidth().padding(horizontal = 20.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
                                     group.forEach { entry ->

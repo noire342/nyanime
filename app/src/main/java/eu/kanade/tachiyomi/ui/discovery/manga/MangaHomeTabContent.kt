@@ -1,7 +1,6 @@
 package eu.kanade.tachiyomi.ui.discovery.manga
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.SnackbarHost
@@ -12,20 +11,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import eu.kanade.domain.ui.UiPreferences
-import eu.kanade.presentation.discovery.DiscoveryHomeHeader
+import eu.kanade.presentation.discovery.HomeLoadingTransition
+import eu.kanade.presentation.discovery.HomeMangaLoadingSkeleton
 import eu.kanade.presentation.discovery.manga.MangaHomeContent
-import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.tachiyomi.ui.browse.manga.source.browse.BrowseMangaSourceScreen
+import eu.kanade.tachiyomi.ui.discovery.DiscoveryHomePage
 import eu.kanade.tachiyomi.ui.discovery.DiscoveryTab
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.library.LibrariesTab
@@ -37,18 +35,16 @@ import eu.kanade.tachiyomi.ui.updates.hasNewLibraryUpdateNotice
 import eu.kanade.tachiyomi.ui.updates.inboxKey
 import eu.kanade.tachiyomi.ui.updates.markLibraryUpdateNoticesSeen
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-import tachiyomi.domain.discovery.SourceHomeGroup
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
 @Composable
-fun MangaHomeTabContent(
-    homes: List<SourceHomeGroup>,
-    onSelectCategory: (String?) -> Unit,
+internal fun MangaHomeTabContent(
+    page: DiscoveryHomePage.Manga,
+    active: Boolean,
     onCycleCategory: () -> Unit,
 ) {
-    val model = DiscoveryTab.rememberScreenModel { MangaHomeScreenModel() }
+    val model = page.model
     val state by model.state.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
     val tabNavigator = LocalTabNavigator.current
@@ -57,39 +53,33 @@ fun MangaHomeTabContent(
     val lastSeenAt by seenNotices.changes().collectAsState(initial = seenNotices.get())
     val autoAcknowledge = remember { Injekt.get<UiPreferences>().autoAcknowledgeHomeUpdates() }
     val acknowledgeOnScroll by autoAcknowledge.changes().collectAsState(initial = autoAcknowledge.get())
-    val scope = rememberCoroutineScope()
     val listState = rememberSaveable(homeKey, saver = LazyListState.Saver) { LazyListState() }
-    DiscoveryTab.HandleHomeReselect(listState, onCycleCategory)
+    DiscoveryTab.HandleHomeReselect(listState, onCycleCategory, active)
     val updateKeys = state.updates.map { it.inboxKey() }.toSet()
     val hasNewUpdates = hasNewLibraryUpdateNotice(updateKeys, lastSeenAt)
-    val motion = appMotionEnabled()
     val updatesIndex = 2 +
         (if (state.homes.flatMap { it.categories }.isNotEmpty()) 1 else 0) +
         (if (state.selected != null) 1 else 0) +
         (if (state.homes.size > 1) 1 else 0) +
         (if (state.history.isNotEmpty()) 1 else 0) +
         (if (!state.initializing && state.homes.isEmpty()) 1 else 0)
+    DiscoveryTab.HandleHomeUpdateRequest(listState, page.key, updatesIndex, active)
     AcknowledgeUpdateNoticeWhenVisible(
         listState,
         "personal-updates",
         updateKeys,
-        hasNewUpdates && acknowledgeOnScroll,
+        active && hasNewUpdates && acknowledgeOnScroll,
         seenNotices,
     )
     val openUpdates: () -> Unit = {
         markLibraryUpdateNoticesSeen(seenNotices, updateKeys)
         navigator.push(MangaUpdatesScreen)
     }
-    val revealUpdates: () -> Unit = {
-        markLibraryUpdateNoticesSeen(seenNotices, updateKeys)
-        scope.launch {
-            if (motion) listState.animateScrollToItem(updatesIndex) else listState.scrollToItem(updatesIndex)
-        }
-    }
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
-    DisposableEffect(model) { onDispose { model.cancelOpening() } }
-    LaunchedEffect(model) {
+    DisposableEffect(model, active) { onDispose { model.cancelOpening() } }
+    LaunchedEffect(model, active) {
+        if (!active) return@LaunchedEffect
         model.events.collectLatest { event ->
             when (event) {
                 is MangaHomeScreenModel.Event.Read ->
@@ -102,18 +92,11 @@ fun MangaHomeTabContent(
     LaunchedEffect(state.initializing) {
         if (!state.initializing) (context as? MainActivity)?.ready = true
     }
-    Column(Modifier.fillMaxSize()) {
-        DiscoveryHomeHeader(
-            selectedHome = DiscoveryTab.MANGA_CATEGORY,
-            homes = homes,
-            onSelect = onSelectCategory,
-            onBack = null,
-            onSearch = { navigator.push(MangaHomeSearchScreen()) },
-            onRefresh = model::refresh,
-            onUpdates = revealUpdates,
-            hasUpdates = hasNewUpdates,
-        )
-        Box(Modifier.weight(1f)) {
+    Box(Modifier.fillMaxSize()) {
+        HomeLoadingTransition(
+            loading = state.initializing,
+            placeholder = { HomeMangaLoadingSkeleton() },
+        ) {
             MangaHomeContent(
                 state = state,
                 onRefresh = model::refresh,
@@ -148,7 +131,7 @@ fun MangaHomeTabContent(
                 },
                 listState = listState,
             )
-            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
         }
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }
 }

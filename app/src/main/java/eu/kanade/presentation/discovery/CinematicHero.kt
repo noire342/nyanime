@@ -66,7 +66,7 @@ internal fun CinematicHero(
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val compact = maxWidth < 600.dp
-        val artworkHeight = if (compact) (maxWidth * 1.25f).coerceIn(400.dp, 540.dp) else 380.dp
+        val artworkHeight = HomeLayout.heroHeight(maxWidth)
         Box(Modifier.fillMaxWidth().heightIn(min = artworkHeight)) {
             artwork()
             Box(
@@ -132,37 +132,65 @@ internal fun CinematicHero(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Row(
-                    modifier = Modifier.widthIn(max = 420.dp).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Button(
-                        onClick = onOpen,
-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                        shape = RoundedCornerShape(4.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-                    ) {
-                        Text(
-                            actionLabel,
-                            style = MaterialTheme.typography.labelLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.size(10.dp))
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(20.dp))
-                    }
-                    if (onSources != null) {
-                        IconButton(onClick = onSources) {
-                            Icon(Icons.Outlined.SwapHoriz, "Scegli la fonte", tint = Color.White)
-                        }
-                    }
-                    IconButton(onClick = { showInformation = true }) {
-                        Icon(Icons.Outlined.Info, "Informazioni", tint = Color.White)
-                    }
-                }
+                HeroActions(actionLabel, onOpen, onSources, { showInformation = true })
             }
         }
+    }
+}
+
+@Composable
+private fun HeroActions(label: String, onOpen: () -> Unit, onSources: (() -> Unit)?, onInformation: () -> Unit) {
+    BoxWithConstraints(Modifier.widthIn(max = 420.dp).fillMaxWidth()) {
+        val stacked = HomeLayout.stackHeroActions(maxWidth, LocalDensity.current.fontScale, onSources != null)
+        if (stacked) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                HeroPrimaryAction(label, onOpen, Modifier.fillMaxWidth())
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                ) {
+                    HeroSecondaryActions(onSources, onInformation)
+                }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                HeroPrimaryAction(label, onOpen, Modifier.weight(1f))
+                HeroSecondaryActions(onSources, onInformation)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroPrimaryAction(label: String, onOpen: () -> Unit, modifier: Modifier) {
+    Button(
+        onClick = onOpen,
+        modifier = modifier.heightIn(min = 48.dp),
+        shape = RoundedCornerShape(4.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+    ) {
+        Text(
+            label,
+            modifier = Modifier.weight(1f, fill = false),
+            style = MaterialTheme.typography.labelLarge,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.size(10.dp))
+        Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun HeroSecondaryActions(onSources: (() -> Unit)?, onInformation: () -> Unit) {
+    if (onSources != null) {
+        IconButton(onClick = onSources) {
+            Icon(Icons.Outlined.SwapHoriz, "Scegli la fonte", tint = Color.White)
+        }
+    }
+    IconButton(onClick = onInformation) {
+        Icon(Icons.Outlined.Info, "Informazioni", tint = Color.White)
     }
 }
 

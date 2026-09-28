@@ -142,8 +142,14 @@ fun SectionHeader(title: String, more: (() -> Unit)? = null) {
 }
 
 @Composable
-fun LoadNotice(loading: Boolean, error: String?, stale: Boolean = false, retry: (() -> Unit)? = null) {
-    if (loading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+fun LoadNotice(
+    loading: Boolean,
+    error: String?,
+    stale: Boolean = false,
+    showLoadingIndicator: Boolean = true,
+    retry: (() -> Unit)? = null,
+) {
+    if (loading && showLoadingIndicator) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
     if (stale || error != null) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
             if (stale) Text("Dati salvati · aggiornamento non disponibile", style = MaterialTheme.typography.labelSmall)
@@ -187,7 +193,7 @@ fun PosterCard(
         TitleInformationSheet(title, badges.joinToString(" · "), subtitle, { information = false }, onClick)
     }
     Column(
-        modifier.width((132 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)
+        modifier.width(HomeLayout.posterWidth(LocalDensity.current.fontScale))
             .graphicsLayer {
                 alpha = pressAlpha.value
             }
@@ -338,7 +344,7 @@ fun LocalAnimeRow(
     if (!LocalNyanimeStyle.current) {
         return eu.kanade.presentation.discovery.legacy.LocalAnimeRow(state, onOpen, emptyMessage, onHide, onPlay)
     }
-    LoadNotice(state.loading, state.error)
+    LoadNotice(state.loading, state.error, showLoadingIndicator = false)
     val items = state.data.orEmpty()
     if (!state.loading && items.isEmpty() && state.error == null) {
         Text(
@@ -347,92 +353,98 @@ fun LocalAnimeRow(
             style = MaterialTheme.typography.bodyMedium,
         )
     }
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val cardWidth = (228 * LocalDensity.current.fontScale.coerceIn(1f, 1.4f)).dp
-            .coerceAtMost((maxWidth - 32.dp).coerceAtLeast(160.dp))
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(items, key = { it.anime.id }) { item ->
-                val poster = rememberPosterSource(item.anime)
-                val openDetails = posterOpen(poster, item.anime.title) { onOpen(item) }
-                Column(Modifier.width(cardWidth)) {
-                    Box(
-                        Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(4.dp))
-                            .clickable(role = Role.Button, onClickLabel = "Apri scheda", onClick = openDetails)
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                    ) {
-                        SourceHomeArtwork(
-                            item.anime,
-                            Modifier.fillMaxSize().posterSource(poster),
-                            background = !item.anime.backgroundUrl.isNullOrBlank(),
-                            initialPainter = posterSourcePlaceholder(poster),
-                            onPainterReady = { poster.painter = it },
-                        )
+    HomeLoadingTransition(
+        loading = state.awaitingContent,
+        placeholder = { HomePosterRowSkeleton(wide = true) },
+    ) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val cardWidth = HomeLayout.resumeWidth(LocalDensity.current.fontScale, maxWidth)
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items(items, key = { it.anime.id }) { item ->
+                    val poster = rememberPosterSource(item.anime)
+                    val openDetails = posterOpen(poster, item.anime.title) { onOpen(item) }
+                    Column(Modifier.width(cardWidth)) {
                         Box(
-                            Modifier.fillMaxSize().posterForeground(poster, zIndex = 1f).background(
-                                Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))),
-                            ),
-                        )
-                        FilledIconButton(
-                            onClick = { onPlay(item) },
-                            modifier = Modifier.align(Alignment.Center).size(48.dp).posterForeground(poster),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = Color.Black.copy(alpha = 0.75f),
-                                contentColor = Color.White,
-                            ),
+                            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(4.dp))
+                                .clickable(role = Role.Button, onClickLabel = "Apri scheda", onClick = openDetails)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                         ) {
-                            Icon(
-                                Icons.Filled.PlayArrow,
-                                (if (item.progress > 0) "Riprendi " else "Guarda ") + item.anime.title,
-                                Modifier.size(32.dp),
+                            SourceHomeArtwork(
+                                item.anime,
+                                Modifier.fillMaxSize().posterSource(poster),
+                                background = !item.anime.backgroundUrl.isNullOrBlank(),
+                                initialPainter = posterSourcePlaceholder(poster),
+                                onPainterReady = { poster.painter = it },
                             )
-                        }
-                        LinearProgressIndicator(
-                            progress = { item.progress.coerceIn(0f, 1f) },
-                            modifier = Modifier.align(
-                                Alignment.BottomCenter,
-                            ).fillMaxWidth().height(3.dp).posterForeground(poster),
-                            trackColor = Color.White.copy(alpha = 0.3f),
-                            gapSize = 0.dp,
-                            drawStopIndicator = {},
-                        )
-                    }
-                    Row(
-                        Modifier.fillMaxWidth().posterForeground(poster).padding(top = 6.dp),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        Column(
-                            Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Apri scheda", onClick = {
-                                openDetails()
-                            }),
-                        ) {
-                            Text(
-                                item.anime.title,
-                                maxLines = 2,
-                                minLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.titleSmall,
+                            Box(
+                                Modifier.fillMaxSize().posterForeground(poster, zIndex = 1f).background(
+                                    Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))),
+                                ),
                             )
-                            Text(
-                                item.episode.name,
-                                maxLines = 2,
-                                minLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        IconButton(onClick = openDetails, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.Outlined.Info, "Scheda di ${item.anime.title}")
-                        }
-                        if (onHide != null) {
-                            IconButton(onClick = { onHide(item) }, modifier = Modifier.size(48.dp)) {
+                            FilledIconButton(
+                                onClick = { onPlay(item) },
+                                modifier = Modifier.align(Alignment.Center).size(48.dp).posterForeground(poster),
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = Color.Black.copy(alpha = 0.75f),
+                                    contentColor = Color.White,
+                                ),
+                            ) {
                                 Icon(
-                                    Icons.Outlined.VisibilityOff,
-                                    "Nascondi ${item.anime.title} da Continua a guardare",
+                                    Icons.Filled.PlayArrow,
+                                    (if (item.progress > 0) "Riprendi " else "Guarda ") + item.anime.title,
+                                    Modifier.size(32.dp),
                                 )
+                            }
+                            LinearProgressIndicator(
+                                progress = { item.progress.coerceIn(0f, 1f) },
+                                modifier = Modifier.align(
+                                    Alignment.BottomCenter,
+                                ).fillMaxWidth().height(3.dp).posterForeground(poster),
+                                trackColor = Color.White.copy(alpha = 0.3f),
+                                gapSize = 0.dp,
+                                drawStopIndicator = {},
+                            )
+                        }
+                        Row(
+                            Modifier.fillMaxWidth().posterForeground(poster).padding(top = 6.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Column(
+                                Modifier.weight(1f).clickable(
+                                    role = Role.Button,
+                                    onClickLabel = "Apri scheda",
+                                    onClick = openDetails,
+                                ),
+                            ) {
+                                Text(
+                                    item.anime.title,
+                                    maxLines = 2,
+                                    minLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                                Text(
+                                    item.episode.name,
+                                    maxLines = 2,
+                                    minLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            IconButton(onClick = openDetails, modifier = Modifier.size(48.dp)) {
+                                Icon(Icons.Outlined.Info, "Scheda di ${item.anime.title}")
+                            }
+                            if (onHide != null) {
+                                IconButton(onClick = { onHide(item) }, modifier = Modifier.size(48.dp)) {
+                                    Icon(
+                                        Icons.Outlined.VisibilityOff,
+                                        "Nascondi ${item.anime.title} da Continua a guardare",
+                                    )
+                                }
                             }
                         }
                     }

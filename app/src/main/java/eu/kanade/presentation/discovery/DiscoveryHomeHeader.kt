@@ -42,7 +42,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -63,7 +62,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
-import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.motion.posterForeground
@@ -71,8 +69,6 @@ import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.theme.NyanimeWordmark
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import tachiyomi.domain.discovery.SourceHomeGroup
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 
 @Composable
 fun DiscoveryHomeHeader(
@@ -86,6 +82,8 @@ fun DiscoveryHomeHeader(
     artworkRefreshKey: Int = 0,
     onUpdates: (() -> Unit)? = null,
     hasUpdates: Boolean = false,
+    categoryOrder: String = "",
+    onPrioritizeCategory: (HomeCategory) -> Unit = {},
 ) {
     if (!LocalNyanimeStyle.current) {
         return eu.kanade.presentation.discovery.legacy.DiscoveryHomeHeader(
@@ -127,7 +125,7 @@ fun DiscoveryHomeHeader(
                     )
                 }
             }
-            HomeContentSwitch(selectedHome, homes, onSelect)
+            HomeContentSwitch(selectedHome, homes, categoryOrder, onSelect, onPrioritizeCategory)
         }
     }
 }
@@ -156,15 +154,20 @@ private fun HomeHeaderActions(
                 )
             }
         }
-        if (onSearch != null) {
+        AnimatedVisibility(
+            visible = onSearch != null,
+            enter = if (motion) expandHorizontally(tween(220)) + fadeIn(tween(160)) else EnterTransition.None,
+            exit = if (motion) shrinkHorizontally(tween(180)) + fadeOut(tween(120)) else ExitTransition.None,
+        ) {
             val description = "Cerca " + (homes.firstOrNull { it.id == selectedHome }?.title ?: "anime")
             if (compactSearch) {
-                IconButton(onClick = onSearch) {
+                IconButton(onClick = { onSearch?.invoke() }, enabled = onSearch != null) {
                     Icon(Icons.Outlined.Search, contentDescription = description)
                 }
             } else {
                 Surface(
-                    onClick = onSearch,
+                    onClick = { onSearch?.invoke() },
+                    enabled = onSearch != null,
                     modifier = Modifier.widthIn(min = 96.dp).heightIn(min = 48.dp).semantics {
                         role = Role.Button
                         contentDescription = description
@@ -189,10 +192,14 @@ private fun HomeHeaderActions(
 
 /** Availability and selection remain owned by the generic extension Home contract. */
 @Composable
-private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
+private fun HomeContentSwitch(
+    selectedHome: String?,
+    homes: List<SourceHomeGroup>,
+    savedOrder: String,
+    onSelect: (String?) -> Unit,
+    onPrioritizeCategory: (HomeCategory) -> Unit,
+) {
     val motion = modernMotionEnabled()
-    val preference = remember { Injekt.get<UiPreferences>().homeCategoryOrder() }
-    val savedOrder by preference.changes().collectAsState(initial = preference.get())
     val choices = HomeCategories.choices(homes, savedOrder)
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
@@ -251,7 +258,7 @@ private fun HomeContentSwitch(selectedHome: String?, homes: List<SourceHomeGroup
                                                 onLongClick = {
                                                     if (choices.firstOrNull() != category) {
                                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                        preference.set(HomeCategories.moveFirst(savedOrder, category))
+                                                        onPrioritizeCategory(category)
                                                     }
                                                 },
                                                 onLongClickLabel = "Sposta ${category.title} all'inizio",

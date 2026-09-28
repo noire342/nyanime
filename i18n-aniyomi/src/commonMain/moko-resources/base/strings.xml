@@ -682,4 +682,5 @@
     <string name="ready_update_title">Update downloaded</string>
     <string name="ready_update_summary">Ready to install. You can also find it in More.</string>
     <string name="ready_update_install">Install now</string>
+    <string name="home_loading_content">Loading content</string>
 </resources>

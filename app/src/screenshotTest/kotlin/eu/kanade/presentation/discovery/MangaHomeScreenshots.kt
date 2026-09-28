@@ -19,6 +19,7 @@ import tachiyomi.domain.entries.manga.model.Manga
 
 @PreviewTest
 @Preview(name = "MangaHomePhone", widthDp = 393, heightDp = 1050, locale = "it")
+@Preview(name = "MangaHomeNarrow", widthDp = 280, heightDp = 1050, fontScale = 1.5f, locale = "it")
 @Preview(name = "MangaHomeLargeText", widthDp = 320, heightDp = 1050, fontScale = 1.5f, locale = "it")
 @Preview(name = "MangaHomeTablet", widthDp = 800, heightDp = 1050, locale = "it")
 @Composable

@@ -591,4 +591,5 @@
     <string name="ready_update_title">Aggiornamento scaricato</string>
     <string name="ready_update_summary">È pronto da installare. Lo ritrovi anche in Altro.</string>
     <string name="ready_update_install">Installa ora</string>
+    <string name="home_loading_content">Caricamento dei contenuti</string>
 </resources>

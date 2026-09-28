@@ -1,9 +1,10 @@
 package eu.kanade.presentation.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
-import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -33,13 +34,16 @@ internal val NyanimeTypography = Typography(
 
 @Composable
 fun NyanimeWordmark(modifier: Modifier = Modifier) {
-    Text(
+    BasicText(
         "NYANIME",
         modifier,
-        color = Color(0xFFE50914),
-        fontSize = 24.sp,
-        letterSpacing = 2.sp,
-        fontWeight = FontWeight.Black,
+        style = MaterialTheme.typography.bodyLarge.copy(
+            color = Color(0xFFE50914),
+            fontSize = 24.sp,
+            letterSpacing = 2.sp,
+            fontWeight = FontWeight.Black,
+        ),
         maxLines = 1,
+        autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 24.sp, stepSize = 0.5.sp),
     )
 }
