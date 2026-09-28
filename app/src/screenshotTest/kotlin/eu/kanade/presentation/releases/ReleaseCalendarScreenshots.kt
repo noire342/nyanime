@@ -71,6 +71,7 @@ private class AgendaScreen(val empty: Boolean, val calendar: Boolean) : Screen()
                 emptyList()
             } else {
                 listOf(
+                    event.copy(key = "past", at = event.at - 10 * 86_400_000L),
                     event,
                     event.copy(
                         key = "manga-available",
@@ -79,10 +80,11 @@ private class AgendaScreen(val empty: Boolean, val calendar: Boolean) : Screen()
                         itemId = 1,
                         medium = ReleaseMedium.MANGA,
                     ),
+                    event.copy(key = "future", at = event.at + 12 * 86_400_000L),
                 )
             },
             false, null, {}, {}, {}, {},
-            initialCalendar = calendar, showBack = false, showMediaFilter = true,
+            initialCalendar = calendar, showBack = false, showMediaFilter = true, today = date,
         )
     }
 }

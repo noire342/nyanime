@@ -1,11 +1,5 @@
 package eu.kanade.presentation.components.releases
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -14,12 +8,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,7 +35,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,11 +55,11 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.relativeDateText
 import eu.kanade.presentation.entries.components.ItemCover
-import eu.kanade.presentation.motion.ModernMotion
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.releases.ReleaseMedium
 import kotlinx.collections.immutable.ImmutableMap
+import kotlinx.coroutines.launch
 import mihon.feature.upcoming.components.calendar.Calendar
 import tachiyomi.presentation.core.components.material.Scaffold
 import java.time.Instant
@@ -67,6 +67,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 data class ReleaseAgendaItem(
     val key: String,
@@ -103,11 +104,15 @@ fun ReleaseCalendarContent(
     medium: ReleaseMedium? = null,
     onMedium: (ReleaseMedium?) -> Unit = {},
     allowAllMedia: Boolean = true,
+    today: LocalDate = LocalDate.now(),
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val locale = LocalConfiguration.current.locales[0]
     var calendarVisible by rememberSaveable { mutableStateOf(initialCalendar) }
     val motion = appMotionEnabled()
+    val scope = rememberCoroutineScope()
+    val focusDate = selectedDate ?: if (calendarVisible && month != YearMonth.from(today)) month.atDay(1) else today
+    val timeline = remember(items, today, focusDate) { ReleaseAgendaTimeline(items, today, focusDate) }
     Scaffold(topBar = {
         AppBar(
             title = stringResource(R.string.release_title),
@@ -126,212 +131,257 @@ fun ReleaseCalendarContent(
             },
         )
     }) { padding ->
-        LazyColumn(Modifier.padding(padding), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxSize().padding(padding)) {
             if (showMediaFilter) {
-                item(key = "media-filter") {
-                    Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (allowAllMedia) {
-                            FilterChip(
-                                selected = medium == null,
-                                onClick = { onMedium(null) },
-                                label = { Text(stringResource(R.string.release_all)) },
-                            )
-                        }
-                        ReleaseMedium.entries.forEach { value ->
-                            val cue = releaseColor(value)
-                            FilterChip(
-                                selected = medium == value,
-                                onClick = { onMedium(value) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    labelColor = cue,
-                                    selectedLabelColor = cue,
-                                    selectedContainerColor = cue.copy(alpha = .12f),
-                                ),
-                                label = {
-                                    Text(
-                                        stringResource(
-                                            if (value == ReleaseMedium.ANIME) {
-                                                R.string.release_anime
-                                            } else {
-                                                R.string.release_manga
-                                            },
-                                        ),
-                                    )
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-            item(key = "view-mode") {
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    SegmentedButton(
-                        selected = !calendarVisible,
-                        onClick = {
-                            calendarVisible = false
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(0, 2),
-                    ) { Text(stringResource(R.string.release_agenda)) }
-                    SegmentedButton(
-                        selected = calendarVisible,
-                        onClick = { calendarVisible = true },
-                        shape = SegmentedButtonDefaults.itemShape(1, 2),
-                    ) { Text(stringResource(R.string.release_calendar_title)) }
-                }
-            }
-            item(key = "calendar") {
-                AnimatedVisibility(
-                    calendarVisible,
-                    enter = expandVertically(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0)) +
-                        fadeIn(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0)),
-                    exit = shrinkVertically(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0)) +
-                        fadeOut(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0)),
-                ) {
-                    Calendar(month, events, onMonth, { onDate(it) }, selectedDate = selectedDate)
-                }
-            }
-            item(key = "agenda-mode") {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(
-                        selectedDate?.let { relativeDateText(it) } ?: if (month == YearMonth.now()) {
-                            stringResource(R.string.release_calendar_week)
-                        } else {
-                            val format = DateTimeFormatter.ofPattern("d MMM", locale)
-                            "${month.atDay(1).format(format)} – ${month.atDay(7).format(format)}"
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f),
+                    if (allowAllMedia) {
+                        FilterChip(
+                            selected = medium == null,
+                            onClick = { onMedium(null) },
+                            label = { Text(stringResource(R.string.release_all)) },
+                        )
+                    }
+                    ReleaseMedium.entries.forEach { value ->
+                        val cue = releaseColor(value)
+                        FilterChip(
+                            selected = medium == value,
+                            onClick = { onMedium(value) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                labelColor = cue,
+                                selectedLabelColor = cue,
+                                selectedContainerColor = cue.copy(alpha = .12f),
+                            ),
+                            label = {
+                                Text(
+                                    stringResource(
+                                        if (value ==
+                                            ReleaseMedium.ANIME
+                                        ) {
+                                            R.string.release_anime
+                                        } else {
+                                            R.string.release_manga
+                                        },
+                                    ),
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                SegmentedButton(
+                    selected = !calendarVisible,
+                    onClick = {
+                        if (calendarVisible && selectedDate == null) onDate(focusDate)
+                        calendarVisible = false
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(0, 2),
+                ) { Text(stringResource(R.string.release_agenda)) }
+                SegmentedButton(
+                    selected = calendarVisible,
+                    onClick = { calendarVisible = true },
+                    shape = SegmentedButtonDefaults.itemShape(1, 2),
+                ) { Text(stringResource(R.string.release_calendar_title)) }
+            }
+            Box(Modifier.fillMaxWidth().height(4.dp).padding(horizontal = 16.dp)) {
+                if (loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+            // Compose the saved scroll state only after the first local snapshot. Its initial
+            // index is today, so a long history never flashes before jumping to the anchor.
+            // Live data updates retain keyed rows and do not recreate this scroll state.
+            if (!loading) {
+                key(medium, calendarVisible, selectedDate) {
+                    val listState = rememberLazyListState(
+                        initialFirstVisibleItemIndex = if (calendarVisible) 0 else timeline.indexOf(focusDate),
                     )
-                    if (selectedDate !=
-                        null
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        Text(
+                            if (calendarVisible) {
+                                relativeDateText(
+                                    focusDate,
+                                )
+                            } else {
+                                stringResource(R.string.release_timeline)
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.weight(1f),
+                        )
                         TextButton(onClick = {
-                            onMonth(YearMonth.now())
-                            onDate(null)
-                        }) { Text(stringResource(R.string.release_calendar_week)) }
+                            if (selectedDate != null || calendarVisible) {
+                                onMonth(YearMonth.from(today))
+                                onDate(null)
+                                calendarVisible = false
+                            } else {
+                                scope.launch {
+                                    if (motion) {
+                                        listState.animateScrollToItem(timeline.indexOf(today))
+                                    } else {
+                                        listState.scrollToItem(timeline.indexOf(today))
+                                    }
+                                }
+                            }
+                        }) { Text(stringResource(R.string.release_today)) }
                     }
-                }
-                Box(Modifier.fillMaxWidth().height(4.dp).padding(horizontal = 16.dp)) {
-                    if (loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                }
-                if (warning != null) {
-                    Text(
-                        warning,
-                        Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (items.isEmpty()) {
-                item(key = "empty") {
-                    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                        Text(
-                            stringResource(
-                                if (selectedDate ==
-                                    null
-                                ) {
-                                    R.string.release_calendar_unknown
-                                } else {
-                                    R.string.release_calendar_empty
-                                },
-                            ),
-                            Modifier.padding(20.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            items.groupBy { it.date }.forEach { (date, releases) ->
-                if (selectedDate == null) {
-                    item(key = "day-$date", contentType = "day") {
-                        Text(
-                            relativeDateText(date),
-                            Modifier.padding(horizontal = 20.dp),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    }
-                }
-                items(releases, key = { it.key }, contentType = { "release" }) { item ->
-                    val cue = releaseColor(item.medium)
-                    val shape = RoundedCornerShape(16.dp)
-                    Card(
-                        (if (motion) Modifier.animateItem() else Modifier).fillMaxWidth().padding(
-                            horizontal = 16.dp,
-                        ).clickable {
-                            onItem(item)
-                        },
-                        shape = shape,
-                        border = BorderStroke(
-                            1.dp,
-                            Brush.linearGradient(
-                                listOf(cue.copy(alpha = .65f), cue.copy(alpha = .18f), cue.copy(alpha = .4f)),
-                            ),
-                        ),
+                    LazyColumn(
+                        Modifier.weight(1f).fillMaxWidth(),
+                        state = listState,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Row(
-                            Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        ) {
-                            ItemCover.Book(
-                                data = item.cover,
-                                modifier = Modifier.width(64.dp).height(96.dp),
-                                shape = RoundedCornerShape(8.dp),
-                            )
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                if (showMediaFilter) {
+                        if (calendarVisible) {
+                            item(key = "calendar") {
+                                Calendar(month, events, onMonth, { onDate(it) }, selectedDate = focusDate)
+                            }
+                        }
+                        val rows = if (calendarVisible) {
+                            timeline.rows.filter { row ->
+                                when (row) {
+                                    is ReleaseAgendaTimeline.Row.Day -> row.date == focusDate
+                                    is ReleaseAgendaTimeline.Row.Empty -> row.date == focusDate
+                                    is ReleaseAgendaTimeline.Row.Release -> row.item.date == focusDate
+                                }
+                            }
+                        } else {
+                            timeline.rows
+                        }
+                        items(rows, key = { it.key }, contentType = {
+                            when (it) {
+                                is ReleaseAgendaTimeline.Row.Day -> "day"
+                                is ReleaseAgendaTimeline.Row.Empty -> "empty"
+                                is ReleaseAgendaTimeline.Row.Release -> "release"
+                            }
+                        }) { row ->
+                            when (row) {
+                                is ReleaseAgendaTimeline.Row.Day -> Text(
+                                    relativeDateText(row.date),
+                                    Modifier.padding(horizontal = 20.dp),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                is ReleaseAgendaTimeline.Row.Empty -> Card(
+                                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                ) {
                                     Text(
                                         stringResource(
-                                            if (item.medium == ReleaseMedium.ANIME) {
-                                                R.string.release_anime
+                                            if (items.isEmpty()) {
+                                                R.string.release_timeline_empty
                                             } else {
-                                                R.string.release_manga
+                                                R.string.release_calendar_empty
                                             },
                                         ),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = cue,
-                                    )
-                                }
-                                Text(
-                                    item.title,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    item.label,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                if (item.choices.isNotEmpty()) {
-                                    Text(
-                                        stringResource(R.string.release_source_choices, item.choices.size),
-                                        style = MaterialTheme.typography.labelMedium,
+                                        Modifier.padding(20.dp),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Text(
-                                    Instant.ofEpochMilli(
-                                        item.at,
-                                    ).atZone(
-                                        ZoneId.systemDefault(),
-                                    ).format(DateTimeFormatter.ofPattern("EEE d MMM · HH:mm", locale)),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = cue,
+                                is ReleaseAgendaTimeline.Row.Release -> ReleaseCard(
+                                    row.item,
+                                    showMediaFilter,
+                                    motion,
+                                    locale,
+                                    onItem,
                                 )
                             }
                         }
+                        if (warning != null) {
+                            item(key = "warning") {
+                                Text(
+                                    warning,
+                                    Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        // A full viewport after the final day allows today's header to start
+                        // at the top even when all known releases are in the past.
+                        item(key = "bottom-space") { Spacer(Modifier.fillParentMaxHeight()) }
                     }
                 }
             }
-            item(key = "bottom-space") { androidx.compose.foundation.layout.Spacer(Modifier.height(16.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun LazyItemScope.ReleaseCard(
+    item: ReleaseAgendaItem,
+    showMediaFilter: Boolean,
+    motion: Boolean,
+    locale: Locale,
+    onItem: (ReleaseAgendaItem) -> Unit,
+) {
+    val cue = releaseColor(item.medium)
+    val shape = RoundedCornerShape(16.dp)
+    Card(
+        (if (motion) Modifier.animateItem() else Modifier).fillMaxWidth().padding(
+            horizontal = 16.dp,
+        ).clickable {
+            onItem(item)
+        },
+        shape = shape,
+        border = BorderStroke(
+            1.dp,
+            Brush.linearGradient(
+                listOf(cue.copy(alpha = .65f), cue.copy(alpha = .18f), cue.copy(alpha = .4f)),
+            ),
+        ),
+    ) {
+        Row(
+            Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            ItemCover.Book(
+                data = item.cover,
+                modifier = Modifier.width(64.dp).height(96.dp),
+                shape = RoundedCornerShape(8.dp),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (showMediaFilter) {
+                    Text(
+                        stringResource(
+                            if (item.medium == ReleaseMedium.ANIME) {
+                                R.string.release_anime
+                            } else {
+                                R.string.release_manga
+                            },
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = cue,
+                    )
+                }
+                Text(
+                    item.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    item.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (item.choices.isNotEmpty()) {
+                    Text(
+                        stringResource(R.string.release_source_choices, item.choices.size),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    Instant.ofEpochMilli(
+                        item.at,
+                    ).atZone(
+                        ZoneId.systemDefault(),
+                    ).format(DateTimeFormatter.ofPattern("EEE d MMM · HH:mm", locale)),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = cue,
+                )
+            }
         }
     }
 }

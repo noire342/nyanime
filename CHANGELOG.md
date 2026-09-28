@@ -8,6 +8,17 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Agenda continua, aperta su oggi
+
+- L’agenda si apre su oggi: scorrendo verso l’alto si consultano le uscite
+  precedenti e verso il basso quelle future, senza il limite di sette giorni.
+- Filtri e scelta Agenda/Calendario sempre accessibili; Oggi riporta al punto
+  corrente. Se oggi non ci sono uscite, resta una posizione chiara nella lista.
+- Il giorno scelto nel calendario diventa il punto di apertura dell’agenda.
+  Gli aggiornamenti dei dati mantengono la posizione senza riportare la lista all’inizio.
+- Consultazione basata sui dati locali e sulle date effettive, senza nuove
+  richieste alle fonti durante lo scorrimento.
+
 ## 28 settembre 2026 - Uscite seguite e calendario affidabile
 
 - Nuovo comando Segui nelle schede anime e manga, con preferenze separate

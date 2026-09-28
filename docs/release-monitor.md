@@ -16,7 +16,12 @@ date, fino a sei titoli per giro con rotazione dei controlli.
 La vista **Agenda** mostra le schede raggruppate per giorno. Il selettore
 **Agenda / Calendario** permette di passare alla griglia mensile: ogni giorno
 è selezionabile, anche se vuoto. Tornando alla lista viene conservato il giorno
-scelto; Prossimi 7 giorni riporta alle uscite da oggi.
+scelto come punto di partenza della sequenza cronologica. All’apertura l’agenda
+parte da oggi: le uscite precedenti sono sopra e quelle future sotto, senza
+un limite di sette giorni. Il comando **Oggi** riporta alla posizione attuale.
+Filtri e selettore restano accessibili durante lo scorrimento; le nuove verifiche
+non riportano la lista all’inizio. Anche un giorno di apertura vuoto conserva
+un punto nella sequenza, senza inventare uscite o date mancanti.
 
 ## Due eventi distinti
 

@@ -23,7 +23,6 @@
     <string name="release_calendar_empty">Nessuna uscita annunciata per questo giorno.</string>
     <string name="release_calendar_unknown">Nessuna data futura annunciata. Le nuove uscite vengono comunque controllate automaticamente.</string>
     <string name="release_calendar_title">Calendario</string>
-    <string name="release_calendar_week">Prossimi 7 giorni</string>
     <string name="release_calendar_loading">Aggiornamento delle date annunciate…</string>
     <string name="release_calendar_error">Alcune date non sono state verificate. Le date salvate restano disponibili.</string>
     <string name="release_calendar_unresolved">Alcuni titoli non hanno ancora un ID di catalogo verificato.</string>
@@ -52,4 +51,7 @@
     <string name="release_content_detected">Rilevato disponibile · %1$s</string>
     <string name="release_source_choices">%1$d opzioni · Scegli dove aprire</string>
     <string name="release_choose_source">Scegli fonte ed edizione</string>
+    <string name="release_timeline">Passate e in arrivo</string>
+    <string name="release_today">Oggi</string>
+    <string name="release_timeline_empty">Nessuna uscita da mostrare. Le nuove uscite vengono comunque controllate automaticamente.</string>
 </resources>

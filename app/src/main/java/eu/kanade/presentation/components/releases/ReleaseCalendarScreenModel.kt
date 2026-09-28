@@ -66,8 +66,8 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
                 )
             }.collectLatest {
                 allItems = it.items.sortedBy { item -> item.at }
-                mutableState.update { state -> state.copy(loading = false, warning = it.warning) }
-                publish()
+                val warning = it.warning
+                publish { state -> state.copy(loading = false, warning = warning) }
             }
         }
         refresh()
@@ -233,29 +233,24 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
     fun refresh() = ReleaseMonitor.enqueue(app)
 
     fun setMonth(month: YearMonth) {
-        mutableState.update { it.copy(month = month, date = null) }
-        publish()
+        publish { it.copy(month = month, date = null) }
     }
 
     fun setDate(date: LocalDate?) {
-        mutableState.update { it.copy(date = date) }
-        publish()
+        publish { it.copy(date = date) }
     }
 
     fun setMedium(medium: ReleaseMedium?) {
         if (scope != null) return
-        mutableState.update { it.copy(medium = medium) }
-        publish()
+        publish { it.copy(medium = medium) }
     }
 
-    private fun publish() {
-        mutableState.update { state ->
-            val from = if (state.month == YearMonth.now()) LocalDate.now() else state.month.atDay(1)
+    private fun publish(transform: (State) -> State) {
+        mutableState.update { previous ->
+            val state = transform(previous)
             val filtered = allItems.filter { state.medium == null || it.medium == state.medium }
             state.copy(
-                items = filtered.filter { item ->
-                    state.date?.let { item.date == it } ?: (item.date >= from && item.date < from.plusDays(7))
-                },
+                items = filtered,
                 events = filtered.groupingBy { it.date }.eachCount().toImmutableMap(),
             )
         }

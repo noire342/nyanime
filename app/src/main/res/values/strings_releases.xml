@@ -23,7 +23,6 @@
     <string name="release_calendar_empty">No announced releases for this day.</string>
     <string name="release_calendar_unknown">No future dates announced. New content is still checked automatically.</string>
     <string name="release_calendar_title">Calendar</string>
-    <string name="release_calendar_week">Next 7 days</string>
     <string name="release_calendar_loading">Updating announced dates…</string>
     <string name="release_calendar_error">Could not verify some dates. Saved dates remain available.</string>
     <string name="release_calendar_unresolved">Some titles have no verified catalog ID yet.</string>
@@ -52,4 +51,7 @@
     <string name="release_content_detected">Detected available · %1$s</string>
     <string name="release_source_choices">%1$d options · Choose where to open</string>
     <string name="release_choose_source">Choose source or edition</string>
+    <string name="release_timeline">Past and upcoming</string>
+    <string name="release_today">Today</string>
+    <string name="release_timeline_empty">No releases to show. New content is still checked automatically.</string>
 </resources>
