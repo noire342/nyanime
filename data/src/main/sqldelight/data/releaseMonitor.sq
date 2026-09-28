@@ -18,7 +18,8 @@ CREATE TABLE release_notice (
     item_id INTEGER NOT NULL PRIMARY KEY REFERENCES chapters(_id) ON DELETE CASCADE,
     entry_id INTEGER NOT NULL REFERENCES mangas(_id) ON DELETE CASCADE,
     created_at INTEGER NOT NULL,
-    delivered_at INTEGER NOT NULL DEFAULT 0
+    delivered_at INTEGER NOT NULL DEFAULT 0,
+    source_at INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX release_notice_pending ON release_notice(delivered_at, created_at);
 
@@ -53,7 +54,7 @@ makeDue:
 UPDATE release_check SET next_check = 0 WHERE entry_id = ?;
 
 queueNotice:
-INSERT OR IGNORE INTO release_notice(item_id, entry_id, created_at) VALUES (?, ?, ?);
+INSERT OR IGNORE INTO release_notice(item_id, entry_id, created_at, source_at) VALUES (?, ?, ?, ?);
 
 getPending:
 SELECT * FROM release_notice WHERE delivered_at = 0 ORDER BY created_at LIMIT 200;
@@ -70,7 +71,7 @@ AND (s.mode = 'FOLLOW' OR p.favorite = 1
     OR EXISTS(SELECT 1 FROM chapters i WHERE i.manga_id = p._id AND (i.read = 1 OR i.last_page_read > 0)));
 
 getNotices:
-SELECT r.* FROM release_notice r JOIN chapters i ON i._id = r.item_id WHERE i.read = 0 ORDER BY r.created_at DESC;
+SELECT r.* FROM release_notice r JOIN chapters i ON i._id = r.item_id WHERE i.read = 0 AND r.delivered_at != 1 ORDER BY r.created_at DESC;
 
 markMetadata:
 UPDATE release_check SET metadata_at = ? WHERE entry_id = ?;

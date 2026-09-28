@@ -77,6 +77,8 @@ class SyncChaptersWithSource(
                     .copy(mangaId = manga.id, sourceOrder = i.toLong())
             }
 
+        val sourceDates = sourceChapters.associate { it.url to it.dateUpload }
+
         val dbChapters = getChaptersByMangaId.await(manga.id)
 
         val newChapters = mutableListOf<Chapter>()
@@ -255,6 +257,7 @@ class SyncChaptersWithSource(
                 notices.map { it.id },
                 dbChapters.isEmpty(),
                 manga.status == eu.kanade.tachiyomi.source.model.SManga.COMPLETED.toLong(),
+                sourceDates = notices.associate { it.id to (sourceDates[it.url] ?: 0) },
             )
             notices
         }

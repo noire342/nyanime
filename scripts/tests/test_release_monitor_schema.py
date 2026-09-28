@@ -25,6 +25,8 @@ class ReleaseSchemaTest(unittest.TestCase):
         root = "sqldelightanime" if anime else "sqldelight"
         migration = "141.sqm" if anime else "35.sqm"
         db.executescript((ROOT / f"data/src/main/{root}/migrations/{migration}").read_text(encoding="utf-8"))
+        correction = "142.sqm" if anime else "36.sqm"
+        db.executescript((ROOT / f"data/src/main/{root}/migrations/{correction}").read_text(encoding="utf-8"))
         query_file = ROOT / f"data/src/main/{root}/{'dataanime' if anime else 'data'}/releaseMonitor.sq"
         return db, query_file, parent, item, fk, seen
 
@@ -48,7 +50,7 @@ class ReleaseSchemaTest(unittest.TestCase):
             db.execute(f"UPDATE {parent} SET favorite=0")
             view = "animeupdatesView" if anime else "updatesView"
             self.assertEqual([], db.execute(f"SELECT * FROM {view}").fetchall())
-            db.execute(self.query(path, "queueNotice"), (11, 1, 2000))
+            db.execute(self.query(path, "queueNotice"), (11, 1, 2000, 0))
             self.assertEqual(1, len(db.execute(f"SELECT * FROM {view}").fetchall()))
             db.close()
 
@@ -58,13 +60,13 @@ class ReleaseSchemaTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 with db:
                     db.execute(f"INSERT INTO {item} SELECT 12," + "1,'New','',0,0,0,0,0,3000,3000,2")
-                    db.execute(self.query(path, "queueNotice"), (12, 1, 3000))
+                    db.execute(self.query(path, "queueNotice"), (12, 1, 3000, 0))
                     raise RuntimeError("interrupt transaction")
             self.assertEqual(0, db.execute("SELECT count(*) FROM release_notice").fetchone()[0])
             with db:
                 db.execute(f"INSERT INTO {item} SELECT 12," + "1,'New','',0,0,0,0,0,3000,3000,2")
                 for _ in range(2):
-                    db.execute(self.query(path, "queueNotice"), (12, 1, 3000))
+                    db.execute(self.query(path, "queueNotice"), (12, 1, 3000, 0))
             self.assertEqual(1, len(db.execute(self.query(path, "getPending")).fetchall()))
             db.execute("UPDATE release_notice SET delivered_at=4000")
             self.assertEqual([], db.execute(self.query(path, "getPending")).fetchall())
@@ -85,7 +87,7 @@ class ReleaseSchemaTest(unittest.TestCase):
     def test_seen_items_disappear_without_destroying_delivery_receipt(self):
         for anime in (False, True):
             db, path, _, item, _, seen = self.database(anime)
-            db.execute(self.query(path, "queueNotice"), (11, 1, 2000))
+            db.execute(self.query(path, "queueNotice"), (11, 1, 2000, 0))
             self.assertEqual(1, len(db.execute(self.query(path, "getNotices")).fetchall()))
             db.execute(f"UPDATE {item} SET {seen}=1")
             self.assertEqual([], db.execute(self.query(path, "getNotices")).fetchall())
@@ -96,7 +98,7 @@ class ReleaseSchemaTest(unittest.TestCase):
         for anime in (False, True):
             db, path, parent, *_ = self.database(anime)
             db.execute(self.query(path, "setSubscription"), (1, "FOLLOW", 1, 1))
-            db.execute(self.query(path, "queueNotice"), (11, 1, 2000))
+            db.execute(self.query(path, "queueNotice"), (11, 1, 2000, 0))
             db.execute(f"DELETE FROM {parent}")
             for table in ("release_check", "release_notice", "release_subscription"):
                 self.assertEqual(0, db.execute(f"SELECT count(*) FROM {table}").fetchone()[0])
@@ -110,6 +112,22 @@ class ReleaseSchemaTest(unittest.TestCase):
         db.execute(self.query(path, "markSuccess"), {"entryId": 1, "now": 7000, "nextCheck": 8000})
         self.assertEqual((7000, 8000, 0), db.execute("SELECT last_success,next_check,failures FROM release_check").fetchone())
         db.close()
+
+    def test_acquired_history_is_not_a_publication_today(self):
+        for anime in (False, True):
+            db, path, _, _, *_ = self.database(anime)
+            db.execute("INSERT INTO release_notice(item_id,entry_id,created_at,delivered_at) VALUES (11,1,999999,1)")
+            self.assertEqual([], db.execute(self.query(path, "getNotices")).fetchall())
+            migration = ROOT / f"data/src/main/{'sqldelightanime' if anime else 'sqldelight'}/migrations/{'142' if anime else '36'}.sqm"
+            cleanup = migration.read_text(encoding="utf-8").split("ALTER TABLE")[0]
+            db.executescript(cleanup)
+            self.assertEqual(0, db.execute("SELECT count(*) FROM release_notice").fetchone()[0])
+            self.assertEqual(1, db.execute(f"SELECT count(*) FROM {'episodes' if anime else 'chapters'}").fetchone()[0])
+            db.execute(self.query(path, "queueNotice"), (11, 1, 999999, 1000))
+            self.assertEqual((999999, 1000), db.execute("SELECT created_at,source_at FROM release_notice").fetchone())
+            db.executescript(cleanup)
+            self.assertEqual(1, db.execute("SELECT count(*) FROM release_notice").fetchone()[0])
+            db.close()
 
 
 if __name__ == "__main__":

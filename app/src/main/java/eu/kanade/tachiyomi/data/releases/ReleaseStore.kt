@@ -15,7 +15,7 @@ class ReleaseStore(
     private val anime: AnimeDatabaseHandler = Injekt.get(),
     private val manga: MangaDatabaseHandler = Injekt.get(),
 ) {
-    data class Notice(val itemId: Long, val entryId: Long, val createdAt: Long)
+    data class Notice(val itemId: Long, val entryId: Long, val createdAt: Long, val sourceAt: Long = 0)
 
     fun subscriptionFlow(medium: ReleaseMedium, id: Long): Flow<ReleaseSubscription?> = when (medium) {
         ReleaseMedium.ANIME -> anime.subscribeToOneOrNull {
@@ -119,6 +119,7 @@ class ReleaseStore(
         firstSnapshot: Boolean,
         completed: Boolean,
         airingAt: Long? = null,
+        sourceDates: Map<Long, Long> = emptyMap(),
     ) {
         val now = System.currentTimeMillis()
         var announced = airingAt
@@ -146,11 +147,33 @@ class ReleaseStore(
             id in monitoredIds(medium)
         when (medium) {
             ReleaseMedium.ANIME -> anime.await(inTransaction = true) {
-                if (!firstSnapshot && capture) items.forEach { releaseMonitorQueries.queueNotice(it, id, now) }
+                if (!firstSnapshot &&
+                    capture
+                ) {
+                    items.forEach {
+                        releaseMonitorQueries.queueNotice(
+                            it,
+                            id,
+                            now,
+                            sourceDates[it]?.takeIf { date -> date in 1..now } ?: 0,
+                        )
+                    }
+                }
                 releaseMonitorQueries.markSuccess(id, now, next)
             }
             ReleaseMedium.MANGA -> manga.await(inTransaction = true) {
-                if (!firstSnapshot && capture) items.forEach { releaseMonitorQueries.queueNotice(it, id, now) }
+                if (!firstSnapshot &&
+                    capture
+                ) {
+                    items.forEach {
+                        releaseMonitorQueries.queueNotice(
+                            it,
+                            id,
+                            now,
+                            sourceDates[it]?.takeIf { date -> date in 1..now } ?: 0,
+                        )
+                    }
+                }
                 releaseMonitorQueries.markSuccess(id, now, next)
             }
         }
@@ -158,19 +181,27 @@ class ReleaseStore(
 
     suspend fun pending(medium: ReleaseMedium): List<Notice> = when (medium) {
         ReleaseMedium.ANIME -> anime.awaitList {
-            releaseMonitorQueries.getPending { item, entry, created, _ -> Notice(item, entry, created) }
+            releaseMonitorQueries.getPending { item, entry, created, _, sourceAt ->
+                Notice(item, entry, created, sourceAt)
+            }
         }
         ReleaseMedium.MANGA -> manga.awaitList {
-            releaseMonitorQueries.getPending { item, entry, created, _ -> Notice(item, entry, created) }
+            releaseMonitorQueries.getPending { item, entry, created, _, sourceAt ->
+                Notice(item, entry, created, sourceAt)
+            }
         }
     }
 
     fun noticeFlow(medium: ReleaseMedium): Flow<List<Notice>> = when (medium) {
         ReleaseMedium.ANIME -> anime.subscribeToList {
-            releaseMonitorQueries.getNotices { item, entry, created, _ -> Notice(item, entry, created) }
+            releaseMonitorQueries.getNotices { item, entry, created, _, sourceAt ->
+                Notice(item, entry, created, sourceAt)
+            }
         }
         ReleaseMedium.MANGA -> manga.subscribeToList {
-            releaseMonitorQueries.getNotices { item, entry, created, _ -> Notice(item, entry, created) }
+            releaseMonitorQueries.getNotices { item, entry, created, _, sourceAt ->
+                Notice(item, entry, created, sourceAt)
+            }
         }
     }
 

@@ -75,6 +75,8 @@ class SyncEpisodesWithSource(
                     .copy(animeId = anime.id, sourceOrder = i.toLong())
             }
 
+        val sourceDates = sourceEpisodes.associate { it.url to it.dateUpload }
+
         val dbEpisodes = getEpisodesByAnimeId.await(anime.id)
 
         val newEpisodes = mutableListOf<Episode>()
@@ -274,6 +276,7 @@ class SyncEpisodesWithSource(
                     it >
                         0
                 }?.times(1000),
+                sourceDates = notices.associate { it.id to (sourceDates[it.url] ?: 0) },
             )
             notices
         }
