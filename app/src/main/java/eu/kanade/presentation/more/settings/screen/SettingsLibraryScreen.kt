@@ -165,6 +165,8 @@ object SettingsLibraryScreen : SearchableSettings {
     ): Preference.PreferenceGroup {
         val context = LocalContext.current
 
+        val scope = rememberCoroutineScope()
+        val navigator = LocalNavigator.currentOrThrow
         val autoUpdateIntervalPref = libraryPreferences.autoUpdateInterval()
         val autoUpdateInterval by autoUpdateIntervalPref.collectAsState()
 
@@ -225,22 +227,43 @@ object SettingsLibraryScreen : SearchableSettings {
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_library_update),
             preferenceItems = persistentListOf(
-                Preference.PreferenceItem.ListPreference(
-                    preference = autoUpdateIntervalPref,
-                    entries = persistentMapOf(
-                        0 to stringResource(MR.strings.update_never),
-                        12 to stringResource(MR.strings.update_12hour),
-                        24 to stringResource(MR.strings.update_24hour),
-                        48 to stringResource(MR.strings.update_48hour),
-                        72 to stringResource(MR.strings.update_72hour),
-                        168 to stringResource(MR.strings.update_weekly),
-                    ),
-                    title = stringResource(MR.strings.pref_library_update_interval),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = eu.kanade.tachiyomi.data.releases.ReleasePreferences().enabled,
+                    title = context.getString(eu.kanade.tachiyomi.R.string.release_monitor),
+                    subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_monitor_description),
                     onValueChanged = {
-                        MangaLibraryUpdateJob.setupTask(context, it)
-                        AnimeLibraryUpdateJob.setupTask(context, it)
+                        ContextCompat.getMainExecutor(context).execute {
+                            eu.kanade.tachiyomi.data.releases.ReleaseMonitor.setup(context)
+                        }
                         true
                     },
+                ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = eu.kanade.tachiyomi.data.releases.ReleasePreferences().availability,
+                    title = context.getString(eu.kanade.tachiyomi.R.string.release_available),
+                    subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_available_description),
+                ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = eu.kanade.tachiyomi.data.releases.ReleasePreferences().reminders,
+                    title = context.getString(eu.kanade.tachiyomi.R.string.release_reminder),
+                    subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_reminder_description),
+                    onValueChanged = {
+                        scope.launch { eu.kanade.tachiyomi.data.releases.ReleaseReminders.schedule(context) }
+                        true
+                    },
+                ),
+                Preference.PreferenceItem.TextPreference(
+                    title = context.getString(eu.kanade.tachiyomi.R.string.release_test_notification),
+                    subtitle = if (eu.kanade.tachiyomi.data.releases.ReleaseNotifications.canPost(context)) {
+                        context.getString(eu.kanade.tachiyomi.R.string.release_test_description)
+                    } else {
+                        context.getString(eu.kanade.tachiyomi.R.string.release_notification_blocked)
+                    },
+                    onClick = { eu.kanade.tachiyomi.data.releases.ReleaseStatus.showTestNotification(context) },
+                ),
+                Preference.PreferenceItem.TextPreference(
+                    title = context.getString(eu.kanade.tachiyomi.R.string.release_status),
+                    onClick = { navigator.push(eu.kanade.presentation.components.releases.ReleaseStatusScreen()) },
                 ),
                 Preference.PreferenceItem.MultiSelectListPreference(
                     preference = libraryPreferences.autoUpdateDeviceRestrictions(),
@@ -251,7 +274,7 @@ object SettingsLibraryScreen : SearchableSettings {
                     ),
                     title = stringResource(MR.strings.pref_library_update_restriction),
                     subtitle = stringResource(MR.strings.restrictions),
-                    enabled = autoUpdateInterval > 0,
+                    enabled = eu.kanade.tachiyomi.data.releases.ReleasePreferences().enabled.get(),
                     onValueChanged = {
                         // Post to event looper to allow the preference to be updated.
                         ContextCompat.getMainExecutor(context).execute {
@@ -283,16 +306,6 @@ object SettingsLibraryScreen : SearchableSettings {
                     preference = libraryPreferences.autoUpdateMetadata(),
                     title = stringResource(MR.strings.pref_library_update_refresh_metadata),
                     subtitle = stringResource(MR.strings.pref_library_update_refresh_metadata_summary),
-                ),
-                Preference.PreferenceItem.MultiSelectListPreference(
-                    preference = libraryPreferences.autoUpdateItemRestrictions(),
-                    entries = persistentMapOf(
-                        ENTRY_HAS_UNVIEWED to stringResource(AYMR.strings.pref_update_only_completely_read),
-                        ENTRY_NON_VIEWED to stringResource(MR.strings.pref_update_only_started),
-                        ENTRY_NON_COMPLETED to stringResource(MR.strings.pref_update_only_non_completed),
-                        ENTRY_OUTSIDE_RELEASE_PERIOD to stringResource(MR.strings.pref_update_only_in_release_period),
-                    ),
-                    title = stringResource(MR.strings.pref_library_update_smart_update),
                 ),
                 Preference.PreferenceItem.SwitchPreference(
                     preference = libraryPreferences.newShowUpdatesCount(),

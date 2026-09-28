@@ -14,6 +14,7 @@ class UpcomingAnimeScreen : Screen() {
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
+        val context = androidx.compose.ui.platform.LocalContext.current
 
         val screenModel = rememberScreenModel { UpcomingAnimeScreenModel() }
         val state by screenModel.state.collectAsState()
@@ -21,7 +22,17 @@ class UpcomingAnimeScreen : Screen() {
         UpcomingAnimeScreenContent(
             state = state,
             setSelectedYearMonth = screenModel::setSelectedYearMonth,
-            onClickUpcoming = { navigator.push(AnimeScreen(it.id)) },
+            setSelectedDate = screenModel::setSelectedDate,
+            onRefresh = screenModel::refresh,
+            onClickUpcoming = {
+                if (it.itemId == null) {
+                    navigator.push(AnimeScreen(it.entryId))
+                } else {
+                    context.startActivity(
+                        eu.kanade.tachiyomi.ui.player.PlayerActivity.newIntent(context, it.entryId, it.itemId),
+                    )
+                }
+            },
         )
     }
 }

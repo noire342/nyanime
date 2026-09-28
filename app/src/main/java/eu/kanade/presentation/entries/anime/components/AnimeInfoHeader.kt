@@ -86,6 +86,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import eu.kanade.presentation.components.DropdownMenu
+import eu.kanade.presentation.components.releases.ReleaseFollowAction
 import eu.kanade.presentation.entries.components.DotSeparatorText
 import eu.kanade.presentation.entries.components.ItemCover
 import eu.kanade.presentation.motion.PosterDetailHero
@@ -263,6 +264,8 @@ fun AnimeWatchButton(resume: Boolean, onClick: () -> Unit, modifier: Modifier = 
 
 @Composable
 fun AnimeActionRow(
+    entryId: Long,
+    automaticFollowed: Boolean,
     favorite: Boolean,
     trackingCount: Int,
     nextUpdate: Instant?,
@@ -303,19 +306,10 @@ fun AnimeActionRow(
             onClick = onAddToLibraryClicked,
             onLongClick = onEditCategory,
         )
-        AnimeActionButton(
-            title = when (nextUpdateDays) {
-                null -> stringResource(MR.strings.not_applicable)
-                0 -> stringResource(MR.strings.manga_interval_expected_update_soon)
-                else -> pluralStringResource(
-                    MR.plurals.day,
-                    count = nextUpdateDays,
-                    nextUpdateDays,
-                )
-            },
-            icon = Icons.Default.HourglassEmpty,
-            color = if (isUserIntervalMode) MaterialTheme.colorScheme.primary else defaultActionButtonColor,
-            onClick = { onEditIntervalClicked?.invoke() },
+        ReleaseFollowAction(
+            medium = eu.kanade.tachiyomi.data.releases.ReleaseMedium.ANIME,
+            entryId = entryId,
+            automaticFollowed = automaticFollowed,
         )
         if (onTrackingClicked != null) {
             AnimeActionButton(

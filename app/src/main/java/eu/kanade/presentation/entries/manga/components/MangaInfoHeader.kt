@@ -78,6 +78,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import eu.kanade.presentation.components.DropdownMenu
+import eu.kanade.presentation.components.releases.ReleaseFollowAction
 import eu.kanade.presentation.entries.components.DotSeparatorText
 import eu.kanade.presentation.entries.components.ItemCover
 import eu.kanade.tachiyomi.R
@@ -161,6 +162,8 @@ fun MangaInfoBox(
 
 @Composable
 fun MangaActionRow(
+    entryId: Long,
+    automaticFollowed: Boolean,
     favorite: Boolean,
     trackingCount: Int,
     nextUpdate: Instant?,
@@ -197,19 +200,10 @@ fun MangaActionRow(
             onClick = onAddToLibraryClicked,
             onLongClick = onEditCategory,
         )
-        MangaActionButton(
-            title = when (nextUpdateDays) {
-                null -> stringResource(MR.strings.not_applicable)
-                0 -> stringResource(MR.strings.manga_interval_expected_update_soon)
-                else -> pluralStringResource(
-                    MR.plurals.day,
-                    count = nextUpdateDays,
-                    nextUpdateDays,
-                )
-            },
-            icon = Icons.Default.HourglassEmpty,
-            color = if (isUserIntervalMode) MaterialTheme.colorScheme.primary else defaultActionButtonColor,
-            onClick = { onEditIntervalClicked?.invoke() },
+        ReleaseFollowAction(
+            medium = eu.kanade.tachiyomi.data.releases.ReleaseMedium.MANGA,
+            entryId = entryId,
+            automaticFollowed = automaticFollowed,
         )
         MangaActionButton(
             title = if (trackingCount == 0) {

@@ -21,6 +21,7 @@ Lo sfondo del lettore manga resta configurabile indipendentemente.
 | --- | --- |
 | **ModernUI chiara e scura** | Sfoglia banner, locandine e caroselli con transizioni della copertina; scegli Scuro, Chiaro o Sistema. Anche il marchio e l’icona Android seguono il tema. |
 | **Home ricche di contenuti** | Esplora cataloghi, stagioni, classifiche e calendario; usa le Home anime e manga definite dalle estensioni compatibili. |
+| **Le tue uscite** | Segui anime e manga dalla scheda, ricevi avvisi delle nuove disponibilita e consulta le date annunciate nel calendario. [Come funziona](docs/release-monitor.md). |
 | **Riprendi da dove eri** | Ritrova “Continua a guardare” e “Continua a leggere”, con avanzamento locale e accesso all'episodio o capitolo. |
 | **Anime4K Ultra offline** | Copie A+ HQ con carico dosato, pause per temperatura e ripresa dei segmenti salvati. Stato, comandi ed esportazione direttamente dagli episodi; coda in Download → Ultra. [Dettagli e requisiti](docs/anime4k-ultra.md). |
 | **Anime4K Smart** | Applica shader nel player interno con qualità adattiva, avvio automatico configurabile e modalità manuali. |

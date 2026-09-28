@@ -537,6 +537,11 @@ private fun AnimeScreenSmallImpl(
                                 )
                             }
                             AnimeActionRow(
+                                entryId = state.anime.id,
+                                automaticFollowed =
+                                state.anime.favorite ||
+                                    state.trackingCount > 0 ||
+                                    state.episodes.any { it.episode.seen || it.episode.lastSecondSeen > 0 },
                                 favorite = state.anime.favorite,
                                 trackingCount = state.trackingCount,
                                 nextUpdate = nextUpdate,
@@ -887,6 +892,11 @@ fun AnimeScreenLargeImpl(
                                 )
                             }
                             AnimeActionRow(
+                                entryId = state.anime.id,
+                                automaticFollowed =
+                                state.anime.favorite ||
+                                    state.trackingCount > 0 ||
+                                    state.episodes.any { it.episode.seen || it.episode.lastSecondSeen > 0 },
                                 favorite = state.anime.favorite,
                                 trackingCount = state.trackingCount,
                                 nextUpdate = nextUpdate,

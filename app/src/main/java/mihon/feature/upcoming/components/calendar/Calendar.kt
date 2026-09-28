@@ -16,11 +16,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
+import eu.kanade.tachiyomi.R
 import io.woong.compose.grid.SimpleGridCells
 import io.woong.compose.grid.VerticalGrid
 import kotlinx.collections.immutable.ImmutableMap
@@ -33,7 +37,6 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.TextStyle
 import java.time.temporal.WeekFields
-import java.util.Locale
 
 private val FontSize = 16.sp
 private const val DAYS_OF_WEEK = 7
@@ -45,9 +48,8 @@ fun Calendar(
     setSelectedYearMonth: (YearMonth) -> Unit,
     onClickDay: (day: LocalDate) -> Unit,
     modifier: Modifier = Modifier,
+    selectedDate: LocalDate? = null,
 ) {
-    var selectedDateText by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
-    val selectedDate = LocalDate.parse(selectedDateText).takeIf { YearMonth.from(it) == selectedYearMonth }
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -67,20 +69,15 @@ fun Calendar(
             events = events,
             selectedDate = selectedDate,
             onClickDay = {
-                selectedDateText = it.toString()
                 onClickDay(it)
             },
         )
         Text(
             text = if (selectedDate == null) {
-                "Scegli un giorno per vedere le uscite previste"
+                stringResource(R.string.release_select_day)
             } else {
                 val count = events[selectedDate] ?: 0
-                if (count == 0) {
-                    "${selectedDate.dayOfMonth} · Nessuna uscita prevista"
-                } else {
-                    "${selectedDate.dayOfMonth} · ${if (count == 1) "1 uscita prevista" else "$count uscite previste"}"
-                }
+                pluralStringResource(R.plurals.release_day_count, count, count)
             },
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             style = MaterialTheme.typography.bodyMedium,
@@ -97,8 +94,9 @@ private fun CalendarGrid(
     selectedDate: LocalDate?,
     onClickDay: (day: LocalDate) -> Unit,
 ) {
-    val localeFirstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek.value
-    val weekDays = remember {
+    val locale = LocalConfiguration.current.locales[0]
+    val localeFirstDayOfWeek = WeekFields.of(locale).firstDayOfWeek.value
+    val weekDays = remember(locale) {
         (0 until DAYS_OF_WEEK)
             .map { DayOfWeek.of((localeFirstDayOfWeek - 1 + it) % DAYS_OF_WEEK + 1) }
             .toImmutableList()
@@ -119,7 +117,7 @@ private fun CalendarGrid(
             Text(
                 text = item.getDisplayName(
                     TextStyle.NARROW,
-                    Locale.getDefault(),
+                    locale,
                 ),
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.SemiBold,

@@ -8,6 +8,22 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 - Uscite seguite e calendario affidabile
+
+- Nuovo comando Segui nelle schede anime e manga, con preferenze separate
+  per nuove disponibilità e promemoria delle trasmissioni annunciate.
+- Aggiornamenti automatici attivi inizialmente, controlli mirati, recupero
+  persistente degli errori e rotazione delle librerie grandi, senza aggiornare
+  tutto a ogni apertura o fermarsi ai primi titoli.
+- Vista Agenda con schede raggruppate per giorno e Calendario con giorni
+  vuoti selezionabili;
+  date annunciate tramite ID verificati, distinte dalla disponibilità nella fonte.
+- Avvisi salvati insieme agli episodi e capitoli, deduplicazione e recupero
+  quando le notifiche vengono riabilitate. Test degli avvisi e stato dei controlli
+  nelle impostazioni; promemoria puntuali facoltativi.
+- Preferenze Segui incluse nei backup, mantenimento dei progressi quando cambiano
+  gli indirizzi e coordinamento tra scheda e aggiornamento in background.
+
 ## 28 settembre 2026 — Protezione laterale del display, verifica hardware
 
 - Aggiunta una protezione hardware facoltativa in Impostazioni → Sicurezza,

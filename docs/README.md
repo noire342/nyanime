@@ -21,6 +21,7 @@ I documenti tecnici in inglese conservano i nomi delle API e dei componenti.
 
 | Guida | Contenuto |
 | --- | --- |
+| [Uscite e calendario](release-monitor.md) | Segui, avvisi, controlli mirati, date annunciate e recupero. |
 | [Home e scoperta](discovery-home.md) | Cataloghi, associazione alle fonti, calendario, cache e ripresa. |
 | [API Home anime](extension-home-api.md) | Contratto dichiarativo generico delle estensioni. |
 | [API Home manga](manga-home-api.md) | Sezioni manga, capitoli, classifiche e identità degli elementi. |

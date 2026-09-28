@@ -14,6 +14,7 @@ class UpcomingMangaScreen : Screen() {
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
+        val context = androidx.compose.ui.platform.LocalContext.current
 
         val screenModel = rememberScreenModel { UpcomingMangaScreenModel() }
         val state by screenModel.state.collectAsState()
@@ -21,7 +22,17 @@ class UpcomingMangaScreen : Screen() {
         UpcomingMangaScreenContent(
             state = state,
             setSelectedYearMonth = screenModel::setSelectedYearMonth,
-            onClickUpcoming = { navigator.push(MangaScreen(it.id)) },
+            setSelectedDate = screenModel::setSelectedDate,
+            onRefresh = screenModel::refresh,
+            onClickUpcoming = {
+                if (it.itemId == null) {
+                    navigator.push(MangaScreen(it.entryId))
+                } else {
+                    context.startActivity(
+                        eu.kanade.tachiyomi.ui.reader.ReaderActivity.newIntent(context, it.entryId, it.itemId),
+                    )
+                }
+            },
         )
     }
 }

@@ -427,6 +427,11 @@ private fun MangaScreenSmallImpl(
                         contentType = EntryScreenItem.ACTION_ROW,
                     ) {
                         MangaActionRow(
+                            entryId = state.manga.id,
+                            automaticFollowed =
+                            state.manga.favorite ||
+                                state.trackingCount > 0 ||
+                                state.chapters.any { it.chapter.read || it.chapter.lastPageRead > 0 },
                             favorite = state.manga.favorite,
                             trackingCount = state.trackingCount,
                             nextUpdate = nextUpdate,
@@ -676,6 +681,11 @@ fun MangaScreenLargeImpl(
                             doSearch = onSearch,
                         )
                         MangaActionRow(
+                            entryId = state.manga.id,
+                            automaticFollowed =
+                            state.manga.favorite ||
+                                state.trackingCount > 0 ||
+                                state.chapters.any { it.chapter.read || it.chapter.lastPageRead > 0 },
                             favorite = state.manga.favorite,
                             trackingCount = state.trackingCount,
                             nextUpdate = nextUpdate,
