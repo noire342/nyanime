@@ -4,7 +4,9 @@ La protezione laterale è facoltativa e richiede un pannello hardware compatibil
 
 ## Impostazioni e dati
 
-In **Impostazioni → Sicurezza → Protezione laterale** il comando principale è inizialmente spento. Video, lettore manga, cronologia, ripresa e ricerca sono selezionati; l’opzione aggiuntiva NSFW è inizialmente spenta. Quest’ultima usa il flag pubblico dell’estensione oppure etichette esplicite del contenuto; non riconosce titoli, domini o immagini per tentativi. Contenuti non segnalati non vengono classificati automaticamente.
+In **Impostazioni → Sicurezza → Protezione laterale** il comando principale è inizialmente spento. Video, lettore manga, librerie anime e manga, cronologia, ripresa e ricerca sono selezionati; l’opzione aggiuntiva NSFW è inizialmente spenta. Quest’ultima usa il flag pubblico dell’estensione oppure etichette esplicite del contenuto; non riconosce titoli, domini o immagini per tentativi. Contenuti non segnalati non vengono classificati automaticamente.
+
+Le librerie anime e manga dichiarano la stessa area `LIBRARY` sul contenuto della schermata, compresa la ricerca nella barra superiore. La relativa preferenza è indipendente da NSFW: disabilitare la protezione delle librerie lascia operative le sole schede esplicitamente classificate NSFW se quell’opzione è attiva. ModernUI e legacy usano le stesse dichiarazioni, senza modifiche all’adattatore hardware. La nuova preferenza è selezionata anche aggiornando un’installazione esistente, ma il comando principale resta sotto il controllo dell’utente.
 
 Il comando in **Player → Altro** è un’eccezione per quella riproduzione e non modifica la preferenza generale. Un errore non interrompe video o lettura; dopo una precedente applicazione riuscita viene mostrato un unico avviso per installazione. Preferenze portabili nei backup, disponibilità e avviso locali. Display esterni, PiP, multifinestra e finestre aggiuntive non sono attualmente validati.
 

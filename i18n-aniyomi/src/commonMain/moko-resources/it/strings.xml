@@ -611,6 +611,7 @@
     <string name="privacy_display_enable">Usa protezione laterale</string>
     <string name="privacy_display_video">Video e sottotitoli</string>
     <string name="privacy_display_reader">Lettore manga</string>
+    <string name="privacy_display_library">Librerie anime e manga</string>
     <string name="privacy_display_history">Cronologia</string>
     <string name="privacy_display_resume">Continua a guardare e leggere</string>
     <string name="privacy_display_search">Ricerca</string>

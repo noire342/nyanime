@@ -37,6 +37,7 @@ import eu.kanade.presentation.library.components.LibraryToolbar
 import eu.kanade.presentation.library.manga.MangaLibraryContent
 import eu.kanade.presentation.library.manga.MangaLibrarySettingsDialog
 import eu.kanade.presentation.more.onboarding.GETTING_STARTED_URL
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.library.manga.MangaLibraryUpdateJob
@@ -45,6 +46,7 @@ import eu.kanade.tachiyomi.ui.category.CategoriesTab
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.ui.updates.MangaUpdatesScreen
 import kotlinx.collections.immutable.persistentListOf
@@ -136,6 +138,7 @@ data object MangaLibraryTab : Tab {
         val defaultTitle = stringResource(AYMR.strings.label_manga_library)
 
         Scaffold(
+            modifier = Modifier.privacyRegion(PrivacyArea.LIBRARY),
             topBar = { scrollBehavior ->
                 val title = state.getToolbarTitle(
                     defaultTitle = defaultTitle,

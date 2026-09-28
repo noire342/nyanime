@@ -36,6 +36,7 @@ import eu.kanade.presentation.library.anime.AnimeLibraryContent
 import eu.kanade.presentation.library.anime.AnimeLibrarySettingsDialog
 import eu.kanade.presentation.library.components.LibraryToolbar
 import eu.kanade.presentation.more.onboarding.GETTING_STARTED_URL
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateJob
@@ -45,6 +46,7 @@ import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.channels.Channel
@@ -121,6 +123,7 @@ data object AnimeLibraryTab : Tab {
         val defaultTitle = stringResource(AYMR.strings.label_anime_library)
 
         Scaffold(
+            modifier = Modifier.privacyRegion(PrivacyArea.LIBRARY),
             topBar = { scrollBehavior ->
                 val title = state.getToolbarTitle(
                     defaultTitle = defaultTitle,

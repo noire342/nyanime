@@ -5,6 +5,20 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class PrivacyDisplayPolicyTest {
+    @Test fun libraryProtectionAndNsfwProtectionRemainIndependent() {
+        val libraries = PrivacyDisplayPolicy(true, setOf(PrivacyArea.LIBRARY))
+        assertTrue(libraries.permits(PrivacyArea.LIBRARY))
+        assertFalse(libraries.permits(PrivacyArea.NSFW, PrivacyArea.LIBRARY))
+        assertFalse(libraries.copy(enabled = false).permits(PrivacyArea.LIBRARY))
+
+        val nsfwOnly = libraries.copy(selectedAreas = setOf(PrivacyArea.NSFW))
+        assertFalse(nsfwOnly.permits(PrivacyArea.LIBRARY))
+        assertTrue(nsfwOnly.permits(PrivacyArea.NSFW, PrivacyArea.LIBRARY))
+
+        val temporaryVideoOverride = libraries.copy(temporaryOverrides = mapOf(PrivacyArea.VIDEO to false))
+        assertTrue(temporaryVideoOverride.permits(PrivacyArea.LIBRARY))
+    }
+
     @Test fun masterOptInControlsOrdinaryAndNsfwDeclarations() {
         val policy = PrivacyDisplayPolicy(false, PrivacyArea.entries.toSet())
         assertTrue(PrivacyArea.entries.none { policy.permits(it) })

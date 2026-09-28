@@ -702,6 +702,7 @@
     <string name="privacy_display_enable">Use side-view protection</string>
     <string name="privacy_display_video">Video and subtitles</string>
     <string name="privacy_display_reader">Manga reader</string>
+    <string name="privacy_display_library">Anime and manga libraries</string>
     <string name="privacy_display_history">History</string>
     <string name="privacy_display_resume">Continue watching and reading</string>
     <string name="privacy_display_search">Search</string>

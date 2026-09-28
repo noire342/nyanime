@@ -80,6 +80,7 @@ internal fun privacyAreaTitle(area: PrivacyArea): String = stringResource(
     when (area) {
         PrivacyArea.VIDEO -> AYMR.strings.privacy_display_video
         PrivacyArea.READER -> AYMR.strings.privacy_display_reader
+        PrivacyArea.LIBRARY -> AYMR.strings.privacy_display_library
         PrivacyArea.HISTORY -> AYMR.strings.privacy_display_history
         PrivacyArea.RESUME -> AYMR.strings.privacy_display_resume
         PrivacyArea.SEARCH -> AYMR.strings.privacy_display_search

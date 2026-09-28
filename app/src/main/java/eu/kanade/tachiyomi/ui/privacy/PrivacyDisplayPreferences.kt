@@ -6,6 +6,7 @@ import tachiyomi.core.common.preference.PreferenceStore
 enum class PrivacyArea(val key: String) {
     VIDEO("video"),
     READER("reader"),
+    LIBRARY("library"),
     HISTORY("history"),
     RESUME("resume"),
     SEARCH("search"),
