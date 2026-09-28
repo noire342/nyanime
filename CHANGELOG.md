@@ -8,6 +8,17 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Filtri delle uscite e verifica della navigazione
+
+- Filtri Tutti/Anime/Manga centrati e distribuiti sulla larghezza disponibile,
+  con etichette leggibili anche negli schermi stretti e con caratteri grandi.
+- L’interno dei filtri si colora soltanto quando sono selezionati.
+- Tutti combina arancione e celeste in una sfumatura che oscilla delicatamente,
+  senza spostare i pulsanti o ridisegnare il testo. Animazione ridotta rispettata.
+- Corretto il test della navigazione rimasto precedente all’aggiunta di Uscite,
+  che impediva la build GitHub; verifica delle destinazioni conservata anche per
+  le vecchie preferenze di navigazione.
+
 ## 28 settembre 2026 — Agenda continua, aperta su oggi
 
 - L’agenda si apre su oggi: scorrendo verso l’alto si consultano le uscite

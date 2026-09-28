@@ -11,7 +11,7 @@ condividono l'agenda con filtri Tutti/Anime/Manga. Impostazioni > Libreria >
 Agenda e calendario unificati permette di consultarli separatamente.
 La schermata legge subito i dati locali; apertura e cambio giorno/mese non
 attendono una verifica completa in rete. Il monitor aggiorna in background le
-date, fino a sei titoli per giro con rotazione dei controlli.
+date con una rotazione limitata dei controlli.
 
 La vista **Agenda** mostra le schede raggruppate per giorno. Il selettore
 **Agenda / Calendario** permette di passare alla griglia mensile: ogni giorno

@@ -2,7 +2,6 @@ package eu.kanade.presentation.components.releases
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,13 +16,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -132,45 +128,7 @@ fun ReleaseCalendarContent(
         )
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            if (showMediaFilter) {
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (allowAllMedia) {
-                        FilterChip(
-                            selected = medium == null,
-                            onClick = { onMedium(null) },
-                            label = { Text(stringResource(R.string.release_all)) },
-                        )
-                    }
-                    ReleaseMedium.entries.forEach { value ->
-                        val cue = releaseColor(value)
-                        FilterChip(
-                            selected = medium == value,
-                            onClick = { onMedium(value) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                labelColor = cue,
-                                selectedLabelColor = cue,
-                                selectedContainerColor = cue.copy(alpha = .12f),
-                            ),
-                            label = {
-                                Text(
-                                    stringResource(
-                                        if (value ==
-                                            ReleaseMedium.ANIME
-                                        ) {
-                                            R.string.release_anime
-                                        } else {
-                                            R.string.release_manga
-                                        },
-                                    ),
-                                )
-                            },
-                        )
-                    }
-                }
-            }
+            if (showMediaFilter) ReleaseMediaFilters(medium, allowAllMedia, onMedium)
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 SegmentedButton(
                     selected = !calendarVisible,
@@ -387,7 +345,7 @@ private fun LazyItemScope.ReleaseCard(
 }
 
 @Composable
-private fun releaseColor(medium: ReleaseMedium): Color {
+internal fun releaseColor(medium: ReleaseMedium): Color {
     val dark = MaterialTheme.colorScheme.surface.luminance() < .5f
     return when (medium) {
         ReleaseMedium.ANIME -> if (dark) Color(0xFFFFAB62) else Color(0xFFB65308)
