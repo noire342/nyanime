@@ -2,13 +2,8 @@ package eu.kanade.tachiyomi.data.releases
 
 import eu.kanade.tachiyomi.data.track.SourceTrackingHints
 import eu.kanade.tachiyomi.data.track.TrackerManager
-import eu.kanade.tachiyomi.network.HttpException
 import eu.kanade.tachiyomi.network.NetworkHelper
-import eu.kanade.tachiyomi.network.POST
-import eu.kanade.tachiyomi.network.await
-import eu.kanade.tachiyomi.network.jsonMime
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -16,15 +11,12 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
-import kotlinx.serialization.json.put
 import logcat.LogPriority
-import okhttp3.RequestBody.Companion.toRequestBody
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.data.handlers.anime.AnimeDatabaseHandler
 import tachiyomi.domain.entries.anime.model.Anime
@@ -86,11 +78,13 @@ class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
         try {
             val hints = SourceTrackingHints.from(anime)
             val tracks = Injekt.get<AnimeTrackRepository>().getTracksByAnimeId(anime.id)
-            val anilistId = (
-                hints?.anilistId ?: tracks.firstOrNull { it.trackerId == TrackerManager.ANILIST }?.remoteId
-                )?.takeIf { it > 0 }
-            val malId = (hints?.malId ?: tracks.firstOrNull { it.trackerId == 1L }?.remoteId)?.takeIf { it > 0 }
-            if (anilistId == null && malId == null) {
+            val reference = AiringCatalogReference.choose(
+                hints?.anilistId,
+                hints?.malId,
+                tracks.firstOrNull { it.trackerId == TrackerManager.ANILIST }?.remoteId,
+                tracks.firstOrNull { it.trackerId == 1L }?.remoteId,
+            )
+            if (reference.anilistId == null && reference.malId == null) {
                 // Preserve the existing calendar integration for a verified alternative tracker ID.
                 val manager = Injekt.get<TrackerManager>()
                 val legacy = tracks.filter { it.trackerId == TrackerManager.SIMKL }.mapNotNull { track ->
@@ -126,9 +120,15 @@ class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
             var page = 1
             var total = 0
             var finished = false
+            var currentReference = reference
             do {
-                val body = query(anilistId, malId, page)
+                val body = catalog.page(currentReference, page)
                 val metadata = Json.parseToJsonElement(body).jsonObject["data"]?.jsonObject?.get("Media")?.jsonObject
+                // Reuse the verified cross-catalog mapping for subsequent schedule pages.
+                currentReference = AiringCatalogReference(
+                    requireNotNull(metadata?.get("id")?.jsonPrimitive?.longOrNull),
+                    metadata?.get("idMal")?.jsonPrimitive?.longOrNull?.takeIf { it > 0 },
+                )
                 total = metadata?.get("episodes")?.jsonPrimitive?.intOrNull ?: 0
                 finished = metadata?.get("status")?.jsonPrimitive?.content == "FINISHED"
                 val parsed = parsePage(body, anime.id)
@@ -159,6 +159,10 @@ class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
             AiringCache(now, now, status, total, finished)
         } catch (e: CancellationException) {
             throw e
+        } catch (e: AiringCatalogIdentityException) {
+            logcat(LogPriority.WARN, e) { "Airing catalog identity unresolved for entry ${anime.id}" }
+            cached.copy(attemptedAt = System.currentTimeMillis(), status = "UNRESOLVED")
+                .also { saveCache(anime.id, it) }
         } catch (e: Exception) {
             logcat(LogPriority.WARN, e) { "Airing verification failed for entry ${anime.id}" }
             cached.copy(attemptedAt = System.currentTimeMillis(), status = "UNAVAILABLE")
@@ -179,41 +183,6 @@ class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
             cache.totalEpisodes.toLong(),
             if (cache.finished) 1L else 0L,
         )
-    }
-
-    private suspend fun query(id: Long?, mal: Long?, page: Int): String {
-        val selector = if (id != null) "id: $id" else "idMal: $mal"
-        val query = """
-            query { Media($selector, type: ANIME) { id status episodes
-              airingSchedule(page: $page, perPage: 50, notYetAired: true) {
-                pageInfo { hasNextPage }
-                nodes { episode airingAt }
-              }
-            } }
-        """.trimIndent()
-        return transport.withLock {
-            val wait = nextRequestAt - System.currentTimeMillis()
-            if (wait > 0) delay(wait)
-            try {
-                client.newCall(
-                    POST(
-                        "https://graphql.anilist.co",
-                        body = buildJsonObject {
-                            put("query", query)
-                        }.toString().toRequestBody(jsonMime),
-                    ),
-                ).await().use { response ->
-                    if (response.code == 429) {
-                        val retry = response.header("Retry-After")?.toLongOrNull()?.coerceIn(1, 3600) ?: 60
-                        nextRequestAt = System.currentTimeMillis() + retry * 1000
-                    }
-                    if (!response.isSuccessful) throw HttpException(response.code)
-                    response.body.string()
-                }
-            } finally {
-                nextRequestAt = maxOf(nextRequestAt, System.currentTimeMillis() + 2_500)
-            }
-        }
     }
 
     internal fun parsePage(body: String, entryId: Long): Pair<List<AiringEvent>, Boolean> {
@@ -237,9 +206,9 @@ class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
     }
 
     companion object {
-        private val transport = Mutex()
-        private var nextRequestAt = 0L
         private val locks = Array(64) { Mutex() }
-        private val client by lazy { AiringHttpClient.create(Injekt.get<NetworkHelper>().apiClient) }
+        private val catalog by lazy {
+            AiringCatalogClient(AiringHttpClient.create(Injekt.get<NetworkHelper>().apiClient))
+        }
     }
 }

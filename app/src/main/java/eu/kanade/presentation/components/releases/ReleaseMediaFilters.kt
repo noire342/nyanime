@@ -1,11 +1,6 @@
 package eu.kanade.presentation.components.releases
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,17 +13,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -60,17 +53,10 @@ internal fun ReleaseMediaFilters(medium: ReleaseMedium?, allowAllMedia: Boolean,
 @Composable
 private fun ReleaseMediaFilter(medium: ReleaseMedium?, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier) {
     val motion = appMotionEnabled()
-    val first = releaseColor(medium ?: ReleaseMedium.ANIME)
-    val last = releaseColor(medium ?: ReleaseMedium.MANGA)
-    val position = if (medium == null && motion && !LocalInspectionMode.current) {
-        rememberInfiniteTransition(label = "release-colors").animateFloat(
-            initialValue = .3f,
-            targetValue = .7f,
-            animationSpec = infiniteRepeatable(tween(4_000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-            label = "release-pendulum",
-        )
+    val cue = if (medium != null) {
+        releaseColor(medium)
     } else {
-        remember { mutableFloatStateOf(.5f) }
+        if (MaterialTheme.colorScheme.surface.luminance() < .5f) Color(0xFFBCA3F5) else Color(0xFF6940AA)
     }
     val fill = animateFloatAsState(
         targetValue = if (isSelected) .2f else 0f,
@@ -84,30 +70,17 @@ private fun ReleaseMediaFilter(medium: ReleaseMedium?, isSelected: Boolean, onCl
             role = Role.Tab
         },
         shape = RoundedCornerShape(10.dp),
-        color = androidx.compose.ui.graphics.Color.Transparent,
+        color = Color.Transparent,
     ) {
         Box(
             Modifier.fillMaxWidth().heightIn(min = 48.dp).drawWithCache {
                 val strokeWidth = 1.dp.toPx()
                 val corner = CornerRadius(10.dp.toPx())
                 onDrawBehind {
-                    // Read animation state during drawing: no layout or text recomposition per frame.
-                    val center = position.value
-                    val stops = arrayOf(0f to first, (center - .18f) to first, (center + .18f) to last, 1f to last)
-                    drawRect(
-                        Brush.horizontalGradient(
-                            *stops.map {
-                                it.first to it.second.copy(alpha = fill.value)
-                            }.toTypedArray(),
-                        ),
-                    )
+                    // Selection changes redraw the surface without moving its contents.
+                    drawRect(cue.copy(alpha = fill.value))
                     drawRoundRect(
-                        Brush.horizontalGradient(
-                            *stops.map {
-                                it.first to
-                                    it.second.copy(alpha = if (isSelected) .9f else .45f)
-                            }.toTypedArray(),
-                        ),
+                        cue.copy(alpha = if (isSelected) .9f else .45f),
                         topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
                         size = Size(size.width - strokeWidth, size.height - strokeWidth),
                         cornerRadius = corner,
@@ -125,7 +98,8 @@ private fun ReleaseMediaFilter(medium: ReleaseMedium?, isSelected: Boolean, onCl
                         ReleaseMedium.MANGA -> R.string.release_manga
                     },
                 ),
-                style = MaterialTheme.typography.labelLarge.copy(brush = Brush.horizontalGradient(listOf(first, last))),
+                style = MaterialTheme.typography.labelLarge,
+                color = cue,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,

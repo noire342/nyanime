@@ -61,6 +61,11 @@ fa ricontrollare un calendario che prima conteneva appuntamenti futuri.
 Le richieste usano il DNS configurato nell'app e il limite comune a Home e tracking.
 Gli avvisi sono riferiti al tipo di contenuto selezionato e gli errori sono registrati
 con l'identificatore locale del titolo, senza pubblicare i dati della libreria.
+Il tracking salvato prevale sugli indizi delle estensioni. Se un ID AniList
+non esiste, il calendario può usare l'ID MyAnimeList collegato solo quando
+la risposta conferma la corrispondenza esatta. ID contraddittori o non trovati
+restano non risolti, senza scegliere un titolo per nome né segnalarli come
+semplici problemi di rete. Consultare gli orari pubblici non richiede login.
 La prima acquisizione di un titolo non pubblica tutto il catalogo come novità.
 Gli avvisi storici importati dalla prima migrazione vengono esclusi dall'agenda,
 senza cancellare capitoli, episodi o progressi. Una data fornita effettivamente
