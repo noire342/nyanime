@@ -53,6 +53,8 @@ class PrivacyDisplayController(
     val videoEnabled: StateFlow<Boolean> = mutableVideoEnabled
     private val mutableNsfwEnabled = MutableStateFlow(policy.permits(PrivacyArea.NSFW))
     val nsfwEnabled: StateFlow<Boolean> = mutableNsfwEnabled
+    private val mutableEnabledAreas = MutableStateFlow(enabledAreasForPolicy())
+    val enabledAreas: StateFlow<Set<PrivacyArea>> = mutableEnabledAreas
 
     init {
         activity.lifecycle.addObserver(this)
@@ -130,6 +132,11 @@ class PrivacyDisplayController(
     private fun updateVideoPreference() {
         mutableVideoEnabled.value = policy.permits(PrivacyArea.VIDEO)
         mutableNsfwEnabled.value = policy.permits(PrivacyArea.NSFW)
+        mutableEnabledAreas.value = enabledAreasForPolicy()
+    }
+
+    private fun enabledAreasForPolicy(): Set<PrivacyArea> = PrivacyArea.entries.filterTo(mutableSetOf()) {
+        policy.permits(it) && PrivacyDisplayRuntime.capability(it) == PrivacyDisplayCapability.Available
     }
 
     private fun reconcileListener() {
@@ -218,6 +225,7 @@ class PrivacyDisplayController(
         }
         if (next is PrivacyDisplayState.Failed) {
             PrivacyDisplayRuntime.recordFailure(next)
+            updateVideoPreference()
             detachListener()
         }
     }

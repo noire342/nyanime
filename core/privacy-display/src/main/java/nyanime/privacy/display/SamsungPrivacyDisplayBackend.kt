@@ -43,9 +43,9 @@ class SamsungPrivacyDisplayBackend private constructor(
         // Keep compensation in this adapter, never in screen geometry or content policy.
         private val panelExpansion = PrivacyPanelExpansion(1, 1, 2, 2)
 
-        // The driver also rejects equality with the panel border. Two pixels cover strict bounds
-        // and the observed one-pixel rounding during window transitions, after native expansion.
-        private const val EDGE_CLEARANCE_PX = 2
+        // SM-S948B / S948BXXS4AZHL probes: 13px requested inset is rejected, 14px is accepted.
+        // Keep 16px after native expansion to include the observed transition rounding.
+        private const val EDGE_CLEARANCE_PX = 16
 
         fun create(device: PrivacyDisplayDevice): SamsungPrivacyDisplayBackend {
             if (!device.samsungPrivacyHardware) {

@@ -5,6 +5,9 @@ plugins {
 
 android {
     namespace = "nyanime.privacy.display"
+    defaultConfig {
+        testInstrumentationRunner = "nyanime.privacy.display.PrivacyHardwareProbe"
+    }
 }
 
 dependencies {
