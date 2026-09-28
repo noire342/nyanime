@@ -228,6 +228,11 @@ object SettingsLibraryScreen : SearchableSettings {
             title = stringResource(MR.strings.pref_category_library_update),
             preferenceItems = persistentListOf(
                 Preference.PreferenceItem.SwitchPreference(
+                    preference = eu.kanade.tachiyomi.data.releases.ReleasePreferences().unifiedAgenda,
+                    title = context.getString(eu.kanade.tachiyomi.R.string.release_unified),
+                    subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_unified_description),
+                ),
+                Preference.PreferenceItem.SwitchPreference(
                     preference = eu.kanade.tachiyomi.data.releases.ReleasePreferences().enabled,
                     title = context.getString(eu.kanade.tachiyomi.R.string.release_monitor),
                     subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_monitor_description),

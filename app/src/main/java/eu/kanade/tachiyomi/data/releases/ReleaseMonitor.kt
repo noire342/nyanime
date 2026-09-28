@@ -33,6 +33,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import mihon.domain.source.interactor.UpdateAnimeFromRemote
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
@@ -71,9 +72,11 @@ class ReleaseMonitor(context: Context, parameters: WorkerParameters) : Coroutine
         try {
             val now = System.currentTimeMillis()
             val candidates = mutableListOf<Candidate>()
+            val calendarIds = mutableListOf<Long>()
             for (medium in ReleaseMedium.entries) {
                 for (id in store.monitoredIds(medium)) {
                     val source = eligibleSource(medium, id) ?: continue
+                    if (medium == ReleaseMedium.ANIME) calendarIds += id
                     if (ReleaseSourceCooldown.active(medium, source, now)) continue
                     val state = store.check(medium, id)
                     if (ReleasePolicy.isDue(state, now)) candidates += Candidate(medium, id, source, state)
@@ -82,6 +85,8 @@ class ReleaseMonitor(context: Context, parameters: WorkerParameters) : Coroutine
             // Aging takes precedence over popularity; every eligible title eventually gets a turn.
             val batch = candidates.sortedBy { it.state.lastSuccess }.take(24)
             coroutineScope {
+                // Calendar metadata does not wait for every source's episode list.
+                val dates = async { refreshCalendar(calendarIds) }
                 batch.groupBy { it.medium to it.source }.values.map { entries ->
                     async {
                         permits.withPermit {
@@ -100,6 +105,7 @@ class ReleaseMonitor(context: Context, parameters: WorkerParameters) : Coroutine
                         }
                     }
                 }.awaitAll()
+                dates.await()
             }
             ReleaseNotifications.flush(applicationContext)
             ReleaseReminders.schedule(applicationContext)
@@ -107,6 +113,37 @@ class ReleaseMonitor(context: Context, parameters: WorkerParameters) : Coroutine
             return Result.success()
         } finally {
             running.unlock()
+        }
+    }
+
+    private suspend fun refreshCalendar(ids: List<Long>) {
+        val repository = AiringRepository()
+        val now = System.currentTimeMillis()
+        val entries = mutableListOf<Pair<tachiyomi.domain.entries.anime.model.Anime, AiringCache>>()
+        for (id in ids) {
+            val cached = repository.cache(id)
+            if (now - cached.attemptedAt < 5 * ReleasePolicy.MINUTE) continue
+            if (cached.verifiedAt > 0 && now - cached.verifiedAt < 6 * ReleasePolicy.HOUR) continue
+            entries += Injekt.get<AnimeRepository>().getAnimeById(id) to cached
+        }
+        val ordered = entries.sortedWith(
+            compareBy<Pair<tachiyomi.domain.entries.anime.model.Anime, AiringCache>> { it.second.attemptedAt }
+                .thenBy { it.first.status == 2L }
+                .thenBy {
+                    val at = it.first.nextEpisodeAiringAt * 1000
+                    if (at > now - 2 * ReleasePolicy.DAY) at else Long.MAX_VALUE
+                },
+        )
+        for ((entry, _) in ordered.take(6)) {
+            if (!preferences.enabled.get() || base.incognitoMode().get() || base.downloadedOnly().get()) return
+            if (eligibleSource(ReleaseMedium.ANIME, entry.id) == null) continue
+            try {
+                withTimeoutOrNull(45_000) { repository.refresh(entry) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // An unavailable catalog or a concurrently removed title must not interrupt source checks.
+            }
         }
     }
 

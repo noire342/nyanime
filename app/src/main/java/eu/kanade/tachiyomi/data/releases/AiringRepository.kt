@@ -9,6 +9,7 @@ import eu.kanade.tachiyomi.network.jsonMime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -47,6 +48,12 @@ data class AiringCache(
 
 /** Public catalog metadata only. Source identification remains the extension's responsibility. */
 class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
+    fun caches(): Flow<Map<Long, AiringCache>> = db.subscribeToList {
+        airingQueries.getCaches { id, verified, attempted, status, total, finished ->
+            id to AiringCache(verified, attempted, status, total.toInt(), finished != 0L)
+        }
+    }.map { it.toMap() }
+
     fun events(): Flow<List<AiringEvent>> = db.subscribeToList {
         airingQueries.getEvents { entry, episode, time, catalog, reminded ->
             AiringEvent(entry, episode.toInt(), time, catalog, reminded)

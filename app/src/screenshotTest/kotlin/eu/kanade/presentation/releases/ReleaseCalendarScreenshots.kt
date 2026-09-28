@@ -10,6 +10,7 @@ import eu.kanade.presentation.components.releases.ReleaseAgendaItem
 import eu.kanade.presentation.components.releases.ReleaseCalendarContent
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import eu.kanade.presentation.util.Screen
+import eu.kanade.tachiyomi.data.releases.ReleaseMedium
 import kotlinx.collections.immutable.persistentMapOf
 import tachiyomi.core.common.preference.InMemoryPreferenceStore
 import uy.kohesive.injekt.Injekt
@@ -65,9 +66,23 @@ private class AgendaScreen(val empty: Boolean, val calendar: Boolean) : Screen()
             "Trasmissione originale · Episodio 15",
         )
         ReleaseCalendarContent(
-            YearMonth.from(date), if (calendar || empty) date else null, persistentMapOf(date to 1),
-            if (empty) emptyList() else listOf(event), false, null, {}, {}, {}, {},
-            initialCalendar = calendar,
+            YearMonth.from(date), if (calendar || empty) date else null, persistentMapOf(date to 2),
+            if (empty) {
+                emptyList()
+            } else {
+                listOf(
+                    event,
+                    event.copy(
+                        key = "manga-available",
+                        title = "Le avventure oltre l’orizzonte",
+                        label = "Disponibile · Capitolo 12",
+                        itemId = 1,
+                        medium = ReleaseMedium.MANGA,
+                    ),
+                )
+            },
+            false, null, {}, {}, {}, {},
+            initialCalendar = calendar, showBack = false, showMediaFilter = true,
         )
     }
 }

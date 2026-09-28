@@ -43,4 +43,11 @@
         <item quantity="one">%1$d uscita</item>
         <item quantity="other">%1$d uscite</item>
     </plurals>
+    <string name="release_navigation">Uscite</string>
+    <string name="release_all">Tutti</string>
+    <string name="release_anime">Anime</string>
+    <string name="release_manga">Manga</string>
+    <string name="release_unified">Agenda e calendario unificati</string>
+    <string name="release_unified_description">Anime e manga insieme. Disattiva per consultarli separatamente.</string>
+    <string name="release_content_detected">Rilevato disponibile · %1$s</string>
 </resources>

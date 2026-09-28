@@ -412,6 +412,7 @@ object HomeScreen : Screen() {
     }
 
     private fun navigationTag(tab: cafe.adriel.voyager.navigator.tab.Tab) = when (tab) {
+        eu.kanade.tachiyomi.ui.releases.ReleasesTab -> "releases"
         LibrariesTab -> "libraries"
         AnimeLibraryTab -> "library_anime"
         MangaLibraryTab -> "library_manga"

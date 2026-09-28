@@ -6,21 +6,27 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -37,6 +43,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,7 +57,9 @@ import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.relativeDateText
 import eu.kanade.presentation.entries.components.ItemCover
 import eu.kanade.presentation.motion.ModernMotion
+import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.releases.ReleaseMedium
 import kotlinx.collections.immutable.ImmutableMap
 import mihon.feature.upcoming.components.calendar.Calendar
 import tachiyomi.presentation.core.components.material.Scaffold
@@ -65,6 +77,8 @@ data class ReleaseAgendaItem(
     val at: Long,
     val label: String,
     val itemId: Long? = null,
+    val medium: ReleaseMedium = ReleaseMedium.ANIME,
+    val dismissalKey: String? = null,
 ) {
     val date: LocalDate get() = Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault()).toLocalDate()
 }
@@ -82,14 +96,27 @@ fun ReleaseCalendarContent(
     onRefresh: () -> Unit,
     onItem: (ReleaseAgendaItem) -> Unit,
     initialCalendar: Boolean = false,
+    showBack: Boolean = true,
+    showMediaFilter: Boolean = false,
+    medium: ReleaseMedium? = null,
+    onMedium: (ReleaseMedium?) -> Unit = {},
+    allowAllMedia: Boolean = true,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val locale = LocalConfiguration.current.locales[0]
     var calendarVisible by rememberSaveable { mutableStateOf(initialCalendar) }
+    val motion = appMotionEnabled()
     Scaffold(topBar = {
         AppBar(
             title = stringResource(R.string.release_title),
-            navigateUp = navigator::pop,
+            navigateUp = if (showBack) {
+                {
+                    navigator.pop()
+                    Unit
+                }
+            } else {
+                null
+            },
             actions = {
                 IconButton(enabled = !loading, onClick = onRefresh) {
                     Icon(Icons.Outlined.Refresh, stringResource(R.string.release_check_now))
@@ -98,6 +125,45 @@ fun ReleaseCalendarContent(
         )
     }) { padding ->
         LazyColumn(Modifier.padding(padding), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (showMediaFilter) {
+                item(key = "media-filter") {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (allowAllMedia) {
+                            FilterChip(
+                                selected = medium == null,
+                                onClick = { onMedium(null) },
+                                label = { Text(stringResource(R.string.release_all)) },
+                            )
+                        }
+                        ReleaseMedium.entries.forEach { value ->
+                            val cue = releaseColor(value)
+                            FilterChip(
+                                selected = medium == value,
+                                onClick = { onMedium(value) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    labelColor = cue,
+                                    selectedLabelColor = cue,
+                                    selectedContainerColor = cue.copy(alpha = .12f),
+                                ),
+                                label = {
+                                    Text(
+                                        stringResource(
+                                            if (value == ReleaseMedium.ANIME) {
+                                                R.string.release_anime
+                                            } else {
+                                                R.string.release_manga
+                                            },
+                                        ),
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+            }
             item(key = "view-mode") {
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     SegmentedButton(
@@ -117,8 +183,10 @@ fun ReleaseCalendarContent(
             item(key = "calendar") {
                 AnimatedVisibility(
                     calendarVisible,
-                    enter = expandVertically(tween(ModernMotion.RESIZE_MILLIS)) + fadeIn(),
-                    exit = shrinkVertically(tween(ModernMotion.RESIZE_MILLIS)) + fadeOut(),
+                    enter = expandVertically(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0)) +
+                        fadeIn(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0)),
+                    exit = shrinkVertically(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0)) +
+                        fadeOut(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0)),
                 ) {
                     Calendar(month, events, onMonth, { onDate(it) }, selectedDate = selectedDate)
                 }
@@ -189,11 +257,26 @@ fun ReleaseCalendarContent(
                     }
                 }
                 items(releases, key = { it.key }, contentType = { "release" }) { item ->
+                    val cue = releaseColor(item.medium)
+                    val shape = RoundedCornerShape(16.dp)
                     Card(
-                        Modifier.animateItem().fillMaxWidth().padding(horizontal = 16.dp).clickable {
+                        (if (motion) Modifier.animateItem() else Modifier).fillMaxWidth().padding(
+                            horizontal = 16.dp,
+                        ).shadow(
+                            6.dp,
+                            shape,
+                            ambientColor = cue.copy(alpha = .22f),
+                            spotColor = cue.copy(alpha = .28f),
+                        ).clickable {
                             onItem(item)
                         },
-                        shape = RoundedCornerShape(16.dp),
+                        shape = shape,
+                        border = BorderStroke(
+                            1.dp,
+                            Brush.linearGradient(
+                                listOf(cue.copy(alpha = .65f), cue.copy(alpha = .18f), cue.copy(alpha = .4f)),
+                            ),
+                        ),
                     ) {
                         Row(
                             Modifier.padding(12.dp),
@@ -206,6 +289,19 @@ fun ReleaseCalendarContent(
                                 shape = RoundedCornerShape(8.dp),
                             )
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (showMediaFilter) {
+                                    Text(
+                                        stringResource(
+                                            if (item.medium == ReleaseMedium.ANIME) {
+                                                R.string.release_anime
+                                            } else {
+                                                R.string.release_manga
+                                            },
+                                        ),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = cue,
+                                    )
+                                }
                                 Text(
                                     item.title,
                                     style = MaterialTheme.typography.titleSmall,
@@ -224,7 +320,7 @@ fun ReleaseCalendarContent(
                                         ZoneId.systemDefault(),
                                     ).format(DateTimeFormatter.ofPattern("EEE d MMM · HH:mm", locale)),
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = cue,
                                 )
                             }
                         }
@@ -233,5 +329,14 @@ fun ReleaseCalendarContent(
             }
             item(key = "bottom-space") { androidx.compose.foundation.layout.Spacer(Modifier.height(16.dp)) }
         }
+    }
+}
+
+@Composable
+private fun releaseColor(medium: ReleaseMedium): Color {
+    val dark = MaterialTheme.colorScheme.surface.luminance() < .5f
+    return when (medium) {
+        ReleaseMedium.ANIME -> if (dark) Color(0xFFFFAB62) else Color(0xFFB65308)
+        ReleaseMedium.MANGA -> if (dark) Color(0xFF80D8FF) else Color(0xFF006C85)
     }
 }

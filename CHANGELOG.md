@@ -18,6 +18,15 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 - Vista Agenda con schede raggruppate per giorno e Calendario con giorni
   vuoti selezionabili;
   date annunciate tramite ID verificati, distinte dalla disponibilità nella fonte.
+- Uscite accanto a Libreria nella navigazione principale. Anime e manga insieme,
+  filtri Tutti/Anime/Manga e preferenza per consultarli separatamente.
+- Schede anime con bordo e bagliore arancione; manga in celeste, con contrasto
+  adattato al tema chiaro e scuro e indicazione testuale del tipo di contenuto.
+- Agenda caricata dai dati locali, senza attendere una verifica in rete di tutta
+  la libreria; giorni e mesi si cambiano senza nuovi controlli remoti.
+- Corretto l'inserimento di capitoli storici nell'agenda di oggi durante la
+  migrazione: data di pubblicazione e data di rilevamento rimangono distinte,
+  senza usare come prova le date sostitutive del catalogo locale.
 - Avvisi salvati insieme agli episodi e capitoli, deduplicazione e recupero
   quando le notifiche vengono riabilitate. Test degli avvisi e stato dei controlli
   nelle impostazioni; promemoria puntuali facoltativi.

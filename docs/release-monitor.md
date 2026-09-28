@@ -6,6 +6,13 @@ anche un titolo fuori dalla libreria; `Smetti di seguire` esclude quel titolo
 dai controlli automatici. Restano rispettate le categorie escluse, le fonti
 disabilitate, i titoli nascosti e la modalità incognito.
 
+La voce **Uscite**, accanto a Libreria, apre **Le tue uscite**. Anime e manga
+condividono l'agenda con filtri Tutti/Anime/Manga. Impostazioni > Libreria >
+Agenda e calendario unificati permette di consultarli separatamente.
+La schermata legge subito i dati locali; apertura e cambio giorno/mese non
+attendono una verifica completa in rete. Il monitor aggiorna in background le
+date, fino a sei titoli per giro con rotazione dei controlli.
+
 La vista **Agenda** mostra le schede raggruppate per giorno. Il selettore
 **Agenda / Calendario** permette di passare alla griglia mensile: ogni giorno
 è selezionabile, anche se vuoto. Tornando alla lista viene conservato il giorno
@@ -42,6 +49,11 @@ recupero e il salvataggio; le richieste al calendario rispettano la risposta 429
 e la relativa attesa. Il ritmo rispetta i
 [limiti documentati di AniList](https://docs.anilist.co/guide/rate-limiting).
 La prima acquisizione di un titolo non pubblica tutto il catalogo come novità.
+Gli avvisi storici importati dalla prima migrazione vengono esclusi dall'agenda,
+senza cancellare capitoli, episodi o progressi. Una data fornita effettivamente
+dall'estensione viene conservata separatamente dalla data di rilevamento.
+In assenza di una data reale la scheda dice **Rilevato disponibile**; le date
+sostitutive create dal catalogo locale non vengono trattate come pubblicazioni.
 
 Le notifiche usano una coda persistente, con deduplicazione e identificatori
 Android stabili. Se il permesso o il canale sono disabilitati, l'avviso resta

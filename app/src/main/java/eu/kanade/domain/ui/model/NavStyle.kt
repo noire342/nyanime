@@ -53,7 +53,8 @@ enum class NavStyle(
         get() = if (this == DISCOVERY) {
             listOf(UpdatesTab, HistoriesTab)
         } else {
-            listOf(moreTab, eu.kanade.tachiyomi.ui.discovery.DiscoveryTab)
+            listOf(moreTab, eu.kanade.tachiyomi.ui.discovery.DiscoveryTab, HistoriesTab, UpdatesTab)
+                .distinct().filterNot { it in visibleTabs }
         }
 
     val visibleTabs: List<Tab>
@@ -62,6 +63,7 @@ enum class NavStyle(
                 return listOf(
                     eu.kanade.tachiyomi.ui.discovery.DiscoveryTab,
                     LibrariesTab,
+                    eu.kanade.tachiyomi.ui.releases.ReleasesTab,
                     BrowseTab,
                     MoreTab,
                 )
@@ -73,6 +75,11 @@ enum class NavStyle(
                 HistoriesTab,
                 BrowseTab,
                 MoreTab,
-            ).apply { remove(this@NavStyle.moreTab) }
+            ).apply {
+                remove(this@NavStyle.moreTab)
+                remove(HistoriesTab)
+                if (size == 5) remove(UpdatesTab)
+                add(1, eu.kanade.tachiyomi.ui.releases.ReleasesTab)
+            }
         }
 }
