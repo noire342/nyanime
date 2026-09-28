@@ -8,6 +8,13 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Home torna prima in cima
+
+- Toccando di nuovo Home, una pagina scorsa torna in cima; il cambio categoria
+  avviene soltanto quando si è già all'inizio della pagina.
+- Lo stesso comportamento vale per le Home video, Manga e catalogo. Durante
+  il ritorno in cima, tocchi ripetuti non cambiano categoria.
+
 ## 28 settembre 2026 — Collegamenti anime e manga sempre compatti
 
 - Rimossi il pulsante di espansione e i dettagli estesi. Restano il gradiente,

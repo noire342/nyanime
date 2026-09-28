@@ -66,7 +66,12 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
 @Composable
-fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
+fun DiscoveryTab.SourceHomeContent(
+    homeKey: String,
+    homes: List<SourceHomeGroup>,
+    onSelect: (String?) -> Unit,
+    onCycleCategory: () -> Unit,
+) {
     val model = rememberScreenModel(tag = homeKey) { SourceHomeScreenModel(homeKey) }
     val state by model.state.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.currentOrThrow
@@ -84,6 +89,7 @@ fun DiscoveryTab.SourceHomeContent(homeKey: String, homes: List<SourceHomeGroup>
     val source = access.group
     // Parent and child observe availability independently: never render a stale branded frame.
     if (access.loading || source == null) return
+    HandleHomeReselect(listState, onCycleCategory)
     var pendingChoice by remember { mutableStateOf<Pair<Anime, Boolean>?>(null) }
     val openCard: (Anime, Boolean) -> Unit = { anime, playEpisode ->
         val id = SourceHomeSourceChoice.preferredAnimeId(context, anime)

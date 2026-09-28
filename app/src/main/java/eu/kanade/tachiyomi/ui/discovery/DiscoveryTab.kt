@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -25,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -65,6 +67,7 @@ import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import eu.kanade.tachiyomi.ui.updates.dismissLibraryUpdate
 import eu.kanade.tachiyomi.ui.updates.hasNewLibraryUpdateNotice
 import eu.kanade.tachiyomi.ui.updates.markLibraryUpdateNoticesSeen
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -82,10 +85,10 @@ import uy.kohesive.injekt.api.get
 
 data object DiscoveryTab : Tab {
     const val MANGA_CATEGORY = "nyanime:manga"
-    private val cycleRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private val reselectRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     override suspend fun onReselect(navigator: Navigator) {
-        cycleRequests.emit(Unit)
+        reselectRequests.emit(Unit)
     }
 
     override val options: TabOptions
@@ -111,11 +114,9 @@ data object DiscoveryTab : Tab {
         }
         val orderPreference = remember { Injekt.get<UiPreferences>().homeCategoryOrder() }
         val categoryOrder by orderPreference.changes().collectAsState(initial = orderPreference.get())
-        LaunchedEffect(availability, headerHomes, categoryOrder, selected) {
-            cycleRequests.collect {
-                val current = if (selected == MANGA_CATEGORY) selected else availability.selectedHome(selected)
-                selected = HomeCategories.next(current, HomeCategories.choices(headerHomes, categoryOrder))
-            }
+        val cycleCategory = {
+            val current = if (selected == MANGA_CATEGORY) selected else availability.selectedHome(selected)
+            selected = HomeCategories.next(current, HomeCategories.choices(headerHomes, categoryOrder))
         }
         val savedState = rememberSaveableStateHolder()
         if (availability.loading && !isManga) {
@@ -124,20 +125,25 @@ data object DiscoveryTab : Tab {
         }
         savedState.SaveableStateProvider(if (isManga) "manga" else homeKey?.let { "source:$it" } ?: "catalog") {
             if (isManga) {
-                MangaHomeTabContent(headerHomes) { selected = it }
+                MangaHomeTabContent(headerHomes, onSelectCategory = { selected = it }, onCycleCategory = cycleCategory)
             } else if (homeKey != null) {
-                SourceHomeContent(homeKey, headerHomes, onSelect = { selected = it })
+                SourceHomeContent(homeKey, headerHomes, onSelect = { selected = it }, onCycleCategory = cycleCategory)
             } else {
                 AnimeContent(
                     homes = headerHomes,
                     onSelect = { selected = it },
+                    onCycleCategory = cycleCategory,
                 )
             }
         }
     }
 
     @Composable
-    private fun AnimeContent(homes: List<SourceHomeGroup>, onSelect: (String?) -> Unit) {
+    private fun AnimeContent(
+        homes: List<SourceHomeGroup>,
+        onSelect: (String?) -> Unit,
+        onCycleCategory: () -> Unit,
+    ) {
         val model = rememberScreenModel { DiscoveryScreenModel() }
         val state by model.state.collectAsState()
         val continueWatchingRefresher = remember { Injekt.get<ContinueWatchingRefresher>() }
@@ -161,6 +167,7 @@ data object DiscoveryTab : Tab {
         val hasNewUpdates = hasNewLibraryUpdateNotice(updateKeys, lastSeenAt)
         val motion = appMotionEnabled()
         val listState = rememberLazyListState()
+        HandleHomeReselect(listState, onCycleCategory)
         AcknowledgeUpdateNoticeWhenVisible(
             listState,
             "updates",
@@ -369,6 +376,26 @@ data object DiscoveryTab : Tab {
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+
+    @Composable
+    internal fun HandleHomeReselect(listState: LazyListState, onAtTop: () -> Unit) {
+        val motion = appMotionEnabled()
+        val currentOnAtTop by rememberUpdatedState(onAtTop)
+        LaunchedEffect(listState, motion) {
+            var scrollJob: Job? = null
+            reselectRequests.collect {
+                // A second tap during the return must not cycle after the animation ends.
+                if (scrollJob?.isActive == true) return@collect
+                if (listState.canScrollBackward) {
+                    scrollJob = launch {
+                        if (motion) listState.animateScrollToItem(0) else listState.scrollToItem(0)
+                    }
+                } else {
+                    currentOnAtTop()
                 }
             }
         }

@@ -43,7 +43,11 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
 @Composable
-fun MangaHomeTabContent(homes: List<SourceHomeGroup>, onSelectCategory: (String?) -> Unit) {
+fun MangaHomeTabContent(
+    homes: List<SourceHomeGroup>,
+    onSelectCategory: (String?) -> Unit,
+    onCycleCategory: () -> Unit,
+) {
     val model = DiscoveryTab.rememberScreenModel { MangaHomeScreenModel() }
     val state by model.state.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
@@ -55,6 +59,7 @@ fun MangaHomeTabContent(homes: List<SourceHomeGroup>, onSelectCategory: (String?
     val acknowledgeOnScroll by autoAcknowledge.changes().collectAsState(initial = autoAcknowledge.get())
     val scope = rememberCoroutineScope()
     val listState = rememberSaveable(homeKey, saver = LazyListState.Saver) { LazyListState() }
+    DiscoveryTab.HandleHomeReselect(listState, onCycleCategory)
     val updateKeys = state.updates.map { it.inboxKey() }.toSet()
     val hasNewUpdates = hasNewLibraryUpdateNotice(updateKeys, lastSeenAt)
     val motion = appMotionEnabled()
