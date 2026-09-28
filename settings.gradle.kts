@@ -1,4 +1,17 @@
 pluginManagement {
+    // Kotlin 2.4 needs R8 9.1.29 or newer; AGP 8.9 bundles an older compiler.
+    // https://developer.android.com/build/kotlin-support
+    buildscript {
+        repositories {
+            mavenCentral()
+            maven(url = "https://storage.googleapis.com/r8-releases/raw") {
+                content { includeModule("com.android.tools", "r8") }
+            }
+        }
+        dependencies {
+            classpath("com.android.tools:r8:9.1.29")
+        }
+    }
     resolutionStrategy {
         eachPlugin {
             val regex = "com.android.(library|application)".toRegex()

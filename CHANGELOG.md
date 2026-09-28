@@ -23,6 +23,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   nelle impostazioni; promemoria puntuali facoltativi.
 - Preferenze Segui incluse nei backup, mantenimento dei progressi quando cambiano
   gli indirizzi e coordinamento tra scheda e aggiornamento in background.
+- Ottimizzatore Android aggiornato alla versione compatibile con Kotlin 2.4,
+  per completare correttamente gli APK firmati.
 
 ## 28 settembre 2026 — Protezione laterale del display, verifica hardware
 
