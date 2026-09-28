@@ -43,7 +43,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -262,11 +261,6 @@ fun ReleaseCalendarContent(
                     Card(
                         (if (motion) Modifier.animateItem() else Modifier).fillMaxWidth().padding(
                             horizontal = 16.dp,
-                        ).shadow(
-                            6.dp,
-                            shape,
-                            ambientColor = cue.copy(alpha = .22f),
-                            spotColor = cue.copy(alpha = .28f),
                         ).clickable {
                             onItem(item)
                         },

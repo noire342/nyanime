@@ -20,7 +20,7 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   date annunciate tramite ID verificati, distinte dalla disponibilità nella fonte.
 - Uscite accanto a Libreria nella navigazione principale. Anime e manga insieme,
   filtri Tutti/Anime/Manga e preferenza per consultarli separatamente.
-- Schede anime con bordo e bagliore arancione; manga in celeste, con contrasto
+- Schede anime con bordo sfumato arancione; manga in celeste, con contrasto
   adattato al tema chiaro e scuro e indicazione testuale del tipo di contenuto.
 - Agenda caricata dai dati locali, senza attendere una verifica in rete di tutta
   la libreria; giorni e mesi si cambiano senza nuovi controlli remoti.
