@@ -8,6 +8,30 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — ModernUI chiara e scelta iniziale del tema
+
+- Tre aspetti selezionabili: Scuro con marchio rosso, Chiaro con superfici bianche
+  e marchio Arancio solare, oppure Segui il sistema. Palette condivise fra
+  Compose, componenti nativi e barre Android; copertine e marchi delle fonti
+  conservano i propri colori, con sfumature adatte al contrasto di ciascun tema.
+- Al primo avvio compare una schermata essenziale con le tre anteprime e
+  «Continua». Preseleziona la preferenza esistente, oppure Sistema nelle nuove
+  installazioni. Dopo la conferma non ricompare nei successivi avvii e aggiornamenti;
+  la scelta e il completamento vengono salvati insieme sul dispositivo.
+- La configurazione mantiene la scelta in corso durante la ricreazione della
+  schermata e riprende i collegamenti di apertura dopo la conferma. Il vecchio
+  passaggio del tema nell'onboarding è stato rimosso per evitare richieste doppie.
+- Impostazioni → Aspetto usa le nuove card di Nyanime. Conservati lingua,
+  manga in altre lingue, modalità tablet, schermata iniziale, formato data e
+  date relative. AMOLED è disponibile soltanto nello scuro; lo sfondo delle
+  pagine manga mantiene le proprie impostazioni di lettura.
+- Anche l'icona Android segue l'aspetto rosso o arancione e si riallinea
+  all'avvio. I tempi di aggiornamento dipendono dal launcher; nei test Samsung
+  il cambio d'icona può chiudere l'app una volta, con scelta già salvata alla riapertura.
+- Card, anteprime e controlli si adattano agli schermi stretti e ai caratteri
+  grandi, rispettando la riduzione delle animazioni. Nessuna modifica ai
+  contratti delle estensioni.
+
 ## 28 settembre 2026 — Home continua e caricamenti più morbidi
 
 - Le categorie della Home condividono una sola testata: cambia soltanto il
