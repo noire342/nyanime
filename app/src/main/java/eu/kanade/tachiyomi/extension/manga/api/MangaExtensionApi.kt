@@ -47,12 +47,18 @@ internal class MangaExtensionApi {
 
     private val updateGate by lazy { ExtensionUpdateCheckGate(preferenceStore) }
 
+    var unavailableRepositories: Set<String> = emptySet()
+        private set
+    private val failures = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
     suspend fun findExtensions(): List<MangaExtension.Available> {
+        failures.clear()
         return withIOContext {
             getExtensionRepo.getAll()
                 .map { async { getExtensions(it) } }
                 .awaitAll()
                 .flatten()
+                .also { unavailableRepositories = failures.toSet() }
         }
     }
 
@@ -61,9 +67,17 @@ internal class MangaExtensionApi {
         return try {
             fetchExtensionList(resolveIndexUrl(repoBaseUrl))
                 .filter { it.libVersion in MangaExtensionLoader.SUPPORTED_LIB_VERSIONS }
+                .map {
+                    it.copy(
+                        expectedSigner = extRepo.signingKeyFingerprint,
+                        repoName = extRepo.name,
+                        repoUrl = extRepo.baseUrl,
+                    )
+                }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            failures.add(extRepo.baseUrl)
             logcat(LogPriority.ERROR, e) { "Failed to get extensions from $repoBaseUrl" }
             emptyList()
         }
@@ -126,7 +140,9 @@ internal class MangaExtensionApi {
     suspend fun checkForUpdates(
         context: Context,
         fromAvailableExtensionList: Boolean = false,
-    ): List<MangaExtension.Installed>? = updateGate.run(ExtensionUpdateKind.MANGA) {
+    ): List<MangaExtension.Installed>? = updateGate.run(ExtensionUpdateKind.MANGA, complete = {
+        unavailableRepositories.isEmpty()
+    }) {
         // Update extension repo details
         updateExtensionRepo.awaitAll()
 
@@ -140,25 +156,21 @@ internal class MangaExtensionApi {
             .filterIsInstance<MangaLoadResult.Success>()
             .map { it.extension }
 
-        val extensionsWithUpdate = mutableListOf<MangaExtension.Installed>()
-        val updates = mutableListOf<ExtensionUpdate>()
-        for (installedExt in installedExtensions) {
-            val pkgName = installedExt.pkgName
-            val availableExt = extensions.find { it.pkgName == pkgName } ?: continue
-            val hasUpdatedVer = availableExt.versionCode > installedExt.versionCode
-            val hasUpdatedLib = availableExt.libVersion > installedExt.libVersion
-            val hasUpdate = hasUpdatedVer || hasUpdatedLib
-            if (hasUpdate) {
-                extensionsWithUpdate.add(installedExt)
-                updates.add(
-                    ExtensionUpdate(
-                        pkgName,
-                        availableExt.versionCode.toLong(),
-                        availableExt.libVersion,
-                        installedExt.name,
-                    ),
-                )
-            }
+        val assessed = extensionManager.assessUpdates(installedExtensions, extensions, unavailableRepositories)
+        val extensionsWithUpdate = assessed.filter { it.hasUpdate }
+        val updates = extensionsWithUpdate.mapNotNull { installed ->
+            val chosen = extensions.filter {
+                it.pkgName == installed.pkgName &&
+                    it.repoUrl == installed.repoUrl
+            }.maxByOrNull { it.versionCode } ?: return@mapNotNull null
+            ExtensionUpdate(
+                installed.pkgName,
+                chosen.versionCode,
+                chosen.libVersion,
+                installed.name,
+                chosen.repoUrl,
+                chosen.expectedSigner,
+            )
         }
 
         if (extensionsWithUpdate.isNotEmpty()) {
@@ -182,6 +194,7 @@ internal class MangaExtensionApi {
                 apkUrl = "$repoUrl/apk/${it.apk}",
                 iconUrl = "$repoUrl/icon/${it.pkg}.png",
                 repoUrl = repoUrl,
+                distributionId = it.nyanimeDistributionId,
             )
         }
     }
@@ -208,6 +221,7 @@ internal class MangaExtensionApi {
                 apkUrl = extension.resources.apkUrl,
                 iconUrl = extension.resources.iconUrl,
                 repoUrl = repoUrl,
+                distributionId = extension.nyanimeDistributionId,
             )
         }
     }
@@ -223,6 +237,7 @@ private data class ExtensionJsonObject(
     val version: String,
     val nsfw: Int,
     val sources: List<ExtensionSourceJsonObject>?,
+    val nyanimeDistributionId: String? = null,
 )
 
 @Serializable

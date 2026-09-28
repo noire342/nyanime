@@ -69,12 +69,18 @@ class AnimeExtensionStoreRepositoryImpl(
         }
     }
 
+    @Volatile
+    override var unavailableRepositories: Set<String> = emptySet()
+        private set
+
     override suspend fun fetchExtensions(): List<AnimeExtension.Available> {
+        val failures = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
         return try {
             supervisorScope {
                 handler.awaitList { extension_storeQueries.getAll(::extensionStoreMapper) }.map { store ->
                     async {
                         service.getExtensions(store).onFailure {
+                            failures.add(store.indexUrl)
                             this@AnimeExtensionStoreRepositoryImpl.logcat(LogPriority.ERROR, it) {
                                 "Failed to fetch extensions for store '${store.name} (${store.indexUrl})'"
                             }
@@ -83,11 +89,13 @@ class AnimeExtensionStoreRepositoryImpl(
                 }
                     .awaitAll()
                     .flatMap { it.getOrDefault(emptyList()) }
+                    .also { unavailableRepositories = failures.toSet() }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
+            unavailableRepositories = getAll().map { it.indexUrl }.toSet()
             emptyList()
         }
     }

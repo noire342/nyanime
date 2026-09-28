@@ -8,8 +8,18 @@ internal data class ExtensionUpdate(
     val versionCode: Long,
     val libVersion: Double,
     val name: String,
+    val repository: String? = null,
+    val signer: String? = null,
 ) {
-    val identity: String get() = packageName + "|" + versionCode + "|" + libVersion
+    val identity: String get() = packageName +
+        "|" +
+        versionCode +
+        "|" +
+        libVersion +
+        "|" +
+        repository.orEmpty() +
+        "|" +
+        signer.orEmpty()
 }
 
 /** Remember versions, not counts: dismissing an alert is not permission to show it again. */

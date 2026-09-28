@@ -11,6 +11,8 @@ interface AnimeExtensionStoreRepository {
 
     suspend fun refreshAll()
 
+    val unavailableRepositories: Set<String> get() = emptySet()
+
     suspend fun fetchExtensions(): List<AnimeExtension.Available>
 
     suspend fun getAll(): List<AnimeExtensionStore>

@@ -37,6 +37,7 @@ data class NetworkAnimeExtensionStore(
         @ProtoNumber(7) val contentWarning: ContentWarning,
         @ProtoNumber(8) val isTorrent: Boolean = false,
         @ProtoNumber(9) val sources: List<Source>,
+        @ProtoNumber(10001) val nyanimeDistributionId: String? = null,
     )
 
     @Serializable
@@ -115,6 +116,7 @@ fun NetworkAnimeExtensionStore.ExtensionList.toAvailableExtensions(
                 )
             },
             store = store,
+            distributionId = extension.nyanimeDistributionId,
         )
     }
 }

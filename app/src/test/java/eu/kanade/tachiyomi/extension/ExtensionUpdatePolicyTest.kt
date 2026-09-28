@@ -90,6 +90,16 @@ class ExtensionUpdatePolicyTest {
     }
 
     @Test
+    fun partialCatalogueFailureRetriesWithoutMarkingAFullDaySuccessful(): Unit = runBlocking {
+        var now = 1_000_000L
+        val gate = ExtensionUpdateCheckGate(Store().preferences) { now }
+        assertEquals(1, gate.run(ExtensionUpdateKind.MANGA, complete = { false }) { 1 })
+        assertNull(gate.run(ExtensionUpdateKind.MANGA) { error("retry storm") })
+        now += 900_000
+        assertEquals(2, gate.run(ExtensionUpdateKind.MANGA) { 2 })
+    }
+
+    @Test
     fun cancellationDoesNotCommitSuccessOrBlockTheNextActivity(): Unit = runBlocking {
         val store = Store()
         val gate = ExtensionUpdateCheckGate(store.preferences)

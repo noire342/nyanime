@@ -2,9 +2,13 @@ package eu.kanade.tachiyomi.extension.anime
 
 import android.content.Context
 import android.graphics.drawable.Drawable
+import eu.kanade.domain.extension.ExtensionUpdateCandidate
+import eu.kanade.domain.extension.ExtensionUpdatePolicy
+import eu.kanade.domain.extension.ExtensionUpdateStatus
 import eu.kanade.domain.extension.anime.interactor.TrustAnimeExtension
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.extension.ExtensionUpdateNotifier
+import eu.kanade.tachiyomi.extension.ExtensionUpdatePreferences
 import eu.kanade.tachiyomi.extension.InstallStep
 import eu.kanade.tachiyomi.extension.anime.api.AnimeExtensionApi
 import eu.kanade.tachiyomi.extension.anime.model.AnimeExtension
@@ -62,6 +66,10 @@ class AnimeExtensionManager(
      * The installer which installs, updates and uninstalls the anime extensions.
      */
     private val installer by lazy { AnimeExtensionInstaller(context) }
+
+    private val updatePreferences = ExtensionUpdatePreferences(Injekt.get(), "anime")
+    var unavailableRepositories: Set<String> = emptySet()
+        private set
 
     private val iconMap = mutableMapOf<String, Drawable>()
 
@@ -132,12 +140,13 @@ class AnimeExtensionManager(
 
         installedExtensionsMapFlow.value = animeextensions
             .filterIsInstance<AnimeLoadResult.Success>()
-            .associate { it.extension.pkgName to it.extension }
+            .associate { it.extension.pkgName to it.extension.withUpdateCheck() }
 
         untrustedExtensionsMapFlow.value = animeextensions
             .filterIsInstance<AnimeLoadResult.Untrusted>()
             .associate { it.extension.pkgName to it.extension }
 
+        updatePendingUpdatesCount()
         _isInitialized.value = true
     }
 
@@ -155,7 +164,8 @@ class AnimeExtensionManager(
 
         enableAdditionalSubLanguages(extensions)
 
-        availableExtensionsMapFlow.value = extensions.associateBy { it.pkgName }
+        availableExtensionsMapFlow.value = extensions.associateBy { it.pkgName + "|" + it.store.indexUrl }
+        unavailableRepositories = api.unavailableRepositories
         updatedInstalledAnimeExtensionsStatuses(extensions)
         setupAvailableAnimeExtensionsSourcesDataMap(extensions)
     }
@@ -195,42 +205,65 @@ class AnimeExtensionManager(
      *
      * @param availableExtensions The list of animeextensions given by the [api].
      */
-    private fun updatedInstalledAnimeExtensionsStatuses(
-        availableExtensions: List<AnimeExtension.Available>,
-    ) {
-        if (availableExtensions.isEmpty()) {
-            preferences.animeExtensionUpdatesCount().set(0)
-            return
-        }
-
-        val installedExtensionsMap = installedExtensionsMapFlow.value.toMutableMap()
-        var changed = false
-
-        for ((pkgName, extension) in installedExtensionsMap) {
-            val availableExt = availableExtensions.find { it.pkgName == pkgName }
-
-            if (availableExt == null && !extension.isObsolete) {
-                installedExtensionsMap[pkgName] = extension.copy(isObsolete = true)
-                changed = true
-            } else if (availableExt != null) {
-                val hasUpdate = extension.updateExists(availableExt)
-                if (extension.hasUpdate != hasUpdate) {
-                    installedExtensionsMap[pkgName] = extension.copy(
-                        hasUpdate = hasUpdate,
-                        store = availableExt.store,
-                    )
-                } else {
-                    installedExtensionsMap[pkgName] = extension.copy(
-                        store = availableExt.store,
-                    )
-                }
-                changed = true
-            }
-        }
-        if (changed) {
-            installedExtensionsMapFlow.value = installedExtensionsMap
+    private fun updatedInstalledAnimeExtensionsStatuses(availableExtensions: List<AnimeExtension.Available>) {
+        installedExtensionsMapFlow.value = installedExtensionsMapFlow.value.mapValues { (_, extension) ->
+            assessed(extension, availableExtensions)
         }
         updatePendingUpdatesCount()
+    }
+
+    fun assessUpdates(
+        extensions: List<AnimeExtension.Installed>,
+        candidates: List<AnimeExtension.Available>,
+        unavailable: Set<String>,
+    ): List<AnimeExtension.Installed> {
+        unavailableRepositories = unavailable
+        availableExtensionsMapFlow.value = candidates.associateBy { it.pkgName + "|" + it.store.indexUrl }
+        updatedInstalledAnimeExtensionsStatuses(candidates)
+        return extensions.map { assessed(it, candidates) }
+    }
+
+    private fun candidate(extension: AnimeExtension.Available) = ExtensionUpdateCandidate(
+        packageName = extension.pkgName,
+        versionCode = extension.versionCode,
+        repository = extension.store.indexUrl,
+        signer = (extension.expectedSigner ?: extension.store.signingKey)?.takeIf {
+            it.matches(Regex("[a-fA-F0-9]{64}"))
+        },
+        compatibleApi = extension.libVersion in AnimeExtensionLoader.SUPPORTED_LIB_VERSIONS,
+        distributionId = extension.distributionId,
+    )
+
+    private fun decide(extension: AnimeExtension.Installed, candidates: List<AnimeExtension.Available>) =
+        ExtensionUpdatePolicy.resolve(
+            packageName = extension.pkgName,
+            versionCode = extension.versionCode,
+            metadata = extension.metadata,
+            candidates = candidates.map(::candidate),
+            keepVersion = updatePreferences.keep(extension.pkgName, extension.metadata),
+            boundRepository = updatePreferences.repository(extension.pkgName, extension.metadata),
+            unavailableRepositories = unavailableRepositories,
+        )
+
+    private fun assessed(
+        extension: AnimeExtension.Installed,
+        candidates: List<AnimeExtension.Available>,
+    ): AnimeExtension.Installed {
+        val decision = decide(extension, candidates)
+        val chosen = decision.candidate?.let { selected -> candidates.firstOrNull { candidate(it) == selected } }
+        if (chosen != null) updatePreferences.bind(extension.pkgName, extension.metadata, candidate(chosen).repository)
+        return extension.copy(
+            hasUpdate = decision.status == ExtensionUpdateStatus.AVAILABLE,
+            isObsolete = false,
+            updateStatus = decision.status,
+            keepVersion = updatePreferences.keep(extension.pkgName, extension.metadata),
+            store = chosen?.store ?: extension.store,
+        )
+    }
+
+    fun setKeepVersion(extension: AnimeExtension.Installed, keep: Boolean) {
+        updatePreferences.setKeep(extension.pkgName, extension.metadata, keep)
+        updatedInstalledAnimeExtensionsStatuses(availableExtensionsMapFlow.value.values.toList())
     }
 
     /**
@@ -241,6 +274,12 @@ class AnimeExtensionManager(
      * @param extension The anime extension to be installed.
      */
     fun installExtension(extension: AnimeExtension.Available): Flow<InstallStep> {
+        val installed = installedExtensionsMapFlow.value[extension.pkgName]
+        if (installed != null &&
+            !isInstallationAllowed(extension.pkgName, extension.versionCode, extension.store.indexUrl)
+        ) {
+            return kotlinx.coroutines.flow.flowOf(InstallStep.Error)
+        }
         return installer.downloadAndInstall(extension.apkUrl, extension)
     }
 
@@ -252,8 +291,20 @@ class AnimeExtensionManager(
      * @param extension The anime extension to be updated.
      */
     fun updateExtension(extension: AnimeExtension.Installed): Flow<InstallStep> {
-        val availableExt = availableExtensionsMapFlow.value[extension.pkgName] ?: return emptyFlow()
+        val decision = decide(extension, availableExtensionsMapFlow.value.values.toList())
+        if (decision.status != ExtensionUpdateStatus.AVAILABLE) return kotlinx.coroutines.flow.flowOf(InstallStep.Error)
+        val availableExt = availableExtensionsMapFlow.value.values.firstOrNull {
+            candidate(it) == decision.candidate
+        } ?: return kotlinx.coroutines.flow.flowOf(InstallStep.Error)
         return installExtension(availableExt)
+    }
+
+    fun isInstallationAllowed(packageName: String, versionCode: Long, repository: String?): Boolean {
+        val installed = installedExtensionsMapFlow.value[packageName] ?: return true
+        val decision = decide(installed, availableExtensionsMapFlow.value.values.toList())
+        return decision.status == ExtensionUpdateStatus.AVAILABLE &&
+            decision.candidate?.versionCode == versionCode &&
+            decision.candidate?.repository == repository
     }
 
     fun cancelInstallUpdateExtension(extension: AnimeExtension) {
@@ -361,23 +412,8 @@ class AnimeExtensionManager(
     /**
      * AnimeExtension method to set the update field of an installed anime extension.
      */
-    private fun AnimeExtension.Installed.withUpdateCheck(): AnimeExtension.Installed {
-        return if (updateExists()) {
-            copy(hasUpdate = true)
-        } else {
-            this
-        }
-    }
-
-    private fun AnimeExtension.Installed.updateExists(
-        availableExtension: AnimeExtension.Available? = null,
-    ): Boolean {
-        val availableExt = availableExtension
-            ?: availableExtensionsMapFlow.value[pkgName]
-            ?: return false
-
-        return (availableExt.versionCode > versionCode || availableExt.libVersion > libVersion)
-    }
+    private fun AnimeExtension.Installed.withUpdateCheck(): AnimeExtension.Installed =
+        assessed(this, availableExtensionsMapFlow.value.values.toList())
 
     private fun updatePendingUpdatesCount() {
         val pendingUpdateCount = installedExtensionsMapFlow.value.values.count { it.hasUpdate }

@@ -277,6 +277,8 @@ dependencies {
     implementation(libs.community.crypto)
     implementation(libs.community.scanner)
 
+    implementation("com.android.tools.build:apksig:8.9.1")
+
     // Data serialization (JSON, protobuf, xml)
     implementation(kotlinx.bundles.serialization)
 

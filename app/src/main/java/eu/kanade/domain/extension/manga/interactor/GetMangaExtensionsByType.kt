@@ -38,20 +38,7 @@ class GetMangaExtensionsByType(
                         _untrusted.none { it.pkgName == extension.pkgName } &&
                         (showNsfwSources || !extension.isNsfw)
                 }
-                .flatMap { ext ->
-                    if (ext.sources.isEmpty()) {
-                        return@flatMap if (ext.lang in enabledLanguages) listOf(ext) else emptyList()
-                    }
-                    ext.sources.filter { it.lang in enabledLanguages }
-                        .map {
-                            ext.copy(
-                                name = it.name,
-                                lang = it.lang,
-                                pkgName = "${ext.pkgName}-${it.id}",
-                                sources = listOf(it),
-                            )
-                        }
-                }
+                .filter { ext -> ext.lang in enabledLanguages || ext.sources.any { it.lang in enabledLanguages } }
                 .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
 
             MangaExtensions(updates, installed, available, untrusted)

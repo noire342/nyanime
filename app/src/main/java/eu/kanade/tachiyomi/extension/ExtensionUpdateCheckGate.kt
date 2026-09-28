@@ -20,7 +20,11 @@ internal class ExtensionUpdateCheckGate(
     private val preferences: PreferenceStore,
     private val now: () -> Long = System::currentTimeMillis,
 ) {
-    suspend fun <T> run(kind: ExtensionUpdateKind, check: suspend () -> T): T? = locks.getValue(kind).withLock {
+    suspend fun <T> run(
+        kind: ExtensionUpdateKind,
+        complete: () -> Boolean = { true },
+        check: suspend () -> T,
+    ): T? = locks.getValue(kind).withLock {
         val success = preferences.getLong(Preference.appStateKey("extension_update_" + kind.key + "_success"), 0)
         val attempt = preferences.getLong(Preference.appStateKey("extension_update_" + kind.key + "_attempt"), 0)
         fun recent(timestamp: Long, interval: Long): Boolean =
@@ -34,8 +38,10 @@ internal class ExtensionUpdateCheckGate(
         try {
             val result = check()
             currentCoroutineContext().ensureActive()
-            success.set(now())
-            attempt.delete()
+            if (complete()) {
+                success.set(now())
+                attempt.delete()
+            }
             result
         } catch (cancelled: CancellationException) {
             attempt.delete()

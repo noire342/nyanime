@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
 import eu.kanade.domain.base.BasePreferences
+import eu.kanade.tachiyomi.extension.ExtensionApkValidator
 import eu.kanade.tachiyomi.extension.InstallStep
 import eu.kanade.tachiyomi.extension.anime.AnimeExtensionManager
 import eu.kanade.tachiyomi.extension.anime.installer.InstallerAnime
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.transformWhile
+import kotlinx.coroutines.launch
 import logcat.LogPriority
 import tachiyomi.core.common.util.lang.withUIContext
 import tachiyomi.core.common.util.system.logcat
@@ -55,9 +57,14 @@ internal class AnimeExtensionInstaller(private val context: Context) {
      * The currently requested downloads, with the package name (unique id) as key, and the id
      * returned by the download manager.
      */
-    private val activeDownloads = hashMapOf<String, Long>()
+    private val activeDownloads = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
-    private val downloadsStateFlows = hashMapOf<Long, MutableStateFlow<InstallStep>>()
+    private val verifiedFiles = java.util.concurrent.ConcurrentHashMap<Long, File>()
+    private val verifying = java.util.concurrent.ConcurrentHashMap.newKeySet<Long>()
+
+    private val expectedPackages = java.util.concurrent.ConcurrentHashMap<Long, ExtensionApkValidator.Expected>()
+
+    private val downloadsStateFlows = java.util.concurrent.ConcurrentHashMap<Long, MutableStateFlow<InstallStep>>()
 
     private val extensionInstaller = Injekt.get<BasePreferences>().extensionInstaller()
 
@@ -92,6 +99,22 @@ internal class AnimeExtensionInstaller(private val context: Context) {
 
         val id = downloadManager.enqueue(request)
         activeDownloads[pkgName] = id
+        val available = extension as? AnimeExtension.Available
+        val installed = Injekt.get<AnimeExtensionManager>().installedExtensionsFlow.value.firstOrNull {
+            it.pkgName ==
+                pkgName
+        }
+        expectedPackages[id] = ExtensionApkValidator.Expected(
+            pkgName,
+            extension.versionCode,
+            available?.expectedSigner ?: available?.store?.signingKey,
+            available?.distributionId,
+            repository = available?.store?.indexUrl,
+            installedVersion = installed?.versionCode,
+            anime = true,
+            libVersion = extension.libVersion,
+            installed = installed?.metadata,
+        )
 
         val downloadStateFlow = MutableStateFlow(InstallStep.Pending)
         downloadsStateFlows[id] = downloadStateFlow
@@ -102,6 +125,7 @@ internal class AnimeExtensionInstaller(private val context: Context) {
             when (downloadStatus) {
                 DownloadManager.STATUS_PENDING -> InstallStep.Pending
                 DownloadManager.STATUS_RUNNING -> InstallStep.Downloading
+                DownloadManager.STATUS_FAILED -> InstallStep.Error
                 else -> null
             }
         }
@@ -113,8 +137,8 @@ internal class AnimeExtensionInstaller(private val context: Context) {
         }.onCompletion {
             // Always notify on main thread
             withUIContext {
-                // Always remove the download when unsubscribed
-                deleteDownload(pkgName)
+                // Only remove this request, never a newer retry for the same package.
+                deleteDownload(pkgName, id)
             }
         }
     }
@@ -156,6 +180,50 @@ internal class AnimeExtensionInstaller(private val context: Context) {
      * @param uri The uri of the extension to install.
      */
     fun installApk(downloadId: Long, uri: Uri) {
+        val manager = Injekt.get<AnimeExtensionManager>()
+        if (!verifying.add(downloadId)) return
+        manager.scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val expected = expectedPackages[downloadId] ?: run {
+                verifying.remove(downloadId)
+                return@launch
+            }
+            val staged = File(context.cacheDir, "verified_extension_$downloadId.apk")
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    staged.outputStream().use { output -> input.copyTo(output) }
+                } ?: error("Downloaded APK unavailable")
+                val live = manager.installedExtensionsFlow.value.firstOrNull { it.pkgName == expected.packageName }
+                val current = expected.copy(
+                    installedVersion = live?.versionCode ?: expected.installedVersion,
+                    installed = live?.metadata ?: expected.installed,
+                )
+                if (!ExtensionApkValidator.validate(context, staged, current)) {
+                    manager.updateInstallStep(downloadId, InstallStep.Error)
+                    return@launch
+                }
+                staged.setReadOnly()
+                verifiedFiles[downloadId] = staged
+                withUIContext {
+                    if (downloadId in activeDownloads.values &&
+                        manager.isInstallationAllowed(expected.packageName, expected.versionCode, expected.repository)
+                    ) {
+                        installVerifiedApk(downloadId, staged.getUriCompat(context))
+                    } else {
+                        verifiedFiles.remove(downloadId)?.delete()
+                        manager.updateInstallStep(downloadId, InstallStep.Error)
+                    }
+                }
+            } catch (e: Exception) {
+                logcat(LogPriority.ERROR, e) { "Extension APK validation failed" }
+                manager.updateInstallStep(downloadId, InstallStep.Error)
+            } finally {
+                verifying.remove(downloadId)
+                if (verifiedFiles[downloadId] !== staged) staged.delete()
+            }
+        }
+    }
+
+    private fun installVerifiedApk(downloadId: Long, uri: Uri) {
         when (val installer = extensionInstaller.get()) {
             BasePreferences.ExtensionInstaller.LEGACY -> {
                 val intent = Intent(context, AnimeExtensionInstallActivity::class.java)
@@ -209,6 +277,9 @@ internal class AnimeExtensionInstaller(private val context: Context) {
      */
     fun cancelInstall(pkgName: String) {
         val downloadId = activeDownloads.remove(pkgName) ?: return
+        downloadsStateFlows[downloadId]?.value = InstallStep.Idle
+        expectedPackages.remove(downloadId)
+        verifiedFiles.remove(downloadId)?.delete()
         downloadManager.remove(downloadId)
         InstallerAnime.cancelInstallQueue(context, downloadId)
     }
@@ -245,11 +316,19 @@ internal class AnimeExtensionInstaller(private val context: Context) {
      *
      * @param pkgName The package name of the download to delete.
      */
-    private fun deleteDownload(pkgName: String) {
+    private fun deleteDownload(pkgName: String, expectedId: Long? = null) {
+        if (expectedId != null && activeDownloads[pkgName] != expectedId) {
+            downloadsStateFlows.remove(expectedId)
+            expectedPackages.remove(expectedId)
+            verifiedFiles.remove(expectedId)?.delete()
+            return
+        }
         val downloadId = activeDownloads.remove(pkgName)
         if (downloadId != null) {
+            expectedPackages.remove(downloadId)
+            verifiedFiles.remove(downloadId)?.delete()
             downloadManager.remove(downloadId)
-            downloadsStateFlows.remove(downloadId)
+            downloadsStateFlows.remove(downloadId)?.value = InstallStep.Idle
         }
         if (activeDownloads.isEmpty()) {
             downloadReceiver.unregister()

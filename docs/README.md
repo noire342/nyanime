@@ -47,3 +47,5 @@ I documenti tecnici in inglese conservano i nomi delle API e dei componenti.
 - [Crediti e licenze](credits.md).
 - [Changelog storico AniYomi](history/aniyomi-changelog.md): archivio upstream,
   non elenco delle release Nyanime.
+
+- [Distribuzioni e aggiornamenti delle estensioni](extension-distributions.md)

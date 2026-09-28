@@ -1,0 +1,70 @@
+package eu.kanade.tachiyomi.extension
+
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.pm.PackageInfoCompat
+import com.android.apksig.ApkVerifier
+import eu.kanade.domain.extension.ExtensionPackageMetadata
+import java.io.File
+
+/** Verification precedes every installer backend, including loading APKs privately. */
+object ExtensionApkValidator {
+    data class Expected(
+        val packageName: String,
+        val versionCode: Long,
+        val signer: String?,
+        val distributionId: String?,
+        val repository: String? = null,
+        val installedVersion: Long? = null,
+        val anime: Boolean = false,
+        val libVersion: Double,
+        val installed: ExtensionPackageMetadata? = null,
+    )
+
+    @Suppress("DEPRECATION")
+    fun validate(context: Context, file: File, expected: Expected): Boolean = runCatching {
+        val verification = ApkVerifier.Builder(file)
+            .setMinCheckedPlatformVersion(Build.VERSION.SDK_INT)
+            .setMaxCheckedPlatformVersion(Build.VERSION.SDK_INT)
+            .build().verify()
+        require(verification.isVerified)
+        val flags =
+            PackageManager.GET_CONFIGURATIONS or PackageManager.GET_SIGNATURES or PackageManager.GET_META_DATA or
+                (if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else 0)
+        val info = context.packageManager.getPackageArchiveInfo(file.absolutePath, flags) ?: return false
+        info.applicationInfo?.sourceDir = file.absolutePath
+        info.applicationInfo?.publicSourceDir = file.absolutePath
+        require(info.packageName == expected.packageName)
+        require(PackageInfoCompat.getLongVersionCode(info) == expected.versionCode)
+        val feature = if (expected.anime) "tachiyomi.animeextension" else "tachiyomi.extension"
+        require(info.reqFeatures?.any { it.name == feature } == true)
+        val api = if (expected.anime) {
+            info.applicationInfo?.metaData?.getInt("aniyomix.extensionLib")?.takeUnless { it == 0 }?.toDouble()
+                ?: info.versionName?.substringBeforeLast('.')?.toDoubleOrNull()
+        } else {
+            info.versionName?.substringBeforeLast('.')?.toDoubleOrNull()
+        }
+        require(api == expected.libVersion)
+        require(expected.installedVersion == null || expected.versionCode > expected.installedVersion)
+        val metadata = ExtensionPackageInspector.inspect(info) { it.sections.size }
+        require(!metadata.invalidDistribution)
+        require(expected.distributionId == metadata.distribution?.id)
+        val signer = expected.signer?.lowercase()
+        if (signer != null && signer.matches(Regex("[a-f0-9]{64}"))) {
+            require(signer in metadata.signerHistory || signer in metadata.signers)
+        }
+        expected.installed?.let { old ->
+            require(old.signers.isNotEmpty())
+            if (old.signers.size > 1 || metadata.signers.size > 1) {
+                require(old.signers == metadata.signers)
+            } else {
+                require(metadata.signerHistory.containsAll(old.signers) || metadata.signers == old.signers)
+            }
+            require(old.distribution?.id == metadata.distribution?.id)
+            require(old.distribution?.updatePolicy != "manual")
+            require(!old.hasHomeDeclaration || metadata.hasHomeDeclaration)
+        }
+        true
+    }.getOrDefault(false)
+}

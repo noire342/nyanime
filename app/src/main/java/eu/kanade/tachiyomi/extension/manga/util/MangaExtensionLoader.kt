@@ -10,6 +10,8 @@ import androidx.core.content.pm.PackageInfoCompat
 import dalvik.system.PathClassLoader
 import eu.kanade.domain.extension.manga.interactor.TrustMangaExtension
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.tachiyomi.data.discovery.MangaHomeFilters
+import eu.kanade.tachiyomi.extension.ExtensionPackageInspector
 import eu.kanade.tachiyomi.extension.manga.model.MangaExtension
 import eu.kanade.tachiyomi.extension.manga.model.MangaLoadResult
 import eu.kanade.tachiyomi.source.CatalogueSource
@@ -22,6 +24,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import logcat.LogPriority
+import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
 import java.io.File
@@ -362,6 +365,14 @@ internal object MangaExtensionLoader {
             pkgFactory = appInfo.metaData.getString(METADATA_SOURCE_FACTORY),
             icon = appInfo.loadIcon(pkgManager),
             isShared = extensionInfo.isShared,
+            metadata = withIOContext {
+                ExtensionPackageInspector.inspect(pkgInfo) { manifest ->
+                    sources.filterIsInstance<CatalogueSource>().singleOrNull {
+                        it.name == manifest.source.name && it.lang == manifest.source.lang
+                    }
+                        ?.let { source -> MangaHomeFilters.sections(manifest, source.getFilterList()).size } ?: 0
+                }
+            },
         )
         return MangaLoadResult.Success(extension)
     }

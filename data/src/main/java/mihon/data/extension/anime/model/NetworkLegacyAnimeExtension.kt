@@ -16,6 +16,7 @@ data class NetworkLegacyAnimeExtension(
     val version: String,
     val nsfw: Int,
     val sources: List<Source>?,
+    val nyanimeDistributionId: String? = null,
 ) {
     @Serializable
     data class Source(
@@ -57,6 +58,7 @@ data class NetworkLegacyAnimeExtension(
                 }
             },
             store = store,
+            distributionId = nyanimeDistributionId,
         )
     }
 }

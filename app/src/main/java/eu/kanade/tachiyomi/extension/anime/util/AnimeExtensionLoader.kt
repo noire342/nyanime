@@ -12,6 +12,8 @@ import eu.kanade.domain.extension.anime.interactor.TrustAnimeExtension
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.AnimeSourceFactory
+import eu.kanade.tachiyomi.data.discovery.ExtensionHomeFilters
+import eu.kanade.tachiyomi.extension.ExtensionPackageInspector
 import eu.kanade.tachiyomi.extension.anime.model.AnimeExtension
 import eu.kanade.tachiyomi.extension.anime.model.AnimeLoadResult
 import eu.kanade.tachiyomi.util.lang.Hash
@@ -21,6 +23,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import logcat.LogPriority
+import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
 import uy.kohesive.injekt.injectLazy
 import java.io.File
@@ -50,7 +53,7 @@ internal object AnimeExtensionLoader {
     private const val METADATA_CONTENT_WARNING = "aniyomix.contentWarning"
     private const val METADATA_IS_TORRENT = "aniyomix.torrent"
 
-    private val SUPPORTED_LIB_VERSIONS = listOf(14.0, 16.0, 17.0)
+    val SUPPORTED_LIB_VERSIONS = listOf(14.0, 16.0, 17.0)
 
     @Suppress("DEPRECATION")
     private val PACKAGE_FLAGS = PackageManager.GET_CONFIGURATIONS or
@@ -365,6 +368,12 @@ internal object AnimeExtensionLoader {
             pkgFactory = appInfo.metaData.getString(METADATA_SOURCE_FACTORY),
             icon = appInfo.loadIcon(pkgManager),
             isShared = extensionInfo.isShared,
+            metadata = withIOContext {
+                ExtensionPackageInspector.inspect(pkgInfo) { manifest ->
+                    sources.singleOrNull { it.name == manifest.source.name && it.lang == manifest.source.lang }
+                        ?.let { source -> ExtensionHomeFilters.sections(manifest, source.getFilterList()).size } ?: 0
+                }
+            },
         )
         return AnimeLoadResult.Success(extension)
     }

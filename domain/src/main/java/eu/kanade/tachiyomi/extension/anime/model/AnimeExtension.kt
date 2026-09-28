@@ -1,6 +1,8 @@
 package eu.kanade.tachiyomi.extension.anime.model
 
 import android.graphics.drawable.Drawable
+import eu.kanade.domain.extension.ExtensionPackageMetadata
+import eu.kanade.domain.extension.ExtensionUpdateStatus
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import mihon.domain.extension.anime.model.AnimeExtensionStore
 import tachiyomi.domain.source.anime.model.StubAnimeSource
@@ -31,6 +33,9 @@ sealed class AnimeExtension {
         val hasUpdate: Boolean = false,
         val isObsolete: Boolean = false,
         val isShared: Boolean,
+        val metadata: ExtensionPackageMetadata = ExtensionPackageMetadata(),
+        val updateStatus: ExtensionUpdateStatus = ExtensionUpdateStatus.UNVERIFIED,
+        val keepVersion: Boolean = false,
         val store: AnimeExtensionStore? = null,
     ) : AnimeExtension()
 
@@ -43,6 +48,8 @@ sealed class AnimeExtension {
         override val lang: String,
         override val isNsfw: Boolean,
         override val isTorrent: Boolean,
+        val expectedSigner: String? = null,
+        val distributionId: String? = null,
         val sources: List<AnimeSource>,
         val apkUrl: String,
         val iconUrl: String,

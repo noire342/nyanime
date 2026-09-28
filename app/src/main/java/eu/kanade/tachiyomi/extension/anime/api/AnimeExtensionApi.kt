@@ -17,6 +17,8 @@ import uy.kohesive.injekt.injectLazy
 
 internal class AnimeExtensionApi {
 
+    val unavailableRepositories: Set<String> get() = repository.unavailableRepositories
+
     private val repository: AnimeExtensionStoreRepository by injectLazy()
 
     private val preferenceStore: PreferenceStore by injectLazy()
@@ -32,7 +34,9 @@ internal class AnimeExtensionApi {
     suspend fun checkForUpdates(
         context: Context,
         fromAvailableExtensionList: Boolean = false,
-    ): List<AnimeExtension.Installed>? = updateGate.run(ExtensionUpdateKind.ANIME) {
+    ): List<AnimeExtension.Installed>? = updateGate.run(ExtensionUpdateKind.ANIME, complete = {
+        unavailableRepositories.isEmpty()
+    }) {
         // Update extension repo details
         updateExtensionStores()
 
@@ -46,26 +50,22 @@ internal class AnimeExtensionApi {
             .filterIsInstance<AnimeLoadResult.Success>()
             .map { it.extension }
 
-        val extensionsWithUpdate = mutableListOf<AnimeExtension.Installed>()
-        val updates = mutableListOf<ExtensionUpdate>()
-        for (installedExt in installedExtensions) {
-            val pkgName = installedExt.pkgName
-            val availableExt = extensions.find { it.pkgName == pkgName } ?: continue
-
-            val hasUpdatedVer = availableExt.versionCode > installedExt.versionCode
-            val hasUpdatedLib = availableExt.libVersion > installedExt.libVersion
-            val hasUpdate = hasUpdatedVer || hasUpdatedLib
-            if (hasUpdate) {
-                extensionsWithUpdate.add(installedExt)
-                updates.add(
-                    ExtensionUpdate(
-                        pkgName,
-                        availableExt.versionCode.toLong(),
-                        availableExt.libVersion,
-                        installedExt.name,
-                    ),
-                )
-            }
+        val assessed = animeExtensionManager.assessUpdates(installedExtensions, extensions, unavailableRepositories)
+        val extensionsWithUpdate = assessed.filter { it.hasUpdate }
+        val updates = extensionsWithUpdate.mapNotNull { installed ->
+            val chosen = extensions.filter {
+                it.pkgName == installed.pkgName &&
+                    it.store.indexUrl == installed.store?.indexUrl
+            }.maxByOrNull { it.versionCode }
+                ?: return@mapNotNull null
+            ExtensionUpdate(
+                installed.pkgName,
+                chosen.versionCode,
+                chosen.libVersion,
+                installed.name,
+                chosen.store.indexUrl,
+                chosen.expectedSigner ?: chosen.store.signingKey,
+            )
         }
 
         if (extensionsWithUpdate.isNotEmpty()) {
