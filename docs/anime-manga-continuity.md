@@ -18,6 +18,8 @@ circolare separato espande i dettagli e segue il bordo inferiore destro durante
 l'animazione. Più copie verificate richiedono una scelta esplicita nei dettagli.
 Senza checkpoint la scheda mantiene il collegamento al titolo senza mostrare
 un numero stimato o un avviso sul capitolo mancante.
+Il gradiente è lo stesso nei due stati. Nella versione compatta sono visibili
+anche i punti documentati di inizio e fine adattamento, senza dover aprire i dettagli.
 
 ## Dal manga all'anime
 
@@ -30,7 +32,9 @@ Se il manga deriva da una novel, il collegamento indiretto è indicato.
 Le stagioni e gli altri adattamenti mantengono il proprio ID e vengono mostrati
 separatamente, con titolo, formato, anno e numero di episodi quando disponibili.
 Nyanime verifica le copie note e interroga `AnimeCatalogIdResolver` nelle estensioni
-compatibili. Non stima un episodio dal capitolo letto e non avvia il player:
+compatibili. La copia deve fornire un ID nei metadati dell'estensione: un vecchio
+tracking da solo non prova che non sia un altro adattamento dello stesso titolo.
+Non stima un episodio dal capitolo letto e non avvia il player:
 apre la scheda dell'anime, conservando progresso, tracking e preferenze esistenti.
 Se una copia non è verificabile, rimane disponibile la ricerca esplicita.
 

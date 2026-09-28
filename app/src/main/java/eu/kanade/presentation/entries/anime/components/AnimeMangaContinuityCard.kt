@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -59,6 +61,21 @@ fun AnimeMangaContinuityCard(
             }
         },
         modifier = modifier,
+        preview = {
+            if (choice.beginning != null || choice.latestAdapted != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    choice.beginning?.let {
+                        ChapterReference("INIZIO", it.chapter, Modifier.weight(1f))
+                    }
+                    choice.latestAdapted?.let {
+                        ChapterReference("FINO A", it.chapter, Modifier.weight(1f))
+                    }
+                }
+            }
+        },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
@@ -150,6 +167,23 @@ fun AnimeMangaContinuityCard(
                 OutlinedButton(onClick = { onOpenManga(target, null) }) { Text("Apri la scheda manga") }
             }
         }
+    }
+}
+
+@Composable
+private fun ChapterReference(label: String, chapter: Double, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "Cap. ${chapterLabel(chapter)}",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 

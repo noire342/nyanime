@@ -31,6 +31,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,6 +48,7 @@ internal fun ContinuityCard(
     onExpandedChange: (Boolean) -> Unit,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
+    preview: @Composable ColumnScope.() -> Unit = {},
     details: @Composable ColumnScope.() -> Unit,
 ) {
     val motion = appMotionEnabled()
@@ -57,7 +60,13 @@ internal fun ContinuityCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-        Box(Modifier.clickable(onClick = onOpen)) {
+        Box(
+            Modifier.background(
+                Brush.linearGradient(
+                    listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), Color.Transparent),
+                ),
+            ).clickable(onClick = onOpen),
+        ) {
             Column(Modifier.fillMaxWidth().heightIn(min = 76.dp)) {
                 Column(Modifier.padding(start = 16.dp, top = 14.dp, end = 64.dp, bottom = 14.dp)) {
                     Text(
@@ -73,6 +82,7 @@ internal fun ContinuityCard(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 3.dp),
                     )
+                    preview()
                 }
                 AnimatedVisibility(
                     visible = expanded,

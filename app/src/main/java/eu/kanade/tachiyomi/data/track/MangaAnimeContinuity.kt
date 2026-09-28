@@ -196,6 +196,8 @@ class MangaAnimeContinuity(
             sourceHints: SourceTrackingHints?,
             trackedHints: SourceTrackingHints?,
         ): Boolean {
+            // An old title-based tracker binding cannot establish the identity of a source copy.
+            if (!AnimeMangaContinuity.hasSameIdentity(id, malId, sourceHints)) return false
             val hints = listOfNotNull(sourceHints, trackedHints)
             if (hints.any {
                     it.anilistId != null &&
@@ -207,7 +209,7 @@ class MangaAnimeContinuity(
             ) {
                 return false
             }
-            return hints.any { AnimeMangaContinuity.hasSameIdentity(id, malId, it) }
+            return true
         }
     }
 }

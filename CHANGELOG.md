@@ -8,6 +8,15 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Riferimenti manga a colpo d'occhio
+
+- La scheda compatta mostra subito il capitolo iniziale e l'ultimo capitolo
+  documentato, quando disponibili. Il gradiente è condiviso con la versione
+  espansa, mantenendo un solo controllo circolare per aprire e richiudere i dettagli.
+- Il passaggio dal manga all'anime verifica l'identità della copia nei metadati
+  dell'estensione: vecchie associazioni di tracking da sole non fanno comparire
+  adattamenti diversi tra le copie dell'anime.
+
 ## 28 settembre 2026 — Dal manga all'anime
 
 - Collegamenti anime/manga compatti di default: toccare la scheda apre il titolo,

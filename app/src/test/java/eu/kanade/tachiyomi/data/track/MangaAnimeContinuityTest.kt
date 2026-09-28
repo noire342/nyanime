@@ -66,7 +66,7 @@ class MangaAnimeContinuityTest {
             ),
         )
         assertTrue(MangaAnimeContinuity.knownIdentityMatches(101, 201, SourceTrackingHints(anilistId = 101), null))
-        assertTrue(MangaAnimeContinuity.knownIdentityMatches(101, 201, null, SourceTrackingHints(malId = 201)))
+        assertFalse(MangaAnimeContinuity.knownIdentityMatches(101, 201, null, SourceTrackingHints(malId = 201)))
         assertFalse(
             MangaAnimeContinuity.knownIdentityMatches(101, 201, SourceTrackingHints(titles = listOf("Same")), null),
         )
