@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.data.releases
 import eu.kanade.tachiyomi.data.track.SourceTrackingHints
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.network.HttpException
+import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.network.await
 import eu.kanade.tachiyomi.network.jsonMime
@@ -22,14 +23,14 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
-import okhttp3.OkHttpClient
+import logcat.LogPriority
 import okhttp3.RequestBody.Companion.toRequestBody
+import tachiyomi.core.common.util.system.logcat
 import tachiyomi.data.handlers.anime.AnimeDatabaseHandler
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.track.anime.repository.AnimeTrackRepository
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
-import java.util.concurrent.TimeUnit
 
 data class AiringEvent(
     val entryId: Long,
@@ -78,10 +79,8 @@ class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
     ): AiringCache = locks[anime.id.hashCode() and 63].withLock {
         val now = System.currentTimeMillis()
         val cached = cache(anime.id)
-        if (!force && now - cached.attemptedAt < 5 * ReleasePolicy.MINUTE) return@withLock cached
         val next = entryEvents(anime.id).firstOrNull { it.airingAt > now }
-        val freshSchedule = cached.status != "UNRESOLVED" && now - cached.verifiedAt < 6 * ReleasePolicy.HOUR
-        if (!force && freshSchedule && (next != null || cached.status == "UNANNOUNCED")) {
+        if (!AiringRefreshPolicy.shouldRefresh(cached, now, next != null, force)) {
             return@withLock cached
         }
         try {
@@ -154,11 +153,16 @@ class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
                 val value = ((upcoming?.episode?.toLong() ?: 0) shl 8) or ((upcoming?.airingAt?.div(1000) ?: 0) shl 24)
                 airingQueries.setNextAiring(mask, value and mask, anime.id)
             }
+            if (cached.status == "UNAVAILABLE") {
+                logcat(LogPriority.INFO) { "Airing verification recovered for entry ${anime.id}" }
+            }
             AiringCache(now, now, status, total, finished)
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            cached.copy(attemptedAt = now, status = "UNAVAILABLE").also { saveCache(anime.id, it) }
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Airing verification failed for entry ${anime.id}" }
+            cached.copy(attemptedAt = System.currentTimeMillis(), status = "UNAVAILABLE")
+                .also { saveCache(anime.id, it) }
         }
     }
 
@@ -236,7 +240,6 @@ class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
         private val transport = Mutex()
         private var nextRequestAt = 0L
         private val locks = Array(64) { Mutex() }
-        private val client = OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS).callTimeout(15, TimeUnit.SECONDS).build()
+        private val client by lazy { AiringHttpClient.create(Injekt.get<NetworkHelper>().apiClient) }
     }
 }

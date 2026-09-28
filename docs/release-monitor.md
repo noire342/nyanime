@@ -53,6 +53,14 @@ fa perdere il lavoro completato. Le richieste allo stesso titolo coordinano il
 recupero e il salvataggio; le richieste al calendario rispettano la risposta 429
 e la relativa attesa. Il ritmo rispetta i
 [limiti documentati di AniList](https://docs.anilist.co/guide/rate-limiting).
+Scheda e monitor condividono la regola di validità degli orari: soltanto una
+risposta riuscita può essere riutilizzata per sei ore. Un errore viene ritentato
+senza ereditare la validità precedente, con almeno cinque minuti tra tentativi
+ordinari; le date salvate restano visibili. Anche l'ultima trasmissione già passata
+fa ricontrollare un calendario che prima conteneva appuntamenti futuri.
+Le richieste usano il DNS configurato nell'app e il limite comune a Home e tracking.
+Gli avvisi sono riferiti al tipo di contenuto selezionato e gli errori sono registrati
+con l'identificatore locale del titolo, senza pubblicare i dati della libreria.
 La prima acquisizione di un titolo non pubblica tutto il catalogo come novità.
 Gli avvisi storici importati dalla prima migrazione vengono esclusi dall'agenda,
 senza cancellare capitoli, episodi o progressi. Una data fornita effettivamente

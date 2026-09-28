@@ -8,6 +8,18 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Recupero delle verifiche degli orari
+
+- Una richiesta degli orari fallita non eredita più le sei ore di validità
+  della verifica precedente: il monitor e la scheda usano la stessa regola
+  per ritentare, conservando le date salvate e limitando richieste ravvicinate.
+- Quando l’ultimo orario è passato, il calendario può ricontrollare il titolo
+  senza aspettare la scadenza dei metadati. Un cambio dell’orologio non blocca i tentativi.
+- Gli avvisi degli orari anime non compaiono nel filtro Manga. Il controllo
+  riuscito rimuove l’avviso; gli errori sono registrati per poterli diagnosticare.
+- Richieste degli orari con il DNS configurato nell’app e il limite condiviso
+  con Home e tracking, evitando un secondo flusso indipendente di richieste.
+
 ## 28 settembre 2026 — Filtri delle uscite e verifica della navigazione
 
 - Filtri Tutti/Anime/Manga centrati e distribuiti sulla larghezza disponibile,

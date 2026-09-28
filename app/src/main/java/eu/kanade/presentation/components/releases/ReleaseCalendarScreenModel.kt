@@ -44,12 +44,15 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
     private val app: Application = Injekt.get()
     private var allItems = emptyList<ReleaseAgendaItem>()
 
-    private data class Snapshot(val items: List<ReleaseAgendaItem>, val warning: String? = null)
+    private data class Snapshot(
+        val items: List<ReleaseAgendaItem>,
+        val warnings: Map<ReleaseMedium, String> = emptyMap(),
+    )
 
     init {
         screenModelScope.launch(Dispatchers.IO) {
             val snapshots = if (scope == null) {
-                combine(anime(), manga()) { a, m -> Snapshot(a.items + m.items, a.warning ?: m.warning) }
+                combine(anime(), manga()) { a, m -> Snapshot(a.items + m.items, a.warnings + m.warnings) }
             } else if (scope == ReleaseMedium.ANIME) {
                 anime()
             } else {
@@ -66,8 +69,8 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
                 )
             }.collectLatest {
                 allItems = it.items.sortedBy { item -> item.at }
-                val warning = it.warning
-                publish { state -> state.copy(loading = false, warning = warning) }
+                val warnings = it.warnings
+                publish { state -> state.copy(loading = false, warnings = warnings) }
             }
         }
         refresh()
@@ -166,13 +169,14 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
                     )
                 }
             }
+            val warning = when {
+                unavailable -> app.getString(R.string.release_calendar_error)
+                unresolved -> app.getString(R.string.release_calendar_unresolved)
+                else -> null
+            }
             Snapshot(
                 ReleaseAgendaMerge.merge(items, works, presentByEntry, watchedByEntry),
-                when {
-                    unavailable -> app.getString(R.string.release_calendar_error)
-                    unresolved -> app.getString(R.string.release_calendar_unresolved)
-                    else -> null
-                },
+                warning?.let { mapOf(ReleaseMedium.ANIME to it) }.orEmpty(),
             )
         }
     }
@@ -263,6 +267,8 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
         val items: List<ReleaseAgendaItem> = emptyList(),
         val events: ImmutableMap<LocalDate, Int> = persistentMapOf(),
         val loading: Boolean = true,
-        val warning: String? = null,
-    )
+        val warnings: Map<ReleaseMedium, String> = emptyMap(),
+    ) {
+        val warning: String? get() = if (medium == null) warnings.values.firstOrNull() else warnings[medium]
+    }
 }

@@ -29,6 +29,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -119,11 +120,11 @@ class ReleaseMonitor(context: Context, parameters: WorkerParameters) : Coroutine
     private suspend fun refreshCalendar(ids: List<Long>) {
         val repository = AiringRepository()
         val now = System.currentTimeMillis()
+        val upcoming = repository.events().first().filter { it.airingAt > now }.map { it.entryId }.toSet()
         val entries = mutableListOf<Pair<tachiyomi.domain.entries.anime.model.Anime, AiringCache>>()
         for (id in ids) {
             val cached = repository.cache(id)
-            if (now - cached.attemptedAt < 5 * ReleasePolicy.MINUTE) continue
-            if (cached.verifiedAt > 0 && now - cached.verifiedAt < 6 * ReleasePolicy.HOUR) continue
+            if (!AiringRefreshPolicy.shouldRefresh(cached, now, id in upcoming)) continue
             entries += Injekt.get<AnimeRepository>().getAnimeById(id) to cached
         }
         val ordered = entries.sortedWith(
