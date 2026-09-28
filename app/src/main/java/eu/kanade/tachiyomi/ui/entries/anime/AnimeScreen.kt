@@ -88,7 +88,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
 class AnimeScreen(
-    private val animeId: Long,
+    internal val animeId: Long,
     val fromSource: Boolean = false,
     private val episodeTarget: String? = null,
 ) : Screen(), AssistContentScreen, PosterDetailsScreen {
@@ -164,7 +164,12 @@ class AnimeScreen(
             state = successState,
             continuity = successState.mangaContinuity,
             onOpenManga = { manga, chapter ->
-                navigator.push(MangaScreen(manga.id, fromSource = !manga.favorite, chapterTarget = chapter))
+                val existing = navigator.items.lastOrNull { it is MangaScreen && it.mangaId == manga.id }
+                if (chapter == null && existing != null) {
+                    navigator.popUntil { it == existing }
+                } else {
+                    navigator.push(MangaScreen(manga.id, fromSource = !manga.favorite, chapterTarget = chapter))
+                }
             },
             onSearchManga = { title -> navigator.push(GlobalMangaSearchScreen(title)) },
             snackbarHostState = screenModel.snackbarHostState,

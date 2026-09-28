@@ -117,13 +117,17 @@ garantisce un miglioramento per ogni video. Il carico dipende da GPU e risoluzio
 e riconnessioni. Uscendo si ripristina la scelta della visione individuale.
 Gli effetti locali di mpv non vengono applicati al video via Cast.
 
-### AniSkip, timer e fine episodio
+### Passaggio tra anime e manga
 
 La scheda anime può mostrare i manga collegati tramite ID di catalogo, anche
 attraverso la novel originale. Le copie disponibili nelle estensioni compatibili
 vengono aperte dopo verifica degli ID; i checkpoint documentati indicano inizio,
 fine e, quando esplicito, un capitolo di ripresa. Non vengono inventate
-corrispondenze episodio/capitolo. Vedi [Dall'anime al manga](anime-manga-continuity.md).
+corrispondenze episodio/capitolo. La scheda manga offre anche il percorso inverso,
+con scelta degli adattamenti e apertura delle copie verificate nelle estensioni.
+Vedi [Passaggio tra anime e manga](anime-manga-continuity.md).
+
+### AniSkip, timer e fine episodio
 
 AniSkip è facoltativo: usa l'identificativo del titolo quando è disponibile
 dall'estensione, da un tracker collegato oppure da una ricerca univoca nel catalogo.

@@ -29,6 +29,17 @@ internal object AniListMediaLookup {
         val viaOriginalNovel: Boolean = false,
     )
 
+    data class AnimeRelation(
+        val id: Long,
+        val malId: Long?,
+        val title: String,
+        val format: String?,
+        val episodes: Int?,
+        val year: Int?,
+        val coverUrl: String?,
+        val viaOriginalNovel: Boolean = false,
+    )
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.SECONDS)
@@ -39,6 +50,86 @@ internal object AniListMediaLookup {
     private data class CacheEntry(val expiresAt: Long, val match: Match?)
     private val cache = LinkedHashMap<Pair<Type, String>, CacheEntry>(128, 0.75f, true)
     private val relationCache = LinkedHashMap<Long, Pair<Long, List<MangaRelation>>>(64, 0.75f, true)
+    private val animeRelationMutex = Mutex()
+    private val animeRelationCache = LinkedHashMap<Long, Pair<Long, List<AnimeRelation>>>(64, 0.75f, true)
+    private val relationClient = client.newBuilder()
+        .readTimeout(10, TimeUnit.SECONDS)
+        .callTimeout(15, TimeUnit.SECONDS)
+        .build()
+
+    suspend fun animeAdaptations(mangaId: Long): List<AnimeRelation> = animeRelationMutex.withLock {
+        if (mangaId !in 1..Int.MAX_VALUE.toLong()) return@withLock emptyList()
+        animeRelationCache[mangaId]?.takeIf { it.first > System.currentTimeMillis() }?.let {
+            return@withLock it.second
+        }
+        val edges = fetchAnimeRelationEdges(mangaId)
+        val direct = animeRelations(edges, viaOriginalNovel = false)
+        val result = if (direct.isNotEmpty()) {
+            direct
+        } else {
+            edges.asSequence()
+                .filter { it.relationType == "ADAPTATION" && it.node?.format == "NOVEL" }
+                .mapNotNull { it.node?.id }
+                .distinct().take(2).toList()
+                .flatMap { animeRelations(fetchAnimeRelationEdges(it), viaOriginalNovel = true) }
+        }.distinctBy { it.id }.sortedWith(
+            compareByDescending<AnimeRelation> { it.format == "TV" || it.format == "TV_SHORT" }
+                .thenBy { it.year ?: Int.MAX_VALUE }.thenBy { it.id },
+        )
+        animeRelationCache[mangaId] = (System.currentTimeMillis() + 24 * 60 * 60 * 1000L) to result
+        if (animeRelationCache.size > 64) animeRelationCache.remove(animeRelationCache.keys.first())
+        result
+    }
+
+    private suspend fun fetchAnimeRelationEdges(mangaId: Long): List<RelationEdge> = withContext(Dispatchers.IO) {
+        val query = """
+            query AnimeAdaptations(${'$'}id: Int) {
+              Media(id: ${'$'}id, type: MANGA) {
+                relations {
+                  edges { relationType node {
+                    id idMal type format episodes seasonYear coverImage { large }
+                    title { romaji english native } synonyms
+                  } }
+                }
+              }
+            }
+        """.trimIndent()
+        val body = buildJsonObject {
+            put("query", query)
+            putJsonObject("variables") { put("id", mangaId) }
+        }.toString().toRequestBody(jsonMime)
+        relationClient.newCall(POST("https://graphql.anilist.co", body = body)).awaitSuccess().use { response ->
+            requireNotNull(json.decodeFromString<RelationResponse>(response.body.string()).data?.media) {
+                "Catalog relationship metadata unavailable"
+            }.relations?.edges.orEmpty()
+        }
+    }
+
+    internal fun parseAnimeRelations(raw: String, viaOriginalNovel: Boolean = false): List<AnimeRelation> =
+        animeRelations(
+            json.decodeFromString<RelationResponse>(raw).data?.media?.relations?.edges.orEmpty(),
+            viaOriginalNovel,
+        )
+
+    private fun animeRelations(edges: List<RelationEdge>, viaOriginalNovel: Boolean): List<AnimeRelation> =
+        edges.mapNotNull { edge ->
+            val node = edge.node ?: return@mapNotNull null
+            if (edge.relationType != "ADAPTATION" || node.type != "ANIME" || node.format == "MUSIC" || node.id <= 0) {
+                return@mapNotNull null
+            }
+            val title = node.title?.english?.takeIf { it.isNotBlank() } ?: node.names.firstOrNull()
+                ?: return@mapNotNull null
+            AnimeRelation(
+                node.id,
+                node.idMal?.takeIf { it > 0 },
+                title,
+                node.format,
+                node.episodes?.takeIf { it > 0 },
+                node.seasonYear,
+                node.coverImage?.large,
+                viaOriginalNovel,
+            )
+        }.distinctBy { it.id }
 
     /** Only catalog IDs are sent. A title match never establishes an adaptation relationship. */
     suspend fun mangaAdaptations(animeId: Long): List<MangaRelation> = cacheMutex.withLock {
@@ -227,9 +318,14 @@ internal object AniListMediaLookup {
         val format: String? = null,
         val title: MediaTitles? = null,
         val synonyms: List<String> = emptyList(),
+        val seasonYear: Int? = null,
+        val coverImage: CoverImage? = null,
     ) {
         val names: List<String> get() = listOfNotNull(title?.romaji, title?.english, title?.native) + synonyms
     }
+
+    @Serializable
+    private data class CoverImage(val large: String? = null)
 
     @Serializable
     private data class MediaTitles(

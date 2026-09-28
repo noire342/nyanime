@@ -1,4 +1,4 @@
-package eu.kanade.presentation.entries.anime.components
+package eu.kanade.presentation.entries.manga.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -30,31 +30,45 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import eu.kanade.presentation.components.ContinuityCard
-import eu.kanade.tachiyomi.data.track.AnimeMangaContinuity
-import tachiyomi.domain.entries.manga.model.Manga
+import eu.kanade.tachiyomi.data.track.MangaAnimeContinuity
+import tachiyomi.domain.entries.anime.model.Anime
 
 @Composable
-fun AnimeMangaContinuityCard(
-    result: AnimeMangaContinuity.Result.Found,
-    onOpenManga: (Manga, Double?) -> Unit,
-    onSearchManga: (String) -> Unit,
+fun MangaAnimeContinuityCard(
+    result: MangaAnimeContinuity.Result?,
+    onOpenAnime: (Anime) -> Unit,
+    onSearchAnime: (String) -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (result.choices.isEmpty()) return
-    var selectedId by rememberSaveable { mutableLongStateOf(result.choices.first().catalogId) }
+    val found = result as? MangaAnimeContinuity.Result.Found
+    if (found?.choices.isNullOrEmpty() && result != MangaAnimeContinuity.Result.Unavailable) return
     var expanded by rememberSaveable { mutableStateOf(false) }
-    val choice = result.choices.firstOrNull { it.catalogId == selectedId } ?: result.choices.first()
-    val continuation = choice.continuationAfter(result.watchedEpisode)
+    if (found == null) {
+        ContinuityCard(
+            title = "Collegamento anime",
+            subtitle = "Non disponibile adesso · tocca per riprovare",
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+            onOpen = onRetry,
+            modifier = modifier,
+        ) {
+            OutlinedButton(onClick = onRetry) { Text("Riprova") }
+        }
+        return
+    }
+    var selectedId by rememberSaveable { mutableLongStateOf(found.choices.first().catalogId) }
+    val choice = found.choices.firstOrNull { it.catalogId == selectedId } ?: found.choices.first()
     val target = choice.matches.singleOrNull()
     ContinuityCard(
-        title = continuation?.let { "Continua nel manga · capitolo ${chapterLabel(it)}" } ?: "Continua nel manga",
+        title = "Passa all'anime",
         subtitle = choice.title,
         expanded = expanded,
         onExpandedChange = { expanded = it },
         onOpen = {
             when {
-                target != null -> onOpenManga(target, continuation)
-                choice.matches.isEmpty() -> onSearchManga(choice.title)
+                target != null -> onOpenAnime(target)
+                choice.matches.isEmpty() -> onSearchAnime(choice.title)
                 else -> expanded = true
             }
         },
@@ -62,8 +76,8 @@ fun AnimeMangaContinuityCard(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 AsyncImage(
                     model = choice.coverUrl ?: choice.matches.firstOrNull()?.thumbnailUrl,
@@ -72,25 +86,36 @@ fun AnimeMangaContinuityCard(
                     modifier = Modifier.size(48.dp, 70.dp).clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                 )
-                Text(
-                    choice.title,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        choice.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        listOfNotNull(
+                            formatLabel(choice.format),
+                            choice.year?.toString(),
+                            choice.episodes?.let { "$it episodi" },
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            if (result.choices.size > 1) {
+            if (found.choices.size > 1) {
+                Text("Scegli l'adattamento", style = MaterialTheme.typography.labelMedium)
                 Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    result.choices.forEach { candidate ->
+                    found.choices.forEach { candidate ->
                         OutlinedButton(
                             onClick = { selectedId = candidate.catalogId },
-                            modifier = Modifier.widthIn(max = 240.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp),
+                            modifier = Modifier.widthIn(max = 240.dp),
                             border = BorderStroke(
                                 1.dp,
                                 if (candidate.catalogId == choice.catalogId) {
@@ -100,12 +125,19 @@ fun AnimeMangaContinuityCard(
                                 },
                             ),
                         ) {
-                            Text(
-                                candidate.title,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.labelMedium,
-                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    candidate.title,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                                Text(
+                                    listOfNotNull(candidate.year?.toString(), formatLabel(candidate.format))
+                                        .joinToString(" · "),
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
                         }
                     }
                 }
@@ -117,45 +149,30 @@ fun AnimeMangaContinuityCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            choice.beginning?.let {
-                val label = if (choice.viaOriginalNovel) "Inizio dell'arco" else "Inizio dell'adattamento"
-                Text(
-                    "$label · cap. ${chapterLabel(it.chapter)}" +
-                        (episodeLabel(it)?.let { episode -> " · $episode" } ?: ""),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            choice.latestAdapted?.let {
-                Text(
-                    "Ultimo punto catalogato · cap. ${chapterLabel(it.chapter)}" +
-                        (episodeLabel(it)?.let { episode -> " · $episode" } ?: ""),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
             if (choice.matches.size > 1) {
                 Text("Scegli la tua copia", style = MaterialTheme.typography.labelMedium)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    choice.matches.forEach { manga ->
-                        OutlinedButton(onClick = { onOpenManga(manga, continuation) }) {
-                            Text(manga.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    choice.matches.forEach { anime ->
+                        OutlinedButton(onClick = { onOpenAnime(anime) }) {
+                            Text(anime.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
             } else if (target == null) {
-                OutlinedButton(onClick = { onSearchManga(choice.title) }) { Text("Cerca una copia") }
-            } else if (continuation != null) {
-                OutlinedButton(onClick = { onOpenManga(target, null) }) { Text("Apri la scheda manga") }
+                OutlinedButton(onClick = { onSearchAnime(choice.title) }) { Text("Cerca una copia") }
             }
         }
     }
 }
 
-private fun chapterLabel(number: Double): String =
-    if (number % 1.0 == 0.0) number.toInt().toString() else number.toString()
-
-private fun episodeLabel(checkpoint: AnimeMangaContinuity.Checkpoint): String? = checkpoint.episode?.let { episode ->
-    checkpoint.season?.let { season -> "stagione $season, episodio $episode" } ?: "episodio $episode"
+private fun formatLabel(format: String?): String? = when (format) {
+    "TV", "TV_SHORT" -> "Serie TV"
+    "MOVIE" -> "Film"
+    "OVA" -> "OVA"
+    "ONA" -> "Serie web"
+    "SPECIAL" -> "Speciale"
+    else -> format
 }

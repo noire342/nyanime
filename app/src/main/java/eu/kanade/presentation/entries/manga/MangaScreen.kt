@@ -59,16 +59,19 @@ import eu.kanade.presentation.entries.components.MissingItemCountListItem
 import eu.kanade.presentation.entries.manga.components.ChapterDownloadAction
 import eu.kanade.presentation.entries.manga.components.ExpandableMangaDescription
 import eu.kanade.presentation.entries.manga.components.MangaActionRow
+import eu.kanade.presentation.entries.manga.components.MangaAnimeContinuityCard
 import eu.kanade.presentation.entries.manga.components.MangaChapterListItem
 import eu.kanade.presentation.entries.manga.components.MangaInfoBox
 import eu.kanade.presentation.util.formatChapterNumber
 import eu.kanade.tachiyomi.data.download.manga.model.MangaDownload
+import eu.kanade.tachiyomi.data.track.MangaAnimeContinuity
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.manga.getNameForMangaInfo
 import eu.kanade.tachiyomi.ui.browse.manga.extension.details.MangaSourcePreferencesScreen
 import eu.kanade.tachiyomi.ui.entries.manga.ChapterList
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreenModel
 import eu.kanade.tachiyomi.util.system.copyToClipboard
+import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.items.chapter.model.Chapter
 import tachiyomi.domain.items.chapter.service.missingChaptersCount
@@ -88,6 +91,9 @@ import java.time.Instant
 @Composable
 fun MangaScreen(
     state: MangaScreenModel.State.Success,
+    onOpenAnime: (Anime) -> Unit,
+    onSearchAnime: (String) -> Unit,
+    onRetryAnime: () -> Unit,
     snackbarHostState: SnackbarHostState,
     nextUpdate: Instant?,
     isTabletUi: Boolean,
@@ -148,6 +154,9 @@ fun MangaScreen(
     if (!isTabletUi) {
         MangaScreenSmallImpl(
             state = state,
+            onOpenAnime = onOpenAnime,
+            onSearchAnime = onSearchAnime,
+            onRetryAnime = onRetryAnime,
             snackbarHostState = snackbarHostState,
             nextUpdate = nextUpdate,
             chapterSwipeStartAction = chapterSwipeStartAction,
@@ -184,6 +193,9 @@ fun MangaScreen(
     } else {
         MangaScreenLargeImpl(
             state = state,
+            onOpenAnime = onOpenAnime,
+            onSearchAnime = onSearchAnime,
+            onRetryAnime = onRetryAnime,
             snackbarHostState = snackbarHostState,
             chapterSwipeStartAction = chapterSwipeStartAction,
             chapterSwipeEndAction = chapterSwipeEndAction,
@@ -223,6 +235,9 @@ fun MangaScreen(
 @Composable
 private fun MangaScreenSmallImpl(
     state: MangaScreenModel.State.Success,
+    onOpenAnime: (Anime) -> Unit,
+    onSearchAnime: (String) -> Unit,
+    onRetryAnime: () -> Unit,
     snackbarHostState: SnackbarHostState,
     nextUpdate: Instant?,
     chapterSwipeStartAction: LibraryPreferences.ChapterSwipeAction,
@@ -423,6 +438,14 @@ private fun MangaScreenSmallImpl(
                         )
                     }
 
+                    if (state.animeContinuity is MangaAnimeContinuity.Result.Found ||
+                        state.animeContinuity == MangaAnimeContinuity.Result.Unavailable
+                    ) {
+                        item(key = "anime-continuity", contentType = "anime-continuity") {
+                            MangaAnimeContinuityCard(state.animeContinuity, onOpenAnime, onSearchAnime, onRetryAnime)
+                        }
+                    }
+
                     item(
                         key = EntryScreenItem.DESCRIPTION_WITH_TAG,
                         contentType = EntryScreenItem.DESCRIPTION_WITH_TAG,
@@ -472,6 +495,9 @@ private fun MangaScreenSmallImpl(
 @Composable
 fun MangaScreenLargeImpl(
     state: MangaScreenModel.State.Success,
+    onOpenAnime: (Anime) -> Unit,
+    onSearchAnime: (String) -> Unit,
+    onRetryAnime: () -> Unit,
     snackbarHostState: SnackbarHostState,
     nextUpdate: Instant?,
     chapterSwipeStartAction: LibraryPreferences.ChapterSwipeAction,
@@ -658,6 +684,7 @@ fun MangaScreenLargeImpl(
                             onEditIntervalClicked = onEditIntervalClicked,
                             onEditCategory = onEditCategoryClicked,
                         )
+                        MangaAnimeContinuityCard(state.animeContinuity, onOpenAnime, onSearchAnime, onRetryAnime)
                         ExpandableMangaDescription(
                             defaultExpandState = true,
                             description = state.manga.description,

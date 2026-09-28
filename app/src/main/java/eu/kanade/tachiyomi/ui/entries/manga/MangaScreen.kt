@@ -45,12 +45,14 @@ import eu.kanade.presentation.util.isTabletUi
 import eu.kanade.tachiyomi.source.MangaSource
 import eu.kanade.tachiyomi.source.manga.isLocalOrStub
 import eu.kanade.tachiyomi.source.online.HttpSource
+import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.GlobalAnimeSearchScreen
 import eu.kanade.tachiyomi.ui.browse.manga.migration.search.MigrateMangaDialog
 import eu.kanade.tachiyomi.ui.browse.manga.migration.search.MigrateMangaDialogScreenModel
 import eu.kanade.tachiyomi.ui.browse.manga.migration.search.MigrateMangaSearchScreen
 import eu.kanade.tachiyomi.ui.browse.manga.source.browse.BrowseMangaSourceScreen
 import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.GlobalMangaSearchScreen
 import eu.kanade.tachiyomi.ui.category.CategoriesTab
+import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.entries.manga.track.MangaTrackInfoDialogHomeScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
@@ -71,7 +73,7 @@ import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.screens.LoadingScreen
 
 class MangaScreen(
-    private val mangaId: Long,
+    internal val mangaId: Long,
     val fromSource: Boolean = false,
     private val chapterTarget: Double? = null,
 ) : Screen(), AssistContentScreen {
@@ -108,6 +110,14 @@ class MangaScreen(
         }
 
         val successState = state as MangaScreenModel.State.Success
+        LaunchedEffect(
+            successState.manga.initialized,
+            successState.manga.lastUpdate,
+            successState.trackedAniListId,
+            successState.trackedMalId,
+        ) {
+            screenModel.updateAnimeContinuity()
+        }
         var targetOpened by rememberSaveable(mangaId, chapterTarget) { mutableStateOf(false) }
         LaunchedEffect(chapterTarget, successState.chapters) {
             if (!targetOpened && chapterTarget != null) {
@@ -135,6 +145,16 @@ class MangaScreen(
 
         MangaScreen(
             state = successState,
+            onOpenAnime = { anime ->
+                val existing = navigator.items.lastOrNull { it is AnimeScreen && it.animeId == anime.id }
+                if (existing != null) {
+                    navigator.popUntil { it == existing }
+                } else {
+                    navigator.push(AnimeScreen(anime.id, fromSource = !anime.favorite))
+                }
+            },
+            onSearchAnime = { title -> navigator.push(GlobalAnimeSearchScreen(title)) },
+            onRetryAnime = { screenModel.updateAnimeContinuity(force = true) },
             snackbarHostState = screenModel.snackbarHostState,
             nextUpdate = successState.manga.expectedNextUpdate,
             isTabletUi = isTabletUi(),

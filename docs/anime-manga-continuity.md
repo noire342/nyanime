@@ -1,4 +1,4 @@
-# Dall'anime al manga
+# Passaggio tra anime e manga
 
 La scheda anime mostra i manga collegati attraverso gli ID di AniList. Se
 l'adattamento parte da una novel, viene seguito anche il rapporto tra quella
@@ -11,6 +11,32 @@ non vengono convertiti in capitoli stimati. Il salto a un capitolo viene propost
 solo con un checkpoint esplicito utilizzabile per l'episodio corrente. La presenza
 di una stagione nel checkpoint richiede una conferma che questa versione non
 deduce dal nome del titolo.
+
+I collegamenti sono compatti di default. Il corpo apre direttamente la copia
+verificata, oppure il capitolo quando esiste un checkpoint applicabile. Il controllo
+circolare separato espande i dettagli e segue il bordo inferiore destro durante
+l'animazione. Più copie verificate richiedono una scelta esplicita nei dettagli.
+Senza checkpoint la scheda mantiene il collegamento al titolo senza mostrare
+un numero stimato o un avviso sul capitolo mancante.
+
+## Dal manga all'anime
+
+La scheda manga offre anche il percorso inverso. L'identità proviene dai metadati
+dell'estensione o da un ID già associato al tracking: l'accesso a un tracker e la
+presenza in libreria non sono richiesti. AniList fornisce i rapporti di adattamento;
+prequel, sequel e musica non vengono confusi con un adattamento del manga.
+Se il manga deriva da una novel, il collegamento indiretto è indicato.
+
+Le stagioni e gli altri adattamenti mantengono il proprio ID e vengono mostrati
+separatamente, con titolo, formato, anno e numero di episodi quando disponibili.
+Nyanime verifica le copie note e interroga `AnimeCatalogIdResolver` nelle estensioni
+compatibili. Non stima un episodio dal capitolo letto e non avvia il player:
+apre la scheda dell'anime, conservando progresso, tracking e preferenze esistenti.
+Se una copia non è verificabile, rimane disponibile la ricerca esplicita.
+
+Il risultato resta nello stato della scheda anche quando si apre un anime.
+Un errore del catalogo conserva un risultato precedente valido; al primo errore
+mostra invece un'azione per riprovare, senza modificare la libreria.
 
 ## Contratti delle estensioni
 

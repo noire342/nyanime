@@ -8,6 +8,21 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Dal manga all'anime
+
+- Collegamenti anime/manga compatti di default: toccare la scheda apre il titolo,
+  il pulsante circolare espande i dettagli e rimane in basso a destra per richiuderli.
+  Il capitolo viene mostrato solo quando esiste un punto di continuazione verificato.
+- Le schede manga mostrano gli anime collegati tramite ID di catalogo, senza
+  richiedere libreria o tracking. Le estensioni compatibili possono aprire una
+  copia verificata direttamente; stagioni, film e altri adattamenti restano
+  distinti e selezionabili.
+- I collegamenti attraverso la novel originale sono indicati esplicitamente.
+  Non viene inventato un episodio dal numero del capitolo: aprire la scheda
+  anime conserva il progresso già presente.
+- La nuova card conserva il suo stato durante la navigazione e rispetta le
+  animazioni ridotte. Un errore del catalogo permette di riprovare nella scheda.
+
 ## 28 settembre 2026 — Manga per archi delle opere nate come novel
 
 - Quando un anime deriva da una novel, Nyanime mostra anche i manga collegati

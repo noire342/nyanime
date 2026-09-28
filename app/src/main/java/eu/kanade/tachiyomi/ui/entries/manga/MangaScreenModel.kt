@@ -35,6 +35,7 @@ import eu.kanade.tachiyomi.data.download.manga.MangaDownloadCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
 import eu.kanade.tachiyomi.data.download.manga.model.MangaDownload
 import eu.kanade.tachiyomi.data.track.EnhancedMangaTracker
+import eu.kanade.tachiyomi.data.track.MangaAnimeContinuity
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.network.HttpException
 import eu.kanade.tachiyomi.source.MangaSource
@@ -45,6 +46,8 @@ import eu.kanade.tachiyomi.util.removeCovers
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
@@ -120,11 +123,62 @@ class MangaScreenModel(
     private val setMangaCategories: SetMangaCategories = Injekt.get(),
     private val mangaRepository: MangaRepository = Injekt.get(),
     private val filterChaptersForDownload: FilterChaptersForDownload = Injekt.get(),
+    private val animeContinuity: MangaAnimeContinuity = Injekt.get(),
     val snackbarHostState: SnackbarHostState = SnackbarHostState(),
 ) : StateScreenModel<MangaScreenModel.State>(State.Loading) {
 
     private val successState: State.Success?
         get() = state.value as? State.Success
+
+    private data class ContinuityRequest(
+        val initialized: Boolean,
+        val lastUpdate: Long,
+        val aniListId: Long?,
+        val malId: Long?,
+    )
+
+    private var continuityRequest: ContinuityRequest? = null
+    private var continuityJob: Job? = null
+
+    fun updateAnimeContinuity(force: Boolean = false) {
+        val current = successState ?: return
+        val request = ContinuityRequest(
+            current.manga.initialized,
+            current.manga.lastUpdate,
+            current.trackedAniListId,
+            current.trackedMalId,
+        )
+        if (!force && request == continuityRequest) return
+        continuityRequest = request
+        continuityJob?.cancel()
+        continuityJob = screenModelScope.launch {
+            try {
+                val result = withIOContext {
+                    animeContinuity.resolve(
+                        current.manga,
+                        current.source,
+                        current.trackedAniListId,
+                        current.trackedMalId,
+                    )
+                }
+                if (continuityRequest == request) updateSuccessState { it.copy(animeContinuity = result) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                logcat(LogPriority.WARN, error) { "Anime continuity metadata unavailable" }
+                if (continuityRequest == request) {
+                    continuityRequest = null
+                    updateSuccessState {
+                        if (it.animeContinuity is MangaAnimeContinuity.Result.Found) {
+                            it
+                        } else {
+                            it.copy(animeContinuity = MangaAnimeContinuity.Result.Unavailable)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     val manga: Manga?
         get() = successState?.manga
@@ -1064,15 +1118,17 @@ class MangaScreenModel(
                 }
                 val supportedTrackerIds = supportedTrackers.map { it.id }.toHashSet()
                 val supportedTrackerTracks = mangaTracks.filter { it.trackerId in supportedTrackerIds }
-                supportedTrackerTracks.size to supportedTrackers.isNotEmpty()
+                Triple(supportedTrackerTracks.size, supportedTrackers.isNotEmpty(), mangaTracks)
             }
                 .flowWithLifecycle(lifecycle)
                 .distinctUntilChanged()
-                .collectLatest { (trackingCount, hasLoggedInTrackers) ->
+                .collectLatest { (trackingCount, hasLoggedInTrackers, tracks) ->
                     updateSuccessState {
                         it.copy(
                             trackingCount = trackingCount,
                             hasLoggedInTrackers = hasLoggedInTrackers,
+                            trackedAniListId = tracks.firstOrNull { it.trackerId == TrackerManager.ANILIST }?.remoteId,
+                            trackedMalId = tracks.firstOrNull { it.trackerId == 1L }?.remoteId,
                         )
                     }
                 }
@@ -1140,6 +1196,9 @@ class MangaScreenModel(
             val excludedScanlators: Set<String>,
             val trackingCount: Int = 0,
             val hasLoggedInTrackers: Boolean = false,
+            val trackedAniListId: Long? = null,
+            val trackedMalId: Long? = null,
+            val animeContinuity: MangaAnimeContinuity.Result? = null,
             val isRefreshingData: Boolean = false,
             val dialog: Dialog? = null,
             val hasPromptedToAddBefore: Boolean = false,
