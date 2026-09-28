@@ -90,6 +90,8 @@ import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
+import eu.kanade.tachiyomi.ui.privacy.registerNsfwView
 import eu.kanade.tachiyomi.util.system.powerManager
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
@@ -314,6 +316,8 @@ class PlayerActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         UltraPlaybackGuard.enterPlayer()
         setContentView(binding.root)
+        privacyDisplayController?.registerView(binding.player, PrivacyArea.VIDEO)
+        privacyDisplayController?.registerNsfwView(binding.player, PrivacyArea.VIDEO) { viewModel.currentAnime.value }
 
         setupPlayerMPV()
         setupPlayerAudio()

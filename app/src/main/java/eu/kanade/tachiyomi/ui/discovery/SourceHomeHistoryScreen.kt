@@ -18,6 +18,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBarTitle
 import eu.kanade.presentation.components.SearchToolbar
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.data.discovery.ExtensionHomeServices
 import eu.kanade.tachiyomi.ui.history.HistoriesTab
@@ -46,18 +47,23 @@ class SourceHomeHistoryScreen(private val homeKey: String) : Screen() {
         val group = access.group
         if (access.loading || group == null) return
         val tab = animeHistoryTab(LocalContext.current, fromMore = true, screenModel = model, globalHistory = false)
-        Scaffold(topBar = {
-            SearchToolbar(
-                titleContent = { AppBarTitle("Cronologia · ${group.title}") },
-                searchEnabled = true,
-                searchQuery = query,
-                onChangeSearchQuery = model::search,
-                navigateUp = { navigator.pop() },
-                actions = {
-                    TextButton(onClick = { navigator.push(HistoriesTab) }) { Text("Tutta la cronologia") }
-                },
-            )
-        }) { padding ->
+        Scaffold(
+            modifier = androidx.compose.ui.Modifier.privacyRegion(
+                eu.kanade.tachiyomi.ui.privacy.PrivacyArea.HISTORY,
+            ),
+            topBar = {
+                SearchToolbar(
+                    titleContent = { AppBarTitle("Cronologia · ${group.title}") },
+                    searchEnabled = true,
+                    searchQuery = query,
+                    onChangeSearchQuery = model::search,
+                    navigateUp = { navigator.pop() },
+                    actions = {
+                        TextButton(onClick = { navigator.push(HistoriesTab) }) { Text("Tutta la cronologia") }
+                    },
+                )
+            },
+        ) { padding ->
             Box(Modifier.padding(padding)) { tab.content(PaddingValues(), model.snackbarHostState) }
         }
     }

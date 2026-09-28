@@ -44,6 +44,7 @@ fun GlobalMangaSearchCardRow(
             val title by getManga(it)
             MangaItem(
                 title = title.title,
+                contentLabels = title.genre,
                 cover = title.asMangaCover(),
                 isFavorite = title.favorite,
                 onClick = { onClick(title) },
@@ -60,9 +61,11 @@ private fun MangaItem(
     isFavorite: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    contentLabels: List<String>?,
 ) {
     Box(modifier = Modifier.width(96.dp)) {
         EntryComfortableGridItem(
+            contentLabels = contentLabels,
             title = title,
             titleMaxLines = 3,
             coverData = cover,

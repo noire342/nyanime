@@ -64,6 +64,7 @@ private fun BrowseAnimeSourceComfortableGridItem(
     onLongClick: () -> Unit = onClick,
 ) {
     EntryComfortableGridItem(
+        contentLabels = anime.genre,
         title = anime.title,
         coverData = AnimeCover(
             animeId = anime.id,

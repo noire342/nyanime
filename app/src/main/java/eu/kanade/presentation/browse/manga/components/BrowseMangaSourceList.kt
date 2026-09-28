@@ -75,6 +75,7 @@ private fun BrowseMangaSourceListItem(
     containerHeight: Int,
 ) {
     EntryListItem(
+        contentLabels = manga.genre,
         title = manga.title,
         coverData = MangaCover(
             mangaId = manga.id,

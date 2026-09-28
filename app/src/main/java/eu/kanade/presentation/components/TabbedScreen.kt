@@ -24,7 +24,9 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.icerock.moko.resources.StringResource
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.theme.MangaSectionTheme
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.launch
@@ -52,6 +54,7 @@ fun TabbedScreen(
     val chromePage = if (pageScopedTheme) state.settledPage else state.currentPage
     MangaSectionTheme(legacy = !pageScopedTheme && tabs[chromePage].legacyManga) {
         Scaffold(
+            modifier = Modifier.privacyRegion(tabs[chromePage].privacyArea),
             topBar = {
                 if (titleRes != null) {
                     val tab = tabs[chromePage]
@@ -139,6 +142,7 @@ data class TabContent(
     val numberTitle: Int = 0,
     val cancelAction: () -> Unit = {},
     val navigateUp: (() -> Unit)? = null,
+    val privacyArea: PrivacyArea? = null,
 )
 
 @Composable

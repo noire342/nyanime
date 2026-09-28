@@ -1,0 +1,27 @@
+# Protezione laterale
+
+La protezione laterale è facoltativa e richiede un pannello hardware compatibile. Non simula l’effetto con filtri, sfocature o oscuramenti software. La protezione delle catture e la modalità incognito rimangono indipendenti.
+
+## Impostazioni e dati
+
+In **Impostazioni → Sicurezza → Protezione laterale** il comando principale è inizialmente spento. Video, lettore manga, cronologia, ripresa e ricerca sono selezionati; l’opzione aggiuntiva NSFW è inizialmente spenta. Quest’ultima usa il flag pubblico dell’estensione oppure etichette esplicite del contenuto; non riconosce titoli, domini o immagini per tentativi. Contenuti non segnalati non vengono classificati automaticamente.
+
+Il comando in **Player → Altro** è un’eccezione per quella riproduzione e non modifica la preferenza generale. Un errore non interrompe video o lettura; dopo una precedente applicazione riuscita viene mostrato un unico avviso per installazione. Preferenze portabili nei backup, disponibilità e avviso locali. Display esterni, PiP, multifinestra e finestre aggiuntive non sono attualmente validati.
+
+## Modulo e rimozione
+
+`core:privacy-display` dipende soltanto dal framework Android. `AndroidPrivacyDisplayBackends` compone gli adattatori senza riferimenti Samsung nelle schermate o nella politica dell’app. Il contratto `PrivacyDisplayBackend` isola il produttore; `PrivacyDisplaySession` serializza applicazione e pulizia e rilascia il target; `PrivacyRegion` e `PrivacyViewGeometry` gestiscono le coordinate. L’implementazione Samsung usa tre signature non pubbliche tramite reflection ordinaria, senza bypass delle restrizioni.
+
+La politica immutabile `PrivacyDisplayPolicy` e le preferenze appartengono a `ui/privacy`, i controlli e i modifier a `presentation/privacy`. Le schermate dichiarano aree; non conoscono Samsung. Non vengono aggiunte chiamate mpv, decoder, servizi, permessi overlay o impostazioni globali del dispositivo.
+
+Per rimuovere la funzione: eliminare le dichiarazioni `privacyRegion`/`nsfwPrivacy`/`nsfwSourcePrivacy`, le registrazioni native, il comando in Altro e il gruppo Sicurezza; rimuovere controller e registrazioni DI; infine eliminare modulo, dipendenza Gradle e risorse. Nessun formato di libreria, database, estensione o backup richiede migrazione. Le preferenze inutilizzate possono essere eliminate per prefisso, senza modificare altri dati.
+
+## Validazione e rilascio
+
+Prima compatibilità hardware: Samsung Galaxy S26 Ultra (`SM-S948…`), Android 16+, display principale e tutte le signature accessibili. La presenza delle API e il successo di una chiamata **non provano** l’effetto ottico. Il parametro float non è un’intensità: la prova deve verificare coordinate e geometria degli angoli.
+
+L’elenco delle combinazioni modello/firmware/aree fisicamente verificate è inizialmente vuoto. Le build ordinarie e CI non abilitano modalità prive di evidenza. Per preparare **soltanto un APK locale di verifica**, usare `assemblePreview -PprivacyDisplayValidation=true`: l’interfaccia segnala che si tratta di una prova. Il flag non supera il controllo hardware e non abilita PiP o multifinestra. Solo questa build include “Copia dati della prova” nella sezione Sicurezza: copia modello, fingerprint, revisione e disponibilità, senza identificativi personali o dati dei contenuti.
+
+Prima di aggiungere una combinazione verificata, registrare modello, fingerprint del firmware, aree provate e risultato di: visione frontale/laterale a diverse luminosità, video con sottotitoli nelle bande, zoom e scorrimento manga, Home e ricerca, transizioni, rotazione, ritorno da PiP, interazione con Privacy Display di sistema e prestazioni. Nessuna combinazione è dichiarata verificata da screenshot o ADB.
+
+Implementazione originale: nessun codice, asset, gestione degli stati o test del progetto PrivacyBox viene incorporato. Riferimenti tecnici: [API non pubbliche Android](https://developer.android.com/guide/app-compatibility/restrictions-non-sdk-interfaces), [hardware Samsung](https://www.samsung.com/uk/support/mobile-devices/how-to-use-privacy-display-on-the-samsung-galaxy-s26-ultra/), [distinzione di licenza del progetto di riferimento](https://github.com/moni11811/PrivacyBox-S26-Ultra/blob/main/LICENSING.md).

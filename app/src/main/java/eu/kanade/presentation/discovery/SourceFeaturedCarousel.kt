@@ -12,6 +12,7 @@ import eu.kanade.presentation.motion.posterOpen
 import eu.kanade.presentation.motion.posterSource
 import eu.kanade.presentation.motion.posterSourcePlaceholder
 import eu.kanade.presentation.motion.rememberPosterSource
+import eu.kanade.presentation.privacy.nsfwPrivacy
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import tachiyomi.domain.discovery.homeItemKey
 import tachiyomi.domain.discovery.homePresentation
@@ -41,7 +42,7 @@ fun SourceFeaturedCarousel(
             val openDetails = posterOpen(poster, anime.title) { onClick(anime) }
             val presentation = anime.homePresentation
             Box(
-                Modifier.graphicsLayer {
+                Modifier.nsfwPrivacy(anime).graphicsLayer {
                     val offset = ((pager.currentPage - index) + pager.currentPageOffsetFraction).absoluteValue.coerceIn(
                         0f,
                         1f,

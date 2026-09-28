@@ -64,6 +64,7 @@ private fun BrowseMangaSourceComfortableGridItem(
     onLongClick: () -> Unit = onClick,
 ) {
     EntryComfortableGridItem(
+        contentLabels = manga.genre,
         title = manga.title,
         coverData = MangaCover(
             mangaId = manga.id,

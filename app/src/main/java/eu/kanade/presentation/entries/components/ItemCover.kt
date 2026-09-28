@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import coil3.compose.AsyncImage
+import eu.kanade.presentation.privacy.nsfwPrivacy
 import eu.kanade.presentation.util.rememberResourceBitmapPainter
 import eu.kanade.tachiyomi.R
 
@@ -39,6 +40,7 @@ enum class ItemCover(val ratio: Float) {
             error = initialPainter ?: rememberResourceBitmapPainter(id = R.drawable.cover_error),
             contentDescription = contentDescription,
             modifier = modifier
+                .nsfwPrivacy(data)
                 .aspectRatio(ratio)
                 .clip(shape)
                 .then(

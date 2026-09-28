@@ -8,6 +8,22 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Protezione laterale del display, verifica hardware
+
+- Aggiunta una protezione hardware facoltativa in Impostazioni → Sicurezza,
+  con selezione separata di video e sottotitoli, lettura manga, cronologia,
+  ripresa e ricerca. Il comando principale parte spento.
+- Opzione aggiuntiva per le aree NSFW dichiarate dal contenuto o dall’estensione,
+  senza oscuramento frontale o riconoscimento dei nomi delle fonti.
+- Comando temporaneo in Player → Altro; geometria aggiornata insieme alla finestra
+  e gestione degli errori separata dalla riproduzione. Preferenze incluse nei backup,
+  senza esportare lo stato hardware o l’avviso locale.
+- Modulo indipendente con adattatore Samsung originale. Sui dispositivi incompatibili
+  il comando è disabilitato. Le build ordinarie mantengono disabilitate le modalità
+  senza verifica fisica; l’APK locale di prova permette la valutazione sul Galaxy
+  S26 Ultra. PiP, multifinestra e display esterni restano esclusi.
+  [Requisiti e validazione](docs/privacy-display.md).
+
 ## 28 settembre 2026 — ModernUI chiara e scelta iniziale del tema
 
 - Tre aspetti selezionabili: Scuro con marchio rosso, Chiaro con superfici bianche

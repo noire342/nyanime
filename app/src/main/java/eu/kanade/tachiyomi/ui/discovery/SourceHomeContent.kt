@@ -45,10 +45,12 @@ import eu.kanade.presentation.discovery.SourceHomeDateSelector
 import eu.kanade.presentation.discovery.SourceHomePosterCard
 import eu.kanade.presentation.discovery.SourceHomeRankingCard
 import eu.kanade.presentation.discovery.awaitingContent
+import eu.kanade.presentation.privacy.nsfwSourcePrivacy
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.data.discovery.SourceHomeSourceChoice
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
+import eu.kanade.tachiyomi.ui.privacy.PrivacyMedia
 import eu.kanade.tachiyomi.ui.updates.AcknowledgeUpdateNoticeWhenVisible
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import eu.kanade.tachiyomi.ui.updates.dismissLibraryUpdate
@@ -168,6 +170,7 @@ private fun DiscoveryTab.SourceHomeReadyContent(
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyColumn(
+                modifier = Modifier.nsfwSourcePrivacy(PrivacyMedia.VIDEO, source.sourceIds),
                 state = listState,
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),

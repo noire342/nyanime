@@ -69,8 +69,11 @@ import eu.kanade.presentation.motion.posterOpen
 import eu.kanade.presentation.motion.posterSource
 import eu.kanade.presentation.motion.posterSourcePlaceholder
 import eu.kanade.presentation.motion.rememberPosterSource
+import eu.kanade.presentation.privacy.nsfwPrivacy
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.data.discovery.LocalHomeItem
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogFeed
 import tachiyomi.domain.discovery.SectionState
@@ -193,7 +196,7 @@ fun PosterCard(
         TitleInformationSheet(title, badges.joinToString(" · "), subtitle, { information = false }, onClick)
     }
     Column(
-        modifier.width(HomeLayout.posterWidth(LocalDensity.current.fontScale))
+        modifier.nsfwPrivacy(cover, badges).width(HomeLayout.posterWidth(LocalDensity.current.fontScale))
             .graphicsLayer {
                 alpha = pressAlpha.value
             }
@@ -357,7 +360,7 @@ fun LocalAnimeRow(
         loading = state.awaitingContent,
         placeholder = { HomePosterRowSkeleton(wide = true) },
     ) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
+        BoxWithConstraints(Modifier.fillMaxWidth().privacyRegion(PrivacyArea.RESUME)) {
             val cardWidth = HomeLayout.resumeWidth(LocalDensity.current.fontScale, maxWidth)
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
@@ -366,7 +369,7 @@ fun LocalAnimeRow(
                 items(items, key = { it.anime.id }) { item ->
                     val poster = rememberPosterSource(item.anime)
                     val openDetails = posterOpen(poster, item.anime.title) { onOpen(item) }
-                    Column(Modifier.width(cardWidth)) {
+                    Column(Modifier.width(cardWidth).nsfwPrivacy(item.anime)) {
                         Box(
                             Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(4.dp))
                                 .clickable(role = Role.Button, onClickLabel = "Apri scheda", onClick = openDetails)

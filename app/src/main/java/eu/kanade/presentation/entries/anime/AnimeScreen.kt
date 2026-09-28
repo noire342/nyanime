@@ -75,6 +75,7 @@ import eu.kanade.presentation.entries.components.EntryBottomActionMenu
 import eu.kanade.presentation.entries.components.EntryToolbar
 import eu.kanade.presentation.entries.components.ItemHeader
 import eu.kanade.presentation.entries.components.MissingItemCountListItem
+import eu.kanade.presentation.privacy.nsfwPrivacy
 import eu.kanade.presentation.util.formatEpisodeNumber
 import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
 import eu.kanade.tachiyomi.animesource.model.FetchType
@@ -384,6 +385,7 @@ private fun AnimeScreenSmallImpl(
         val density = LocalDensity.current
         val containerHeightPx = with(density) { this@BoxWithConstraints.maxHeight.roundToPx() }
         Scaffold(
+            modifier = Modifier.nsfwPrivacy(state.anime),
             topBar = {
                 val selectedEpisodeCount: Int = remember(episodes) {
                     episodes.count { it.selected }
@@ -759,6 +761,7 @@ fun AnimeScreenLargeImpl(
         val density = LocalDensity.current
         val containerHeightPx = with(density) { this@BoxWithConstraints.maxHeight.roundToPx() }
         Scaffold(
+            modifier = Modifier.nsfwPrivacy(state.anime),
             topBar = {
                 val selectedChapterCount = remember(episodes) {
                     episodes.count { it.selected }

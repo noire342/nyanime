@@ -10,11 +10,13 @@ import eu.kanade.presentation.browse.GlobalSearchLoadingResultItem
 import eu.kanade.presentation.browse.GlobalSearchResultItem
 import eu.kanade.presentation.browse.manga.components.GlobalMangaSearchCardRow
 import eu.kanade.presentation.browse.manga.components.GlobalMangaSearchToolbar
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.MangaSearchItemResult
 import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.MangaSearchScreenModel
 import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.MangaSourceFilter
 import eu.kanade.tachiyomi.ui.browse.sourceSearchErrorMessage
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.presentation.core.components.material.Scaffold
@@ -34,6 +36,7 @@ fun GlobalMangaSearchScreen(
     onRetrySource: ((CatalogueSource) -> Unit)? = null,
 ) {
     Scaffold(
+        modifier = Modifier.privacyRegion(PrivacyArea.SEARCH),
         topBar = { scrollBehavior ->
             GlobalMangaSearchToolbar(
                 searchQuery = state.searchQuery,

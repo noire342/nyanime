@@ -44,6 +44,7 @@ import eu.kanade.presentation.browse.manga.MissingSourceScreen
 import eu.kanade.presentation.browse.manga.components.BrowseMangaSourceToolbar
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.entries.manga.DuplicateMangaDialog
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
@@ -56,6 +57,7 @@ import eu.kanade.tachiyomi.ui.browse.manga.migration.search.MigrateMangaDialogSc
 import eu.kanade.tachiyomi.ui.browse.manga.source.browse.BrowseMangaSourceScreenModel.Listing
 import eu.kanade.tachiyomi.ui.category.CategoriesTab
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import eu.kanade.tachiyomi.ui.webview.WebViewScreen
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
@@ -138,6 +140,11 @@ data class BrowseMangaSourceScreen(
 
         var topBarHeight by remember { mutableIntStateOf(0) }
         Scaffold(
+            modifier = Modifier.privacyRegion(
+                PrivacyArea.SEARCH,
+                enabled =
+                state.toolbarQuery != null || state.isUserQuery,
+            ),
             topBar = {
                 Column(
                     modifier = Modifier

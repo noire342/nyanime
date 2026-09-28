@@ -75,6 +75,7 @@ fun Screen.mangaHistoryTab(
     }
 
     return TabContent(
+        privacyArea = eu.kanade.tachiyomi.ui.privacy.PrivacyArea.HISTORY,
         legacyManga = true,
         titleRes = AYMR.strings.label_history,
         searchEnabled = true,

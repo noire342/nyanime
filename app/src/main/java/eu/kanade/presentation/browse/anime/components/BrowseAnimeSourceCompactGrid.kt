@@ -64,6 +64,7 @@ private fun BrowseAnimeSourceCompactGridItem(
     onLongClick: () -> Unit = onClick,
 ) {
     EntryCompactGridItem(
+        contentLabels = anime.genre,
         title = anime.title,
         coverData = AnimeCover(
             animeId = anime.id,

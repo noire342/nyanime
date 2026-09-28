@@ -75,6 +75,7 @@ private fun BrowseAnimeSourceListItem(
     containerHeight: Int,
 ) {
     EntryListItem(
+        contentLabels = anime.genre,
         title = anime.title,
         coverData = AnimeCover(
             animeId = anime.id,

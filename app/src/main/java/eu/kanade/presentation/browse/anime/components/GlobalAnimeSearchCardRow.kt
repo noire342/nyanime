@@ -44,6 +44,7 @@ fun GlobalAnimeSearchCardRow(
             val title by getAnime(it)
             AnimeItem(
                 title = title.title,
+                contentLabels = title.genre,
                 cover = title.asAnimeCover(),
                 isFavorite = title.favorite,
                 onClick = { onClick(title) },
@@ -60,9 +61,11 @@ private fun AnimeItem(
     isFavorite: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    contentLabels: List<String>?,
 ) {
     Box(modifier = Modifier.width(96.dp)) {
         EntryComfortableGridItem(
+            contentLabels = contentLabels,
             title = title,
             titleMaxLines = 3,
             coverData = cover,

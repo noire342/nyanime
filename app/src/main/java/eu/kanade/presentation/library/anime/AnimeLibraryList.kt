@@ -52,6 +52,7 @@ internal fun AnimeLibraryList(
         ) { libraryItem ->
             val anime = libraryItem.libraryAnime.anime
             EntryListItem(
+                contentLabels = anime.genre,
                 isSelected = selection.fastAny { it.id == libraryItem.libraryAnime.id },
                 title = anime.title,
                 coverData = AnimeCover(

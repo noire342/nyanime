@@ -24,6 +24,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.entries.components.ItemCover
+import eu.kanade.presentation.privacy.nsfwPrivacy
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import eu.kanade.presentation.util.formatEpisodeNumber
 import eu.kanade.tachiyomi.util.lang.toTimestampString
@@ -45,7 +46,7 @@ fun AnimeHistoryItem(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier
+        modifier = modifier.nsfwPrivacy(history.coverData)
             .clickable(onClick = onClickResume)
             .height(HistoryItemHeight)
             .padding(

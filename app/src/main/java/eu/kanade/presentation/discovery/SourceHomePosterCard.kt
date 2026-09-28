@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.privacy.nsfwPrivacy
 import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
 
@@ -31,7 +32,7 @@ fun SourceHomePosterCard(
 ) {
     val presentation = anime.homePresentation
     val sourceCount = presentation?.choices.orEmpty().size
-    Box(modifier) {
+    Box(modifier.nsfwPrivacy(anime)) {
         PosterCard(
             title = anime.title,
             cover = anime,

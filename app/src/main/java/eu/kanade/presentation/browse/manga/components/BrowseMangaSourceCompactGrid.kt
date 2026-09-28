@@ -64,6 +64,7 @@ private fun BrowseMangaSourceCompactGridItem(
     onLongClick: () -> Unit = onClick,
 ) {
     EntryCompactGridItem(
+        contentLabels = manga.genre,
         title = manga.title,
         coverData = MangaCover(
             mangaId = manga.id,

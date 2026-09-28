@@ -50,6 +50,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import eu.kanade.domain.ui.UiPreferences
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.data.discovery.MangaGenreLabels
 import eu.kanade.tachiyomi.data.discovery.MangaHomeItem
@@ -58,6 +59,7 @@ import eu.kanade.tachiyomi.data.discovery.MangaHomePage
 import eu.kanade.tachiyomi.data.discovery.MangaHomeRegistry
 import eu.kanade.tachiyomi.data.discovery.MangaHomeService
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -180,7 +182,10 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
             }
         }
 
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Surface(
+            Modifier.fillMaxSize().privacyRegion(PrivacyArea.SEARCH),
+            color = MaterialTheme.colorScheme.background,
+        ) {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     IconButton(onClick = { navigator.pop() }) {

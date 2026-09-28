@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.fragment.app.FragmentActivity
 import eu.kanade.presentation.more.settings.Preference
+import eu.kanade.presentation.privacy.privacyDisplayPreferences
 import eu.kanade.tachiyomi.core.security.SecurityPreferences
 import eu.kanade.tachiyomi.util.system.AuthenticatorUtil.authenticate
 import eu.kanade.tachiyomi.util.system.AuthenticatorUtil.isAuthenticationSupported
@@ -81,6 +82,7 @@ object SettingsSecurityScreen : SearchableSettings {
                 title = stringResource(MR.strings.secure_screen),
             ),
             Preference.PreferenceItem.InfoPreference(stringResource(MR.strings.secure_screen_summary)),
+            privacyDisplayPreferences(),
         )
     }
 }

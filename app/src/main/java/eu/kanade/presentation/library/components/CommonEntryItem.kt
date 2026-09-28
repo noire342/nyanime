@@ -46,6 +46,7 @@ import eu.kanade.presentation.motion.posterOpen
 import eu.kanade.presentation.motion.posterSource
 import eu.kanade.presentation.motion.posterSourcePlaceholder
 import eu.kanade.presentation.motion.rememberPosterSource
+import eu.kanade.presentation.privacy.nsfwPrivacy
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import tachiyomi.domain.entries.anime.model.AnimeCover
 import tachiyomi.i18n.MR
@@ -88,11 +89,13 @@ fun EntryCompactGridItem(
     coverAlpha: Float = 1f,
     coverBadgeStart: @Composable (RowScope.() -> Unit)? = null,
     coverBadgeEnd: @Composable (RowScope.() -> Unit)? = null,
+    contentLabels: List<String>? = null,
 ) {
     val poster = rememberAnimePosterSource(coverData)
     val openDetails = if (poster != null) posterOpen(poster, title.orEmpty(), onClick) else onClick
 
     GridItemSelectable(
+        modifier = Modifier.nsfwPrivacy(coverData, contentLabels),
         isSelected = isSelected,
         onClick = openDetails,
         onLongClick = onLongClick,
@@ -200,11 +203,13 @@ fun EntryComfortableGridItem(
     coverBadgeStart: (@Composable RowScope.() -> Unit)? = null,
     coverBadgeEnd: (@Composable RowScope.() -> Unit)? = null,
     onClickContinueViewing: (() -> Unit)? = null,
+    contentLabels: List<String>? = null,
 ) {
     val poster = rememberAnimePosterSource(coverData)
     val openDetails = if (poster != null) posterOpen(poster, title.orEmpty(), onClick) else onClick
 
     GridItemSelectable(
+        modifier = Modifier.nsfwPrivacy(coverData, contentLabels),
         isSelected = isSelected,
         onClick = openDetails,
         onLongClick = onLongClick,
@@ -369,12 +374,14 @@ fun EntryListItem(
     entries: Int = 0,
     containerHeight: Int = 0,
     modifier: Modifier = Modifier,
+    contentLabels: List<String>? = null,
 ) {
     val poster = rememberAnimePosterSource(coverData)
     val openDetails = if (poster != null) posterOpen(poster, title.orEmpty(), onClick) else onClick
 
     Row(
         modifier = modifier
+            .nsfwPrivacy(coverData, contentLabels)
             .selectedBackground(isSelected)
             .height(
                 when (entries) {

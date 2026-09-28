@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.discovery.SourceHomeArtwork
+import eu.kanade.presentation.privacy.nsfwPrivacy
 import tachiyomi.domain.discovery.homeItemKey
 import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
@@ -39,7 +40,7 @@ fun SourceFeaturedCarousel(items: List<Anime>, refreshKey: Int = 0, onClick: (An
         pageSpacing = 12.dp,
     ) { index ->
         val anime = items[index]
-        Card(onClick = { onClick(anime) }, modifier = Modifier.fillMaxWidth()) {
+        Card(onClick = { onClick(anime) }, modifier = Modifier.fillMaxWidth().nsfwPrivacy(anime)) {
             Box(Modifier.fillMaxWidth().heightIn(min = 340.dp), contentAlignment = Alignment.BottomStart) {
                 SourceHomeArtwork(
                     data = anime,

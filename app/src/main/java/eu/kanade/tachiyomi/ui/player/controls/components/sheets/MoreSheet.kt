@@ -140,6 +140,7 @@ fun MoreSheet(
                 }
             }
             SleepTimerEntry(remainingTime, onOpenSleepTimer, timerAtEpisodeEnd)
+            eu.kanade.presentation.privacy.PlayerPrivacyEntry()
             Text("Salto della sigla", style = MaterialTheme.typography.titleMedium)
             ShortcutPreference(
                 "Salta automaticamente (predefinito)",

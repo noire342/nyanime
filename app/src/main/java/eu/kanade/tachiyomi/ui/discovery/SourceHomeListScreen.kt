@@ -55,9 +55,11 @@ import eu.kanade.presentation.discovery.SourceHomeChoiceDialog
 import eu.kanade.presentation.discovery.SourceHomeFilterSheet
 import eu.kanade.presentation.discovery.SourceHomePosterCard
 import eu.kanade.presentation.discovery.SourceHomeRankingCard
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.data.discovery.SourceHomeSourceChoice
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.discovery.homeItemKey
@@ -159,7 +161,7 @@ class SourceHomeListScreen(
                 onApply = model::applyFilters,
             )
         }
-        Scaffold(topBar = {
+        Scaffold(modifier = Modifier.privacyRegion(PrivacyArea.SEARCH, enabled = isCatalogue), topBar = {
             Column {
                 TopAppBar(title = {
                     Text(if (isCatalogue) "Esplora ${source.title}" else state.title ?: title)

@@ -52,6 +52,7 @@ internal fun MangaLibraryList(
         ) { libraryItem ->
             val manga = libraryItem.libraryManga.manga
             EntryListItem(
+                contentLabels = manga.genre,
                 isSelected = selection.fastAny { it.id == libraryItem.libraryManga.id },
                 title = manga.title,
                 coverData = MangaCover(

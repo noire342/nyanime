@@ -79,6 +79,7 @@ fun Screen.animeHistoryTab(
     }
 
     return TabContent(
+        privacyArea = eu.kanade.tachiyomi.ui.privacy.PrivacyArea.HISTORY,
         titleRes = AYMR.strings.label_anime_history,
         searchEnabled = true,
         content = { contentPadding, _ ->

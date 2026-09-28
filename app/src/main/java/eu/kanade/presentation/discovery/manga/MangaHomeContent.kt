@@ -74,11 +74,14 @@ import eu.kanade.presentation.discovery.HomeMotion
 import eu.kanade.presentation.discovery.HomePosterRowSkeleton
 import eu.kanade.presentation.discovery.HomeSkeleton
 import eu.kanade.presentation.motion.appMotionEnabled
+import eu.kanade.presentation.privacy.nsfwPrivacy
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.discovery.MangaGenreLabels
 import eu.kanade.tachiyomi.data.discovery.MangaHomeChapter
 import eu.kanade.tachiyomi.data.discovery.MangaHomeItem
 import eu.kanade.tachiyomi.ui.discovery.manga.MangaHomeState
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import tachiyomi.domain.discovery.SourceHomeSection
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.history.manga.model.MangaHistoryWithRelations
@@ -254,7 +257,9 @@ fun MangaHomeContent(
                                 },
                             ) {
                                 if (featuredItem != null) {
-                                    BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = 222.dp)) {
+                                    BoxWithConstraints(
+                                        Modifier.fillMaxWidth().heightIn(min = 222.dp).nsfwPrivacy(featuredItem.manga),
+                                    ) {
                                         val posterWidth = (maxWidth * 0.34f).coerceIn(72.dp, 128.dp)
                                         Row(
                                             Modifier.padding(14.dp),
@@ -348,7 +353,10 @@ fun MangaHomeContent(
                 }
                 if (state.history.isNotEmpty()) {
                     item("continue") {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(
+                            modifier = Modifier.privacyRegion(PrivacyArea.RESUME),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
                             SectionTitle("Continua a leggere")
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 20.dp),
@@ -359,7 +367,7 @@ fun MangaHomeContent(
                                         onClick = { onResume(history) },
                                         shape = RoundedCornerShape(12.dp),
                                         color = MaterialTheme.colorScheme.surfaceContainer,
-                                        modifier = Modifier.width(260.dp),
+                                        modifier = Modifier.width(260.dp).nsfwPrivacy(history.coverData),
                                     ) {
                                         Row(
                                             Modifier.padding(10.dp),
@@ -405,7 +413,7 @@ fun MangaHomeContent(
                                         onClick = { onUpdate(update) },
                                         shape = RoundedCornerShape(12.dp),
                                         color = MaterialTheme.colorScheme.surfaceContainer,
-                                        modifier = Modifier.width(260.dp),
+                                        modifier = Modifier.width(260.dp).nsfwPrivacy(update.coverData),
                                     ) {
                                         Row(
                                             Modifier.padding(10.dp),
@@ -504,7 +512,7 @@ fun MangaHomeContent(
                                     ) {
                                         items(entries, key = { it.key }) { entry ->
                                             Column(
-                                                Modifier.width(152.dp),
+                                                Modifier.width(152.dp).nsfwPrivacy(entry.manga),
                                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                                             ) {
                                                 Artwork(
@@ -610,7 +618,7 @@ private fun MangaUpdateCard(
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().nsfwPrivacy(item.manga),
     ) {
         Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(Modifier.width(100.dp)) {

@@ -45,7 +45,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import eu.kanade.presentation.discovery.SourceHomeArtwork
+import eu.kanade.presentation.privacy.nsfwPrivacy
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.tachiyomi.data.discovery.LocalHomeItem
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import tachiyomi.domain.discovery.CatalogAnime
 import tachiyomi.domain.discovery.CatalogFeed
 import tachiyomi.domain.discovery.SectionState
@@ -137,7 +140,7 @@ fun PosterCard(
     artworkRefreshKey: Int = 0,
 ) {
     Column(
-        modifier.width((144 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)
+        modifier.nsfwPrivacy(cover, badges).width((144 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)
             .clickable(onClick = onClick).padding(bottom = 8.dp),
     ) {
         Box(
@@ -186,7 +189,10 @@ fun PosterCard(
 
 @Composable
 fun CatalogRow(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit, calendar: Boolean = false) {
-    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         items(items, key = { "${it.id.provider}:${it.id.value}:${it.airingAt}" }) { anime ->
             PosterCard(
                 anime.title,
@@ -291,9 +297,15 @@ fun LocalAnimeRow(
             style = MaterialTheme.typography.bodyMedium,
         )
     }
-    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyRow(
+        modifier = Modifier.privacyRegion(PrivacyArea.RESUME),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         items(items, key = { it.anime.id }) { item ->
-            Column(Modifier.width((160 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp)) {
+            Column(
+                Modifier.nsfwPrivacy(item.anime).width((160 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp),
+            ) {
                 PosterCard(item.anime.title, item.anime.asAnimeCover(), item.episode.name, { onOpen(item) })
                 if (item.progress > 0) {
                     LinearProgressIndicator(

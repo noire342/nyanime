@@ -11,9 +11,11 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import eu.kanade.presentation.components.relativeDateText
 import eu.kanade.presentation.history.anime.components.AnimeHistoryItem
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import eu.kanade.presentation.util.animateItemFastScroll
 import eu.kanade.tachiyomi.ui.history.anime.AnimeHistoryScreenModel
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import tachiyomi.domain.history.anime.model.AnimeHistoryWithRelations
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
@@ -35,6 +37,7 @@ fun AnimeHistoryScreen(
     searchQuery: String? = null,
 ) {
     Scaffold(
+        modifier = Modifier.privacyRegion(PrivacyArea.HISTORY),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { contentPadding ->
         state.list.let {

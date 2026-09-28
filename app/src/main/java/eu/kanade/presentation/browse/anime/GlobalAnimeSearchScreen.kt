@@ -10,11 +10,13 @@ import eu.kanade.presentation.browse.GlobalSearchLoadingResultItem
 import eu.kanade.presentation.browse.GlobalSearchResultItem
 import eu.kanade.presentation.browse.anime.components.GlobalAnimeSearchCardRow
 import eu.kanade.presentation.browse.anime.components.GlobalAnimeSearchToolbar
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.AnimeSearchItemResult
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.AnimeSearchScreenModel
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.AnimeSourceFilter
 import eu.kanade.tachiyomi.ui.browse.sourceSearchErrorMessage
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.presentation.core.components.material.Scaffold
@@ -34,6 +36,7 @@ fun GlobalAnimeSearchScreen(
     onRetrySource: ((AnimeSource) -> Unit)? = null,
 ) {
     Scaffold(
+        modifier = Modifier.privacyRegion(PrivacyArea.SEARCH),
         topBar = { scrollBehavior ->
             GlobalAnimeSearchToolbar(
                 searchQuery = state.searchQuery,

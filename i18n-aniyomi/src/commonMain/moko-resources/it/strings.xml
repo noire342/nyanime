@@ -607,4 +607,25 @@
     <string name="nyanime_amoled_description">Superfici completamente nere, disponibili con l’aspetto scuro.</string>
     <string name="nyanime_source_logo_title">Logo della fonte nella Home</string>
     <string name="nyanime_source_logo_description">Mostra il logo originale fornito dall’estensione. Se non disponibile, usa il logo Nyanime del tema scelto.</string>
+    <string name="privacy_display_title">Protezione laterale</string>
+    <string name="privacy_display_enable">Usa protezione laterale</string>
+    <string name="privacy_display_video">Video e sottotitoli</string>
+    <string name="privacy_display_reader">Lettore manga</string>
+    <string name="privacy_display_history">Cronologia</string>
+    <string name="privacy_display_resume">Continua a guardare e leggere</string>
+    <string name="privacy_display_search">Ricerca</string>
+    <string name="privacy_display_nsfw">Contenuti e fonti NSFW</string>
+    <string name="privacy_display_no_hardware">Questo dispositivo non ha un display privacy compatibile.</string>
+    <string name="privacy_display_no_firmware">La protezione non è applicabile con il firmware attuale.</string>
+    <string name="privacy_display_no_display">Non disponibile sui display esterni.</string>
+    <string name="privacy_display_no_window">Non disponibile in PiP, multifinestra e finestre aggiuntive.</string>
+    <string name="privacy_display_not_validated">Serve una verifica fisica per questo dispositivo e firmware.</string>
+    <string name="privacy_display_validation">Versione di prova: verifica sul dispositivo l’effetto visto di lato.</string>
+    <string name="privacy_display_available">Si applica automaticamente alle aree che scegli.</string>
+    <string name="privacy_display_summary">Limita la visione laterale sui display compatibili. L’effetto dipende da angolo e luminosità. La protezione delle catture è un’impostazione separata.</string>
+    <string name="privacy_display_interrupted">La protezione laterale non è applicata. Video e lettura continuano normalmente. Puoi consultarne lo stato nelle impostazioni di Sicurezza.</string>
+    <string name="privacy_display_applied">Richiesta sull’area video. L’effetto dipende dal display.</string>
+    <string name="privacy_display_player_session">Solo per questa riproduzione.</string>
+    <string name="privacy_display_copy_validation">Copia dati della prova</string>
+    <string name="privacy_display_copy_validation_summary">Modello e versione del sistema, per confermare questa verifica.</string>
 </resources>

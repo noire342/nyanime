@@ -33,7 +33,9 @@ import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.PosterCard
 import eu.kanade.presentation.discovery.airingLabel
 import eu.kanade.presentation.discovery.displayTitle
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.util.Screen
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import tachiyomi.domain.discovery.CatalogFeed
 
 class CatalogListScreen(private val feed: CatalogFeed) : Screen() {
@@ -45,7 +47,7 @@ class CatalogListScreen(private val feed: CatalogFeed) : Screen() {
         val navigator = LocalNavigator.currentOrThrow
         var query by rememberSaveable { mutableStateOf("") }
         LaunchedEffect(query) { if (feed == CatalogFeed.SEARCH) model.search(query) }
-        Scaffold(topBar = {
+        Scaffold(modifier = Modifier.privacyRegion(PrivacyArea.SEARCH, enabled = feed == CatalogFeed.SEARCH), topBar = {
             TopAppBar(title = { Text(feed.displayTitle()) }, navigationIcon = {
                 IconButton(onClick = { navigator.pop() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
             })
