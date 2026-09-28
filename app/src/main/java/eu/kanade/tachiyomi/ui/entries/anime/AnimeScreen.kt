@@ -144,7 +144,13 @@ class AnimeScreen(
         val watchedEpisode = successState.episodes.map { it.episode }
             .filter { it.episodeNumber > 0 && (it.seen || it.lastSecondSeen > 0) }
             .maxOfOrNull { it.episodeNumber }
-        LaunchedEffect(successState.anime.memo, trackedAniListId, trackedMalId, watchedEpisode) {
+        LaunchedEffect(
+            successState.anime.memo,
+            successState.anime.seasonNumber,
+            trackedAniListId,
+            trackedMalId,
+            watchedEpisode,
+        ) {
             screenModel.updateMangaContinuity(trackedAniListId, trackedMalId, watchedEpisode)
         }
 

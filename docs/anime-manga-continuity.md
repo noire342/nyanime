@@ -9,8 +9,11 @@ adattamento. Sono riferimenti editoriali, non una mappa completa di ogni episodi
 Gli intervalli stagione/episodio sono mostrati per aiutare a distinguere gli archi;
 non vengono convertiti in capitoli stimati. Il salto a un capitolo viene proposto
 solo con un checkpoint esplicito utilizzabile per l'episodio corrente. La presenza
-di una stagione nel checkpoint richiede una conferma che questa versione non
-deduce dal nome del titolo.
+di una stagione nel checkpoint viene confrontata con la stagione della scheda:
+numero esplicito fornito dall'estensione o dai titoli dell'esatto ID di catalogo.
+Una serie TV senza prequel TV è trattata come prima stagione; film, parti e anni
+di uscita non incrementano la numerazione. In caso di conflitto non si attribuisce
+un numero di stagione.
 
 I collegamenti sono compatti di default. Il corpo apre direttamente la copia
 verificata, oppure il capitolo quando esiste un checkpoint applicabile. Il controllo
@@ -19,7 +22,15 @@ l'animazione. Più copie verificate richiedono una scelta esplicita nei dettagli
 Senza checkpoint la scheda mantiene il collegamento al titolo senza mostrare
 un numero stimato o un avviso sul capitolo mancante.
 Il gradiente è lo stesso nei due stati. Nella versione compatta sono visibili
-anche i punti documentati di inizio e fine adattamento, senza dover aprire i dettagli.
+due righe «Stagione N • Inizio • Capitolo X» e «Stagione N • Fine • Capitolo Y»,
+quando esistono riferimenti per la stagione aperta. Più stagioni nello stesso
+campo sono lette separatamente: un punto dell'intera serie non diventa la fine
+di una stagione successiva. Un riferimento senza stagione può essere mostrato
+come riferimento della prima stagione solo se non risultano prequel o sequel TV.
+I punti mancanti o ambigui non sono inventati. Per film o adattamenti senza una
+stagione identificabile resta l'etichetta «Adattamento» sui riferimenti non numerati.
+Il termine «Fine» indica il punto finale catalogato, anche se una serie ancora
+in corso può estendere l'adattamento nei successivi aggiornamenti del catalogo.
 
 ## Dal manga all'anime
 

@@ -168,6 +168,7 @@ class AnimeScreenModel(
         val trackedAniListId: Long?,
         val trackedMalId: Long?,
         val watchedEpisode: Double?,
+        val seasonNumber: Double,
     )
 
     private var continuityRequest: ContinuityRequest? = null
@@ -175,7 +176,13 @@ class AnimeScreenModel(
 
     fun updateMangaContinuity(trackedAniListId: Long?, trackedMalId: Long?, watchedEpisode: Double?) {
         val current = successState ?: return
-        val request = ContinuityRequest(current.anime.memo, trackedAniListId, trackedMalId, watchedEpisode)
+        val request = ContinuityRequest(
+            current.anime.memo,
+            trackedAniListId,
+            trackedMalId,
+            watchedEpisode,
+            current.anime.seasonNumber,
+        )
         if (request == continuityRequest) return
         continuityRequest = request
         continuityJob?.cancel()

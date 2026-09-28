@@ -29,6 +29,9 @@ internal object AniListMediaLookup {
         val viaOriginalNovel: Boolean = false,
     )
 
+    data class AdaptationContext(val season: Int?, val standaloneSeason: Boolean)
+    data class MangaAdaptations(val relations: List<MangaRelation>, val context: AdaptationContext)
+
     data class AnimeRelation(
         val id: Long,
         val malId: Long?,
@@ -46,10 +49,16 @@ internal object AniListMediaLookup {
         .callTimeout(7, TimeUnit.SECONDS)
         .build()
     private val json = Json { ignoreUnknownKeys = true }
+    private val seasonPattern =
+        Regex(
+            "(?i)\\b(?:season|stagione|saison|staffel|temporada|сезон)\\s*(\\d{1,2})\\b|" +
+                "\\b(\\d{1,2})(?:st|nd|rd|th)\\s+season\\b|(?:第|ภาค\\s*)(\\d{1,2})(?:期|\\b)",
+        )
+    private val partPattern = Regex("(?i)\\bpart\\s*[2-9]\\b")
     private val cacheMutex = Mutex()
     private data class CacheEntry(val expiresAt: Long, val match: Match?)
     private val cache = LinkedHashMap<Pair<Type, String>, CacheEntry>(128, 0.75f, true)
-    private val relationCache = LinkedHashMap<Long, Pair<Long, List<MangaRelation>>>(64, 0.75f, true)
+    private val relationCache = LinkedHashMap<Long, Pair<Long, MangaAdaptations>>(64, 0.75f, true)
     private val animeRelationMutex = Mutex()
     private val animeRelationCache = LinkedHashMap<Long, Pair<Long, List<AnimeRelation>>>(64, 0.75f, true)
     private val relationClient = client.newBuilder()
@@ -132,8 +141,10 @@ internal object AniListMediaLookup {
         }.distinctBy { it.id }
 
     /** Only catalog IDs are sent. A title match never establishes an adaptation relationship. */
-    suspend fun mangaAdaptations(animeId: Long): List<MangaRelation> = cacheMutex.withLock {
-        if (animeId !in 1..Int.MAX_VALUE.toLong()) return@withLock emptyList()
+    suspend fun mangaAdaptations(animeId: Long): MangaAdaptations = cacheMutex.withLock {
+        if (animeId !in 1..Int.MAX_VALUE.toLong()) {
+            return@withLock MangaAdaptations(emptyList(), AdaptationContext(null, false))
+        }
         relationCache[animeId]?.takeIf { it.first > System.currentTimeMillis() }?.let { return@withLock it.second }
         val relations = fetchMangaAdaptations(animeId)
         relationCache[animeId] = (System.currentTimeMillis() + 24 * 60 * 60 * 1000L) to relations
@@ -141,10 +152,11 @@ internal object AniListMediaLookup {
         relations
     }
 
-    private suspend fun fetchMangaAdaptations(animeId: Long): List<MangaRelation> = withContext(Dispatchers.IO) {
+    private suspend fun fetchMangaAdaptations(animeId: Long): MangaAdaptations = withContext(Dispatchers.IO) {
         val query = """
             query Adaptations(${'$'}id: Int) {
               Media(id: ${'$'}id, type: ANIME) {
+                id type format title { romaji english native } synonyms
                 relations {
                   edges { relationType node { id idMal type format title { romaji english native } synonyms } }
                 }
@@ -155,9 +167,13 @@ internal object AniListMediaLookup {
             put("query", query)
             putJsonObject("variables") { put("id", animeId) }
         }.toString().toRequestBody(jsonMime)
-        val edges = client.newCall(POST("https://graphql.anilist.co", body = body)).awaitSuccess().use { response ->
-            json.decodeFromString<RelationResponse>(response.body.string()).data?.media?.relations?.edges.orEmpty()
+        val media = client.newCall(POST("https://graphql.anilist.co", body = body)).awaitSuccess().use { response ->
+            requireNotNull(json.decodeFromString<RelationResponse>(response.body.string()).data?.media) {
+                "Catalog relationship metadata unavailable"
+            }
         }
+        val edges = media.relations?.edges.orEmpty()
+        val context = adaptationContext(media)
         val direct = edges.mapNotNull { edge ->
             val node = edge.node ?: return@mapNotNull null
             if (edge.relationType != "ADAPTATION" || node.type != "MANGA" || node.format == "NOVEL") {
@@ -165,7 +181,7 @@ internal object AniListMediaLookup {
             }
             MangaRelation(node.id, node.idMal, node.names, node.format)
         }.distinctBy { it.id }
-        if (direct.isNotEmpty()) return@withContext direct
+        if (direct.isNotEmpty()) return@withContext MangaAdaptations(direct, context)
 
         // Some anime adapt a novel that has its own manga adaptations. Keep that relationship indirect.
         val novelIds = edges.asSequence()
@@ -176,7 +192,36 @@ internal object AniListMediaLookup {
             .toList()
         val indirect = mutableListOf<MangaRelation>()
         for (novelId in novelIds) indirect += fetchNovelMangaAdaptations(novelId)
-        indirect.distinctBy { it.id }
+        MangaAdaptations(indirect.distinctBy { it.id }, context)
+    }
+
+    internal fun parseAdaptationContext(raw: String): AdaptationContext =
+        adaptationContext(requireNotNull(json.decodeFromString<RelationResponse>(raw).data?.media))
+
+    private fun adaptationContext(media: Media): AdaptationContext {
+        val serial = media.format in setOf("TV", "TV_SHORT")
+        val edges = media.relations?.edges.orEmpty()
+        val previousSeason = edges.any {
+            it.relationType == "PREQUEL" && it.node?.type == "ANIME" && it.node.format in setOf("TV", "TV_SHORT")
+        }
+        val nextSeason = edges.any {
+            it.relationType == "SEQUEL" && it.node?.type == "ANIME" && it.node.format in setOf("TV", "TV_SHORT")
+        }
+        // Broadcast quarters and release years are not season ordinals.
+        val explicit = seasonOrdinal(media.names)
+        val partOnly = media.names.any { partPattern.containsMatchIn(it) }
+        val conflictingSeasons = explicit == null && media.names.any { seasonPattern.containsMatchIn(it) }
+        val season = explicit ?: if (serial && !previousSeason && !partOnly && !conflictingSeasons) 1 else null
+        return AdaptationContext(season, serial && !previousSeason && !nextSeason && season == 1)
+    }
+
+    internal fun seasonOrdinal(titles: List<String>): Int? {
+        return titles.flatMap { title ->
+            seasonPattern.findAll(title).mapNotNull { match ->
+                (match.groups[1]?.value ?: match.groups[2]?.value ?: match.groups[3]?.value)
+                    ?.toIntOrNull()?.takeIf { it > 0 }
+            }.toList()
+        }.distinct().singleOrNull()
     }
 
     private suspend fun fetchNovelMangaAdaptations(novelId: Long): List<MangaRelation> {
@@ -289,10 +334,7 @@ internal object AniListMediaLookup {
     private data class RelationResponse(val data: RelationData? = null)
 
     @Serializable
-    private data class RelationData(@kotlinx.serialization.SerialName("Media") val media: RelationMedia? = null)
-
-    @Serializable
-    private data class RelationMedia(val relations: RelationConnection? = null)
+    private data class RelationData(@kotlinx.serialization.SerialName("Media") val media: Media? = null)
 
     @Serializable
     private data class RelationConnection(val edges: List<RelationEdge> = emptyList())
@@ -311,7 +353,7 @@ internal object AniListMediaLookup {
 
     @Serializable
     private data class Media(
-        val id: Long,
+        val id: Long = 0,
         val idMal: Long? = null,
         val episodes: Int? = null,
         val type: String? = null,
@@ -320,6 +362,7 @@ internal object AniListMediaLookup {
         val synonyms: List<String> = emptyList(),
         val seasonYear: Int? = null,
         val coverImage: CoverImage? = null,
+        val relations: RelationConnection? = null,
     ) {
         val names: List<String> get() = listOfNotNull(title?.romaji, title?.english, title?.native) + synonyms
     }

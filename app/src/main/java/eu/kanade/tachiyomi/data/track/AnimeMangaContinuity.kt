@@ -63,6 +63,7 @@ class AnimeMangaContinuity(
         val beginning: Checkpoint?,
         val latestAdapted: Checkpoint?,
         val matches: List<Manga>,
+        val season: Int? = null,
     ) {
         /** Never interpolate episode numbers into chapter numbers. */
         fun continuationAfter(watchedEpisode: Double?): Double? {
@@ -93,8 +94,8 @@ class AnimeMangaContinuity(
         .build()
     private val json = Json { ignoreUnknownKeys = true }
     private data class CatalogMetadata(
-        val beginning: Checkpoint?,
-        val ending: Checkpoint?,
+        val beginning: List<Checkpoint>,
+        val ending: List<Checkpoint>,
         val coverUrl: String?,
     )
     private data class LinkedManga(val manga: SManga, val source: CatalogueSource, val hints: SourceTrackingHints)
@@ -114,7 +115,16 @@ class AnimeMangaContinuity(
             AniListMediaLookup.resolveId(it, AniListMediaLookup.Type.ANIME, malId = true)?.id
         } ?: return Result.NoCatalogId
 
-        val allRelations = AniListMediaLookup.mangaAdaptations(animeId)
+        val adaptation = AniListMediaLookup.mangaAdaptations(animeId)
+        val allRelations = adaptation.relations
+        val sourceSeason = anime.seasonNumber.takeIf { it in 1.0..99.0 && it % 1.0 == 0.0 }?.toInt()
+        val season = when {
+            sourceSeason != null &&
+                adaptation.context.season != null &&
+                sourceSeason != adaptation.context.season -> null
+            else -> sourceSeason ?: adaptation.context.season
+        }
+        val allowUnscoped = adaptation.context.standaloneSeason && season == 1
         val relations = allRelations.filter { it.format == "MANGA" }
             .ifEmpty { allRelations.filter { it.format == "ONE_SHOT" } }
         if (relations.isEmpty()) return Result.NoMangaRelation
@@ -151,7 +161,7 @@ class AnimeMangaContinuity(
                     permits.withPermit {
                         runCatching { bridge(relation.id) }.getOrElse { error ->
                             if (error is CancellationException) throw error
-                            CatalogMetadata(null, null, null)
+                            CatalogMetadata(emptyList(), emptyList(), null)
                         }
                     }
                 }
@@ -160,13 +170,13 @@ class AnimeMangaContinuity(
         val choices = prioritizedRelations.mapIndexed { index, relation ->
             val catalogMetadata = metadata[index]
             val matches = findVerifiedManga(relation, favorites, tracksByMangaId, linkedManga)
-            val (directBeginning, directEnding) = if (catalogMetadata.beginning == null ||
-                catalogMetadata.ending == null
-            ) {
+            val beginning = selectCheckpoint(catalogMetadata.beginning, season, allowUnscoped)
+            val ending = selectCheckpoint(catalogMetadata.ending, season, allowUnscoped)
+            val (directBeginning, directEnding) = if (beginning == null || ending == null) {
                 matches.firstOrNull()?.let { readMangaUpdatesCheckpoint(it, tracksByMangaId[it.id].orEmpty()) }
-                    ?: (null to null)
+                    ?: (emptyList<Checkpoint>() to emptyList())
             } else {
-                null to null
+                emptyList<Checkpoint>() to emptyList()
             }
             Choice(
                 catalogId = relation.id,
@@ -175,12 +185,19 @@ class AnimeMangaContinuity(
                 coverUrl = catalogMetadata.coverUrl,
                 format = relation.format,
                 viaOriginalNovel = relation.viaOriginalNovel,
-                beginning = catalogMetadata.beginning ?: directBeginning,
-                latestAdapted = catalogMetadata.ending ?: directEnding,
+                beginning = beginning ?: selectCheckpoint(directBeginning, season, allowUnscoped),
+                latestAdapted = ending ?: selectCheckpoint(directEnding, season, allowUnscoped),
                 matches = matches,
+                season = season,
             )
         }
-        return Result.Found(choices, watchedEpisode)
+        // A documented reference for this season takes precedence over other novel arcs.
+        return Result.Found(
+            choices.sortedByDescending { choice ->
+                listOfNotNull(choice.beginning, choice.latestAdapted).count { season != null && it.season == season }
+            },
+            watchedEpisode,
+        )
     }
 
     private suspend fun bridge(id: Long): CatalogMetadata = withContext(Dispatchers.IO) {
@@ -195,8 +212,8 @@ class AnimeMangaContinuity(
         // A merged or duplicated catalog mapping must not supply a silent checkpoint.
         val adaptation = series.singleOrNull()?.obj("anime")
         val result = CatalogMetadata(
-            checkpoint(adaptation?.string("start")),
-            checkpoint(adaptation?.string("end")),
+            checkpoints(adaptation?.string("start")),
+            checkpoints(adaptation?.string("end")),
             series.singleOrNull()?.obj("cover")?.obj("x250")?.string("x1")
                 ?: series.singleOrNull()?.obj("cover")?.obj("raw")?.string("url"),
         )
@@ -276,7 +293,7 @@ class AnimeMangaContinuity(
     private suspend fun readMangaUpdatesCheckpoint(
         manga: Manga,
         tracks: List<MangaTrack>,
-    ): Pair<Checkpoint?, Checkpoint?> {
+    ): Pair<List<Checkpoint>, List<Checkpoint>> {
         val trackedId = tracks
             .firstOrNull { it.trackerId == 7L && it.remoteId > 0 }?.remoteId
         val id = trackedId ?: withTimeoutOrNull(6_000) {
@@ -289,19 +306,19 @@ class AnimeMangaContinuity(
                 fetchChapters = false,
             ).manga
             SourceTrackingHints.from(details)?.mangaUpdatesId
-        } ?: return null to null
+        } ?: return emptyList<Checkpoint>() to emptyList()
         return runCatching {
             withContext(Dispatchers.IO) {
                 client.newCall(GET("https://api.mangaupdates.com/v1/series/$id"))
                     .awaitSuccess().use {
                         val record = json.parseToJsonElement(it.body.string()).jsonObject
                         val anime = record.obj("anime")
-                        checkpoint(anime?.string("start")) to checkpoint(anime?.string("end"))
+                        checkpoints(anime?.string("start")) to checkpoints(anime?.string("end"))
                     }
             }
         }.getOrElse { error ->
             if (error is CancellationException) throw error
-            null to null
+            emptyList<Checkpoint>() to emptyList()
         }
     }
 
@@ -315,17 +332,58 @@ class AnimeMangaContinuity(
         private val episodePattern = Regex("(?i)\\b(?:ep(?:isode)?)[ .:#]*(\\d+)\\b")
         private val seasonEpisodePattern =
             Regex("(?i)\\bS(?:eason)?[ .:#]*(\\d+)[ .:-]*E(?:p(?:isode)?)?[ .:#]*(\\d+)\\b")
+        private val seasonPattern = Regex("(?i)\\b(?:s(?:eason)?|stagione)[ .:#]*(\\d{1,2})\\b")
         private val exactEpisodePattern =
             Regex("(?i)\\b(?:adapted|covered|animated)\\s+in\\s+(?:ep(?:isode)?)[ .:#]*\\d+\\b")
 
-        internal fun checkpoint(raw: String?): Checkpoint? {
-            val text = raw?.trim()?.takeIf { it.isNotEmpty() && it.length <= 160 } ?: return null
-            val chapter = chapterPattern.find(text)?.groupValues?.get(1)?.toDoubleOrNull() ?: return null
-            val seasonEpisode = seasonEpisodePattern.find(text)
-            val season = seasonEpisode?.groupValues?.get(1)?.toIntOrNull()
-            val episode = seasonEpisode?.groupValues?.get(2)?.toIntOrNull()
-                ?: episodePattern.find(text)?.groupValues?.get(1)?.toIntOrNull()
-            return Checkpoint(chapter, text, episode, exactEpisodePattern.containsMatchIn(text), season)
+        internal fun checkpoint(raw: String?): Checkpoint? = checkpoints(raw).singleOrNull()
+
+        internal fun checkpoints(raw: String?): List<Checkpoint> {
+            val text = raw?.trim()?.takeIf { it.isNotEmpty() && it.length <= 4096 } ?: return emptyList()
+            return text.replace(Regex("(?i)<br\\s*/?>"), "\n").split(Regex("[\\r\\n;]+"))
+                .flatMap { line ->
+                    val references = chapterPattern.findAll(line).toList()
+                    // Repeated chapter mentions in a note belong to the same reference.
+                    val groups = references.fold(mutableListOf<MutableList<MatchResult>>()) { groups, reference ->
+                        if (groups.lastOrNull()?.last()?.groupValues?.get(1) == reference.groupValues[1]) {
+                            groups.last().add(reference)
+                        } else {
+                            groups.add(mutableListOf(reference))
+                        }
+                        groups
+                    }
+                    groups.mapIndexedNotNull { index, group ->
+                        val chapter = group.first().groupValues[1].toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 }
+                            ?: return@mapIndexedNotNull null
+                        val start = if (index == 0) 0 else group.first().range.first
+                        val end = groups.getOrNull(index + 1)?.first()?.range?.first ?: line.length
+                        val note = line.substring(start, end).trim().takeIf { it.length <= 512 }
+                            ?: return@mapIndexedNotNull null
+                        val seasons = (seasonPattern.findAll(note) + seasonEpisodePattern.findAll(note)).mapNotNull {
+                            it.groupValues[1].toIntOrNull()?.takeIf { number -> number > 0 }
+                        }.distinct().toList()
+                        // Ambiguous prose is not turned into a season/chapter assignment.
+                        if (seasons.size > 1) return@mapIndexedNotNull null
+                        val seasonEpisode = seasonEpisodePattern.find(note)
+                        val episode = seasonEpisode?.groupValues?.get(2)?.toIntOrNull()
+                            ?: episodePattern.find(note)?.groupValues?.get(1)?.toIntOrNull()
+                        Checkpoint(
+                            chapter,
+                            note,
+                            episode,
+                            exactEpisodePattern.containsMatchIn(note),
+                            seasons.singleOrNull(),
+                        )
+                    }
+                }.distinctBy { listOf(it.chapter, it.season, it.episode, it.exactEpisode) }
+        }
+
+        internal fun selectCheckpoint(points: List<Checkpoint>, season: Int?, allowUnscoped: Boolean): Checkpoint? {
+            if (season == null) return points.filter { it.season == null }.singleOrNull()
+            val scoped = points.filter { it.season == season }
+            if (scoped.isNotEmpty()) return scoped.singleOrNull()
+            // A series-wide endpoint must not be labelled as the endpoint of a sequel.
+            return if (allowUnscoped && points.none { it.season != null }) points.singleOrNull() else null
         }
 
         internal fun hasSameIdentity(anilistId: Long, malId: Long?, hints: SourceTrackingHints?): Boolean {

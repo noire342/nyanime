@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -27,8 +26,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import eu.kanade.presentation.components.ContinuityCard
@@ -63,15 +65,15 @@ fun AnimeMangaContinuityCard(
         modifier = modifier,
         preview = {
             if (choice.beginning != null || choice.latestAdapted != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                Column(
+                    modifier = Modifier.padding(top = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     choice.beginning?.let {
-                        ChapterReference("INIZIO", it.chapter, Modifier.weight(1f))
+                        ChapterReference(choice.season, "Inizio", it.chapter)
                     }
                     choice.latestAdapted?.let {
-                        ChapterReference("FINO A", it.chapter, Modifier.weight(1f))
+                        ChapterReference(choice.season, "Fine", it.chapter)
                     }
                 }
             }
@@ -171,20 +173,20 @@ fun AnimeMangaContinuityCard(
 }
 
 @Composable
-private fun ChapterReference(label: String, chapter: Double, modifier: Modifier = Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            "Cap. ${chapterLabel(chapter)}",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
+private fun ChapterReference(season: Int?, label: String, chapter: Double) {
+    Text(
+        buildAnnotatedString {
+            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                append(season?.let { "Stagione $it" } ?: "Adattamento")
+                append(" • $label • ")
+            }
+            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) {
+                append("Capitolo ${chapterLabel(chapter)}")
+            }
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
 }
 
 private fun chapterLabel(number: Double): String =

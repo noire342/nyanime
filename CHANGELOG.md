@@ -8,6 +8,16 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Capitoli della stagione aperta
+
+- La scheda compatta anime/manga mostra due righe con stagione, inizio/fine e
+  capitolo documentato. Il numero si riferisce alla stagione aperta nella scheda.
+- Riconosciuti anche i riferimenti «S1» senza episodio e i campi con più stagioni:
+  i capitoli di un'altra stagione o dell'intera serie non vengono riutilizzati
+  come fine di un sequel. Gli archi con riferimenti pertinenti hanno la precedenza.
+- Conservati il gradiente, l'apertura diretta del manga e il controllo circolare
+  per espandere e richiudere i dettagli.
+
 ## 28 settembre 2026 — Riferimenti manga a colpo d'occhio
 
 - La scheda compatta mostra subito il capitolo iniziale e l'ultimo capitolo

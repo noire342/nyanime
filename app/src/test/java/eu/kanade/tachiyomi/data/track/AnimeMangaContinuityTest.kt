@@ -45,6 +45,70 @@ class AnimeMangaContinuityTest {
     }
 
     @Test
+    fun `standalone season tags and separate season references are retained`() {
+        val points = AnimeMangaContinuity.checkpoints("Vol 1, Chap 1 (S1); Vol 5, Chap 30 (S2)")
+        assertEquals(listOf(1, 2), points.map { it.season })
+        assertEquals(1.0, AnimeMangaContinuity.selectCheckpoint(points, 1, false)?.chapter)
+        assertEquals(30.0, AnimeMangaContinuity.selectCheckpoint(points, 2, false)?.chapter)
+        assertNull(AnimeMangaContinuity.selectCheckpoint(points, 3, false))
+        assertNull(AnimeMangaContinuity.selectCheckpoint(points, null, false))
+        val inline = AnimeMangaContinuity.checkpoints("Vol 1, Chap 1 (S1), Vol 5, Chap 30 (S2E1)")
+        assertEquals(listOf(1, 2), inline.map { it.season })
+        assertEquals(1, inline.last().episode)
+        val slashSeparated = AnimeMangaContinuity.checkpoints(
+            "Vol 1, Chap 1 (S1) / Vol 5, Chap 30 (S2) / Vol 9, Chap 55 (S3) / Vol 13, Chap 90 (S4)",
+        )
+        assertEquals(listOf(1, 2, 3, 4), slashSeparated.map { it.season })
+        assertEquals(55.0, AnimeMangaContinuity.selectCheckpoint(slashSeparated, 3, false)?.chapter)
+        val html = AnimeMangaContinuity.checkpoints("Chap 23 (Season 1)<br />Chap 55 (Season 2)")
+        assertEquals(55.0, AnimeMangaContinuity.selectCheckpoint(html, 2, false)?.chapter)
+    }
+
+    @Test
+    fun `a series wide or ambiguous checkpoint is not a sequel endpoint`() {
+        val points = AnimeMangaContinuity.checkpoints("Vol 10, Chap 90")
+        assertEquals(90.0, AnimeMangaContinuity.selectCheckpoint(points, 1, true)?.chapter)
+        assertNull(AnimeMangaContinuity.selectCheckpoint(points, 1, false))
+        assertNull(AnimeMangaContinuity.selectCheckpoint(points, 2, false))
+        val ambiguous = AnimeMangaContinuity.checkpoints("Chap 30 (S2); Chap 35 (S2)")
+        assertNull(AnimeMangaContinuity.selectCheckpoint(ambiguous, 2, false))
+        assertNull(AnimeMangaContinuity.checkpoint("Chap 30 (S1 or S2)"))
+        assertNull(AnimeMangaContinuity.checkpoint("Chap 1 to Chap 30"))
+    }
+
+    @Test
+    fun `season numbering uses catalog entry titles and serial relations`() {
+        assertEquals(2, AniListMediaLookup.seasonOrdinal(listOf("Example 2nd Season", "Example Season 2 Part 2")))
+        assertEquals(2, AniListMediaLookup.seasonOrdinal(listOf("Example: Another Arc", "Example ภาค 2")))
+        assertEquals(3, AniListMediaLookup.seasonOrdinal(listOf("Example 第3期", "Example Staffel 3")))
+        assertNull(AniListMediaLookup.seasonOrdinal(listOf("Example 2026", "Example Part 2")))
+        assertNull(AniListMediaLookup.seasonOrdinal(listOf("Example Season 2", "Example Season 3")))
+        val first = AniListMediaLookup.parseAdaptationContext(
+            """{"data":{"Media":{"id":10,"format":"TV","title":{"english":"Example"},
+                "relations":{"edges":[{"relationType":"SEQUEL","node":{"id":20,"type":"ANIME","format":"TV"}}]}}}}""",
+        )
+        assertEquals(1, first.season)
+        assertFalse(first.standaloneSeason)
+        val sequel = AniListMediaLookup.parseAdaptationContext(
+            """{"data":{"Media":{"id":20,"format":"TV","title":{"english":"Example: Another Arc"},
+                "relations":{"edges":[{"relationType":"PREQUEL","node":{"id":10,"type":"ANIME","format":"TV"}}]}}}}""",
+        )
+        assertNull(sequel.season)
+        assertFalse(sequel.standaloneSeason)
+        val namedArc = AniListMediaLookup.parseAdaptationContext(
+            """{"data":{"Media":{"id":20,"format":"TV","title":{"english":"Example: Another Arc"},
+                "synonyms":["Example ภาค 2"],"relations":{"edges":[]}}}}""",
+        )
+        assertEquals(2, namedArc.season)
+        val standalone = AniListMediaLookup.parseAdaptationContext(
+            """{"data":{"Media":{"id":30,"format":"TV","title":{"english":"Example"},
+                "relations":{"edges":[{"relationType":"PREQUEL","node":{"id":40,"type":"ANIME","format":"MOVIE"}}]}}}}""",
+        )
+        assertEquals(1, standalone.season)
+        assertTrue(standalone.standaloneSeason)
+    }
+
+    @Test
     fun `a conflicting catalog ID prevents automatic association`() {
         assertTrue(AnimeMangaContinuity.hasSameIdentity(10, 20, SourceTrackingHints(anilistId = 10)))
         assertFalse(AnimeMangaContinuity.hasSameIdentity(10, 20, SourceTrackingHints(malId = 20, anilistId = 11)))
