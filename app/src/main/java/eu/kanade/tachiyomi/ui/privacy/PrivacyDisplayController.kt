@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.ui.privacy
 
 import android.view.Display
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.widget.Toast
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import nyanime.privacy.display.AndroidPrivacyDisplayTarget
 import nyanime.privacy.display.PrivacyBounds
 import nyanime.privacy.display.PrivacyDisplayCapability
 import nyanime.privacy.display.PrivacyDisplaySession
@@ -37,7 +39,8 @@ class PrivacyDisplayController(
     private val declarations = linkedMapOf<Any, Declaration>()
     private var host: View? = null
     private var observedTree: ViewTreeObserver? = null
-    private var session: PrivacyDisplaySession<View>? = null
+    private var session: PrivacyDisplaySession<AndroidPrivacyDisplayTarget>? = null
+    private var target: AndroidPrivacyDisplayTarget? = null
     private var started = false
     private var closed = false
     private var policy = PrivacyDisplayPolicy(
@@ -115,6 +118,8 @@ class PrivacyDisplayController(
         detachListener()
         session?.close()
         session = null
+        target?.close()
+        target = null
         host = null
         declarations.clear()
         owner.lifecycle.removeObserver(this)
@@ -146,8 +151,14 @@ class PrivacyDisplayController(
         if (host !== decor) {
             detachListener()
             session?.close()
+            target?.close()
+            val parent = decor as? ViewGroup ?: run {
+                acceptState(PrivacyDisplayState.Unavailable(PrivacyUnavailableReason.WINDOW_MODE))
+                return
+            }
             host = decor
-            session = PrivacyDisplaySession(decor, PrivacyDisplayRuntime.backend, ::acceptState)
+            val surface = AndroidPrivacyDisplayTarget(parent).also { target = it }
+            session = PrivacyDisplaySession(surface, PrivacyDisplayRuntime.backend, ::acceptState)
         }
         if (observedTree?.isAlive != true) {
             observedTree = decor.viewTreeObserver.also { it.addOnPreDrawListener(this) }

@@ -3,7 +3,7 @@ package nyanime.privacy.display
 import kotlin.math.ceil
 import kotlin.math.floor
 
-/** Physical display pixels, with exclusive right and bottom edges. */
+/** Android display-coordinate pixels, with exclusive right and bottom edges. */
 data class PrivacyBounds(val left: Int, val top: Int, val right: Int, val bottom: Int) {
     val empty: Boolean get() = left >= right || top >= bottom
 

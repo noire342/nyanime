@@ -18,6 +18,9 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 - Comando temporaneo in Player → Altro; geometria aggiornata insieme alla finestra
   e gestione degli errori separata dalla riproduzione. Preferenze incluse nei backup,
   senza esportare lo stato hardware o l’avviso locale.
+- Regione gestita tramite una vista dedicata, senza spostare o ridisegnare i contenuti
+  dell’app. Gestione dei margini richiesti dal pannello e aggiornamenti della posizione
+  senza ripetere l’attivazione hardware.
 - Modulo indipendente con adattatore Samsung originale. Sui dispositivi incompatibili
   il comando è disabilitato. Le build ordinarie mantengono disabilitate le modalità
   senza verifica fisica; l’APK locale di prova permette la valutazione sul Galaxy

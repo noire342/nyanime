@@ -9,6 +9,7 @@ class PrivacyDisplaySession<T : Any>(
     var state: PrivacyDisplayState = PrivacyDisplayState.Disabled
         private set
     private var applied: PrivacyRegion? = null
+    private var requested: PrivacyRegion? = null
     private var faulted = false
     private var closed = false
 
@@ -24,6 +25,7 @@ class PrivacyDisplaySession<T : Any>(
                     return
                 }
                 applied = null
+                requested = null
             }
             publish(
                 if (permitted &&
@@ -36,10 +38,13 @@ class PrivacyDisplaySession<T : Any>(
             )
             return
         }
-        if (applied == region) return
+        if (requested == region) return
         // Mark before calling: an enable that succeeds before position fails still needs cleanup.
+        val previous = applied
         applied = region
-        if (backend.apply(owner, region).isFailure) {
+        requested = region
+        val result = backend.apply(owner, region, previous)
+        if (result.isFailure) {
             faulted = true
             val cleanup = backend.clear(owner)
             if (cleanup.isSuccess) applied = null
@@ -49,7 +54,8 @@ class PrivacyDisplaySession<T : Any>(
                 ),
             )
         } else {
-            publish(PrivacyDisplayState.Applied(region))
+            applied = result.getOrThrow()
+            publish(PrivacyDisplayState.Applied(result.getOrThrow()))
         }
     }
 
@@ -64,6 +70,7 @@ class PrivacyDisplaySession<T : Any>(
             publish(PrivacyDisplayState.Disabled)
         }
         applied = null
+        requested = null
     }
 
     private fun publish(next: PrivacyDisplayState) {

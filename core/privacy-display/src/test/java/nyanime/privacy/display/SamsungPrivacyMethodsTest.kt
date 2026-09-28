@@ -52,4 +52,13 @@ class SamsungPrivacyMethodsTest {
         assertTrue(api.calls.isEmpty())
         assertTrue(samsungApiCall { throw NoSuchMethodError() }.isFailure)
     }
+
+    @Test fun changingPositionDoesNotReactivateThePrivacyView() {
+        val api = Api()
+        val methods = SamsungPrivacyMethods.resolve(Api::class.java)
+        val region = PrivacyRegion(PrivacyBounds(1, 2, 111, 222), 0)
+        methods.apply(api, region)
+        methods.apply(api, region.copy(bounds = region.bounds.translate(0, 20)), activate = false)
+        assertEquals(listOf("radius:0.0", "1,2,111,222", "1,22,111,242"), api.calls)
+    }
 }

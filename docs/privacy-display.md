@@ -14,6 +14,10 @@ Il comando in **Player → Altro** è un’eccezione per quella riproduzione e n
 
 La politica immutabile `PrivacyDisplayPolicy` e le preferenze appartengono a `ui/privacy`, i controlli e i modifier a `presentation/privacy`. Le schermate dichiarano aree; non conoscono Samsung. Non vengono aggiunte chiamate mpv, decoder, servizi, permessi overlay o impostazioni globali del dispositivo.
 
+L’API Samsung di posizionamento modifica il RenderNode della View destinataria: non deve essere chiamata sul decor o su una View che disegna contenuti. `AndroidPrivacyDisplayTarget` possiede una View trasparente e non interattiva nel `ViewGroupOverlay` della finestra, separata dalla misura e dal layout dei contenuti. Solo quella View viene posizionata e attivata; gli aggiornamenti della posizione non ripetono l’attivazione. Disattivazione e chiusura rimuovono l’ancora e tutti i riferimenti alla finestra.
+
+Nella prova SM-S948B con firmware `S948BXXS4AZHL`, i log del driver hanno mostrato un’espansione di un pixel a sinistra/in alto e due a destra/in basso, seguita dal rifiuto delle regioni fuori pannello. L’adattatore compensa questa espansione prima della validazione dei bordi; `PrivacyViewPlacement` gestisce separatamente rettangolo nel display e coordinate locali dell’ancora, usando le dimensioni correnti anche dopo rotazione. La sessione espone la regione accettata e deduplica quella richiesta, evitando riapplicazioni continue quando i bordi vengono corretti. Questa evidenza tecnica non costituisce una verifica ottica.
+
 Per rimuovere la funzione: eliminare le dichiarazioni `privacyRegion`/`nsfwPrivacy`/`nsfwSourcePrivacy`, le registrazioni native, il comando in Altro e il gruppo Sicurezza; rimuovere controller e registrazioni DI; infine eliminare modulo, dipendenza Gradle e risorse. Nessun formato di libreria, database, estensione o backup richiede migrazione. Le preferenze inutilizzate possono essere eliminate per prefisso, senza modificare altri dati.
 
 ## Validazione e rilascio

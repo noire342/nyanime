@@ -10,7 +10,9 @@ sealed interface PrivacyDisplayCapability {
 /** The target is platform-owned; implementations must not retain it after an operation. */
 interface PrivacyDisplayBackend<T : Any> {
     val capability: PrivacyDisplayCapability
-    fun apply(target: T, region: PrivacyRegion): Result<Unit>
+
+    /** Returns the region accepted after platform geometry constraints. No target is retained. */
+    fun apply(target: T, region: PrivacyRegion, previous: PrivacyRegion?): Result<PrivacyRegion>
     fun clear(target: T): Result<Unit>
 }
 

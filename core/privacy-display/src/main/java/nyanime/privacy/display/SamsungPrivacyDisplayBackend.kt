@@ -12,15 +12,37 @@ data class PrivacyDisplayDevice(val manufacturer: String, val model: String, val
 class SamsungPrivacyDisplayBackend private constructor(
     override val capability: PrivacyDisplayCapability,
     private val methods: SamsungPrivacyMethods?,
-) : PrivacyDisplayBackend<View> {
-    override fun apply(target: View, region: PrivacyRegion): Result<Unit> = samsungApiCall {
+) : PrivacyDisplayBackend<AndroidPrivacyDisplayTarget> {
+    override fun apply(
+        target: AndroidPrivacyDisplayTarget,
+        region: PrivacyRegion,
+        previous: PrivacyRegion?,
+    ): Result<PrivacyRegion> = samsungApiCall {
         val api = checkNotNull(methods)
-        api.apply(target, region)
+        val placement = target.place(region, panelExpansion)
+        val view = checkNotNull(target.currentView)
+        api.apply(
+            view,
+            placement.displayRegion.copy(bounds = placement.localBounds),
+            activate = previous == null || previous.cornerRadiusPx != region.cornerRadiusPx,
+        )
+        view.invalidate()
+        placement.displayRegion
     }
 
-    override fun clear(target: View): Result<Unit> = samsungApiCall { checkNotNull(methods).clear(target) }
+    override fun clear(target: AndroidPrivacyDisplayTarget): Result<Unit> = samsungApiCall {
+        try {
+            target.currentView?.let { checkNotNull(methods).clear(it) }
+        } finally {
+            target.detach()
+        }
+    }
 
     companion object {
+        // Observed S26 firmware expands by (-1, -1, +2, +2), then rejects out-of-panel regions.
+        // Keep compensation in this adapter, never in screen geometry or content policy.
+        private val panelExpansion = PrivacyPanelExpansion(1, 1, 2, 2)
+
         fun create(device: PrivacyDisplayDevice): SamsungPrivacyDisplayBackend {
             if (!device.samsungPrivacyHardware) {
                 return SamsungPrivacyDisplayBackend(
@@ -47,8 +69,8 @@ internal class SamsungPrivacyMethods private constructor(
     private val position: Method,
     private val disable: Method,
 ) {
-    fun apply(target: Any, region: PrivacyRegion) {
-        enable.invoke(target, region.cornerRadiusPx)
+    fun apply(target: Any, region: PrivacyRegion, activate: Boolean = true) {
+        if (activate) enable.invoke(target, region.cornerRadiusPx)
         with(region.bounds) { position.invoke(target, left, top, right, bottom) }
     }
 

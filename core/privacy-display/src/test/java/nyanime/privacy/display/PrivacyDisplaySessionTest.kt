@@ -11,9 +11,12 @@ class PrivacyDisplaySessionTest {
         var clears = 0
         var failApply = false
         var failClear = false
-        override fun apply(target: String, region: PrivacyRegion): Result<Unit> {
+        var previousRegions = mutableListOf<PrivacyRegion?>()
+        var accepted: PrivacyRegion? = null
+        override fun apply(target: String, region: PrivacyRegion, previous: PrivacyRegion?): Result<PrivacyRegion> {
             applies++
-            return if (failApply) Result.failure(IllegalStateException("apply")) else Result.success(Unit)
+            previousRegions += previous
+            return if (failApply) Result.failure(IllegalStateException("apply")) else Result.success(accepted ?: region)
         }
         override fun clear(target: String): Result<Unit> {
             clears++
@@ -96,5 +99,19 @@ class PrivacyDisplaySessionTest {
         repeat(10) { session.update(region, true) }
         assertEquals(1, backend.applies)
         assertEquals(1, backend.clears)
+    }
+
+    @Test fun fittedGeometryDoesNotCauseRepeatedApplicationAndIsReportedAccurately() {
+        val accepted = region.copy(bounds = region.bounds.translate(1, 0))
+        val backend = Backend().apply { this.accepted = accepted }
+        val session = PrivacyDisplaySession("window", backend)
+        repeat(100) { session.update(region, true) }
+        assertEquals(1, backend.applies)
+        assertEquals(PrivacyDisplayState.Applied(accepted), session.state)
+        session.update(region.copy(bounds = region.bounds.translate(2, 0)), true)
+        assertEquals(listOf(null, accepted), backend.previousRegions)
+        session.update(null, false)
+        session.update(region, true)
+        assertEquals(null, backend.previousRegions.last())
     }
 }
