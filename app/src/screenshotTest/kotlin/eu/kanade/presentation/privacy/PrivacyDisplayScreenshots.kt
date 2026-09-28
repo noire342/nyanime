@@ -30,7 +30,7 @@ fun PrivacyUnsupportedPreview() = PrivacyPreview(false, true, true)
 fun PrivacyLegacyPreview() = PrivacyPreview(false, false, false)
 
 @PreviewTest
-@Preview(name = "PrivacyValidationEnabled", widthDp = 393, heightDp = 1000, locale = "it")
+@Preview(name = "PrivacyEnabled", widthDp = 393, heightDp = 1000, locale = "it")
 @Preview(name = "PrivacyEnabledNarrowLargeText", widthDp = 280, heightDp = 1500, fontScale = 1.5f, locale = "it")
 @Composable
 fun PrivacyEnabledPreview() = PrivacyPreview(true, true, true)
@@ -45,7 +45,7 @@ private fun PrivacyPreview(available: Boolean, modern: Boolean, dark: Boolean) {
                     title = stringResource(AYMR.strings.privacy_display_enable),
                     subtitle = stringResource(
                         if (available) {
-                            AYMR.strings.privacy_display_validation
+                            AYMR.strings.privacy_display_available
                         } else {
                             AYMR.strings.privacy_display_no_hardware
                         },

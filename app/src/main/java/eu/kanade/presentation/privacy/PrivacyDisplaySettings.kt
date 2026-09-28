@@ -10,7 +10,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import eu.kanade.presentation.more.settings.Preference
-import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import eu.kanade.tachiyomi.ui.privacy.PrivacyDisplayPreferences
 import eu.kanade.tachiyomi.ui.privacy.PrivacyDisplayRuntime
@@ -69,8 +68,7 @@ fun privacyDisplayPreferences(): Preference.PreferenceGroup {
                         }
                     }
                 } +
-                Preference.PreferenceItem.InfoPreference(stringResource(AYMR.strings.privacy_display_summary)) +
-                privacyValidationDiagnostics(capability)
+                Preference.PreferenceItem.InfoPreference(stringResource(AYMR.strings.privacy_display_summary))
             ).toImmutableList(),
     )
 }
@@ -96,10 +94,6 @@ fun privacyCapabilityDescription(capability: PrivacyDisplayCapability): String =
         PrivacyUnavailableReason.DISPLAY -> AYMR.strings.privacy_display_no_display
         PrivacyUnavailableReason.WINDOW_MODE -> AYMR.strings.privacy_display_no_window
         PrivacyUnavailableReason.NOT_VALIDATED -> AYMR.strings.privacy_display_not_validated
-        null -> if (BuildConfig.PRIVACY_DISPLAY_VALIDATION) {
-            AYMR.strings.privacy_display_validation
-        } else {
-            AYMR.strings.privacy_display_available
-        }
+        null -> AYMR.strings.privacy_display_available
     },
 )

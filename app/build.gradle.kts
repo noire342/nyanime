@@ -34,7 +34,6 @@ android {
         buildConfigField("boolean", "UPDATER_ENABLED", "${Config.enableUpdater}")
         buildConfigField("boolean", "COMMUNITY_ENABLED", communityEnabled.toString())
         buildConfigField("boolean", "PERSONAL_SYNC_ENABLED", personalSyncEnabled.toString())
-        buildConfigField("boolean", "PRIVACY_DISPLAY_VALIDATION", "false")
 
         // Put these fields in acra.properties
         // val acraProperties = Properties()
@@ -70,13 +69,6 @@ android {
 
         create("preview") {
             initWith(release)
-            // Local optical validation only. CI does not opt into unverified display modes.
-            buildConfigField(
-                "boolean",
-                "PRIVACY_DISPLAY_VALIDATION",
-                (providers.gradleProperty("privacyDisplayValidation").orNull == "true").toString(),
-            )
-
             applicationIdSuffix = ".debug"
 
             versionNameSuffix = debug.versionNameSuffix

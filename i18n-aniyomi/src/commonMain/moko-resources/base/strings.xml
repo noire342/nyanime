@@ -712,12 +712,9 @@
     <string name="privacy_display_no_display">Unavailable on external displays.</string>
     <string name="privacy_display_no_window">Unavailable in picture-in-picture, multi-window and additional windows.</string>
     <string name="privacy_display_not_validated">Physical verification is required for this device and firmware.</string>
-    <string name="privacy_display_validation">Test version: check the actual side-view effect on this device.</string>
     <string name="privacy_display_available">Automatically applies to the areas you choose.</string>
     <string name="privacy_display_summary">Limits side viewing on supported hardware. The effect depends on angle and brightness. Screenshot protection is a separate setting.</string>
     <string name="privacy_display_interrupted">Side-view protection is not applied. Playback and reading will continue. Check Security settings for its status.</string>
     <string name="privacy_display_applied">Requested on the video area. Effect depends on the display.</string>
     <string name="privacy_display_player_session">For this playback session only.</string>
-    <string name="privacy_display_copy_validation">Copy validation details</string>
-    <string name="privacy_display_copy_validation_summary">Device model and system version, to record this validation.</string>
 </resources>
