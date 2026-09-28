@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import eu.kanade.presentation.components.ContinuityCard
 import eu.kanade.presentation.components.ContinuityDestination
 import eu.kanade.presentation.components.ContinuityDestinationSheet
+import eu.kanade.tachiyomi.data.track.AnimeMangaContinuity
 import eu.kanade.tachiyomi.data.track.MangaAnimeContinuity
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
@@ -61,8 +62,22 @@ fun MangaAnimeContinuityCard(
             destinations = found.choices.map {
                 ContinuityDestination(
                     it.title,
-                    listOfNotNull(formatLabel(it.format), it.year?.toString(), it.episodes?.let { "$it episodi" })
+                    listOfNotNull(
+                        if (it.format in setOf("TV", "TV_SHORT", "ONA") && it.season != null) {
+                            "Stagione ${it.season}"
+                        } else {
+                            formatLabel(it.format)
+                        },
+                        it.year?.toString(),
+                        it.episodes?.takeUnless { count -> it.format == "MOVIE" && count == 1 }?.let { count ->
+                            if (count == 1) "1 episodio" else "$count episodi"
+                        },
+                    )
                         .joinToString(" · "),
+                    listOfNotNull(
+                        it.beginning?.let { point -> "Inizio · ${chapterReference(point)}" },
+                        it.latestAdapted?.let { point -> "Fine · ${chapterReference(point)}" },
+                    ).ifEmpty { listOf("Capitoli non disponibili") },
                 )
             },
             onSelect = {
@@ -84,6 +99,11 @@ fun MangaAnimeContinuityCard(
             onDismiss = { choosingCopy = false },
         )
     }
+}
+
+private fun chapterReference(point: AnimeMangaContinuity.Checkpoint): String {
+    val chapter = if (point.chapter % 1.0 == 0.0) point.chapter.toInt().toString() else point.chapter.toString()
+    return "Capitolo $chapter" + (point.page?.let { " · pagina $it" } ?: "")
 }
 
 private fun formatLabel(format: String?): String? = when (format) {

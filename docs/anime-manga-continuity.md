@@ -46,6 +46,12 @@ Se il manga deriva da una novel, il collegamento indiretto è indicato.
 
 Le stagioni e gli altri adattamenti mantengono il proprio ID e vengono mostrati
 separatamente, con titolo, formato, anno e numero di episodi quando disponibili.
+La scelta mostra sotto ogni stagione i capitoli documentati di inizio e fine,
+in due righe distinte. Il numero di stagione viene ricavato dal catalogo, con
+gli stessi criteri del percorso inverso; film e speciali non ereditano intervalli
+TV. Se manca un riferimento, non viene calcolato dal numero degli episodi.
+Gli eventuali riferimenti a una pagina interna al capitolo restano visibili.
+I due percorsi condividono la cache dei cataloghi, interrogati tramite ID.
 Nyanime verifica le copie note e interroga `AnimeCatalogIdResolver` nelle estensioni
 compatibili. La copia deve fornire un ID nei metadati dell'estensione: un vecchio
 tracking da solo non prova che non sia un altro adattamento dello stesso titolo.

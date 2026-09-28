@@ -41,6 +41,7 @@ internal object AniListMediaLookup {
         val year: Int?,
         val coverUrl: String?,
         val viaOriginalNovel: Boolean = false,
+        val context: AdaptationContext = AdaptationContext(null, false),
     )
 
     private val client = OkHttpClient.Builder()
@@ -98,6 +99,7 @@ internal object AniListMediaLookup {
                   edges { relationType node {
                     id idMal type format episodes seasonYear coverImage { large }
                     title { romaji english native } synonyms
+                    relations { edges { relationType node { id type format } } }
                   } }
                 }
               }
@@ -137,6 +139,7 @@ internal object AniListMediaLookup {
                 node.seasonYear,
                 node.coverImage?.large,
                 viaOriginalNovel,
+                adaptationContext(node),
             )
         }.distinctBy { it.id }
 

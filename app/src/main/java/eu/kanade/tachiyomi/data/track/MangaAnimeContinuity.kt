@@ -40,6 +40,9 @@ class MangaAnimeContinuity(
         val coverUrl: String?,
         val viaOriginalNovel: Boolean,
         val matches: List<Anime>,
+        val season: Int? = null,
+        val beginning: AnimeMangaContinuity.Checkpoint? = null,
+        val latestAdapted: AnimeMangaContinuity.Checkpoint? = null,
     )
 
     sealed interface Result {
@@ -77,6 +80,23 @@ class MangaAnimeContinuity(
         sourceManager.isInitialized.first { it }
         val sources = sourceManager.getAll().filterIsInstance<AnimeCatalogIdResolver>()
         val choices = coroutineScope {
+            val chapterRanges = async(Dispatchers.IO) {
+                val primary = AdaptationChapterCatalog.mangaBaka(mangaId)
+                val fallback = hints?.mangaUpdatesId?.takeIf {
+                    relations.any {
+                        it.format in setOf("TV", "TV_SHORT", "ONA") &&
+                            it.context.season != null &&
+                            !primary.forAdaptation(it.format, it.context).complete
+                    }
+                }?.let { AdaptationChapterCatalog.mangaUpdates(it) }
+                relations.associate { relation ->
+                    val range = primary.forAdaptation(relation.format, relation.context)
+                    val resolvedRange = fallback?.let {
+                        range.withFallback(it.forAdaptation(relation.format, relation.context))
+                    } ?: range
+                    relation.id to resolvedRange
+                }
+            }
             val permits = Semaphore(3)
             relations.map { relation ->
                 async(Dispatchers.IO) {
@@ -149,6 +169,7 @@ class MangaAnimeContinuity(
                                 break
                             }
                         }
+                        val range = chapterRanges.await()[relation.id]
                         Choice(
                             relation.id,
                             relation.title,
@@ -158,6 +179,9 @@ class MangaAnimeContinuity(
                             relation.coverUrl,
                             relation.viaOriginalNovel,
                             matches,
+                            relation.context.season,
+                            range?.beginning,
+                            range?.ending,
                         )
                     }
                 }

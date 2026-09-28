@@ -3,6 +3,7 @@ package eu.kanade.presentation.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -63,7 +64,11 @@ internal fun ContinuityCard(
     }
 }
 
-internal data class ContinuityDestination(val title: String, val subtitle: String? = null)
+internal data class ContinuityDestination(
+    val title: String,
+    val subtitle: String? = null,
+    val chapterReferences: List<String> = emptyList(),
+)
 
 /** Only ambiguous destinations require a choice; the card itself never expands. */
 @Composable
@@ -86,7 +91,11 @@ internal fun ContinuityDestinationSheet(
                         Modifier.fillMaxWidth().clickable { onSelect(index) }
                             .heightIn(min = 56.dp).padding(horizontal = 24.dp, vertical = 14.dp),
                     ) {
-                        Text(destination.title, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            destination.title,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                        )
                         destination.subtitle?.takeIf(String::isNotBlank)?.let {
                             Text(
                                 it,
@@ -94,6 +103,20 @@ internal fun ContinuityDestinationSheet(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 4.dp),
                             )
+                        }
+                        if (destination.chapterReferences.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                        RoundedCornerShape(12.dp),
+                                    ).padding(horizontal = 12.dp, vertical = 9.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                destination.chapterReferences.forEach {
+                                    Text(it, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
                         }
                     }
                 }

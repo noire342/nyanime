@@ -4,8 +4,6 @@ import eu.kanade.domain.entries.manga.model.toDomainManga
 import eu.kanade.domain.entries.manga.model.toSManga
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.RelatedMangaLinks
-import eu.kanade.tachiyomi.network.GET
-import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.MangaCatalogIdResolver
 import eu.kanade.tachiyomi.source.MangaCatalogLinkResolver
@@ -21,14 +19,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
-import okhttp3.OkHttpClient
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.manga.interactor.NetworkToLocalManga
 import tachiyomi.domain.entries.manga.model.Manga
@@ -36,7 +26,6 @@ import tachiyomi.domain.entries.manga.repository.MangaRepository
 import tachiyomi.domain.source.manga.service.MangaSourceManager
 import tachiyomi.domain.track.manga.model.MangaTrack
 import tachiyomi.domain.track.manga.repository.MangaTrackRepository
-import java.util.concurrent.TimeUnit
 
 /** Verified catalog relationships and source-independent continuation checkpoints. */
 class AnimeMangaContinuity(
@@ -51,6 +40,7 @@ class AnimeMangaContinuity(
         val episode: Int?,
         val exactEpisode: Boolean = false,
         val season: Int? = null,
+        val page: Int? = null,
     )
 
     data class Choice(
@@ -87,19 +77,7 @@ class AnimeMangaContinuity(
         data object NoMangaRelation : Result
     }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
-        .callTimeout(12, TimeUnit.SECONDS)
-        .build()
-    private val json = Json { ignoreUnknownKeys = true }
-    private data class CatalogMetadata(
-        val beginning: List<Checkpoint>,
-        val ending: List<Checkpoint>,
-        val coverUrl: String?,
-    )
     private data class LinkedManga(val manga: SManga, val source: CatalogueSource, val hints: SourceTrackingHints)
-    private val bridgeCache = LinkedHashMap<Long, Pair<Long, CatalogMetadata>>(64, 0.75f, true)
 
     suspend fun resolve(
         anime: Anime,
@@ -159,10 +137,7 @@ class AnimeMangaContinuity(
             prioritizedRelations.map { relation ->
                 async(Dispatchers.IO) {
                     permits.withPermit {
-                        runCatching { bridge(relation.id) }.getOrElse { error ->
-                            if (error is CancellationException) throw error
-                            CatalogMetadata(emptyList(), emptyList(), null)
-                        }
+                        AdaptationChapterCatalog.mangaBaka(relation.id)
                     }
                 }
             }.awaitAll()
@@ -198,30 +173,6 @@ class AnimeMangaContinuity(
             },
             watchedEpisode,
         )
-    }
-
-    private suspend fun bridge(id: Long): CatalogMetadata = withContext(Dispatchers.IO) {
-        synchronized(bridgeCache) {
-            bridgeCache[id]?.takeIf { it.first > System.currentTimeMillis() }?.second
-        }?.let { return@withContext it }
-        val raw = client.newCall(GET("https://api.mangabaka.org/v1/source/anilist/$id"))
-            .awaitSuccess().use { json.parseToJsonElement(it.body.string()).jsonObject }
-        val series = raw.obj("data")?.get("series")?.jsonArray.orEmpty()
-            .mapNotNull { runCatching { it.jsonObject }.getOrNull() }
-            .filter { it.obj("source")?.obj("anilist")?.get("id")?.jsonPrimitive?.longOrNull == id }
-        // A merged or duplicated catalog mapping must not supply a silent checkpoint.
-        val adaptation = series.singleOrNull()?.obj("anime")
-        val result = CatalogMetadata(
-            checkpoints(adaptation?.string("start")),
-            checkpoints(adaptation?.string("end")),
-            series.singleOrNull()?.obj("cover")?.obj("x250")?.string("x1")
-                ?: series.singleOrNull()?.obj("cover")?.obj("raw")?.string("url"),
-        )
-        synchronized(bridgeCache) {
-            bridgeCache[id] = (System.currentTimeMillis() + 24 * 60 * 60 * 1000L) to result
-            if (bridgeCache.size > 64) bridgeCache.remove(bridgeCache.keys.first())
-        }
-        result
     }
 
     private suspend fun findVerifiedManga(
@@ -307,29 +258,14 @@ class AnimeMangaContinuity(
             ).manga
             SourceTrackingHints.from(details)?.mangaUpdatesId
         } ?: return emptyList<Checkpoint>() to emptyList()
-        return runCatching {
-            withContext(Dispatchers.IO) {
-                client.newCall(GET("https://api.mangaupdates.com/v1/series/$id"))
-                    .awaitSuccess().use {
-                        val record = json.parseToJsonElement(it.body.string()).jsonObject
-                        val anime = record.obj("anime")
-                        checkpoints(anime?.string("start")) to checkpoints(anime?.string("end"))
-                    }
-            }
-        }.getOrElse { error ->
-            if (error is CancellationException) throw error
-            emptyList<Checkpoint>() to emptyList()
-        }
+        val metadata = AdaptationChapterCatalog.mangaUpdates(id)
+        return metadata.beginning to metadata.ending
     }
-
-    private fun JsonObject.obj(key: String): JsonObject? = runCatching { get(key)?.jsonObject }.getOrNull()
-    private fun JsonObject.string(
-        key: String,
-    ): String? = runCatching { get(key)?.jsonPrimitive?.contentOrNull }.getOrNull()
 
     companion object {
         private val chapterPattern = Regex("(?i)\\b(?:chap(?:ter)?|ch\\.?)[ .:#]*(\\d+(?:\\.\\d+)?)\\b")
         private val episodePattern = Regex("(?i)\\b(?:ep(?:isode)?)[ .:#]*(\\d+)\\b")
+        private val pagePattern = Regex("(?i)\\bpage[ .:#]*(\\d+)\\b")
         private val seasonEpisodePattern =
             Regex("(?i)\\bS(?:eason)?[ .:#]*(\\d+)[ .:-]*E(?:p(?:isode)?)?[ .:#]*(\\d+)\\b")
         private val seasonPattern = Regex("(?i)\\b(?:s(?:eason)?|stagione)[ .:#]*(\\d{1,2})\\b")
@@ -373,9 +309,10 @@ class AnimeMangaContinuity(
                             episode,
                             exactEpisodePattern.containsMatchIn(note),
                             seasons.singleOrNull(),
+                            pagePattern.find(note)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 },
                         )
                     }
-                }.distinctBy { listOf(it.chapter, it.season, it.episode, it.exactEpisode) }
+                }.distinctBy { listOf(it.chapter, it.season, it.episode, it.exactEpisode, it.page) }
         }
 
         internal fun selectCheckpoint(points: List<Checkpoint>, season: Int?, allowUnscoped: Boolean): Checkpoint? {

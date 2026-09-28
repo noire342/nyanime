@@ -8,6 +8,15 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Scegliere la stagione dal manga
+
+- La scelta degli anime collegati a un manga mostra i capitoli documentati di
+  inizio e fine per ogni stagione, in un riquadro compatto sotto titolo e anno.
+  Sono conservati anche i riferimenti a una pagina interna al capitolo.
+- I due percorsi anime/manga condividono dati e cache di catalogo. Film, speciali
+  e stagioni senza un riferimento pertinente non ereditano intervalli di altre
+  stagioni; l'apertura del titolo continua a verificarne gli ID nelle estensioni.
+
 ## 28 settembre 2026 — Home torna prima in cima
 
 - Toccando di nuovo Home, una pagina scorsa torna in cima; il cambio categoria
