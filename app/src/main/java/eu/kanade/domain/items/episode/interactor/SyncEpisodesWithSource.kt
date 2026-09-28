@@ -183,6 +183,7 @@ class SyncEpisodesWithSource(
                     it >
                         0
                 }?.times(1000),
+                sourceDates = dbEpisodes.associate { it.id to (sourceDates[it.url] ?: 0) },
             )
             return emptyList()
         }
@@ -276,7 +277,7 @@ class SyncEpisodesWithSource(
                     it >
                         0
                 }?.times(1000),
-                sourceDates = notices.associate { it.id to (sourceDates[it.url] ?: 0) },
+                sourceDates = (dbEpisodes + updatedToAdd).associate { it.id to (sourceDates[it.url] ?: 0) },
             )
             notices
         }

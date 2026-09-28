@@ -56,6 +56,9 @@ UPDATE release_check SET next_check = 0 WHERE entry_id = ?;
 queueNotice:
 INSERT OR IGNORE INTO release_notice(item_id, entry_id, created_at, source_at) VALUES (?, ?, ?, ?);
 
+verifyPublicationDate:
+UPDATE release_notice SET source_at = :sourceAt WHERE item_id = :itemId AND source_at != :sourceAt;
+
 getPending:
 SELECT * FROM release_notice WHERE delivered_at = 0 ORDER BY created_at LIMIT 200;
 

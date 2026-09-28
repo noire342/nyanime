@@ -78,6 +78,9 @@ data class ReleaseAgendaItem(
     val itemId: Long? = null,
     val medium: ReleaseMedium = ReleaseMedium.ANIME,
     val dismissalKey: String? = null,
+    val number: Double? = null,
+    val sourceLabel: String = "",
+    val choices: List<ReleaseAgendaItem> = emptyList(),
 ) {
     val date: LocalDate get() = Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault()).toLocalDate()
 }
@@ -307,6 +310,13 @@ fun ReleaseCalendarContent(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                if (item.choices.isNotEmpty()) {
+                                    Text(
+                                        stringResource(R.string.release_source_choices, item.choices.size),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                                 Text(
                                     Instant.ofEpochMilli(
                                         item.at,

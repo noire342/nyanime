@@ -167,6 +167,7 @@ class SyncChaptersWithSource(
                 emptyList(),
                 dbChapters.isEmpty(),
                 manga.status == eu.kanade.tachiyomi.source.model.SManga.COMPLETED.toLong(),
+                sourceDates = dbChapters.associate { it.id to (sourceDates[it.url] ?: 0) },
             )
             return emptyList()
         }
@@ -257,7 +258,7 @@ class SyncChaptersWithSource(
                 notices.map { it.id },
                 dbChapters.isEmpty(),
                 manga.status == eu.kanade.tachiyomi.source.model.SManga.COMPLETED.toLong(),
-                sourceDates = notices.associate { it.id to (sourceDates[it.url] ?: 0) },
+                sourceDates = (dbChapters + updatedToAdd).associate { it.id to (sourceDates[it.url] ?: 0) },
             )
             notices
         }

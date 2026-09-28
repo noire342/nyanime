@@ -24,9 +24,13 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   adattato al tema chiaro e scuro e indicazione testuale del tipo di contenuto.
 - Agenda caricata dai dati locali, senza attendere una verifica in rete di tutta
   la libreria; giorni e mesi si cambiano senza nuovi controlli remoti.
-- Corretto l'inserimento di capitoli storici nell'agenda di oggi durante la
-  migrazione: data di pubblicazione e data di rilevamento rimangono distinte,
-  senza usare come prova le date sostitutive del catalogo locale.
+- Corretta la data dei capitoli storici: l'agenda usa soltanto date annunciate o
+  di pubblicazione fornite dalla fonte; il rilevamento nell'app non diventa
+  un'uscita di oggi. Riparazione degli avvisi esistenti al controllo del titolo,
+  senza cancellare letture, capitoli o ricevute delle notifiche.
+- Uscite dello stesso anime riunite tra fonti tramite gli stessi criteri della
+  Home e identificativi verificati; una scheda con scelta della fonte, senza
+  confondere le stagioni. Visto in una fonte non resta annunciato in un'altra.
 - Avvisi salvati insieme agli episodi e capitoli, deduplicazione e recupero
   quando le notifiche vengono riabilitate. Test degli avvisi e stato dei controlli
   nelle impostazioni; promemoria puntuali facoltativi.

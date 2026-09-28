@@ -50,4 +50,6 @@
     <string name="release_unified">Unified agenda and calendar</string>
     <string name="release_unified_description">Anime and manga together. Turn off to browse them separately.</string>
     <string name="release_content_detected">Detected available · %1$s</string>
+    <string name="release_source_choices">%1$d sources · Choose where to open</string>
+    <string name="release_choose_source">Choose source</string>
 </resources>

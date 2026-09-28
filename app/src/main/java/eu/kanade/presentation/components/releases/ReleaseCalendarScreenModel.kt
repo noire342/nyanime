@@ -10,6 +10,8 @@ import eu.kanade.tachiyomi.data.releases.ReleaseEligibility
 import eu.kanade.tachiyomi.data.releases.ReleaseMedium
 import eu.kanade.tachiyomi.data.releases.ReleaseMonitor
 import eu.kanade.tachiyomi.data.releases.ReleaseStore
+import eu.kanade.tachiyomi.data.track.SourceTrackingHints
+import eu.kanade.tachiyomi.data.track.TrackerManager
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toImmutableMap
@@ -19,12 +21,17 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import tachiyomi.domain.discovery.SourceHomePresentation
+import tachiyomi.domain.discovery.homePresentation
+import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.anime.model.asAnimeCover
 import tachiyomi.domain.entries.anime.repository.AnimeRepository
 import tachiyomi.domain.entries.manga.model.asMangaCover
 import tachiyomi.domain.entries.manga.repository.MangaRepository
 import tachiyomi.domain.items.chapter.repository.ChapterRepository
 import tachiyomi.domain.items.episode.repository.EpisodeRepository
+import tachiyomi.domain.source.anime.service.AnimeSourceManager
+import tachiyomi.domain.track.anime.repository.AnimeTrackRepository
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.time.LocalDate
@@ -52,7 +59,11 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
                     snapshot,
                     dismissed,
                 ->
-                snapshot.copy(items = snapshot.items.filterNot { it.dismissalKey in dismissed })
+                snapshot.copy(
+                    items = snapshot.items.filterNot {
+                        it.dismissalKey in dismissed || it.choices.any { choice -> choice.dismissalKey in dismissed }
+                    },
+                )
             }.collectLatest {
                 allItems = it.items.sortedBy { item -> item.at }
                 mutableState.update { state -> state.copy(loading = false, warning = it.warning) }
@@ -75,6 +86,9 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
             val episodes: EpisodeRepository = Injekt.get()
             var unresolved = false
             var unavailable = false
+            val works = mutableListOf<Anime>()
+            val presentByEntry = mutableMapOf<Long, Set<Double>>()
+            val watchedByEntry = mutableMapOf<Long, Set<Double>>()
             val groupedEvents = events.groupBy { it.entryId }
             val groupedNotices = notices.groupBy { it.entryId }
             for (id in ids) {
@@ -83,11 +97,41 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
                 unavailable = unavailable || cache?.status == "UNAVAILABLE"
                 val entryEvents = groupedEvents[id].orEmpty()
                 val entryNotices = groupedNotices[id].orEmpty()
-                if (entryEvents.isEmpty() && entryNotices.isEmpty()) continue
                 if (ReleaseEligibility.source(ReleaseMedium.ANIME, id) == null) continue
                 val entry = anime.getAnimeById(id)
+                val presentation = entry.homePresentation ?: SourceHomePresentation()
+                val hints = SourceTrackingHints.from(entry)
+                val tracks = Injekt.get<AnimeTrackRepository>().getTracksByAnimeId(id)
+                val trackIds = buildMap {
+                    tracks.forEach { track ->
+                        when (track.trackerId) {
+                            TrackerManager.ANILIST -> put("anilist", track.remoteId)
+                            1L -> put("myanimelist", track.remoteId)
+                        }
+                    }
+                }
+                val hintIds = buildMap {
+                    hints?.anilistId?.let { put("anilist", it) }
+                    hints?.malId?.let { put("myanimelist", it) }
+                }
+                val eventIds = entryEvents.map { it.catalogId }.filter { it > 0 }.distinct()
+                val ids = ReleaseAgendaMerge.verifiedIds(
+                    presentation.catalogIds,
+                    hintIds,
+                    trackIds,
+                    eventIds.singleOrNull()?.let { mapOf("anilist" to it) }.orEmpty(),
+                )
+                val identity = if (ids == null || eventIds.size > 1) {
+                    SourceHomePresentation() // Contradictory IDs also disable the title/year fallback.
+                } else {
+                    presentation.copy(catalogIds = ids, choices = emptyList())
+                }
+                works += entry.copy(memo = identity.attachTo(entry.memo))
+                val sourceLabel = Injekt.get<AnimeSourceManager>().getOrStub(entry.source).name
                 val present = episodes.getEpisodeByAnimeId(id)
                 val numbers = present.map { it.episodeNumber }.toSet()
+                presentByEntry[id] = numbers
+                watchedByEntry[id] = present.filter { it.seen }.map { it.episodeNumber }.toSet()
                 val byId = present.associateBy { it.id }
                 for (event in entryEvents) {
                     if (event.episode.toDouble() in numbers) continue
@@ -98,31 +142,32 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
                         entry.asAnimeCover(),
                         event.airingAt,
                         app.getString(R.string.release_broadcast_label, event.episode.toString()),
+                        number = event.episode.toDouble(),
+                        sourceLabel = sourceLabel,
                     )
                 }
                 for (notice in entryNotices) {
                     val item = byId[notice.itemId]?.takeUnless { it.seen } ?: continue
+                    if (notice.sourceAt <= 0) continue
                     items += ReleaseAgendaItem(
                         "anime-available-${item.id}",
                         id,
                         entry.title,
                         entry.asAnimeCover(),
-                        notice.sourceAt.takeIf { it > 0 } ?: notice.createdAt,
+                        notice.sourceAt,
                         app.getString(
-                            if (notice.sourceAt > 0) {
-                                R.string.release_content_available
-                            } else {
-                                R.string.release_content_detected
-                            },
+                            R.string.release_content_available,
                             item.name,
                         ),
                         item.id,
                         dismissalKey = "${item.dateFetch}|anime|${entry.source}|${entry.title}|${item.name}",
+                        number = item.episodeNumber,
+                        sourceLabel = sourceLabel,
                     )
                 }
             }
             Snapshot(
-                items,
+                ReleaseAgendaMerge.merge(items, works, presentByEntry, watchedByEntry),
                 when {
                     unavailable -> app.getString(R.string.release_calendar_error)
                     unresolved -> app.getString(R.string.release_calendar_unresolved)
@@ -165,18 +210,15 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
             }
             for (notice in entryNotices) {
                 val item = byId[notice.itemId]?.takeUnless { it.read } ?: continue
+                if (notice.sourceAt <= 0) continue
                 items += ReleaseAgendaItem(
                     "manga-available-${item.id}",
                     id,
                     entry.title,
                     entry.asMangaCover(),
-                    notice.sourceAt.takeIf { it > 0 } ?: notice.createdAt,
+                    notice.sourceAt,
                     app.getString(
-                        if (notice.sourceAt > 0) {
-                            R.string.release_content_available
-                        } else {
-                            R.string.release_content_detected
-                        },
+                        R.string.release_content_available,
                         item.name,
                     ),
                     item.id,

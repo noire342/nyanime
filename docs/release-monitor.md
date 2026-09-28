@@ -52,8 +52,10 @@ La prima acquisizione di un titolo non pubblica tutto il catalogo come novità.
 Gli avvisi storici importati dalla prima migrazione vengono esclusi dall'agenda,
 senza cancellare capitoli, episodi o progressi. Una data fornita effettivamente
 dall'estensione viene conservata separatamente dalla data di rilevamento.
-In assenza di una data reale la scheda dice **Rilevato disponibile**; le date
-sostitutive create dal catalogo locale non vengono trattate come pubblicazioni.
+Anche i controlli senza modifiche verificano le date degli avvisi esistenti.
+Una disponibilità priva di data resta nella Home/Novità, senza inventare un giorno
+nel calendario. La correzione degli avvisi precedenti usa la normale rotazione
+limitata delle richieste; le date sostitutive del catalogo non sono prove di pubblicazione.
 
 Le notifiche usano una coda persistente, con deduplicazione e identificatori
 Android stabili. Se il permesso o il canale sono disabilitati, l'avviso resta
@@ -83,3 +85,15 @@ AnimeSchedule non fa parte di questa implementazione.
   rollback della coda, invii duplicati, esclusioni, visto/letto e cancellazione.
 - Le prove reali di layout e notifiche sono distinte dalle prove delle migrazioni;
   l'esecuzione pianificata a schermo spento va verificata per ogni dispositivo.
+
+## Unione delle uscite tra fonti
+
+L'agenda anime riusa `mergeHomeCards`: ID di catalogo compatibili, oppure titolo
+normalizzato e anno entrambi noti, senza conflitti tra identificativi. I dati di
+tracking e calendario arricchiscono il contratto generico delle estensioni;
+evidenze contraddittorie impediscono l'unione. Un episodio con numero riconosciuto
+compare una sola volta e offre le fonti concrete disponibili. Numeri sconosciuti,
+stagioni con ID diversi e contenuti della stessa fonte non vengono accorpati.
+La disponibilità prevale sull'annuncio e un episodio già visto in una variante
+non resta un'uscita da vedere nell'altra. Le date di pubblicazione dei capitoli
+restano separate dal rilevamento nell'app anche durante la riparazione dei dati.

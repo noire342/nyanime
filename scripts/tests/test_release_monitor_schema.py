@@ -129,6 +129,34 @@ class ReleaseSchemaTest(unittest.TestCase):
             self.assertEqual(1, db.execute("SELECT count(*) FROM release_notice").fetchone()[0])
             db.close()
 
+    def test_verifying_an_existing_notice_repairs_date_without_redelivery(self):
+        for anime in (False, True):
+            db, path, *_ = self.database(anime)
+            db.execute(self.query(path, "queueNotice"), (11, 1, 999999, 0))
+            db.execute("UPDATE release_notice SET delivered_at=123456")
+            db.execute(self.query(path, "verifyPublicationDate"), {"sourceAt": 1000, "itemId": 11})
+            self.assertEqual((999999, 123456, 1000), db.execute(
+                "SELECT created_at,delivered_at,source_at FROM release_notice"
+            ).fetchone())
+            self.assertEqual([], db.execute(self.query(path, "getPending")).fetchall())
+            db.close()
+
+    def test_publication_repair_is_queued_only_for_unverified_notices(self):
+        for anime in (False, True):
+            db, path, parent, item, *_ = self.database(anime)
+            db.execute(f"INSERT INTO {parent} SELECT 2,42,'Second',1,0,'',0,0,0")
+            db.execute(f"INSERT INTO {item} SELECT 12,2,'Second','',0,0,0,0,0,3000,3000,2")
+            for entry in (1, 2):
+                db.execute(self.query(path, "markSuccess"), {"entryId": entry, "now": 3000, "nextCheck": 6000})
+            db.execute(self.query(path, "queueNotice"), (11, 1, 999999, 0))
+            db.execute(self.query(path, "queueNotice"), (12, 2, 999999, 1000))
+            migration = ROOT / f"data/src/main/{'sqldelightanime' if anime else 'sqldelight'}/migrations/{'143' if anime else '37'}.sqm"
+            db.executescript(migration.read_text(encoding="utf-8"))
+            self.assertEqual([(1, 0), (2, 6000)], db.execute(
+                "SELECT entry_id,next_check FROM release_check ORDER BY entry_id"
+            ).fetchall())
+            db.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -147,6 +147,9 @@ class ReleaseStore(
             id in monitoredIds(medium)
         when (medium) {
             ReleaseMedium.ANIME -> anime.await(inTransaction = true) {
+                sourceDates.filterValues { it in 1..now }.forEach { (item, date) ->
+                    releaseMonitorQueries.verifyPublicationDate(date, item)
+                }
                 if (!firstSnapshot &&
                     capture
                 ) {
@@ -162,6 +165,9 @@ class ReleaseStore(
                 releaseMonitorQueries.markSuccess(id, now, next)
             }
             ReleaseMedium.MANGA -> manga.await(inTransaction = true) {
+                sourceDates.filterValues { it in 1..now }.forEach { (item, date) ->
+                    releaseMonitorQueries.verifyPublicationDate(date, item)
+                }
                 if (!firstSnapshot &&
                     capture
                 ) {
