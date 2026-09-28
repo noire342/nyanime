@@ -11,12 +11,17 @@ class PrivacyDisplaySessionTest {
         var clears = 0
         var failApply = false
         var failClear = false
+        var noApplicablePixels = false
         var previousRegions = mutableListOf<PrivacyRegion?>()
         var accepted: PrivacyRegion? = null
-        override fun apply(target: String, region: PrivacyRegion, previous: PrivacyRegion?): Result<PrivacyRegion> {
+        override fun apply(target: String, region: PrivacyRegion, previous: PrivacyRegion?): Result<PrivacyRegion?> {
             applies++
             previousRegions += previous
-            return if (failApply) Result.failure(IllegalStateException("apply")) else Result.success(accepted ?: region)
+            return when {
+                failApply -> Result.failure(IllegalStateException("apply"))
+                noApplicablePixels -> Result.success(null)
+                else -> Result.success(accepted ?: region)
+            }
         }
         override fun clear(target: String): Result<Unit> {
             clears++
@@ -113,5 +118,33 @@ class PrivacyDisplaySessionTest {
         session.update(null, false)
         session.update(region, true)
         assertEquals(null, backend.previousRegions.last())
+    }
+
+    @Test fun clippingOutOfTheSafePanelClearsWithoutFaultingOrLooping() {
+        val backend = Backend()
+        val session = PrivacyDisplaySession("window", backend)
+        session.update(region, true)
+        backend.noApplicablePixels = true
+        val clipped = region.copy(bounds = PrivacyBounds(0, 0, 1, 1))
+        repeat(100) { session.update(clipped, true) }
+        assertEquals(1, backend.clears)
+        assertEquals(2, backend.applies)
+        assertEquals(PrivacyDisplayState.Disabled, session.state)
+        backend.noApplicablePixels = false
+        session.update(region, true)
+        assertEquals(PrivacyDisplayState.Applied(region), session.state)
+        assertEquals(null, backend.previousRegions.last())
+    }
+
+    @Test fun anInitiallyClippedRegionCanBeRetriedAfterWindowResume() {
+        val backend = Backend().apply { noApplicablePixels = true }
+        val session = PrivacyDisplaySession("window", backend)
+        session.update(region, true)
+        assertEquals(0, backend.clears)
+        session.update(null, false)
+        backend.noApplicablePixels = false
+        session.update(region, true)
+        assertEquals(PrivacyDisplayState.Applied(region), session.state)
+        assertEquals(2, backend.applies)
     }
 }

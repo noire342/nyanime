@@ -11,8 +11,8 @@ sealed interface PrivacyDisplayCapability {
 interface PrivacyDisplayBackend<T : Any> {
     val capability: PrivacyDisplayCapability
 
-    /** Returns the region accepted after platform geometry constraints. No target is retained. */
-    fun apply(target: T, region: PrivacyRegion, previous: PrivacyRegion?): Result<PrivacyRegion>
+    /** Returns the fitted region, or null when clipping leaves no applicable pixels. */
+    fun apply(target: T, region: PrivacyRegion, previous: PrivacyRegion?): Result<PrivacyRegion?>
     fun clear(target: T): Result<Unit>
 }
 

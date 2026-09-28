@@ -33,4 +33,25 @@ class PrivacyViewPlacementTest {
         assertNull(PrivacyViewPlacement.resolve(region, PrivacyBounds(0, 0, 2, 2), expansion, 0, 0))
         assertNull(PrivacyViewPlacement.resolve(region, PrivacyBounds(100, 100, 200, 200), expansion, 0, 0))
     }
+
+    @Test fun strictPanelEdgesRemainInteriorAfterExpansionAndTransitionRounding() {
+        val panel = PrivacyBounds(0, 0, 1440, 3120)
+        val interior = PrivacyBounds(2, 2, 1438, 3118)
+        val fitted = PrivacyViewPlacement.resolve(PrivacyRegion(panel, 0), interior, expansion, 0, 0)!!
+        assertEquals(PrivacyBounds(3, 3, 1436, 3116), fitted.displayRegion.bounds)
+        val bounds = fitted.displayRegion.bounds
+        for (rounding in -1..1) {
+            val expanded = PrivacyBounds(
+                bounds.left - expansion.left + rounding,
+                bounds.top - expansion.top + rounding,
+                bounds.right + expansion.right + rounding,
+                bounds.bottom + expansion.bottom + rounding,
+            )
+            org.junit.jupiter.api.Assertions.assertTrue(expanded.left > panel.left && expanded.top > panel.top)
+            org.junit.jupiter.api.Assertions.assertTrue(expanded.right < panel.right && expanded.bottom < panel.bottom)
+        }
+        assertNull(
+            PrivacyViewPlacement.resolve(PrivacyRegion(PrivacyBounds(0, 0, 2, 2), 0), interior, expansion, 0, 0),
+        )
+    }
 }

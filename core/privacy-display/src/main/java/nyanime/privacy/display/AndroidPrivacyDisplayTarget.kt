@@ -28,7 +28,11 @@ class AndroidPrivacyDisplayTarget(private var host: ViewGroup?) : AutoCloseable 
     private var anchor: View? = null
     internal val currentView: View? get() = anchor
 
-    internal fun place(region: PrivacyRegion, expansion: PrivacyPanelExpansion): PrivacyViewPlacement {
+    internal fun place(
+        region: PrivacyRegion,
+        expansion: PrivacyPanelExpansion,
+        edgeClearancePx: Int,
+    ): PrivacyViewPlacement? {
         val owner = checkNotNull(host)
         check(owner.isAttachedToWindow)
         val display = checkNotNull(owner.display)
@@ -38,15 +42,14 @@ class AndroidPrivacyDisplayTarget(private var host: ViewGroup?) : AutoCloseable 
         display.getRealSize(size)
         val origin = IntArray(2)
         owner.getLocationOnScreen(origin)
-        val placement = checkNotNull(
-            PrivacyViewPlacement.resolve(
-                region,
-                PrivacyBounds(0, 0, size.x, size.y),
-                expansion,
-                origin[0],
-                origin[1],
-            ),
-        )
+        require(edgeClearancePx >= 0)
+        val placement = PrivacyViewPlacement.resolve(
+            region,
+            PrivacyBounds(edgeClearancePx, edgeClearancePx, size.x - edgeClearancePx, size.y - edgeClearancePx),
+            expansion,
+            origin[0],
+            origin[1],
+        ) ?: return null
         val view = anchor ?: Anchor(owner).also {
             anchor = it
             owner.overlay.add(it)

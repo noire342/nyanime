@@ -17,9 +17,9 @@ class SamsungPrivacyDisplayBackend private constructor(
         target: AndroidPrivacyDisplayTarget,
         region: PrivacyRegion,
         previous: PrivacyRegion?,
-    ): Result<PrivacyRegion> = samsungApiCall {
+    ): Result<PrivacyRegion?> = samsungApiCall {
         val api = checkNotNull(methods)
-        val placement = target.place(region, panelExpansion)
+        val placement = target.place(region, panelExpansion, EDGE_CLEARANCE_PX) ?: return@samsungApiCall null
         val view = checkNotNull(target.currentView)
         api.apply(
             view,
@@ -42,6 +42,10 @@ class SamsungPrivacyDisplayBackend private constructor(
         // Observed S26 firmware expands by (-1, -1, +2, +2), then rejects out-of-panel regions.
         // Keep compensation in this adapter, never in screen geometry or content policy.
         private val panelExpansion = PrivacyPanelExpansion(1, 1, 2, 2)
+
+        // The driver also rejects equality with the panel border. Two pixels cover strict bounds
+        // and the observed one-pixel rounding during window transitions, after native expansion.
+        private const val EDGE_CLEARANCE_PX = 2
 
         fun create(device: PrivacyDisplayDevice): SamsungPrivacyDisplayBackend {
             if (!device.samsungPrivacyHardware) {

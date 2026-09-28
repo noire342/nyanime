@@ -25,8 +25,8 @@ class PrivacyDisplaySession<T : Any>(
                     return
                 }
                 applied = null
-                requested = null
             }
+            requested = null
             publish(
                 if (permitted &&
                     reason != null
@@ -55,7 +55,17 @@ class PrivacyDisplaySession<T : Any>(
             )
         } else {
             applied = result.getOrThrow()
-            publish(PrivacyDisplayState.Applied(result.getOrThrow()))
+            if (applied == null) {
+                if (previous != null && backend.clear(owner).isFailure) {
+                    applied = previous
+                    faulted = true
+                    publish(PrivacyDisplayState.Failed(PrivacyDisplayState.Operation.CLEAR))
+                } else {
+                    publish(PrivacyDisplayState.Disabled)
+                }
+            } else {
+                publish(PrivacyDisplayState.Applied(checkNotNull(applied)))
+            }
         }
     }
 
