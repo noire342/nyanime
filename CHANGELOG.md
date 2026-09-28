@@ -8,6 +8,13 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Collegamenti anime e manga sempre compatti
+
+- Rimossi il pulsante di espansione e i dettagli estesi. Restano il gradiente,
+  i riferimenti di stagione e capitolo e l'apertura diretta del titolo.
+- Se sono disponibili più adattamenti o copie, una breve scelta al tocco conserva
+  tutte le destinazioni senza ingrandire la scheda.
+
 ## 28 settembre 2026 — Dettagli manga senza ripetizioni
 
 - La scheda espansa mantiene i riferimenti compatti di stagione, inizio e fine

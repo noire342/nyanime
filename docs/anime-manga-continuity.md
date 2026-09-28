@@ -15,13 +15,15 @@ Una serie TV senza prequel TV è trattata come prima stagione; film, parti e ann
 di uscita non incrementano la numerazione. In caso di conflitto non si attribuisce
 un numero di stagione.
 
-I collegamenti sono compatti di default. Il corpo apre direttamente la copia
-verificata, oppure il capitolo quando esiste un checkpoint applicabile. Il controllo
-circolare separato espande i dettagli e segue il bordo inferiore destro durante
-l'animazione. Più copie verificate richiedono una scelta esplicita nei dettagli.
+I collegamenti restano sempre compatti, senza pulsante o contenuto espandibile.
+Il corpo apre direttamente la copia verificata, oppure il capitolo quando esiste
+un checkpoint applicabile. Quando la destinazione è ambigua, la scelta avviene
+in un foglio separato, aperto soltanto al tocco della scheda. Dal manga si possono
+scegliere le diverse stagioni; più copie mostrano anche il nome della fonte,
+ottenuto dall'estensione installata.
 Senza checkpoint la scheda mantiene il collegamento al titolo senza mostrare
 un numero stimato o un avviso sul capitolo mancante.
-Il gradiente è lo stesso nei due stati. Nella versione compatta sono visibili
+La scheda mantiene il gradiente. Sono visibili
 due righe «Stagione N • Inizio • Capitolo X» e «Stagione N • Fine • Capitolo Y»,
 quando esistono riferimenti per la stagione aperta. Più stagioni nello stesso
 campo sono lette separatamente: un punto dell'intera serie non diventa la fine
@@ -31,9 +33,8 @@ I punti mancanti o ambigui non sono inventati. Per film o adattamenti senza una
 stagione identificabile resta l'etichetta «Adattamento» sui riferimenti non numerati.
 Il termine «Fine» indica il punto finale catalogato, anche se una serie ancora
 in corso può estendere l'adattamento nei successivi aggiornamenti del catalogo.
-Le due righe restano visibili quando la scheda viene espansa: i dettagli non
-ripetono inizio e fine, ma aggiungono soltanto copertina, adattamenti e copie
-alternative e le azioni pertinenti.
+I riferimenti compaiono una sola volta; non sono presenti dettagli espansi,
+copertine aggiuntive o informazioni duplicate.
 
 ## Dal manga all'anime
 
