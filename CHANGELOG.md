@@ -8,6 +8,12 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 28 settembre 2026 — Dettagli manga senza ripetizioni
+
+- La scheda espansa mantiene i riferimenti compatti di stagione, inizio e fine
+  una sola volta. Rimossi i paragrafi duplicati dai dettagli; restano le copie
+  alternative, la copertina e le azioni di apertura.
+
 ## 28 settembre 2026 — Capitoli della stagione aperta
 
 - La scheda compatta anime/manga mostra due righe con stagione, inizio/fine e

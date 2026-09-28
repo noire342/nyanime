@@ -31,6 +31,9 @@ I punti mancanti o ambigui non sono inventati. Per film o adattamenti senza una
 stagione identificabile resta l'etichetta «Adattamento» sui riferimenti non numerati.
 Il termine «Fine» indica il punto finale catalogato, anche se una serie ancora
 in corso può estendere l'adattamento nei successivi aggiornamenti del catalogo.
+Le due righe restano visibili quando la scheda viene espansa: i dettagli non
+ripetono inizio e fine, ma aggiungono soltanto copertina, adattamenti e copie
+alternative e le azioni pertinenti.
 
 ## Dal manga all'anime
 

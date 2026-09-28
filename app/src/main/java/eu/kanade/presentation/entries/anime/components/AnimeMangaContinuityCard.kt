@@ -136,21 +136,6 @@ fun AnimeMangaContinuityCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            choice.beginning?.let {
-                val label = if (choice.viaOriginalNovel) "Inizio dell'arco" else "Inizio dell'adattamento"
-                Text(
-                    "$label · cap. ${chapterLabel(it.chapter)}" +
-                        (episodeLabel(it)?.let { episode -> " · $episode" } ?: ""),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            choice.latestAdapted?.let {
-                Text(
-                    "Ultimo punto catalogato · cap. ${chapterLabel(it.chapter)}" +
-                        (episodeLabel(it)?.let { episode -> " · $episode" } ?: ""),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
             if (choice.matches.size > 1) {
                 Text("Scegli la tua copia", style = MaterialTheme.typography.labelMedium)
                 FlowRow(
@@ -191,7 +176,3 @@ private fun ChapterReference(season: Int?, label: String, chapter: Double) {
 
 private fun chapterLabel(number: Double): String =
     if (number % 1.0 == 0.0) number.toInt().toString() else number.toString()
-
-private fun episodeLabel(checkpoint: AnimeMangaContinuity.Checkpoint): String? = checkpoint.episode?.let { episode ->
-    checkpoint.season?.let { season -> "stagione $season, episodio $episode" } ?: "episodio $episode"
-}
