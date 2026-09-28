@@ -19,6 +19,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -46,6 +47,7 @@ import eu.kanade.presentation.motion.PosterDetailsScreen
 import eu.kanade.presentation.motion.PosterLoadingBody
 import eu.kanade.presentation.motion.posterDetailPreview
 import eu.kanade.presentation.theme.LocalNyanimeStyle
+import eu.kanade.presentation.theme.nyanimeBrandColors
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
@@ -204,8 +206,8 @@ class CatalogDetailScreen(private val catalogId: Long, private val provider: Str
                                         },
                                         colors = if (LocalNyanimeStyle.current) {
                                             ButtonDefaults.buttonColors(
-                                                containerColor = Color.White,
-                                                contentColor = Color.Black,
+                                                containerColor = nyanimeBrandColors.actionBackground,
+                                                contentColor = nyanimeBrandColors.actionText,
                                             )
                                         } else {
                                             ButtonDefaults.buttonColors()
@@ -227,8 +229,16 @@ class CatalogDetailScreen(private val catalogId: Long, private val provider: Str
                                     },
                                     colors = if (LocalNyanimeStyle.current) {
                                         ButtonDefaults.buttonColors(
-                                            containerColor = if (state.next == null) Color.White else Color(0xFF262626),
-                                            contentColor = if (state.next == null) Color.Black else Color.White,
+                                            containerColor = if (state.next == null) {
+                                                nyanimeBrandColors.actionBackground
+                                            } else {
+                                                MaterialTheme.colorScheme.surfaceContainerHigh
+                                            },
+                                            contentColor = if (state.next == null) {
+                                                nyanimeBrandColors.actionText
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface
+                                            },
                                         )
                                     } else {
                                         ButtonDefaults.buttonColors()

@@ -6,8 +6,10 @@ I nomi dei comandi possono variare con la lingua scelta.
 
 ## Interfaccia e navigazione
 
-**ModernUI** presenta la parte video con sfondo nero, accenti rossi, banner,
-caroselli e schede delle locandine. La copertina accompagna l'apertura e il ritorno
+**ModernUI** offre un aspetto scuro con accenti rossi e uno chiaro con accenti
+Arancio solare, oppure segue il sistema. Il marchio e l’icona Android seguono
+la scelta, mentre i loghi delle fonti mantengono i colori originali. Banner,
+caroselli e locandine presentano i titoli. La copertina accompagna l'apertura e il ritorno
 dai dettagli; ombre, testi, pannelli e controlli hanno transizioni coordinate.
 Le immagini usano segnaposto e comparsa graduale, conservando i contenuti disponibili
 durante gli aggiornamenti.
@@ -17,11 +19,11 @@ stretti. Griglie, testi e pannelli si adattano all'orientamento e ai caratteri g
 L'indicatore del gesto di aggiornamento appare durante il trascinamento; i caricamenti
 automatici delle Home video non lo fanno comparire durante la navigazione.
 
-In **Impostazioni > Aspetto > ModernUI** puoi tornare alla UI legacy. La scelta
-è persistente e conserva librerie, cronologia e avanzamento. Il tema manga è
-separato: lettore, biblioteca e dettagli mantengono la propria presentazione.
-Restano disponibili temi, modalità chiara/scura, AMOLED e personalizzazione della
-navigazione. Le animazioni temporizzate rispettano la scala di sistema; il player
+Il primo avvio dopo l’introduzione del tema chiaro presenta una scelta dedicata:
+**Scuro, Chiaro o Segui il sistema**. Dopo la conferma non viene riproposta negli
+aggiornamenti successivi; puoi cambiare tema in **Impostazioni > Aspetto**.
+La modalità AMOLED si applica soltanto all’aspetto scuro. Lo sfondo del lettore
+manga resta configurabile separatamente. Le animazioni temporizzate rispettano la scala di sistema; il player
 offre anche la riduzione del movimento.
 
 ## Catalogo video e ricerca

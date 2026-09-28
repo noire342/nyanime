@@ -38,7 +38,7 @@ fun NyanimeWordmark(modifier: Modifier = Modifier) {
         "NYANIME",
         modifier,
         style = MaterialTheme.typography.bodyLarge.copy(
-            color = Color(0xFFE50914),
+            color = nyanimeBrandColors.wordmark,
             fontSize = 24.sp,
             letterSpacing = 2.sp,
             fontWeight = FontWeight.Black,

@@ -36,8 +36,8 @@ Una Home dedicata compare solo con un'estensione compatibile e utilizzabile.
 
 | Preferenza | Dove e perché |
 | --- | --- |
-| ModernUI | **Impostazioni > Aspetto > ModernUI**. Attiva di default; disattivala per recuperare la presentazione legacy. |
-| Tema manga | **Impostazioni > Aspetto**. Indipendente dal tema della sezione video. |
+| Aspetto ModernUI | **Impostazioni > Aspetto**. Scegli Scuro, Chiaro o Segui il sistema, con anteprime del marchio e dei colori. |
+| Sfondo lettore manga | **Impostazioni > Lettore**. Lo sfondo di lettura resta indipendente dall’aspetto generale. |
 | Avvio automatico di Smart | **Impostazioni > Lettore interno > Anime4K**. Attivo di default; disattivarlo lascia disponibile l'attivazione manuale SM. |
 | AniSkip | Nelle impostazioni del lettore interno, sezione salto dell'introduzione. Richiede l'associazione del titolo tramite un tracker supportato. |
 | Fiducia automatica nelle estensioni | **Impostazioni > Avanzate**. Attiva di default; disattivala e riavvia per tornare ai consensi espliciti. Le estensioni eseguono codice nell'app. |
@@ -97,10 +97,12 @@ La riga usa la cronologia locale. Controlla incognito, filtro Solo scaricati,
 avanzamento e titoli nascosti. Il comando di ripristino dei nascosti non richiede
 di cancellare o ricostruire la libreria.
 
-### Come torno alla vecchia interfaccia?
+### Come cambio tra tema chiaro e scuro?
 
-Disattiva ModernUI in Aspetto. La preferenza conserva librerie, cronologia e tema
-manga. Cambiare interfaccia non richiede reinstallazione.
+Apri **Impostazioni > Aspetto** e scegli **Scuro**, **Chiaro** o **Segui il sistema**.
+Il tema chiaro usa Arancio solare, quello scuro mantiene il rosso. La scelta
+iniziale viene richiesta una sola volta dopo la conferma; cambiare tema conserva
+librerie, cronologia e progressi e non richiede reinstallazione.
 
 ### Disattivare l'avvio di Smart disattiva Anime4K per sempre?
 

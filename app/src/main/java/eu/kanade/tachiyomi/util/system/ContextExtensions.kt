@@ -138,7 +138,7 @@ fun Context.createReaderThemeContext(): Context {
         wrappedContext.applyOverrideConfiguration(overrideConf)
         ThemingDelegate.getThemeResIds(
             preferences.legacyMangaTheme().get(),
-            preferences.themeDarkAmoled().get(),
+            preferences.themeDarkAmoled().get() && isDarkBackground,
         )
             .forEach { wrappedContext.theme.applyStyle(it, true) }
         return wrappedContext

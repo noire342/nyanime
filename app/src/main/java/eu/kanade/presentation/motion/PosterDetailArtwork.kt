@@ -40,6 +40,7 @@ import eu.kanade.presentation.discovery.ArtworkPlaceholder
 import eu.kanade.presentation.discovery.FadingAsyncImage
 import eu.kanade.presentation.discovery.SourceHomeArtwork
 import eu.kanade.presentation.discovery.sourceHomeArtworkIdentity
+import eu.kanade.presentation.theme.nyanimeBrandColors
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.TwoPanelBox
 import tachiyomi.presentation.core.components.material.Scaffold
@@ -69,7 +70,7 @@ internal fun PosterDetailHero(
             Box(
                 Modifier.matchParentSize().posterForeground(zIndex = 1f).background(
                     Brush.verticalGradient(
-                        0f to if (catalog) Color.Transparent else Color.Black.copy(alpha = 0.6f),
+                        0f to if (catalog) Color.Transparent else nyanimeBrandColors.artworkShade.copy(alpha = 0.6f),
                         (if (catalog) 0.5f else 0.4f) to Color.Transparent,
                         1f to MaterialTheme.colorScheme.background,
                     ),

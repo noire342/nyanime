@@ -592,4 +592,20 @@
     <string name="ready_update_summary">È pronto da installare. Lo ritrovi anche in Altro.</string>
     <string name="ready_update_install">Installa ora</string>
     <string name="home_loading_content">Caricamento dei contenuti</string>
+    <string name="nyanime_theme_choice_title">Scegli l’aspetto di Nyanime</string>
+    <string name="nyanime_theme_choice_description">Le tue storie, il tuo stile. Scegli l’aspetto che preferisci.</string>
+    <string name="nyanime_theme_dark">Scuro</string>
+    <string name="nyanime_theme_light">Chiaro</string>
+    <string name="nyanime_theme_system">Segui il sistema</string>
+    <string name="nyanime_theme_dark_description">Nero cinema e accenti rossi.</string>
+    <string name="nyanime_theme_light_description">Superfici bianche e accenti Arancio solare.</string>
+    <string name="nyanime_theme_system_description">Cambia automaticamente con il dispositivo.</string>
+    <string name="nyanime_theme_continue">Continua</string>
+    <string name="nyanime_theme_saving">Salvataggio…</string>
+    <string name="nyanime_theme_save_error">Non è stato possibile salvare la scelta. Riprova.</string>
+    <string name="nyanime_theme_change_later">Puoi cambiarlo quando vuoi in Impostazioni → Aspetto.</string>
+    <string name="nyanime_appearance_title">Aspetto di Nyanime</string>
+    <string name="nyanime_amoled_description">Superfici completamente nere, disponibili con l’aspetto scuro.</string>
+    <string name="nyanime_source_logo_title">Logo della fonte nella Home</string>
+    <string name="nyanime_source_logo_description">Mostra il logo originale fornito dall’estensione. Se non disponibile, usa il logo Nyanime del tema scelto.</string>
 </resources>

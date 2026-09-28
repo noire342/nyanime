@@ -102,6 +102,7 @@ import eu.kanade.tachiyomi.ui.more.NewUpdateScreen
 import eu.kanade.tachiyomi.ui.more.OnboardingScreen
 import eu.kanade.tachiyomi.ui.player.ExternalIntents
 import eu.kanade.tachiyomi.ui.player.PlayerActivity
+import eu.kanade.tachiyomi.ui.theme.InitialThemeChoiceGate
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.isNavigationBarNeedsScrim
 import eu.kanade.tachiyomi.util.system.openInBrowser
@@ -164,6 +165,7 @@ class MainActivity : BaseActivity() {
     var ready = false
 
     private var navigator: Navigator? = null
+    private var launchIntentHandled = false
 
     init {
         registerSecureActivity(this)
@@ -171,6 +173,11 @@ class MainActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val isLaunch = savedInstanceState == null
+        launchIntentHandled = savedInstanceState?.getBoolean("nyanime_launch_intent_handled") ?: false
+        if (!launchIntentHandled) {
+            @Suppress("DEPRECATION")
+            savedInstanceState?.getParcelable<Intent>("nyanime_pending_launch_intent")?.let(::setIntent)
+        }
 
         // Prevent splash screen showing up on configuration changes
         val splashScreen = if (isLaunch) installSplashScreen() else null
@@ -186,154 +193,159 @@ class MainActivity : BaseActivity() {
         }
 
         setComposeContent {
-            val context = LocalContext.current
+            InitialThemeChoiceGate(onReady = { ready = true }) {
+                val context = LocalContext.current
 
-            var incognito by remember { mutableStateOf(getMangaIncognitoState.await(null)) }
-            var incognitoAnime by remember { mutableStateOf(getAnimeIncognitoState.await(null)) }
-            val downloadOnly by preferences.downloadedOnly().collectAsState()
-            val indexing by downloadCache.isInitializing.collectAsState()
-            val indexingAnime by animeDownloadCache.isInitializing.collectAsState()
+                var incognito by remember { mutableStateOf(getMangaIncognitoState.await(null)) }
+                var incognitoAnime by remember { mutableStateOf(getAnimeIncognitoState.await(null)) }
+                val downloadOnly by preferences.downloadedOnly().collectAsState()
+                val indexing by downloadCache.isInitializing.collectAsState()
+                val indexingAnime by animeDownloadCache.isInitializing.collectAsState()
 
-            val navigationBackgroundColor = eu.kanade.presentation.theme.LocalMangaSurfaces.current
-                ?.values?.firstOrNull() ?: MaterialTheme.colorScheme.surface
-            val statusBarBackgroundColor = when {
-                indexing || indexingAnime -> IndexingBannerBackgroundColor
-                downloadOnly -> DownloadedOnlyBannerBackgroundColor
-                incognito || incognitoAnime -> IncognitoModeBannerBackgroundColor
-                else -> navigationBackgroundColor
-            }
-            LaunchedEffect(navigationBackgroundColor, statusBarBackgroundColor) {
-                // Draw edge-to-edge and set system bars color to transparent
-                val lightStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.BLACK)
-                val darkStyle = SystemBarStyle.dark(Color.TRANSPARENT)
-                enableEdgeToEdge(
-                    statusBarStyle = if (statusBarBackgroundColor.luminance() > 0.5) lightStyle else darkStyle,
-                    navigationBarStyle = if (navigationBackgroundColor.luminance() > 0.5) lightStyle else darkStyle,
-                )
-            }
-
-            Navigator(
-                screen = HomeScreen,
-                disposeBehavior = NavigatorDisposeBehavior(
-                    disposeNestedNavigators = false,
-                    disposeSteps = true,
-                ),
-            ) { navigator ->
-
-                LaunchedEffect(navigator) {
-                    this@MainActivity.navigator = navigator
-
-                    if (isLaunch) {
-                        // Set start screen
-                        handleIntentAction(intent, navigator)
-
-                        // Reset Incognito Mode on relaunch
-                        preferences.incognitoMode().set(false)
-                    }
+                val navigationBackgroundColor = eu.kanade.presentation.theme.LocalMangaSurfaces.current
+                    ?.values?.firstOrNull() ?: MaterialTheme.colorScheme.surface
+                val statusBarBackgroundColor = when {
+                    indexing || indexingAnime -> IndexingBannerBackgroundColor
+                    downloadOnly -> DownloadedOnlyBannerBackgroundColor
+                    incognito || incognitoAnime -> IncognitoModeBannerBackgroundColor
+                    else -> navigationBackgroundColor
                 }
-                LaunchedEffect(navigator.lastItem) {
-                    (navigator.lastItem as? BrowseMangaSourceScreen)?.sourceId
-                        .let(getMangaIncognitoState::subscribe)
-                        .collectLatest { incognito = it }
+                LaunchedEffect(navigationBackgroundColor, statusBarBackgroundColor) {
+                    // Draw edge-to-edge and set system bars color to transparent
+                    val lightStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.BLACK)
+                    val darkStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+                    enableEdgeToEdge(
+                        statusBarStyle = if (statusBarBackgroundColor.luminance() > 0.5) lightStyle else darkStyle,
+                        navigationBarStyle = if (navigationBackgroundColor.luminance() > 0.5) lightStyle else darkStyle,
+                    )
                 }
 
-                LaunchedEffect(navigator.lastItem) {
-                    (navigator.lastItem as? BrowseAnimeSourceScreen)?.sourceId
-                        .let(getAnimeIncognitoState::subscribe)
-                        .collectLatest { incognitoAnime = it }
-                }
+                Navigator(
+                    screen = HomeScreen,
+                    disposeBehavior = NavigatorDisposeBehavior(
+                        disposeNestedNavigators = false,
+                        disposeSteps = true,
+                    ),
+                ) { navigator ->
 
-                val scaffoldInsets = WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal)
-                Scaffold(
-                    topBar = {
-                        AppStateBanners(
-                            downloadedOnlyMode = downloadOnly,
-                            incognitoMode = incognito || incognitoAnime,
-                            indexing = indexing || indexingAnime,
-                            modifier = Modifier.windowInsetsPadding(scaffoldInsets),
-                        )
-                    },
-                    bottomBar = {
-                        if (navigator.lastItem != HomeScreen) {
-                            androidx.compose.foundation.layout.Column {
-                                eu.kanade.tachiyomi.ui.watch.WatchMiniController()
-                                CastMiniController()
-                            }
+                    LaunchedEffect(navigator) {
+                        this@MainActivity.navigator = navigator
+
+                        if (!launchIntentHandled) {
+                            // Set start screen
+                            handleIntentAction(intent, navigator)
+                            launchIntentHandled = true
                         }
-                    },
-                    contentWindowInsets = scaffoldInsets,
-                ) { contentPadding ->
-                    // Consume insets already used by app state banners
-                    Box {
-                        // Shows current screen
-                        DefaultNavigatorScreenTransition(
-                            navigator = navigator,
-                            modifier = Modifier
-                                .padding(contentPadding)
-                                .consumeWindowInsets(contentPadding),
-                        )
-                        // Draw navigation bar scrim when needed
-                        if (remember { isNavigationBarNeedsScrim() }) {
-                            Spacer(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .fillMaxWidth()
-                                    .windowInsetsBottomHeight(WindowInsets.navigationBars)
-                                    .alpha(0.8f)
-                                    .background(MaterialTheme.colorScheme.surfaceContainer),
+
+                        if (isLaunch) {
+                            // Reset Incognito Mode on relaunch
+                            preferences.incognitoMode().set(false)
+                        }
+                    }
+                    LaunchedEffect(navigator.lastItem) {
+                        (navigator.lastItem as? BrowseMangaSourceScreen)?.sourceId
+                            .let(getMangaIncognitoState::subscribe)
+                            .collectLatest { incognito = it }
+                    }
+
+                    LaunchedEffect(navigator.lastItem) {
+                        (navigator.lastItem as? BrowseAnimeSourceScreen)?.sourceId
+                            .let(getAnimeIncognitoState::subscribe)
+                            .collectLatest { incognitoAnime = it }
+                    }
+
+                    val scaffoldInsets = WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal)
+                    Scaffold(
+                        topBar = {
+                            AppStateBanners(
+                                downloadedOnlyMode = downloadOnly,
+                                incognitoMode = incognito || incognitoAnime,
+                                indexing = indexing || indexingAnime,
+                                modifier = Modifier.windowInsetsPadding(scaffoldInsets),
                             )
-                        }
-                    }
-                }
-
-                // Pop source-related screens when incognito mode is turned off
-                LaunchedEffect(Unit) {
-                    preferences.incognitoMode().changes()
-                        .drop(1)
-                        .filter { !it }
-                        .onEach {
-                            val currentScreen = navigator.lastItem
-                            if ((
-                                    currentScreen is BrowseMangaSourceScreen ||
-                                        (currentScreen is MangaScreen && currentScreen.fromSource)
-                                    ) ||
-                                (
-                                    currentScreen is BrowseAnimeSourceScreen ||
-                                        (currentScreen is AnimeScreen && currentScreen.fromSource)
-                                    )
-                            ) {
-                                navigator.popUntilRoot()
+                        },
+                        bottomBar = {
+                            if (navigator.lastItem != HomeScreen) {
+                                androidx.compose.foundation.layout.Column {
+                                    eu.kanade.tachiyomi.ui.watch.WatchMiniController()
+                                    CastMiniController()
+                                }
+                            }
+                        },
+                        contentWindowInsets = scaffoldInsets,
+                    ) { contentPadding ->
+                        // Consume insets already used by app state banners
+                        Box {
+                            // Shows current screen
+                            DefaultNavigatorScreenTransition(
+                                navigator = navigator,
+                                modifier = Modifier
+                                    .padding(contentPadding)
+                                    .consumeWindowInsets(contentPadding),
+                            )
+                            // Draw navigation bar scrim when needed
+                            if (remember { isNavigationBarNeedsScrim() }) {
+                                Spacer(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .fillMaxWidth()
+                                        .windowInsetsBottomHeight(WindowInsets.navigationBars)
+                                        .alpha(0.8f)
+                                        .background(MaterialTheme.colorScheme.surfaceContainer),
+                                )
                             }
                         }
-                        .launchIn(this)
+                    }
+
+                    // Pop source-related screens when incognito mode is turned off
+                    LaunchedEffect(Unit) {
+                        preferences.incognitoMode().changes()
+                            .drop(1)
+                            .filter { !it }
+                            .onEach {
+                                val currentScreen = navigator.lastItem
+                                if ((
+                                        currentScreen is BrowseMangaSourceScreen ||
+                                            (currentScreen is MangaScreen && currentScreen.fromSource)
+                                        ) ||
+                                    (
+                                        currentScreen is BrowseAnimeSourceScreen ||
+                                            (currentScreen is AnimeScreen && currentScreen.fromSource)
+                                        )
+                                ) {
+                                    navigator.popUntilRoot()
+                                }
+                            }
+                            .launchIn(this)
+                    }
+
+                    HandleOnNewIntent(context = context, navigator = navigator)
+
+                    CheckForUpdates()
+                    ShowOnboarding()
                 }
 
-                HandleOnNewIntent(context = context, navigator = navigator)
-
-                CheckForUpdates()
-                ShowOnboarding()
-            }
-
-            var showChangelog by remember { mutableStateOf(didMigration && !BuildConfig.DEBUG) }
-            if (showChangelog) {
-                AlertDialog(
-                    onDismissRequest = { showChangelog = false },
-                    title = {
-                        Text(
-                            text = stringResource(MR.strings.updated_version, BuildConfig.VERSION_NAME),
-                        )
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { openInBrowser(RELEASE_URL) }) {
-                            Text(text = stringResource(MR.strings.whats_new))
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(onClick = { showChangelog = false }) {
-                            Text(text = stringResource(MR.strings.action_ok))
-                        }
-                    },
-                )
+                var showChangelog by remember { mutableStateOf(didMigration && !BuildConfig.DEBUG) }
+                if (showChangelog) {
+                    AlertDialog(
+                        onDismissRequest = { showChangelog = false },
+                        title = {
+                            Text(
+                                text = stringResource(MR.strings.updated_version, BuildConfig.VERSION_NAME),
+                            )
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { openInBrowser(RELEASE_URL) }) {
+                                Text(text = stringResource(MR.strings.whats_new))
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showChangelog = false }) {
+                                Text(text = stringResource(MR.strings.action_ok))
+                            }
+                        },
+                    )
+                }
             }
         }
 
@@ -368,6 +380,12 @@ class MainActivity : BaseActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        setIntent(intent)
+        if (navigator == null) launchIntentHandled = false
+        super.onNewIntent(intent)
+    }
+
     override fun onProvideAssistContent(outContent: AssistContent) {
         super.onProvideAssistContent(outContent)
         when (val screen = navigator?.lastItem) {
@@ -386,7 +404,10 @@ class MainActivity : BaseActivity() {
                 componentActivity.addOnNewIntentListener(consumer)
                 awaitClose { componentActivity.removeOnNewIntentListener(consumer) }
             }
-                .collectLatest { handleIntentAction(it, navigator) }
+                .collectLatest {
+                    handleIntentAction(it, navigator)
+                    launchIntentHandled = true
+                }
         }
     }
 
@@ -608,6 +629,8 @@ class MainActivity : BaseActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("nyanime_launch_intent_handled", launchIntentHandled)
+        if (!launchIntentHandled) outState.putParcelable("nyanime_pending_launch_intent", intent)
         super.onSaveInstanceState(outState)
 
         ExternalIntents.externalIntents.animeId?.let {

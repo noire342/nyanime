@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.theme.NyanimeMark
 import eu.kanade.presentation.theme.NyanimeWordmark
 import eu.kanade.tachiyomi.R
 
@@ -21,10 +22,7 @@ fun LogoHeader(compact: Boolean = false) {
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(
-            painter = painterResource(if (compact) R.drawable.ic_nyanime_mark else R.drawable.ic_ani),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurface,
+        NyanimeMark(
             modifier = Modifier
                 .padding(top = if (compact) 8.dp else 32.dp, bottom = 8.dp)
                 .size(if (compact) 44.dp else 64.dp),

@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Looper
 import android.webkit.WebView
@@ -26,7 +27,6 @@ import eu.kanade.domain.DomainModule
 import eu.kanade.domain.SYDomainModule
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.ui.UiPreferences
-import eu.kanade.domain.ui.model.setAppCompatDelegateThemeMode
 import eu.kanade.tachiyomi.crash.CrashActivity
 import eu.kanade.tachiyomi.crash.GlobalExceptionHandler
 import eu.kanade.tachiyomi.data.coil.AnimeCoverKeyer
@@ -175,7 +175,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
         Injekt.get<UiPreferences>().let {
             it.installNyanimeThemeOnce()
-            setAppCompatDelegateThemeMode(it.themeMode().get())
+            Injekt.get<eu.kanade.domain.ui.ThemeController>().restore()
         }
 
         // Updates widget update
@@ -266,6 +266,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
     }
 
     override fun onStart(owner: LifecycleOwner) {
+        Injekt.get<eu.kanade.domain.ui.ThemeController>().reconcile()
         SecureActivityDelegate.onApplicationStart()
         RetroactiveTracking.onForeground()
         LibraryAutoTracking.onForeground()
@@ -276,6 +277,11 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         SecureActivityDelegate.onApplicationStopped()
         RetroactiveTracking.onBackground()
         eu.kanade.tachiyomi.data.community.CommunityManager.lifecycle(this, false)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        Injekt.get<eu.kanade.domain.ui.ThemeController>().reconcile()
     }
 
     override fun getPackageName(): String {

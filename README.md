@@ -7,8 +7,10 @@
 </div>
 
 **Nyanime** è un fork di AniYomi che aggiunge una nuova esperienza video e conserva
-le funzioni di gestione e lettura manga. La ModernUI è attiva di default e si può
-disabilitare per tornare all'interfaccia legacy. Il tema manga resta indipendente.
+le funzioni di gestione e lettura manga. La ModernUI offre un aspetto scuro con
+marchio rosso e uno chiaro con accenti Arancio solare, oppure segue il sistema.
+Al primo avvio viene chiesto quale usare; puoi cambiarlo in Impostazioni → Aspetto.
+Lo sfondo del lettore manga resta configurabile indipendentemente.
 
 [Funzionalità complete](docs/features.md) · [Primi passi e FAQ](docs/getting-started.md) ·
 [Documentazione](docs/README.md) · [Novità](CHANGELOG.md) · [Contribuire](CONTRIBUTING.md)
@@ -17,7 +19,7 @@ disabilitare per tornare all'interfaccia legacy. Il tema manga resta indipendent
 
 | Funzione | Cosa puoi fare |
 | --- | --- |
-| **ModernUI reversibile** | Sfoglia banner, locandine e caroselli; apri le schede con transizioni della copertina e torna alla UI legacy dalle impostazioni. |
+| **ModernUI chiara e scura** | Sfoglia banner, locandine e caroselli con transizioni della copertina; scegli Scuro, Chiaro o Sistema. Anche il marchio e l’icona Android seguono il tema. |
 | **Home ricche di contenuti** | Esplora cataloghi, stagioni, classifiche e calendario; usa le Home anime e manga definite dalle estensioni compatibili. |
 | **Riprendi da dove eri** | Ritrova “Continua a guardare” e “Continua a leggere”, con avanzamento locale e accesso all'episodio o capitolo. |
 | **Anime4K Ultra offline** | Copie A+ HQ con carico dosato, pause per temperatura e ripresa dei segmenti salvati. Stato, comandi ed esportazione direttamente dagli episodi; coda in Download → Ultra. [Dettagli e requisiti](docs/anime4k-ultra.md). |

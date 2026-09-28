@@ -17,7 +17,7 @@ class UiPreferences(
     private val preferenceStore: PreferenceStore,
 ) {
 
-    fun themeMode() = preferenceStore.getEnum("pref_theme_mode_key", ThemeMode.SYSTEM)
+    fun themeMode() = preferenceStore.getEnum(ThemePreferenceKeys.MODE, ThemeMode.SYSTEM)
 
     fun appTheme() = preferenceStore.getEnum(
         "pref_app_theme",

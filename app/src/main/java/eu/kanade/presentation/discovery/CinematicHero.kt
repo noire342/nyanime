@@ -46,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.motion.PosterSource
 import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.motion.posterForeground
+import eu.kanade.presentation.theme.nyanimeBrandColors
+import eu.kanade.presentation.theme.nyanimeHeroGradient
 
 /** Artwork and actions stay owned by the existing catalogue/source integration. */
 @Composable
@@ -71,12 +73,7 @@ internal fun CinematicHero(
             artwork()
             Box(
                 Modifier.matchParentSize().posterForeground(poster, zIndex = 1f).background(
-                    Brush.verticalGradient(
-                        0f to Color.Black.copy(alpha = 0.12f),
-                        0.38f to Color.Black.copy(alpha = 0.05f),
-                        0.7f to Color.Black.copy(alpha = 0.82f),
-                        1f to MaterialTheme.colorScheme.background,
-                    ),
+                    nyanimeHeroGradient(artworkHeight),
                 ),
             )
             Column(
@@ -87,7 +84,7 @@ internal fun CinematicHero(
             ) {
                 Text(
                     eyebrow.uppercase(),
-                    color = Color.White.copy(alpha = 0.85f),
+                    color = nyanimeBrandColors.artworkText.copy(alpha = 0.85f),
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -104,7 +101,7 @@ internal fun CinematicHero(
                     Text(
                         title,
                         modifier = Modifier.align(if (compact) Alignment.BottomCenter else Alignment.BottomStart),
-                        color = Color.White,
+                        color = nyanimeBrandColors.artworkText,
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold,
                         textAlign = if (compact) TextAlign.Center else TextAlign.Start,
@@ -114,7 +111,7 @@ internal fun CinematicHero(
                 }
                 Text(
                     metadata.orEmpty(),
-                    color = Color.White.copy(alpha = 0.86f),
+                    color = nyanimeBrandColors.artworkText.copy(alpha = 0.86f),
                     style = MaterialTheme.typography.labelMedium,
                     textAlign = if (compact) TextAlign.Center else TextAlign.Start,
                     maxLines = 2,
@@ -125,7 +122,7 @@ internal fun CinematicHero(
                     Text(
                         description.orEmpty(),
                         modifier = Modifier.widthIn(max = 640.dp),
-                        color = Color.White.copy(alpha = 0.8f),
+                        color = nyanimeBrandColors.artworkText.copy(alpha = 0.8f),
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         minLines = 2,
@@ -167,7 +164,10 @@ private fun HeroPrimaryAction(label: String, onOpen: () -> Unit, modifier: Modif
         onClick = onOpen,
         modifier = modifier.heightIn(min = 48.dp),
         shape = RoundedCornerShape(4.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = nyanimeBrandColors.actionBackground,
+            contentColor = nyanimeBrandColors.actionText,
+        ),
     ) {
         Text(
             label,
@@ -186,11 +186,11 @@ private fun HeroPrimaryAction(label: String, onOpen: () -> Unit, modifier: Modif
 private fun HeroSecondaryActions(onSources: (() -> Unit)?, onInformation: () -> Unit) {
     if (onSources != null) {
         IconButton(onClick = onSources) {
-            Icon(Icons.Outlined.SwapHoriz, "Scegli la fonte", tint = Color.White)
+            Icon(Icons.Outlined.SwapHoriz, "Scegli la fonte", tint = nyanimeBrandColors.artworkText)
         }
     }
     IconButton(onClick = onInformation) {
-        Icon(Icons.Outlined.Info, "Informazioni", tint = Color.White)
+        Icon(Icons.Outlined.Info, "Informazioni", tint = nyanimeBrandColors.artworkText)
     }
 }
 

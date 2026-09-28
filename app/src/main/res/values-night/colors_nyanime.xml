@@ -29,4 +29,10 @@
     <color name="nyanime_surfaceVariant">#252525</color>
     <color name="nyanime_tertiary">#FFC878</color>
     <color name="nyanime_tertiaryContainer">#44351F</color>
+    <color name="nyanime_error">#FFB4AB</color>
+    <color name="nyanime_onError">#690005</color>
+    <color name="nyanime_errorContainer">#93000A</color>
+    <color name="nyanime_onErrorContainer">#FFDAD6</color>
+    <color name="nyanime_surfaceDim">#080808</color>
+    <color name="nyanime_surfaceBright">#232323</color>
 </resources>

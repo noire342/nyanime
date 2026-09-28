@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.ui.base.delegate
 
 import android.app.Activity
+import android.content.res.Configuration
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.domain.ui.model.AppTheme
 import eu.kanade.tachiyomi.R
@@ -26,7 +27,9 @@ class ThemingDelegateImpl : ThemingDelegate {
         val uiPreferences = Injekt.get<UiPreferences>()
         ThemingDelegate.getThemeResIds(
             if (activity is ReaderActivity) uiPreferences.legacyMangaTheme().get() else uiPreferences.activeAppTheme(),
-            uiPreferences.themeDarkAmoled().get(),
+            uiPreferences.themeDarkAmoled().get() &&
+                activity.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+                Configuration.UI_MODE_NIGHT_YES,
         )
             .forEach(activity::setTheme)
     }

@@ -1,12 +1,18 @@
 package eu.kanade.tachiyomi.di
 
 import android.app.Application
+import androidx.preference.PreferenceManager
 import aniyomi.core.common.torrent.TorrentPreferences
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.track.service.TrackPreferences
+import eu.kanade.domain.ui.ThemeController
+import eu.kanade.domain.ui.ThemeModeApplier
+import eu.kanade.domain.ui.ThemeSettingsRepository
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.tachiyomi.core.security.SecurityPreferences
+import eu.kanade.tachiyomi.data.theme.AndroidThemeSettingsRepository
+import eu.kanade.tachiyomi.data.theme.LauncherIconController
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.ui.player.settings.AdvancedPlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
@@ -33,6 +39,11 @@ class PreferenceModule(val app: Application) : InjektModule {
         addSingletonFactory<PreferenceStore> {
             AndroidPreferenceStore(app)
         }
+        addSingletonFactory<ThemeSettingsRepository> {
+            AndroidThemeSettingsRepository(PreferenceManager.getDefaultSharedPreferences(app))
+        }
+        addSingletonFactory<ThemeModeApplier> { LauncherIconController(app) }
+        addSingletonFactory { ThemeController(get(), get()) }
         addSingletonFactory {
             NetworkPreferences(
                 preferenceStore = get(),

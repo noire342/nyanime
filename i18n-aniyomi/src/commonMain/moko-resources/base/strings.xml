@@ -683,4 +683,20 @@
     <string name="ready_update_summary">Ready to install. You can also find it in More.</string>
     <string name="ready_update_install">Install now</string>
     <string name="home_loading_content">Loading content</string>
+    <string name="nyanime_theme_choice_title">Choose your Nyanime look</string>
+    <string name="nyanime_theme_choice_description">Your stories, your style. Choose the look you enjoy most.</string>
+    <string name="nyanime_theme_dark">Dark</string>
+    <string name="nyanime_theme_light">Light</string>
+    <string name="nyanime_theme_system">Follow system</string>
+    <string name="nyanime_theme_dark_description">Cinema black with red accents.</string>
+    <string name="nyanime_theme_light_description">White surfaces with Solar Orange accents.</string>
+    <string name="nyanime_theme_system_description">Changes automatically with your device.</string>
+    <string name="nyanime_theme_continue">Continue</string>
+    <string name="nyanime_theme_saving">Saving…</string>
+    <string name="nyanime_theme_save_error">Could not save your choice. Please try again.</string>
+    <string name="nyanime_theme_change_later">You can change this anytime in Settings → Appearance.</string>
+    <string name="nyanime_appearance_title">The Nyanime look</string>
+    <string name="nyanime_amoled_description">Pure black surfaces, available with the dark look.</string>
+    <string name="nyanime_source_logo_title">Source logo in Home</string>
+    <string name="nyanime_source_logo_description">Display the extension’s original logo. If unavailable, use the Nyanime logo in the selected theme.</string>
 </resources>

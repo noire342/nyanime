@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Tachiyomi.Nyanime" parent="Theme.Tachiyomi">
+        <item name="android:windowLightStatusBar">@bool/nyanime_light_theme</item>
+        <item name="android:windowLightNavigationBar">@bool/nyanime_light_theme</item>
+        <item name="colorError">@color/nyanime_error</item>
+        <item name="colorOnError">@color/nyanime_onError</item>
+        <item name="colorErrorContainer">@color/nyanime_errorContainer</item>
+        <item name="colorOnErrorContainer">@color/nyanime_onErrorContainer</item>
+        <item name="colorSurfaceDim">@color/nyanime_surfaceDim</item>
+        <item name="colorSurfaceBright">@color/nyanime_surfaceBright</item>
         <item name="android:colorBackground">@color/nyanime_background</item>
         <item name="colorOnSurfaceInverse">@color/nyanime_inverseOnSurface</item>
         <item name="colorPrimaryInverse">@color/nyanime_inversePrimary</item>
