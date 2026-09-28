@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import eu.kanade.domain.extension.anime.interactor.AnimeExtensionSourceItem
 import eu.kanade.presentation.browse.anime.components.AnimeExtensionIcon
+import eu.kanade.presentation.browse.components.ExtensionIntegrationDetails
 import eu.kanade.presentation.browse.manga.NsfwWarningDialog
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarActions
@@ -75,6 +76,7 @@ fun AnimeExtensionDetailsScreen(
     onClickUninstall: () -> Unit,
     onClickSource: (sourceId: Long) -> Unit,
     onClickIncognito: (Boolean) -> Unit,
+    onKeepVersion: (Boolean) -> Unit = {},
 ) {
     val uriHandler = LocalUriHandler.current
     val url = remember(state.extension) {
@@ -148,6 +150,7 @@ fun AnimeExtensionDetailsScreen(
             onClickUninstall = onClickUninstall,
             onClickSource = onClickSource,
             onClickIncognito = onClickIncognito,
+            onKeepVersion = onKeepVersion,
         )
     }
 }
@@ -162,6 +165,7 @@ private fun AnimeExtensionDetails(
     onClickUninstall: () -> Unit,
     onClickSource: (sourceId: Long) -> Unit,
     onClickIncognito: (Boolean) -> Unit,
+    onKeepVersion: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     var showNsfwWarning by remember { mutableStateOf(false) }
@@ -191,6 +195,16 @@ private fun AnimeExtensionDetails(
                     showNsfwWarning = true
                 },
                 onExtIncognitoChange = onClickIncognito,
+            )
+        }
+
+        item(key = "integration") {
+            ExtensionIntegrationDetails(
+                metadata = extension.metadata,
+                status = extension.updateStatus,
+                repository = extension.store?.name,
+                keep = extension.keepVersion,
+                onKeep = onKeepVersion,
             )
         }
 

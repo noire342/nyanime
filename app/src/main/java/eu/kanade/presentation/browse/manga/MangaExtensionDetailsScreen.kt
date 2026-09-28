@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import eu.kanade.domain.extension.manga.interactor.MangaExtensionSourceItem
+import eu.kanade.presentation.browse.components.ExtensionIntegrationDetails
 import eu.kanade.presentation.browse.manga.components.MangaExtensionIcon
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarActions
@@ -76,6 +77,7 @@ fun MangaExtensionDetailsScreen(
     onClickUninstall: () -> Unit,
     onClickSource: (sourceId: Long) -> Unit,
     onClickIncognito: (Boolean) -> Unit,
+    onKeepVersion: (Boolean) -> Unit = {},
 ) {
     val uriHandler = LocalUriHandler.current
     val url = remember(state.extension) {
@@ -149,6 +151,7 @@ fun MangaExtensionDetailsScreen(
             onClickUninstall = onClickUninstall,
             onClickSource = onClickSource,
             onClickIncognito = onClickIncognito,
+            onKeepVersion = onKeepVersion,
         )
     }
 }
@@ -163,6 +166,7 @@ private fun ExtensionDetails(
     onClickUninstall: () -> Unit,
     onClickSource: (sourceId: Long) -> Unit,
     onClickIncognito: (Boolean) -> Unit,
+    onKeepVersion: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     var showNsfwWarning by remember { mutableStateOf(false) }
@@ -192,6 +196,16 @@ private fun ExtensionDetails(
                     showNsfwWarning = true
                 },
                 onExtIncognitoChange = onClickIncognito,
+            )
+        }
+
+        item(key = "integration") {
+            ExtensionIntegrationDetails(
+                metadata = extension.metadata,
+                status = extension.updateStatus,
+                repository = extension.repoName,
+                keep = extension.keepVersion,
+                onKeep = onKeepVersion,
             )
         }
 

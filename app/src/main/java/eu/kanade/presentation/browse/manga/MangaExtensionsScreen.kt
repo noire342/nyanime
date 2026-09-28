@@ -43,7 +43,12 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import dev.icerock.moko.resources.StringResource
+import eu.kanade.domain.extension.ExtensionPackageMetadata
+import eu.kanade.domain.extension.ExtensionUpdateStatus
 import eu.kanade.presentation.browse.BaseBrowseItem
+import eu.kanade.presentation.browse.components.ExtensionEntry
+import eu.kanade.presentation.browse.components.ExtensionManagerContent
+import eu.kanade.presentation.browse.components.ExtensionManagerSkeleton
 import eu.kanade.presentation.browse.manga.components.MangaExtensionIcon
 import eu.kanade.presentation.components.WarningBanner
 import eu.kanade.presentation.entries.components.DotSeparatorNoSpaceText
@@ -94,27 +99,9 @@ fun MangaExtensionScreen(
         enabled = !state.isLoading,
     ) {
         when {
-            state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
-            state.isEmpty -> {
-                val msg = if (!searchQuery.isNullOrEmpty()) {
-                    MR.strings.no_results_found
-                } else {
-                    MR.strings.empty_screen
-                }
-                EmptyScreen(
-                    stringRes = msg,
-                    modifier = Modifier.padding(contentPadding),
-                    actions = persistentListOf(
-                        EmptyScreenAction(
-                            stringRes = MR.strings.label_extension_repos,
-                            icon = Icons.Outlined.Settings,
-                            onClick = { navigator.push(MangaExtensionReposScreen()) },
-                        ),
-                    ),
-                )
-            }
+            state.isLoading -> ExtensionManagerSkeleton(contentPadding)
             else -> {
-                ExtensionContent(
+                ManagedMangaExtensionContent(
                     state = state,
                     contentPadding = contentPadding,
                     onLongClickItem = onLongClickItem,
@@ -127,358 +114,6 @@ fun MangaExtensionScreen(
                     onOpenExtension = onOpenExtension,
                     onClickUpdateAll = onClickUpdateAll,
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExtensionContent(
-    state: MangaExtensionsScreenModel.State,
-    contentPadding: PaddingValues,
-    onLongClickItem: (MangaExtension) -> Unit,
-    onOpenWebView: (MangaExtension.Available) -> Unit,
-    onClickItemCancel: (MangaExtension) -> Unit,
-    onInstallExtension: (MangaExtension.Available) -> Unit,
-    onUninstallExtension: (MangaExtension) -> Unit,
-    onUpdateExtension: (MangaExtension.Installed) -> Unit,
-    onTrustExtension: (MangaExtension.Untrusted) -> Unit,
-    onOpenExtension: (MangaExtension.Installed) -> Unit,
-    onClickUpdateAll: () -> Unit,
-) {
-    val context = LocalContext.current
-    var trustState by remember { mutableStateOf<MangaExtension.Untrusted?>(null) }
-    val installGranted = rememberRequestPackageInstallsPermissionState(initialValue = true)
-
-    FastScrollLazyColumn(
-        contentPadding = contentPadding + topSmallPaddingValues,
-    ) {
-        if (!installGranted && state.installer?.requiresSystemPermission == true) {
-            item(key = "extension-permissions-warning") {
-                WarningBanner(
-                    textRes = MR.strings.ext_permission_install_apps_warning,
-                    modifier = Modifier.clickable {
-                        context.launchRequestPackageInstallsPermission()
-                    },
-                )
-            }
-        }
-
-        state.items.forEach { (header, items) ->
-            item(
-                contentType = "header",
-                key = "extensionHeader-${header.hashCode()}",
-            ) {
-                when (header) {
-                    is MangaExtensionUiModel.Header.Resource -> {
-                        val action: @Composable RowScope.() -> Unit =
-                            if (header.textRes == MR.strings.ext_updates_pending) {
-                                {
-                                    Button(onClick = { onClickUpdateAll() }) {
-                                        Text(
-                                            text = stringResource(MR.strings.ext_update_all),
-                                            style = LocalTextStyle.current.copy(
-                                                color = MaterialTheme.colorScheme.onPrimary,
-                                            ),
-                                        )
-                                    }
-                                }
-                            } else {
-                                {}
-                            }
-                        ExtensionHeader(
-                            textRes = header.textRes,
-                            modifier = Modifier.animateItemFastScroll(),
-                            action = action,
-                        )
-                    }
-                    is MangaExtensionUiModel.Header.Text -> {
-                        ExtensionHeader(
-                            text = header.text,
-                            modifier = Modifier.animateItemFastScroll(),
-                        )
-                    }
-                }
-            }
-
-            items(
-                items = items,
-                contentType = { "item" },
-                key = { item ->
-                    when (item.extension) {
-                        is MangaExtension.Untrusted -> "extension-untrusted-${item.hashCode()}"
-                        is MangaExtension.Installed -> "extension-installed-${item.hashCode()}"
-                        is MangaExtension.Available -> "extension-available-${item.hashCode()}"
-                    }
-                },
-            ) { item ->
-                ExtensionItem(
-                    modifier = Modifier.animateItemFastScroll(),
-                    item = item,
-                    onClickItem = {
-                        when (it) {
-                            is MangaExtension.Available -> onInstallExtension(it)
-                            is MangaExtension.Installed -> onOpenExtension(it)
-                            is MangaExtension.Untrusted -> {
-                                trustState = it
-                            }
-                        }
-                    },
-                    onLongClickItem = onLongClickItem,
-                    onClickItemSecondaryAction = {
-                        when (it) {
-                            is MangaExtension.Available -> onOpenWebView(it)
-                            is MangaExtension.Installed -> onOpenExtension(it)
-                            else -> {}
-                        }
-                    },
-                    onClickItemCancel = onClickItemCancel,
-                    onClickItemAction = {
-                        when (it) {
-                            is MangaExtension.Available -> onInstallExtension(it)
-                            is MangaExtension.Installed -> {
-                                if (it.hasUpdate) {
-                                    onUpdateExtension(it)
-                                } else {
-                                    onOpenExtension(it)
-                                }
-                            }
-
-                            is MangaExtension.Untrusted -> {
-                                trustState = it
-                            }
-                        }
-                    },
-                )
-            }
-        }
-    }
-    if (trustState != null) {
-        ExtensionTrustDialog(
-            onClickConfirm = {
-                onTrustExtension(trustState!!)
-                trustState = null
-            },
-            onClickDismiss = {
-                onUninstallExtension(trustState!!)
-                trustState = null
-            },
-            onDismissRequest = {
-                trustState = null
-            },
-        )
-    }
-}
-
-@Composable
-private fun ExtensionItem(
-    item: MangaExtensionUiModel.Item,
-    onClickItem: (MangaExtension) -> Unit,
-    onLongClickItem: (MangaExtension) -> Unit,
-    onClickItemCancel: (MangaExtension) -> Unit,
-    onClickItemAction: (MangaExtension) -> Unit,
-    onClickItemSecondaryAction: (MangaExtension) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val (extension, installStep) = item
-    BaseBrowseItem(
-        modifier = modifier
-            .combinedClickable(
-                onClick = { onClickItem(extension) },
-                onLongClick = { onLongClickItem(extension) },
-            ),
-        onClickItem = { onClickItem(extension) },
-        onLongClickItem = { onLongClickItem(extension) },
-        icon = {
-            Box(
-                modifier = Modifier
-                    .size(40.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                val idle = installStep.isCompleted()
-                if (!idle) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(40.dp),
-                        strokeWidth = 2.dp,
-                    )
-                }
-
-                val padding by animateDpAsState(
-                    targetValue = if (idle) 0.dp else 8.dp,
-                    label = "iconPadding",
-                )
-                MangaExtensionIcon(
-                    extension = extension,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .padding(padding),
-                )
-            }
-        },
-        action = {
-            ExtensionItemActions(
-                extension = extension,
-                installStep = installStep,
-                onClickItemCancel = onClickItemCancel,
-                onClickItemAction = onClickItemAction,
-                onClickItemSecondaryAction = onClickItemSecondaryAction,
-            )
-        },
-    ) {
-        ExtensionItemContent(
-            extension = extension,
-            installStep = installStep,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun ExtensionItemContent(
-    extension: MangaExtension,
-    installStep: InstallStep,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.padding(start = MaterialTheme.padding.medium),
-    ) {
-        Text(
-            text = extension.name,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        // Won't look good but it's not like we can ellipsize overflowing content
-        FlowRow(
-            modifier = Modifier.secondaryItemAlpha(),
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.extraSmall),
-        ) {
-            ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
-                if (extension is MangaExtension.Installed && extension.lang.isNotEmpty()) {
-                    Text(
-                        text = LocaleHelper.getSourceDisplayName(
-                            extension.lang,
-                            LocalContext.current,
-                        ),
-                    )
-                }
-
-                if (extension.versionName.isNotEmpty()) {
-                    Text(
-                        text = extension.versionName,
-                    )
-                }
-
-                val warning = when {
-                    extension is MangaExtension.Untrusted -> MR.strings.ext_untrusted
-                    extension is MangaExtension.Installed && extension.isObsolete -> MR.strings.ext_obsolete
-                    extension.isNsfw -> MR.strings.ext_nsfw_short
-                    else -> null
-                }
-                if (warning != null) {
-                    Text(
-                        text = stringResource(warning).uppercase(),
-                        color = MaterialTheme.colorScheme.error,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                if (!installStep.isCompleted()) {
-                    DotSeparatorNoSpaceText()
-                    Text(
-                        text = when (installStep) {
-                            InstallStep.Pending -> stringResource(MR.strings.ext_pending)
-                            InstallStep.Downloading -> stringResource(MR.strings.ext_downloading)
-                            InstallStep.Installing -> stringResource(MR.strings.ext_installing)
-                            else -> error("Must not show non-install process text")
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExtensionItemActions(
-    extension: MangaExtension,
-    installStep: InstallStep,
-    modifier: Modifier = Modifier,
-    onClickItemCancel: (MangaExtension) -> Unit = {},
-    onClickItemAction: (MangaExtension) -> Unit = {},
-    onClickItemSecondaryAction: (MangaExtension) -> Unit = {},
-) {
-    val isIdle = installStep.isCompleted()
-
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
-    ) {
-        when {
-            !isIdle -> {
-                IconButton(onClick = { onClickItemCancel(extension) }) {
-                    Icon(
-                        imageVector = Icons.Outlined.Close,
-                        contentDescription = stringResource(MR.strings.action_cancel),
-                    )
-                }
-            }
-            installStep == InstallStep.Error -> {
-                IconButton(onClick = { onClickItemAction(extension) }) {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh,
-                        contentDescription = stringResource(MR.strings.action_retry),
-                    )
-                }
-            }
-            installStep == InstallStep.Idle -> {
-                when (extension) {
-                    is MangaExtension.Installed -> {
-                        IconButton(onClick = { onClickItemSecondaryAction(extension) }) {
-                            Icon(
-                                imageVector = Icons.Outlined.Settings,
-                                contentDescription = stringResource(MR.strings.action_settings),
-                            )
-                        }
-
-                        if (extension.hasUpdate) {
-                            IconButton(onClick = { onClickItemAction(extension) }) {
-                                Icon(
-                                    imageVector = Icons.Outlined.GetApp,
-                                    contentDescription = stringResource(MR.strings.ext_update),
-                                )
-                            }
-                        }
-                    }
-                    is MangaExtension.Untrusted -> {
-                        IconButton(onClick = { onClickItemAction(extension) }) {
-                            Icon(
-                                imageVector = Icons.Outlined.VerifiedUser,
-                                contentDescription = stringResource(MR.strings.ext_trust),
-                            )
-                        }
-                    }
-                    is MangaExtension.Available -> {
-                        if (extension.sources.isNotEmpty()) {
-                            IconButton(
-                                onClick = { onClickItemSecondaryAction(extension) },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Public,
-                                    contentDescription = stringResource(MR.strings.action_open_in_web_view),
-                                )
-                            }
-                        }
-
-                        IconButton(onClick = { onClickItemAction(extension) }) {
-                            Icon(
-                                imageVector = Icons.Outlined.GetApp,
-                                contentDescription = stringResource(MR.strings.ext_install),
-                            )
-                        }
-                    }
-                }
             }
         }
     }
@@ -543,4 +178,94 @@ fun ExtensionTrustDialog(
         },
         onDismissRequest = onDismissRequest,
     )
+}
+
+@Composable
+private fun ManagedMangaExtensionContent(
+    state: MangaExtensionsScreenModel.State,
+    contentPadding: PaddingValues,
+    onLongClickItem: (MangaExtension) -> Unit,
+    onOpenWebView: (MangaExtension.Available) -> Unit,
+    onClickItemCancel: (MangaExtension) -> Unit,
+    onInstallExtension: (MangaExtension.Available) -> Unit,
+    onUninstallExtension: (MangaExtension) -> Unit,
+    onUpdateExtension: (MangaExtension.Installed) -> Unit,
+    onTrustExtension: (MangaExtension.Untrusted) -> Unit,
+    onOpenExtension: (MangaExtension.Installed) -> Unit,
+    onClickUpdateAll: () -> Unit,
+) {
+    var trust by remember { mutableStateOf<MangaExtension.Untrusted?>(null) }
+    val entries = state.items.values.flatten().map { item ->
+        val extension = item.extension
+        val installed = extension as? MangaExtension.Installed
+        val available = extension as? MangaExtension.Available
+        val untrusted = extension as? MangaExtension.Untrusted
+        val repository = installed?.repoName ?: available?.repoName
+        ExtensionEntry(
+            id = if (available == null) extension.pkgName else extension.pkgName + "|" + available.repoUrl,
+            name = extension.name, version = extension.versionName,
+            installed = available == null,
+            languages = when (extension) {
+                is MangaExtension.Available -> extension.sources.map {
+                    it.lang
+                }.toSet().ifEmpty { setOf(extension.lang) }
+                is MangaExtension.Installed ->
+                    extension.sources
+                        .filterIsInstance<eu.kanade.tachiyomi.source.CatalogueSource>()
+                        .map { it.lang }.toSet()
+                is MangaExtension.Untrusted -> setOfNotNull(extension.lang)
+            },
+            repository = repository,
+            metadata = installed?.metadata ?: ExtensionPackageMetadata(),
+            status = installed?.updateStatus ?: ExtensionUpdateStatus.UNVERIFIED,
+            needsTrust = untrusted != null, nsfw = extension.isNsfw, step = item.installStep,
+            sources = available?.sources?.map { it.name }.orEmpty(),
+            icon = { MangaExtensionIcon(extension = extension, modifier = Modifier.size(44.dp)) },
+            onOpen = {
+                when (extension) {
+                    is MangaExtension.Installed -> onOpenExtension(extension)
+                    is MangaExtension.Available -> onOpenWebView(extension)
+                    is MangaExtension.Untrusted -> trust = extension
+                }
+            },
+            onAction = {
+                when (extension) {
+                    is MangaExtension.Installed -> if (extension.hasUpdate) {
+                        onUpdateExtension(
+                            extension,
+                        )
+                    } else {
+                        onOpenExtension(extension)
+                    }
+                    is MangaExtension.Available -> onInstallExtension(extension)
+                    is MangaExtension.Untrusted -> trust = extension
+                }
+            },
+            onCancel = { onClickItemCancel(extension) },
+            onLongClick = { onLongClickItem(extension) },
+        )
+    }
+    val context = LocalContext.current
+    val installGranted = rememberRequestPackageInstallsPermissionState(initialValue = true)
+    ExtensionManagerContent(entries, contentPadding, state.updates, state.checkFailed, onClickUpdateAll) {
+        if (!installGranted && state.installer?.requiresSystemPermission == true) {
+            WarningBanner(
+                textRes = MR.strings.ext_permission_install_apps_warning,
+                modifier = Modifier.clickable { context.launchRequestPackageInstallsPermission() },
+            )
+        }
+    }
+    trust?.let { extension ->
+        ExtensionTrustDialog(
+            onClickConfirm = {
+                onTrustExtension(extension)
+                trust = null
+            },
+            onClickDismiss = {
+                onUninstallExtension(extension)
+                trust = null
+            },
+            onDismissRequest = { trust = null },
+        )
+    }
 }

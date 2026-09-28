@@ -8,6 +8,24 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 29 settembre 2026 - Estensioni e distribuzioni protette
+
+- Schermate Estensioni anime e manga con viste Installate e Catalogo, schede
+  compatte e filtri per lingua, repository e supporto Home, anche con UI legacy.
+- Provenienza e Home distinte: badge Adattata a Nyanime, Home integrata,
+  Home parziale e Senza Home con spiegazioni nei dettagli.
+- Aggiornamenti soltanto per pacchetto, firma, distribuzione e API compatibili.
+  Le edizioni locali manuali e quelle protette non vengono sostituite dai cataloghi;
+  repository duplicati non vengono scelti arbitrariamente.
+- Mantieni questa versione nei dettagli, conservato nei backup e rivalidato
+  contro la firma degli APK presenti dopo il ripristino.
+- Contatori, notifiche e Aggiorna tutte usano la stessa politica. Un catalogo
+  irraggiungibile mostra Controllo non riuscito e viene ricontrollato, senza
+  dichiarare obsolete le estensioni locali.
+- APK scaricati verificati crittograficamente prima di qualsiasi installatore,
+  comprese le installazioni private; controlli di pacchetto, versione, API,
+  firma e descrittore della distribuzione.
+
 ## 28 settembre 2026 — Identificatori verificati per gli orari
 
 - Il tracking già salvato ha precedenza sugli identificatori forniti dalle

@@ -14,9 +14,10 @@ import eu.kanade.tachiyomi.extension.InstallStep
 import eu.kanade.tachiyomi.extension.anime.AnimeExtensionManager
 import eu.kanade.tachiyomi.extension.anime.model.AnimeExtension
 import eu.kanade.tachiyomi.util.system.LocaleHelper
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -32,7 +33,6 @@ import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.i18n.MR
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
-import kotlin.time.Duration.Companion.seconds
 
 class AnimeExtensionsScreenModel(
     preferences: SourcePreferences = Injekt.get(),
@@ -160,9 +160,7 @@ class AnimeExtensionsScreenModel(
 
     fun updateAllExtensions() {
         screenModelScope.launchIO {
-            state.value.items.values.flatten()
-                .map { it.extension }
-                .filterIsInstance<AnimeExtension.Installed>()
+            extensionManager.installedExtensionsFlow.value
                 .filter { it.hasUpdate }
                 .forEach(::updateExtension)
         }
@@ -189,11 +187,15 @@ class AnimeExtensionsScreenModel(
     }
 
     private fun removeDownloadState(extension: AnimeExtension) {
-        currentDownloads.update { it - extension.pkgName }
+        currentDownloads.update { if (it[extension.pkgName] == InstallStep.Error) it else it - extension.pkgName }
     }
 
     private suspend fun Flow<InstallStep>.collectToInstallUpdate(extension: AnimeExtension) =
         this
+            .catch { error ->
+                if (error is CancellationException) throw error
+                emit(InstallStep.Error)
+            }
             .onEach { installStep -> addDownloadState(extension, installStep) }
             .onCompletion { removeDownloadState(extension) }
             .collect()
@@ -207,10 +209,9 @@ class AnimeExtensionsScreenModel(
             mutableState.update { it.copy(isRefreshing = true) }
             extensionManager.findAvailableExtensions()
 
-            // Fake slower refresh so it doesn't seem like it's not doing anything
-            delay(1.seconds)
-
-            mutableState.update { it.copy(isRefreshing = false) }
+            mutableState.update {
+                it.copy(isRefreshing = false, checkFailed = extensionManager.unavailableRepositories.isNotEmpty())
+            }
         }
     }
 
@@ -224,6 +225,7 @@ class AnimeExtensionsScreenModel(
     data class State(
         val isLoading: Boolean = true,
         val isRefreshing: Boolean = false,
+        val checkFailed: Boolean = false,
         val items: ItemGroups = mutableMapOf(),
         val updates: Int = 0,
         val installer: BasePreferences.ExtensionInstaller? = null,

@@ -45,8 +45,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.domain.extension.ExtensionPackageMetadata
+import eu.kanade.domain.extension.ExtensionUpdateStatus
 import eu.kanade.presentation.browse.BaseBrowseItem
 import eu.kanade.presentation.browse.anime.components.AnimeExtensionIcon
+import eu.kanade.presentation.browse.components.ExtensionEntry
+import eu.kanade.presentation.browse.components.ExtensionManagerContent
+import eu.kanade.presentation.browse.components.ExtensionManagerSkeleton
 import eu.kanade.presentation.browse.manga.ExtensionHeader
 import eu.kanade.presentation.browse.manga.ExtensionTrustDialog
 import eu.kanade.presentation.components.WarningBanner
@@ -100,27 +105,9 @@ fun AnimeExtensionScreen(
         enabled = !state.isLoading,
     ) {
         when {
-            state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
-            state.isEmpty -> {
-                val msg = if (!searchQuery.isNullOrEmpty()) {
-                    MR.strings.no_results_found
-                } else {
-                    MR.strings.empty_screen
-                }
-                EmptyScreen(
-                    stringRes = msg,
-                    modifier = Modifier.padding(contentPadding),
-                    actions = persistentListOf(
-                        EmptyScreenAction(
-                            stringRes = MR.strings.extensionStores,
-                            icon = Icons.Outlined.Settings,
-                            onClick = { navigator.push(AnimeExtensionStoresScreen()) },
-                        ),
-                    ),
-                )
-            }
+            state.isLoading -> ExtensionManagerSkeleton(contentPadding)
             else -> {
-                AnimeExtensionContent(
+                ManagedAnimeExtensionContent(
                     state = state,
                     contentPadding = contentPadding,
                     onLongClickItem = onLongClickItem,
@@ -139,7 +126,7 @@ fun AnimeExtensionScreen(
 }
 
 @Composable
-private fun AnimeExtensionContent(
+private fun ManagedAnimeExtensionContent(
     state: AnimeExtensionsScreenModel.State,
     contentPadding: PaddingValues,
     onLongClickItem: (AnimeExtension) -> Unit,
@@ -152,366 +139,75 @@ private fun AnimeExtensionContent(
     onOpenExtension: (AnimeExtension.Installed) -> Unit,
     onClickUpdateAll: () -> Unit,
 ) {
-    val context = LocalContext.current
-    var trustState by remember { mutableStateOf<AnimeExtension.Untrusted?>(null) }
-    val installGranted = rememberRequestPackageInstallsPermissionState(initialValue = true)
-
-    FastScrollLazyColumn(
-        contentPadding = contentPadding + topSmallPaddingValues,
-    ) {
-        if (!installGranted && state.installer?.requiresSystemPermission == true) {
-            item(key = "extension-permissions-warning") {
-                WarningBanner(
-                    textRes = MR.strings.ext_permission_install_apps_warning,
-                    modifier = Modifier.clickable {
-                        context.launchRequestPackageInstallsPermission()
-                    },
-                )
-            }
-        }
-
-        state.items.forEach { (header, items) ->
-            item(
-                contentType = "header",
-                key = "extensionHeader-${header.hashCode()}",
-            ) {
-                when (header) {
-                    is AnimeExtensionUiModel.Header.Resource -> {
-                        val action: @Composable RowScope.() -> Unit =
-                            if (header.textRes == MR.strings.ext_updates_pending) {
-                                {
-                                    Button(onClick = { onClickUpdateAll() }) {
-                                        Text(
-                                            text = stringResource(MR.strings.ext_update_all),
-                                            style = LocalTextStyle.current.copy(
-                                                color = MaterialTheme.colorScheme.onPrimary,
-                                            ),
-                                        )
-                                    }
-                                }
-                            } else {
-                                {}
-                            }
-                        ExtensionHeader(
-                            textRes = header.textRes,
-                            modifier = Modifier.animateItemFastScroll(),
-                            action = action,
-                        )
-                    }
-                    is AnimeExtensionUiModel.Header.Text -> {
-                        ExtensionHeader(
-                            text = header.text,
-                            modifier = Modifier.animateItemFastScroll(),
-                        )
-                    }
+    var trust by remember { mutableStateOf<AnimeExtension.Untrusted?>(null) }
+    val entries = state.items.values.flatten().map { item ->
+        val extension = item.extension
+        val installed = extension as? AnimeExtension.Installed
+        val available = extension as? AnimeExtension.Available
+        val untrusted = extension as? AnimeExtension.Untrusted
+        val repository = installed?.store?.name ?: available?.store?.name
+        ExtensionEntry(
+            id = if (available == null) extension.pkgName else extension.pkgName + "|" + available.store.indexUrl,
+            name = extension.name, version = extension.versionName,
+            installed = available == null,
+            languages = when (extension) {
+                is AnimeExtension.Available -> extension.sources.map {
+                    it.lang
+                }.toSet().ifEmpty { setOf(extension.lang) }
+                is AnimeExtension.Installed -> extension.sources.map { it.lang }.toSet()
+                is AnimeExtension.Untrusted -> setOfNotNull(extension.lang)
+            },
+            repository = repository,
+            metadata = installed?.metadata ?: ExtensionPackageMetadata(),
+            status = installed?.updateStatus ?: ExtensionUpdateStatus.UNVERIFIED,
+            needsTrust = untrusted != null, nsfw = extension.isNsfw, step = item.installStep,
+            sources = available?.sources?.map { it.name }.orEmpty(),
+            icon = { AnimeExtensionIcon(extension = extension, modifier = Modifier.size(44.dp)) },
+            onOpen = {
+                when (extension) {
+                    is AnimeExtension.Installed -> onOpenExtension(extension)
+                    is AnimeExtension.Available -> onOpenWebView(extension)
+                    is AnimeExtension.Untrusted -> trust = extension
                 }
-            }
-
-            items(
-                items = items,
-                contentType = { "item" },
-                key = { item ->
-                    when (item.extension) {
-                        is AnimeExtension.Untrusted -> "extension-untrusted-${item.hashCode()}"
-                        is AnimeExtension.Installed -> "extension-installed-${item.hashCode()}"
-                        is AnimeExtension.Available -> "extension-available-${item.hashCode()}"
+            },
+            onAction = {
+                when (extension) {
+                    is AnimeExtension.Installed -> if (extension.hasUpdate) {
+                        onUpdateExtension(
+                            extension,
+                        )
+                    } else {
+                        onOpenExtension(extension)
                     }
-                },
-            ) { item ->
-                AnimeExtensionItem(
-                    item = item,
-                    modifier = Modifier.animateItemFastScroll(),
-                    onClickItem = {
-                        when (it) {
-                            is AnimeExtension.Available -> onInstallExtension(it)
-                            is AnimeExtension.Installed -> onOpenExtension(it)
-                            is AnimeExtension.Untrusted -> {
-                                trustState = it
-                            }
-                        }
-                    },
-                    onLongClickItem = onLongClickItem,
-                    onClickItemSecondaryAction = {
-                        when (it) {
-                            is AnimeExtension.Available -> onOpenWebView(it)
-                            is AnimeExtension.Installed -> onOpenExtension(it)
-                            else -> {}
-                        }
-                    },
-                    onClickItemCancel = onClickItemCancel,
-                    onClickItemAction = {
-                        when (it) {
-                            is AnimeExtension.Available -> onInstallExtension(it)
-                            is AnimeExtension.Installed -> {
-                                if (it.hasUpdate) {
-                                    onUpdateExtension(it)
-                                } else {
-                                    onOpenExtension(it)
-                                }
-                            }
-
-                            is AnimeExtension.Untrusted -> {
-                                trustState = it
-                            }
-                        }
-                    },
-                )
-            }
+                    is AnimeExtension.Available -> onInstallExtension(extension)
+                    is AnimeExtension.Untrusted -> trust = extension
+                }
+            },
+            onCancel = { onClickItemCancel(extension) },
+            onLongClick = { onLongClickItem(extension) },
+        )
+    }
+    val context = LocalContext.current
+    val installGranted = rememberRequestPackageInstallsPermissionState(initialValue = true)
+    ExtensionManagerContent(entries, contentPadding, state.updates, state.checkFailed, onClickUpdateAll) {
+        if (!installGranted && state.installer?.requiresSystemPermission == true) {
+            WarningBanner(
+                textRes = MR.strings.ext_permission_install_apps_warning,
+                modifier = Modifier.clickable { context.launchRequestPackageInstallsPermission() },
+            )
         }
     }
-    if (trustState != null) {
+    trust?.let { extension ->
         ExtensionTrustDialog(
             onClickConfirm = {
-                onTrustExtension(trustState!!)
-                trustState = null
+                onTrustExtension(extension)
+                trust = null
             },
             onClickDismiss = {
-                onUninstallExtension(trustState!!)
-                trustState = null
+                onUninstallExtension(extension)
+                trust = null
             },
-            onDismissRequest = {
-                trustState = null
-            },
+            onDismissRequest = { trust = null },
         )
     }
 }
-
-@Composable
-private fun AnimeExtensionItem(
-    item: AnimeExtensionUiModel.Item,
-    onClickItem: (AnimeExtension) -> Unit,
-    onLongClickItem: (AnimeExtension) -> Unit,
-    onClickItemCancel: (AnimeExtension) -> Unit,
-    onClickItemAction: (AnimeExtension) -> Unit,
-    modifier: Modifier = Modifier,
-    onClickItemSecondaryAction: (AnimeExtension) -> Unit,
-) {
-    val (extension, installStep) = item
-    BaseBrowseItem(
-        modifier = modifier
-            .combinedClickable(
-                onClick = { onClickItem(extension) },
-                onLongClick = { onLongClickItem(extension) },
-            ),
-        onClickItem = { onClickItem(extension) },
-        onLongClickItem = { onLongClickItem(extension) },
-        icon = {
-            Box(
-                modifier = Modifier
-                    .size(40.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                val idle = installStep.isCompleted()
-                if (!idle) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(40.dp),
-                        strokeWidth = 2.dp,
-                    )
-                }
-
-                val padding by animateDpAsState(
-                    targetValue = if (idle) 0.dp else 8.dp,
-                    label = "iconPadding",
-                )
-                AnimeExtensionIcon(
-                    extension = extension,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .padding(padding),
-                )
-            }
-        },
-        action = {
-            AnimeExtensionItemActions(
-                extension = extension,
-                installStep = installStep,
-                onClickItemCancel = onClickItemCancel,
-                onClickItemAction = onClickItemAction,
-                onClickItemSecondaryAction = onClickItemSecondaryAction,
-            )
-        },
-    ) {
-        AnimeExtensionItemContent(
-            extension = extension,
-            installStep = installStep,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun AnimeExtensionItemContent(
-    extension: AnimeExtension,
-    installStep: InstallStep,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.padding(start = MaterialTheme.padding.medium),
-    ) {
-        val text = buildAnnotatedString {
-            if (extension.isTorrent) {
-                appendInlineContent(TORRENT_ICON, "(Torrent)")
-                append(" ")
-            }
-            append(extension.name)
-        }
-
-        val inlineContent = mapOf(
-            Pair(
-                TORRENT_ICON,
-                InlineTextContent(
-                    Placeholder(
-                        width = MaterialTheme.typography.bodyMedium.fontSize,
-                        height = MaterialTheme.typography.bodyMedium.fontSize,
-                        placeholderVerticalAlign = PlaceholderVerticalAlign.Center,
-                    ),
-                ) {
-                    Icon(CustomIcons.Magnet, "")
-                },
-            ),
-        )
-
-        Text(
-            text = text,
-            inlineContent = inlineContent,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        // Won't look good but it's not like we can ellipsize overflowing content
-        FlowRow(
-            modifier = Modifier.secondaryItemAlpha(),
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.extraSmall),
-        ) {
-            ProvideTextStyle(value = MaterialTheme.typography.bodySmall) {
-                if (extension is AnimeExtension.Installed && extension.lang.isNotEmpty()) {
-                    Text(
-                        text = LocaleHelper.getSourceDisplayName(
-                            extension.lang,
-                            LocalContext.current,
-                        ),
-                    )
-                }
-
-                if (extension.versionName.isNotEmpty()) {
-                    Text(
-                        text = extension.versionName,
-                    )
-                }
-
-                val warning = when {
-                    extension is AnimeExtension.Untrusted -> MR.strings.ext_untrusted
-                    extension is AnimeExtension.Installed && extension.isObsolete -> MR.strings.ext_obsolete
-                    extension.isNsfw -> MR.strings.ext_nsfw_short
-                    else -> null
-                }
-                if (warning != null) {
-                    Text(
-                        text = stringResource(warning).uppercase(),
-                        color = MaterialTheme.colorScheme.error,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                if (!installStep.isCompleted()) {
-                    DotSeparatorNoSpaceText()
-                    Text(
-                        text = when (installStep) {
-                            InstallStep.Pending -> stringResource(MR.strings.ext_pending)
-                            InstallStep.Downloading -> stringResource(MR.strings.ext_downloading)
-                            InstallStep.Installing -> stringResource(MR.strings.ext_installing)
-                            else -> error("Must not show non-install process text")
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AnimeExtensionItemActions(
-    extension: AnimeExtension,
-    installStep: InstallStep,
-    modifier: Modifier = Modifier,
-    onClickItemCancel: (AnimeExtension) -> Unit = {},
-    onClickItemAction: (AnimeExtension) -> Unit = {},
-    onClickItemSecondaryAction: (AnimeExtension) -> Unit = {},
-) {
-    val isIdle = installStep.isCompleted()
-
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
-    ) {
-        when {
-            !isIdle -> {
-                IconButton(onClick = { onClickItemCancel(extension) }) {
-                    Icon(
-                        imageVector = Icons.Outlined.Close,
-                        contentDescription = stringResource(MR.strings.action_cancel),
-                    )
-                }
-            }
-            installStep == InstallStep.Error -> {
-                IconButton(onClick = { onClickItemAction(extension) }) {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh,
-                        contentDescription = stringResource(MR.strings.action_retry),
-                    )
-                }
-            }
-            installStep == InstallStep.Idle -> {
-                when (extension) {
-                    is AnimeExtension.Installed -> {
-                        IconButton(onClick = { onClickItemSecondaryAction(extension) }) {
-                            Icon(
-                                imageVector = Icons.Outlined.Settings,
-                                contentDescription = stringResource(MR.strings.action_settings),
-                            )
-                        }
-
-                        if (extension.hasUpdate) {
-                            IconButton(onClick = { onClickItemAction(extension) }) {
-                                Icon(
-                                    imageVector = Icons.Outlined.GetApp,
-                                    contentDescription = stringResource(MR.strings.ext_update),
-                                )
-                            }
-                        }
-                    }
-                    is AnimeExtension.Untrusted -> {
-                        IconButton(onClick = { onClickItemAction(extension) }) {
-                            Icon(
-                                imageVector = Icons.Outlined.VerifiedUser,
-                                contentDescription = stringResource(MR.strings.ext_trust),
-                            )
-                        }
-                    }
-                    is AnimeExtension.Available -> {
-                        if (extension.sources.isNotEmpty()) {
-                            IconButton(
-                                onClick = { onClickItemSecondaryAction(extension) },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Public,
-                                    contentDescription = stringResource(MR.strings.action_open_in_web_view),
-                                )
-                            }
-                        }
-
-                        IconButton(onClick = { onClickItemAction(extension) }) {
-                            Icon(
-                                imageVector = Icons.Outlined.GetApp,
-                                contentDescription = stringResource(MR.strings.ext_install),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-private const val TORRENT_ICON = "torrentIcon"

@@ -120,6 +120,11 @@ class MangaExtensionDetailsScreenModel(
         logcat { "Cleared $cleared cookies for: ${urls.joinToString()}" }
     }
 
+    fun setKeepVersion(keep: Boolean) {
+        val extension = state.value.extension ?: return
+        extensionManager.setKeepVersion(extension, keep)
+    }
+
     fun uninstallExtension() {
         val extension = state.value.extension ?: return
         extensionManager.uninstallExtension(extension)
