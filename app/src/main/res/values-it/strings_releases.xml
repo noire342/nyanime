@@ -50,6 +50,6 @@
     <string name="release_unified">Agenda e calendario unificati</string>
     <string name="release_unified_description">Anime e manga insieme. Disattiva per consultarli separatamente.</string>
     <string name="release_content_detected">Rilevato disponibile · %1$s</string>
-    <string name="release_source_choices">%1$d fonti · Scegli dove aprire</string>
-    <string name="release_choose_source">Scegli la fonte</string>
+    <string name="release_source_choices">%1$d opzioni · Scegli dove aprire</string>
+    <string name="release_choose_source">Scegli fonte ed edizione</string>
 </resources>

@@ -28,8 +28,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   di pubblicazione fornite dalla fonte; il rilevamento nell'app non diventa
   un'uscita di oggi. Riparazione degli avvisi esistenti al controllo del titolo,
   senza cancellare letture, capitoli o ricevute delle notifiche.
-- Uscite dello stesso anime riunite tra fonti tramite gli stessi criteri della
-  Home e identificativi verificati; una scheda con scelta della fonte, senza
+- Uscite dello stesso anime riunite tra fonti ed edizioni tramite i criteri della
+  Home e identificativi verificati; una scheda con scelta di fonte ed edizione, senza
   confondere le stagioni. Visto in una fonte non resta annunciato in un'altra.
 - Avvisi salvati insieme agli episodi e capitoli, deduplicazione e recupero
   quando le notifiche vengono riabilitate. Test degli avvisi e stato dei controlli

@@ -12,7 +12,7 @@ internal object ReleaseAgendaMerge {
         present: Map<Long, Set<Double>> = emptyMap(),
         watched: Map<Long, Set<Double>> = emptyMap(),
     ): List<ReleaseAgendaItem> {
-        val groups = mergeHomeCards(works.sortedBy { it.id })
+        val groups = mergeHomeCards(works.sortedBy { it.id }, mergeSourceVariants = true)
         val members = groups.associate { work ->
             work.id to (work.homePresentation?.choices?.map { it.animeId } ?: listOf(work.id))
         }

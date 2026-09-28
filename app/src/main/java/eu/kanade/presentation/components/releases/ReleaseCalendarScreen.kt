@@ -75,7 +75,11 @@ fun cafe.adriel.voyager.core.screen.Screen.ReleaseCalendar(
     }
     ReleaseCalendarContent(
         state.month, state.date, state.events, state.items,
-        state.loading, state.warning, model::setMonth, model::setDate, model::refresh,
+        state.loading,
+        state.warning.takeUnless {
+            state.medium == ReleaseMedium.MANGA
+        },
+        model::setMonth, model::setDate, model::refresh,
         onItem = {
             if (it.choices.isEmpty()) open(it) else choice = it
         }, showBack = showBack, showMediaFilter = true, medium = state.medium,
@@ -108,6 +112,9 @@ fun cafe.adriel.voyager.core.screen.Screen.ReleaseCalendar(
                     ) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(option.sourceLabel, style = MaterialTheme.typography.titleMedium)
+                            if (option.title != item.title) {
+                                Text(option.title, style = MaterialTheme.typography.bodySmall)
+                            }
                             Text(
                                 option.label,
                                 style = MaterialTheme.typography.bodyMedium,

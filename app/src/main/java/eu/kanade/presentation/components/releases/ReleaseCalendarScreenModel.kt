@@ -92,12 +92,12 @@ class ReleaseCalendarScreenModel(private val scope: ReleaseMedium? = null) :
             val groupedEvents = events.groupBy { it.entryId }
             val groupedNotices = notices.groupBy { it.entryId }
             for (id in ids) {
+                if (ReleaseEligibility.source(ReleaseMedium.ANIME, id) == null) continue
                 val cache = caches[id]
                 unresolved = unresolved || cache == null || cache.status == "UNRESOLVED"
                 unavailable = unavailable || cache?.status == "UNAVAILABLE"
                 val entryEvents = groupedEvents[id].orEmpty()
                 val entryNotices = groupedNotices[id].orEmpty()
-                if (ReleaseEligibility.source(ReleaseMedium.ANIME, id) == null) continue
                 val entry = anime.getAnimeById(id)
                 val presentation = entry.homePresentation ?: SourceHomePresentation()
                 val hints = SourceTrackingHints.from(entry)

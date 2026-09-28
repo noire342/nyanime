@@ -93,7 +93,9 @@ normalizzato e anno entrambi noti, senza conflitti tra identificativi. I dati di
 tracking e calendario arricchiscono il contratto generico delle estensioni;
 evidenze contraddittorie impediscono l'unione. Un episodio con numero riconosciuto
 compare una sola volta e offre le fonti concrete disponibili. Numeri sconosciuti,
-stagioni con ID diversi e contenuti della stessa fonte non vengono accorpati.
+stagioni con ID diversi non vengono accorpati. Le edizioni nella stessa fonte
+possono condividere l'annuncio solo con ID comuni verificati, mai per il solo
+titolo/anno; la scelta resta esplicita e non cambia il comportamento della Home.
 La disponibilità prevale sull'annuncio e un episodio già visto in una variante
 non resta un'uscita da vedere nell'altra. Le date di pubblicazione dei capitoli
 restano separate dal rilevamento nell'app anche durante la riparazione dei dati.

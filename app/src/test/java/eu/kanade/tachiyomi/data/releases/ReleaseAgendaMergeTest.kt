@@ -82,12 +82,26 @@ class ReleaseAgendaMergeTest {
         )
     }
 
-    @Test fun distinctEpisodesAndSameSourceEditionsRemainSeparate() {
+    @Test fun distinctEpisodesAndUnverifiedSameSourceEditionsRemainSeparate() {
         assertEquals(2, ReleaseAgendaMerge.merge(listOf(item(1), item(2, 3.0)), listOf(work(1), work(2))).size)
         assertEquals(
             2,
-            ReleaseAgendaMerge.merge(listOf(item(1), item(2)), listOf(work(1, source = 3), work(2, source = 3))).size,
+            ReleaseAgendaMerge.merge(
+                listOf(item(1), item(2)),
+                listOf(
+                    work(1, source = 3, catalog = null, year = 2025),
+                    work(2, source = 3, catalog = null, year = 2025),
+                ),
+            ).size,
         )
+    }
+
+    @Test fun verifiedEditionsShareOneBroadcastAndKeepAllThreeSourceChoices() {
+        val works = listOf(work(1, source = 3), work(2, source = 3).copy(title = "Series (Dub)"), work(4))
+        val result = ReleaseAgendaMerge.merge(listOf(item(1), item(2), item(4)), works)
+        assertEquals(1, result.size)
+        assertEquals(listOf(1L, 2L, 4L), result.single().choices.map { it.entryId })
+        assertEquals(2, tachiyomi.data.discovery.mergeHomeCards(works).size)
     }
 
     @Test fun availableEpisodeReplacesTheBroadcastWithoutOpeningAnUnavailableSource() {
