@@ -194,7 +194,7 @@ class AnimeLibraryUpdateNotifier(
      *
      * @param updates a list of anime with new updates.
      */
-    fun showUpdateNotifications(updates: List<Pair<Anime, Array<Episode>>>) {
+    suspend fun showUpdateNotifications(updates: List<Pair<Anime, Array<Episode>>>) {
         // Parent group notification
         context.notify(
             Notifications.ID_NEW_EPISODES,
@@ -227,31 +227,40 @@ class AnimeLibraryUpdateNotifier(
             setLargeIcon(notificationBitmap)
 
             setGroup(Notifications.GROUP_NEW_EPISODES)
-            setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
+            setGroupAlertBehavior(
+                if (securityPreferences.hideNotificationContent().get()) {
+                    NotificationCompat.GROUP_ALERT_SUMMARY
+                } else {
+                    NotificationCompat.GROUP_ALERT_CHILDREN
+                },
+            )
             setGroupSummary(true)
             priority = NotificationCompat.PRIORITY_HIGH
 
             setContentIntent(getNotificationIntent())
             setAutoCancel(true)
+            setOnlyAlertOnce(true)
         }
 
         // Per-anime notification
         if (!securityPreferences.hideNotificationContent().get()) {
-            launchUI {
-                context.notify(
-                    updates.map { (anime, episodes) ->
-                        NotificationManagerCompat.NotificationWithIdAndTag(
-                            anime.id.hashCode(),
-                            createNewEpisodesNotification(anime, episodes),
-                        )
-                    },
+            for ((anime, episodes) in updates) {
+                eu.kanade.tachiyomi.data.releases.ReleaseNotifications.reserveSlot(
+                    context,
+                    "release-anime",
+                    anime.id.hashCode(),
+                )
+                androidx.core.app.NotificationManagerCompat.from(context).notify(
+                    "release-anime",
+                    anime.id.hashCode(),
+                    createNewEpisodesNotification(anime, episodes),
                 )
             }
         }
     }
 
     private suspend fun createNewEpisodesNotification(anime: Anime, episodes: Array<Episode>): Notification {
-        val icon = getAnimeIcon(anime)
+        val icon = kotlinx.coroutines.withTimeoutOrNull(500) { getAnimeIcon(anime) }
         return context.notificationBuilder(Notifications.CHANNEL_NEW_CHAPTERS_EPISODES) {
             setContentTitle(anime.title)
 
@@ -266,7 +275,7 @@ class AnimeLibraryUpdateNotifier(
             }
 
             setGroup(Notifications.GROUP_NEW_EPISODES)
-            setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
+            setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             priority = NotificationCompat.PRIORITY_HIGH
 
             // Open first episode on tap
@@ -274,6 +283,11 @@ class AnimeLibraryUpdateNotifier(
                 NotificationReceiver.openEpisodePendingActivity(context, anime, episodes.first()),
             )
             setAutoCancel(true)
+            val newest = episodes.maxOf { it.dateFetch }
+            val previous = context.getSystemService(android.app.NotificationManager::class.java)
+                .activeNotifications.firstOrNull { it.id == anime.id.hashCode() && it.tag == "release-anime" }
+            setWhen(newest)
+            setOnlyAlertOnce(previous != null && previous.notification.`when` >= newest)
 
             // Mark episodes as read action
             addAction(

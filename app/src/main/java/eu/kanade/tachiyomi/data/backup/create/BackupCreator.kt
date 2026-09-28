@@ -108,7 +108,15 @@ class BackupCreator(
             val hiddenAnime = hiddenResume?.entries.orEmpty().mapNotNull { entry ->
                 animeRepository.getAnimeByUrlAndSourceId(entry.url, entry.source)
             }
-            val animeEntries = getAnimeFavorites.await() + nonFavoriteAnime + hiddenAnime
+            val releaseStore = eu.kanade.tachiyomi.data.releases.ReleaseStore()
+            val subscriptions = if (options.appSettings) releaseStore.backup() else emptyList()
+            val followedAnime = subscriptions.filter { it.medium == "ANIME" }.mapNotNull {
+                animeRepository.getAnimeByUrlAndSourceId(it.url, it.source)
+            }
+            val followedManga = subscriptions.filter { it.medium == "MANGA" }.mapNotNull {
+                mangaRepository.getMangaByUrlAndSourceId(it.url, it.source)
+            }
+            val animeEntries = getAnimeFavorites.await() + nonFavoriteAnime + hiddenAnime + followedAnime
             val seasons = animeEntries.filter { it.fetchType == FetchType.Seasons }
                 .flatMap { animeRepository.getAnimeSeasonsById(it.id).map { season -> season.anime } }
             val backupAnime = backupAnimes((animeEntries + seasons).distinctBy { it.id }, options)
@@ -117,7 +125,13 @@ class BackupCreator(
             } else {
                 emptyList()
             }
-            val backupManga = backupMangas(getMangaFavorites.await() + nonFavoriteManga, options)
+            val backupManga =
+                backupMangas(
+                    (getMangaFavorites.await() + nonFavoriteManga + followedManga).distinctBy {
+                        it.id
+                    },
+                    options,
+                )
 
             val backup = Backup(
                 backupManga = backupManga,
@@ -135,6 +149,7 @@ class BackupCreator(
                 backupAnimeExtensionStores = backupAnimeExtensionStores(options),
                 backupCustomButton = backupCustomButtons(options),
                 backupHiddenResume = hiddenResume,
+                releaseSubscriptions = subscriptions,
             )
 
             val byteArray = parser.encodeToByteArray(Backup.serializer(), backup)

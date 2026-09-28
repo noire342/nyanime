@@ -73,13 +73,14 @@ class BackupRestorer(
     suspend fun restore(uri: Uri, options: RestoreOptions) {
         val startTime = System.currentTimeMillis()
 
-        val community = eu.kanade.tachiyomi.data.community.CommunityManager.existing()
-        if (community != null && !isSync) {
-            community.withLibraryImport { restoreFromFile(uri, options) }
-        } else {
-            restoreFromFile(uri, options)
+        eu.kanade.tachiyomi.data.releases.ReleaseRestoreGuard.during {
+            val community = eu.kanade.tachiyomi.data.community.CommunityManager.existing()
+            if (community != null && !isSync) {
+                community.withLibraryImport { restoreFromFile(uri, options) }
+            } else {
+                restoreFromFile(uri, options)
+            }
         }
-
         val time = System.currentTimeMillis() - startTime
 
         val logFile = writeErrorLog()
@@ -148,6 +149,8 @@ class BackupRestorer(
                     .join()
                 if (options.appSettings) {
                     backup.backupHiddenResume?.let { restoreHiddenResume(it) }
+                    eu.kanade.tachiyomi.data.releases.ReleaseStore().restore(backup.releaseSubscriptions)
+                    eu.kanade.tachiyomi.data.releases.ReleaseMonitor.setup(context)
                 }
             }
             if (options.extensionStores) {

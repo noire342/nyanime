@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="release_title">Le tue uscite</string>
+    <string name="release_follow">Segui</string>
+    <string name="release_following">Seguito</string>
+    <string name="release_unfollow">Smetti di seguire le uscite</string>
+    <string name="release_follow_explanation">Aggiorna questo titolo e ricevi gli avvisi, anche senza aggiungerlo alla libreria.</string>
+    <string name="release_save_failed">Impossibile salvare. Riprova.</string>
+    <string name="release_available">Nuovi episodi e capitoli</string>
+    <string name="release_available_description">Avvisami quando un nuovo contenuto è disponibile nella mia fonte.</string>
+    <string name="release_reminder">Promemoria di trasmissione</string>
+    <string name="release_reminder_description">La trasmissione originale giapponese annunciata; la disponibilità nella fonte può essere diversa.</string>
+    <string name="release_disabled">Il monitoraggio automatico è disattivato.</string>
+    <string name="release_enable_monitor">Attiva gli aggiornamenti automatici</string>
+    <string name="release_enable_notifications">Abilita le notifiche</string>
+    <string name="release_exact_reminders">Consenti promemoria puntuali</string>
+    <string name="release_approximate">Senza questa autorizzazione i promemoria possono arrivare in ritardo.</string>
+    <string name="release_monitor">Aggiornamento automatico delle uscite</string>
+    <string name="release_monitor_description">Controlli mirati sui titoli seguiti, in libreria e già iniziati.</string>
+    <string name="release_test_notification">Prova una notifica</string>
+    <string name="release_test_description">Verifica che gli avvisi di Nyanime arrivino su questo dispositivo.</string>
+    <string name="release_notification_blocked">Le notifiche sono disabilitate nelle impostazioni Android.</string>
+    <string name="release_calendar_empty">Nessuna uscita annunciata per questo giorno.</string>
+    <string name="release_calendar_unknown">Nessuna data futura annunciata. Le nuove uscite vengono comunque controllate automaticamente.</string>
+    <string name="release_calendar_title">Calendario</string>
+    <string name="release_calendar_week">Prossimi 7 giorni</string>
+    <string name="release_calendar_loading">Aggiornamento delle date annunciate…</string>
+    <string name="release_calendar_error">Alcune date non sono state verificate. Le date salvate restano disponibili.</string>
+    <string name="release_calendar_unresolved">Alcuni titoli non hanno ancora un ID di catalogo verificato.</string>
+    <string name="release_broadcast">Trasmissione originale · Episodio %1$d · %2$s</string>
+    <string name="release_day">Giorno selezionato</string>
+    <string name="release_status">Stato del monitoraggio</string>
+    <string name="release_status_waiting">In attesa della connessione o del prossimo controllo programmato.</string>
+    <string name="release_status_counts">%1$d seguiti · %2$d verificati · %3$d in attesa di riprovare</string>
+    <string name="release_last_check">Ultimo controllo riuscito: %1$s</string>
+    <string name="release_check_now">Controlla adesso</string>
+    <string name="release_broadcast_label">Trasmissione originale · Episodio %1$s</string>
+    <string name="release_chapter_planned">Annunciato · Capitolo %1$s</string>
+    <string name="release_content_available">Disponibile · %1$s</string>
+    <string name="release_select_day">Scegli un giorno per vedere le uscite</string>
+    <string name="release_agenda">Agenda</string>
+    <plurals name="release_day_count">
+        <item quantity="one">%1$d uscita</item>
+        <item quantity="other">%1$d uscite</item>
+    </plurals>
+</resources>

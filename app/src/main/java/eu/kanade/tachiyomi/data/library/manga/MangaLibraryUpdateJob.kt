@@ -24,6 +24,8 @@ import eu.kanade.domain.items.chapter.interactor.SyncChaptersWithSource
 import eu.kanade.tachiyomi.data.cache.MangaCoverCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
 import eu.kanade.tachiyomi.data.notification.Notifications
+import eu.kanade.tachiyomi.data.releases.ReleaseMedium
+import eu.kanade.tachiyomi.data.releases.ReleaseUpdateGate
 import eu.kanade.tachiyomi.source.MangaSourceUpdateGate
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.UpdateStrategy
@@ -98,6 +100,11 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
 
     override suspend fun doWork(): Result {
         if (tags.contains(WORK_NAME_AUTO)) {
+            eu.kanade.tachiyomi.data.releases.ReleaseMonitor.enqueue(context)
+            return Result.success()
+        }
+
+        if (tags.contains(WORK_NAME_AUTO)) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
                 val preferences = Injekt.get<LibraryPreferences>()
                 val restrictions = preferences.autoUpdateDeviceRestrictions().get()
@@ -118,19 +125,17 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             logcat(LogPriority.ERROR, e) { "Not allowed to set foreground job" }
         }
 
-        libraryPreferences.lastUpdatedTimestamp().set(Instant.now().toEpochMilli())
-
         val categoryId = inputData.getLong(KEY_CATEGORY, -1L)
         addMangaToQueue(categoryId)
 
         return withIOContext {
             try {
                 updateChapterList()
+                libraryPreferences.lastUpdatedTimestamp().set(Instant.now().toEpochMilli())
                 Result.success()
             } catch (e: Exception) {
                 if (e is CancellationException) {
-                    // Assume success although cancelled
-                    Result.success()
+                    throw e
                 } else {
                     logcat(LogPriority.ERROR, e)
                     Result.failure()
@@ -166,7 +171,6 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             getMangaHistory.subscribe("").first()
                 .filter { (it.readAt?.time ?: 0L) >= recent }
                 .distinctBy { it.mangaId }
-                .take(20)
                 .mapNotNull { getManga.await(it.mangaId) }
                 .filterNot { it.favorite }
                 .map { manga -> LibraryManga(manga, 0, 1, 1, 0, 0, 0, 0) }
@@ -197,7 +201,14 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                 .distinctBy { it.manga.id }
         }
 
-        val restrictions = libraryPreferences.autoUpdateItemRestrictions().get()
+        val restrictions = if (tags.contains(
+                WORK_NAME_AUTO,
+            )
+        ) {
+            libraryPreferences.autoUpdateItemRestrictions().get()
+        } else {
+            emptySet()
+        }
         val skippedUpdates = mutableListOf<Pair<Manga, String?>>()
         val (_, fetchWindowUpperBound) = mangaFetchInterval.getWindow(ZonedDateTime.now())
 
@@ -335,7 +346,7 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         notifier.cancelProgressNotification()
 
         if (newUpdates.isNotEmpty()) {
-            notifier.showUpdateNotifications(newUpdates)
+            eu.kanade.tachiyomi.data.releases.ReleaseNotifications.flush(context)
             if (hasDownloads.get()) {
                 downloadManager.startDownloads()
             }
@@ -362,7 +373,10 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
      * @param manga the manga to update.
      * @return a pair of the inserted and removed chapters.
      */
-    private suspend fun updateManga(manga: Manga, fetchWindow: Pair<Long, Long>): List<Chapter> {
+    private suspend fun updateManga(
+        manga: Manga,
+        fetchWindow: Pair<Long, Long>,
+    ): List<Chapter> = ReleaseUpdateGate.withEntry(ReleaseMedium.MANGA, manga.id) {
         val source = sourceManager.getOrStub(manga.source)
 
         val fetchDetails = libraryPreferences.autoUpdateMetadata().get()
@@ -380,9 +394,9 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         // Get manga from database to account for if it was removed during the update and
         // to get latest data so it doesn't get overwritten later on
         val dbManga = getManga.await(manga.id)?.takeIf { it.favorite || it.id in readMangaIds }
-            ?: return emptyList()
+            ?: return@withEntry emptyList()
 
-        return syncChaptersWithSource.await(update.chapters, dbManga, source, false, fetchWindow)
+        syncChaptersWithSource.await(update.chapters, dbManga, source, false, fetchWindow)
     }
 
     private suspend fun withUpdateNotification(
@@ -466,49 +480,7 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             context: Context,
             prefInterval: Int? = null,
         ) {
-            val preferences = Injekt.get<LibraryPreferences>()
-            val interval = prefInterval ?: preferences.autoUpdateInterval().get()
-            if (interval > 0) {
-                val restrictions = preferences.autoUpdateDeviceRestrictions().get()
-                val networkType = if (DEVICE_NETWORK_NOT_METERED in restrictions) {
-                    NetworkType.UNMETERED
-                } else {
-                    NetworkType.CONNECTED
-                }
-                val networkRequestBuilder = NetworkRequest.Builder()
-                if (DEVICE_ONLY_ON_WIFI in restrictions) {
-                    networkRequestBuilder.addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                }
-                if (DEVICE_NETWORK_NOT_METERED in restrictions) {
-                    networkRequestBuilder.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
-                }
-                val constraints = Constraints.Builder()
-                    // 'networkRequest' only applies to Android 9+, otherwise 'networkType' is used
-                    .setRequiredNetworkRequest(networkRequestBuilder.build(), networkType)
-                    .setRequiresCharging(DEVICE_CHARGING in restrictions)
-                    .setRequiresBatteryNotLow(true)
-                    .build()
-
-                val request = PeriodicWorkRequestBuilder<MangaLibraryUpdateJob>(
-                    interval.toLong(),
-                    TimeUnit.HOURS,
-                    10,
-                    TimeUnit.MINUTES,
-                )
-                    .addTag(TAG)
-                    .addTag(WORK_NAME_AUTO)
-                    .setConstraints(constraints)
-                    .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.MINUTES)
-                    .build()
-
-                context.workManager.enqueueUniquePeriodicWork(
-                    WORK_NAME_AUTO,
-                    ExistingPeriodicWorkPolicy.UPDATE,
-                    request,
-                )
-            } else {
-                context.workManager.cancelUniqueWork(WORK_NAME_AUTO)
-            }
+            eu.kanade.tachiyomi.data.releases.ReleaseMonitor.setup(context)
         }
 
         fun startNow(

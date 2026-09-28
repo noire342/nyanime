@@ -101,6 +101,11 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
     private var hasAutomaticBacklog = false
 
     override suspend fun doWork(): Result {
+        if (tags.contains(WORK_NAME_AUTO)) {
+            eu.kanade.tachiyomi.data.releases.ReleaseMonitor.enqueue(context)
+            return Result.success()
+        }
+
         val automatic = tags.contains(WORK_NAME_AUTO)
         if (automatic) {
             if (libraryPreferences.autoUpdateInterval().get() <= 0) return Result.success()
@@ -128,7 +133,6 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
 
     private suspend fun runUpdate(automatic: Boolean): Result {
         if (automatic) refreshSchedule.recordAutomaticBatch(System.currentTimeMillis())
-        libraryPreferences.lastUpdatedTimestamp().set(Instant.now().toEpochMilli())
 
         val categoryId = inputData.getLong(KEY_CATEGORY, -1L)
         addAnimeToQueue(categoryId)
@@ -137,11 +141,11 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             try {
                 updateEpisodeList()
                 if (automatic && hasAutomaticBacklog) scheduleAutomaticFollowUp(context)
+                libraryPreferences.lastUpdatedTimestamp().set(Instant.now().toEpochMilli())
                 Result.success()
             } catch (e: Exception) {
                 if (e is CancellationException) {
-                    // Assume success although cancelled
-                    Result.success()
+                    throw e
                 } else {
                     logcat(LogPriority.ERROR, e)
                     Result.failure()
@@ -178,7 +182,6 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             getAnimeHistory.subscribe("").first()
                 .filter { (it.seenAt?.time ?: 0L) >= recent }
                 .distinctBy { it.animeId }
-                .take(20)
                 .mapNotNull { getAnime.await(it.animeId) }
                 .filterNot { it.favorite }
                 .map { anime -> LibraryAnime(anime, 0, 1, 1, 0, 0, 0, 0, 0) }
@@ -228,7 +231,14 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             }
         }
 
-        val restrictions = libraryPreferences.autoUpdateItemRestrictions().get()
+        val restrictions = if (tags.contains(
+                WORK_NAME_AUTO,
+            )
+        ) {
+            libraryPreferences.autoUpdateItemRestrictions().get()
+        } else {
+            emptySet()
+        }
         val skippedUpdates = mutableListOf<Pair<Anime, String?>>()
         val (_, fetchWindowUpperBound) = animeFetchInterval.getWindow(ZonedDateTime.now())
 
@@ -397,7 +407,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         notifier.cancelProgressNotification()
 
         if (newUpdates.isNotEmpty()) {
-            notifier.showUpdateNotifications(newUpdates)
+            eu.kanade.tachiyomi.data.releases.ReleaseNotifications.flush(context)
             if (hasDownloads.get()) {
                 downloadManager.startDownloads()
             }
@@ -540,40 +550,11 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             context: Context,
             prefInterval: Int? = null,
         ) {
-            val preferences = Injekt.get<LibraryPreferences>()
-            val interval = prefInterval ?: preferences.autoUpdateInterval().get()
-            if (interval > 0) {
-                val request = PeriodicWorkRequestBuilder<AnimeLibraryUpdateJob>(
-                    interval.toLong(),
-                    TimeUnit.HOURS,
-                    10,
-                    TimeUnit.MINUTES,
-                )
-                    .addTag(TAG)
-                    .addTag(WORK_NAME_AUTO)
-                    .setConstraints(automaticConstraints(preferences))
-                    .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.MINUTES)
-                    .build()
-
-                context.workManager.enqueueUniquePeriodicWork(
-                    WORK_NAME_AUTO,
-                    ExistingPeriodicWorkPolicy.UPDATE,
-                    request,
-                )
-            } else {
-                context.workManager.cancelUniqueWork(WORK_NAME_AUTO)
-                context.workManager.cancelAllWorkByTag(WORK_NAME_CATCHUP)
-            }
+            eu.kanade.tachiyomi.data.releases.ReleaseMonitor.setup(context)
         }
 
-        /** Resume a stale automatic library scan after a long absence, without flooding a source. */
         fun catchUpAfterReopen(context: Context) {
-            val preferences = Injekt.get<LibraryPreferences>()
-            if (preferences.autoUpdateInterval().get() <= 0) return
-            val schedule = Injekt.get<AnimeRefreshSchedule>()
-            if (System.currentTimeMillis() - schedule.lastAutomaticBatch() < REOPEN_CHECK_INTERVAL_MS) return
-            if (context.workManager.isRunning(TAG)) return
-            enqueueAutomaticBatch(context, "${WORK_NAME_CATCHUP}-reopen", 0L)
+            eu.kanade.tachiyomi.data.releases.ReleaseMonitor.enqueue(context)
         }
 
         private fun scheduleAutomaticFollowUp(context: Context) {

@@ -43,7 +43,7 @@ class EpisodeRepositoryImpl(
             }
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
-            emptyList()
+            throw e
         }
     }
 
@@ -88,6 +88,7 @@ class EpisodeRepositoryImpl(
             handler.await { episodesQueries.removeEpisodesWithIds(episodeIds) }
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
+            throw e
         }
     }
 

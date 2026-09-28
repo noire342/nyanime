@@ -25,7 +25,11 @@ import java.time.OffsetDateTime
 import java.util.Calendar
 
 class AniChartApi {
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+        .callTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
 
     internal suspend fun loadAiringTime(
         anime: Anime,

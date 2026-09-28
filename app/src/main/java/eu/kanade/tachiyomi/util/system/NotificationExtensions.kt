@@ -53,7 +53,10 @@ fun Context.notify(notificationWithIdAndTags: List<NotificationWithIdAndTag>) {
 }
 
 fun Context.cancelNotification(id: Int) {
-    NotificationManagerCompat.from(this).cancel(id)
+    val manager = NotificationManagerCompat.from(this)
+    manager.cancel(id)
+    notificationManager.activeNotifications.filter { it.id == id && it.tag in setOf("release-anime", "release-manga") }
+        .forEach { manager.cancel(it.tag, id) }
 }
 
 /**

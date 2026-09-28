@@ -22,6 +22,7 @@ OR (mangas.favorite = 0 AND chapters.date_fetch > COALESCE((
     FROM history JOIN chapters followed ON followed._id = history.chapter_id
     WHERE followed.manga_id = mangas._id AND history.last_read > 0
 ), 9223372036854775807))
+OR EXISTS(SELECT 1 FROM release_notice r WHERE r.item_id = chapters._id)
 ORDER BY date_fetch DESC;
 
 getRecentUpdates:

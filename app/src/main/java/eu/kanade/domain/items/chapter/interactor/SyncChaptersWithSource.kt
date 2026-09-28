@@ -7,9 +7,13 @@ import eu.kanade.domain.items.chapter.model.copyFromSChapter
 import eu.kanade.domain.items.chapter.model.toSChapter
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadProvider
+import eu.kanade.tachiyomi.data.releases.ReleaseMedium
+import eu.kanade.tachiyomi.data.releases.ReleaseNotifications
+import eu.kanade.tachiyomi.data.releases.ReleaseStore
 import eu.kanade.tachiyomi.source.MangaSource
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.online.HttpSource
+import tachiyomi.data.handlers.manga.MangaDatabaseHandler
 import tachiyomi.data.items.chapter.ChapterSanitizer
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.items.chapter.interactor.GetChaptersByMangaId
@@ -22,6 +26,8 @@ import tachiyomi.domain.items.chapter.repository.ChapterRepository
 import tachiyomi.domain.items.chapter.service.ChapterRecognition
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.source.local.entries.manga.isLocal
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import java.lang.Long.max
 import java.time.ZonedDateTime
 import java.util.TreeSet
@@ -56,6 +62,8 @@ class SyncChaptersWithSource(
         if (rawSourceChapters.isEmpty() && !source.isLocal()) {
             throw NoChaptersException()
         }
+
+        require(rawSourceChapters.all { it.url.isNotBlank() }) { "Invalid item identifier in source snapshot" }
 
         val now = ZonedDateTime.now()
         val nowMillis = now.toInstant().toEpochMilli()
@@ -151,6 +159,13 @@ class SyncChaptersWithSource(
                     fetchWindow,
                 )
             }
+            ReleaseStore().committed(
+                ReleaseMedium.MANGA,
+                manga.id,
+                emptyList(),
+                dbChapters.isEmpty(),
+                manga.status == eu.kanade.tachiyomi.source.model.SManga.COMPLETED.toLong(),
+            )
             return emptyList()
         }
 
@@ -194,6 +209,9 @@ class SyncChaptersWithSource(
             chapter = chapter.copy(
                 read = chapter.chapterNumber in deletedReadChapterNumbers,
                 bookmark = chapter.chapterNumber in deletedBookmarkedChapterNumbers,
+                lastPageRead =
+                removedChapters.filter { it.chapterNumber == chapter.chapterNumber }.maxOfOrNull { it.lastPageRead }
+                    ?: 0,
             )
 
             // Try to to use the fetch date of the original entry to not pollute 'Updates' tab
@@ -206,29 +224,41 @@ class SyncChaptersWithSource(
             chapter
         }
 
-        if (removedChapters.isNotEmpty()) {
-            val toDeleteIds = removedChapters.map { it.id }
-            chapterRepository.removeChaptersWithIds(toDeleteIds)
-        }
-
-        if (updatedToAdd.isNotEmpty()) {
-            updatedToAdd = chapterRepository.addAllChapters(updatedToAdd)
-        }
-
-        if (updatedChapters.isNotEmpty()) {
-            val chapterUpdates = updatedChapters.map { it.toChapterUpdate() }
-            updateChapter.awaitAll(chapterUpdates)
-        }
-        updateManga.awaitUpdateFetchInterval(manga, now, fetchWindow)
-
-        // Set this manga as updated since chapters were changed
-        // Note that last_update actually represents last time the chapter list changed at all
-        updateManga.awaitUpdateLastUpdate(manga.id)
-
         val excludedScanlators = getExcludedScanlators.await(manga.id).toHashSet()
+        val added = Injekt.get<MangaDatabaseHandler>().await(inTransaction = true) {
+            if (removedChapters.isNotEmpty()) {
+                val toDeleteIds = removedChapters.map { it.id }
+                chapterRepository.removeChaptersWithIds(toDeleteIds)
+            }
 
-        return updatedToAdd.filterNot {
-            it.url in changedOrDuplicateReadUrls || it.scanlator in excludedScanlators
+            if (updatedToAdd.isNotEmpty()) {
+                updatedToAdd = chapterRepository.addAllChapters(updatedToAdd)
+            }
+
+            if (updatedChapters.isNotEmpty()) {
+                val chapterUpdates = updatedChapters.map { it.toChapterUpdate() }
+                chapterRepository.updateAllChapters(chapterUpdates)
+            }
+            check(updateManga.awaitUpdateFetchInterval(manga, now, fetchWindow))
+
+            // Set this manga as updated since chapters were changed
+            // Note that last_update actually represents last time the chapter list changed at all
+            check(updateManga.awaitUpdateLastUpdate(manga.id))
+
+            val notices = updatedToAdd.filterNot {
+                it.url in changedOrDuplicateReadUrls ||
+                    it.scanlator in excludedScanlators
+            }
+            ReleaseStore().committed(
+                ReleaseMedium.MANGA,
+                manga.id,
+                notices.map { it.id },
+                dbChapters.isEmpty(),
+                manga.status == eu.kanade.tachiyomi.source.model.SManga.COMPLETED.toLong(),
+            )
+            notices
         }
+        ReleaseNotifications.afterCommit(Injekt.get<android.app.Application>())
+        return added
     }
 }

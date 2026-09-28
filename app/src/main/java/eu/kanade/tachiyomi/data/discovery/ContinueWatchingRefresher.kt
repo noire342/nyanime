@@ -5,6 +5,10 @@ import eu.kanade.domain.source.anime.interactor.GetAnimeIncognitoState
 import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.data.library.anime.AnimeForegroundRefreshGate
 import eu.kanade.tachiyomi.data.library.anime.AnimeRefreshSchedule
+import eu.kanade.tachiyomi.data.releases.ReleaseEligibility
+import eu.kanade.tachiyomi.data.releases.ReleaseMedium
+import eu.kanade.tachiyomi.data.releases.ReleasePolicy
+import eu.kanade.tachiyomi.data.releases.ReleaseStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -61,7 +65,11 @@ class ContinueWatchingRefresher(
             val anime = getAnime.await(entry.animeId) ?: continue
             if (anime.isLocal() || incognito.await(anime.source)) continue
             if (sources.get(anime.source)?.let(sourceService::isEnabled) != true) continue
-            if (!schedule.isDue(anime, now)) continue
+            if (ReleaseEligibility.source(ReleaseMedium.ANIME, anime.id) == null ||
+                !ReleasePolicy.isDue(ReleaseStore().check(ReleaseMedium.ANIME, anime.id), now, foreground = true)
+            ) {
+                continue
+            }
             candidates += anime
         }
 
@@ -78,10 +86,6 @@ class ContinueWatchingRefresher(
             if (anime.id.toString() in visibility.hidden.get()) continue
             val source = sources.get(anime.source)?.takeIf(sourceService::isEnabled) ?: continue
             if (!AnimeForegroundRefreshGate.tryBegin(anime.id, gateClock())) continue
-            if (!schedule.reserve(anime.source, System.currentTimeMillis())) {
-                AnimeForegroundRefreshGate.finish(anime.id, gateClock(), successful = false, cancelled = true)
-                continue
-            }
 
             checked++
             var succeeded = false
@@ -100,7 +104,11 @@ class ContinueWatchingRefresher(
                 }
                 currentCoroutineContext().ensureActive()
             } finally {
-                schedule.record(anime.id, System.currentTimeMillis(), succeeded)
+                if (!succeeded &&
+                    currentCoroutineContext().isActive
+                ) {
+                    ReleaseStore().markFailure(ReleaseMedium.ANIME, anime.id, System.currentTimeMillis())
+                }
                 AnimeForegroundRefreshGate.finish(
                     anime.id,
                     gateClock(),

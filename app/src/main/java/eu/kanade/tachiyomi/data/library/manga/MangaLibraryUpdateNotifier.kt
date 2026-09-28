@@ -176,7 +176,7 @@ class MangaLibraryUpdateNotifier(
      *
      * @param updates a list of manga with new updates.
      */
-    fun showUpdateNotifications(updates: List<Pair<Manga, Array<Chapter>>>) {
+    suspend fun showUpdateNotifications(updates: List<Pair<Manga, Array<Chapter>>>) {
         // Parent group notification
         context.notify(
             Notifications.ID_NEW_CHAPTERS,
@@ -209,31 +209,40 @@ class MangaLibraryUpdateNotifier(
             setLargeIcon(notificationBitmap)
 
             setGroup(Notifications.GROUP_NEW_CHAPTERS)
-            setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
+            setGroupAlertBehavior(
+                if (securityPreferences.hideNotificationContent().get()) {
+                    NotificationCompat.GROUP_ALERT_SUMMARY
+                } else {
+                    NotificationCompat.GROUP_ALERT_CHILDREN
+                },
+            )
             setGroupSummary(true)
             priority = NotificationCompat.PRIORITY_HIGH
 
             setContentIntent(getNotificationIntent())
             setAutoCancel(true)
+            setOnlyAlertOnce(true)
         }
 
         // Per-manga notification
         if (!securityPreferences.hideNotificationContent().get()) {
-            launchUI {
-                context.notify(
-                    updates.map { (manga, chapters) ->
-                        NotificationManagerCompat.NotificationWithIdAndTag(
-                            manga.id.hashCode(),
-                            createNewChaptersNotification(manga, chapters),
-                        )
-                    },
+            for ((manga, chapters) in updates) {
+                eu.kanade.tachiyomi.data.releases.ReleaseNotifications.reserveSlot(
+                    context,
+                    "release-manga",
+                    manga.id.hashCode(),
+                )
+                androidx.core.app.NotificationManagerCompat.from(context).notify(
+                    "release-manga",
+                    manga.id.hashCode(),
+                    createNewChaptersNotification(manga, chapters),
                 )
             }
         }
     }
 
     private suspend fun createNewChaptersNotification(manga: Manga, chapters: Array<Chapter>): Notification {
-        val icon = getMangaIcon(manga)
+        val icon = kotlinx.coroutines.withTimeoutOrNull(500) { getMangaIcon(manga) }
         return context.notificationBuilder(Notifications.CHANNEL_NEW_CHAPTERS_EPISODES) {
             setContentTitle(manga.title)
 
@@ -248,7 +257,7 @@ class MangaLibraryUpdateNotifier(
             }
 
             setGroup(Notifications.GROUP_NEW_CHAPTERS)
-            setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
+            setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             priority = NotificationCompat.PRIORITY_HIGH
 
             // Open first chapter on tap
@@ -260,6 +269,11 @@ class MangaLibraryUpdateNotifier(
                 ),
             )
             setAutoCancel(true)
+            val newest = chapters.maxOf { it.dateFetch }
+            val previous = context.getSystemService(android.app.NotificationManager::class.java)
+                .activeNotifications.firstOrNull { it.id == manga.id.hashCode() && it.tag == "release-manga" }
+            setWhen(newest)
+            setOnlyAlertOnce(previous != null && previous.notification.`when` >= newest)
 
             // Mark chapters as read action
             addAction(

@@ -34,6 +34,11 @@ import eu.kanade.presentation.util.formattedMessage
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
 import eu.kanade.tachiyomi.data.download.manga.model.MangaDownload
+import eu.kanade.tachiyomi.data.releases.ReleaseEligibility
+import eu.kanade.tachiyomi.data.releases.ReleaseMedium
+import eu.kanade.tachiyomi.data.releases.ReleasePolicy
+import eu.kanade.tachiyomi.data.releases.ReleaseStore
+import eu.kanade.tachiyomi.data.releases.ReleaseUpdateGate
 import eu.kanade.tachiyomi.data.track.EnhancedMangaTracker
 import eu.kanade.tachiyomi.data.track.MangaAnimeContinuity
 import eu.kanade.tachiyomi.data.track.TrackerManager
@@ -297,8 +302,16 @@ class MangaScreenModel(
 
             // Fetch info-chapters when needed
             if (screenModelScope.isActive) {
-                if (needRefreshInfo || needRefreshChapter) {
-                    fetchUpdateFromSource(needRefreshInfo, needRefreshChapter)
+                if (needRefreshInfo ||
+                    needRefreshChapter ||
+                    ReleaseEligibility.source(ReleaseMedium.MANGA, mangaId) != null &&
+                    ReleasePolicy.isDue(
+                        ReleaseStore().check(ReleaseMedium.MANGA, mangaId),
+                        System.currentTimeMillis(),
+                        foreground = true,
+                    )
+                ) {
+                    fetchUpdateFromSource(needRefreshInfo, true)
                 }
             }
 
@@ -327,28 +340,33 @@ class MangaScreenModel(
     ) {
         val state = successState ?: return
         try {
-            withIOContext {
-                val update = MangaSourceUpdateGate.await(
-                    state.source,
-                    state.manga.toSManga(),
-                    emptyList(),
-                    fetchDetails,
-                    fetchChapters,
-                )
-                if (fetchDetails) {
-                    updateManga.awaitUpdateFromSource(state.manga, update.manga, manualFetch)
-                }
-                if (fetchChapters) {
-                    val newChapters = syncChaptersWithSource.await(
-                        update.chapters,
-                        state.manga,
+            ReleaseUpdateGate.withEntry(ReleaseMedium.MANGA, mangaId) {
+                withIOContext {
+                    val update = MangaSourceUpdateGate.await(
                         state.source,
-                        manualFetch,
+                        state.manga.toSManga(),
+                        emptyList(),
+                        fetchDetails,
+                        fetchChapters,
                     )
-                    if (manualFetch) downloadNewChapters(newChapters)
+                    if (fetchDetails) {
+                        updateManga.awaitUpdateFromSource(state.manga, update.manga, manualFetch)
+                    }
+                    if (fetchChapters) {
+                        val newChapters = syncChaptersWithSource.await(
+                            update.chapters,
+                            state.manga,
+                            state.source,
+                            manualFetch,
+                        )
+                        if (manualFetch) downloadNewChapters(newChapters)
+                    }
                 }
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Throwable) {
+            ReleaseStore().markFailure(ReleaseMedium.MANGA, mangaId, System.currentTimeMillis())
             // Ignore early hints "errors" that aren't handled by OkHttp
             if (e is HttpException && e.code == 103) return
 

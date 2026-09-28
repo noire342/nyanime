@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="release_title">Your releases</string>
+    <string name="release_follow">Follow</string>
+    <string name="release_following">Following</string>
+    <string name="release_unfollow">Stop following releases</string>
+    <string name="release_follow_explanation">Keep this title up to date and receive notifications, even outside your library.</string>
+    <string name="release_save_failed">Could not save. Please try again.</string>
+    <string name="release_available">New episodes and chapters</string>
+    <string name="release_available_description">Notify me when new content is available in my source.</string>
+    <string name="release_reminder">Broadcast reminder</string>
+    <string name="release_reminder_description">The announced original Japanese broadcast; availability in your source may differ.</string>
+    <string name="release_disabled">Automatic monitoring is disabled.</string>
+    <string name="release_enable_monitor">Enable automatic updates</string>
+    <string name="release_enable_notifications">Enable notifications</string>
+    <string name="release_exact_reminders">Allow precise reminders</string>
+    <string name="release_approximate">Without this permission reminders may arrive later.</string>
+    <string name="release_monitor">Automatic release monitoring</string>
+    <string name="release_monitor_description">Targeted checks for followed, library and started titles.</string>
+    <string name="release_test_notification">Test notification</string>
+    <string name="release_test_description">Check that Nyanime notifications can reach this device.</string>
+    <string name="release_notification_blocked">Notifications are disabled in Android settings.</string>
+    <string name="release_calendar_empty">No announced releases for this day.</string>
+    <string name="release_calendar_unknown">No future dates announced. New content is still checked automatically.</string>
+    <string name="release_calendar_title">Calendar</string>
+    <string name="release_calendar_week">Next 7 days</string>
+    <string name="release_calendar_loading">Updating announced dates…</string>
+    <string name="release_calendar_error">Could not verify some dates. Saved dates remain available.</string>
+    <string name="release_calendar_unresolved">Some titles have no verified catalog ID yet.</string>
+    <string name="release_broadcast">Original broadcast · Episode %1$d · %2$s</string>
+    <string name="release_day">Selected day</string>
+    <string name="release_status">Monitoring status</string>
+    <string name="release_status_waiting">Waiting for a network connection or the next scheduled check.</string>
+    <string name="release_status_counts">%1$d followed · %2$d checked · %3$d retrying</string>
+    <string name="release_last_check">Last successful check: %1$s</string>
+    <string name="release_check_now">Check now</string>
+    <string name="release_broadcast_label">Original broadcast · Episode %1$s</string>
+    <string name="release_chapter_planned">Announced · Chapter %1$s</string>
+    <string name="release_content_available">Available · %1$s</string>
+    <string name="release_select_day">Choose a day to see releases</string>
+    <string name="release_agenda">Agenda</string>
+    <plurals name="release_day_count">
+        <item quantity="one">%1$d release</item>
+        <item quantity="other">%1$d releases</item>
+    </plurals>
+</resources>

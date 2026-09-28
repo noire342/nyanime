@@ -39,6 +39,10 @@ import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
 import eu.kanade.tachiyomi.data.library.anime.AnimeForegroundRefreshGate
+import eu.kanade.tachiyomi.data.releases.ReleaseEligibility
+import eu.kanade.tachiyomi.data.releases.ReleaseMedium
+import eu.kanade.tachiyomi.data.releases.ReleasePolicy
+import eu.kanade.tachiyomi.data.releases.ReleaseStore
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
 import eu.kanade.tachiyomi.data.track.AnimeMangaContinuity
 import eu.kanade.tachiyomi.data.track.EnhancedAnimeTracker
@@ -266,6 +270,7 @@ class AnimeScreenModel(
                     updateSuccessState {
                         it.copy(
                             anime = anime,
+                            nextAiringEpisode = anime.nextEpisodeToAir to anime.nextEpisodeAiringAt,
                             episodes = episodes.toEpisodeListItems(anime),
                             seasons = seasons.toAnimeSeasonItems(),
                         )
@@ -330,6 +335,12 @@ class AnimeScreenModel(
                     fetchSeasons = needRefreshSeason || (needRefreshInfo && anime.fetchType == FetchType.Seasons),
                 )
             } else if (screenModelScope.isActive &&
+                ReleaseEligibility.source(ReleaseMedium.ANIME, animeId) != null &&
+                ReleasePolicy.isDue(
+                    ReleaseStore().check(ReleaseMedium.ANIME, animeId),
+                    System.currentTimeMillis(),
+                    foreground = true,
+                ) &&
                 AnimeForegroundRefreshGate.tryBegin(animeId, detailRefreshClock())
             ) {
                 var completed = false
@@ -342,6 +353,11 @@ class AnimeScreenModel(
                         showErrors = false,
                     )
                 } finally {
+                    if (!completed &&
+                        screenModelScope.isActive
+                    ) {
+                        ReleaseStore().markFailure(ReleaseMedium.ANIME, animeId, System.currentTimeMillis())
+                    }
                     AnimeForegroundRefreshGate.finish(
                         animeId,
                         detailRefreshClock(),
@@ -1622,12 +1638,13 @@ class AnimeScreenModel(
         trackItems: List<AnimeTrackItem>,
         manualFetch: Boolean,
     ) {
-        val airingEpisodeData = AniChartApi().loadAiringTime(anime, trackItems, manualFetch) ?: return
-        val current = successState?.nextAiringEpisode ?: return
-        if (airingEpisodeData == current) return
-
-        setAnimeViewerFlags.awaitSetNextEpisodeAiring(anime.id, airingEpisodeData)
+        val repository = eu.kanade.tachiyomi.data.releases.AiringRepository()
+        val result = repository.refresh(anime, force = manualFetch)
+        if (result.status == "UNAVAILABLE" || result.status == "UNRESOLVED") return
+        val next = repository.entryEvents(anime.id).firstOrNull { it.airingAt > System.currentTimeMillis() }
+        val airingEpisodeData = (next?.episode ?: 0) to (next?.airingAt?.div(1000) ?: 0)
         updateSuccessState { it.copy(nextAiringEpisode = airingEpisodeData) }
+        eu.kanade.tachiyomi.data.releases.ReleaseReminders.schedule(Injekt.get<android.app.Application>())
     }
 
     // Track sheet - end

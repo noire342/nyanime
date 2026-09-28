@@ -118,7 +118,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         scope.launch(Dispatchers.IO) {
             try {
                 AnimeLibraryUpdateJob.retireHomeRefresh(this@App)
-                AnimeLibraryUpdateJob.catchUpAfterReopen(this@App)
+                eu.kanade.tachiyomi.data.releases.ReleaseMonitor.initialize(this@App)
             } catch (error: Exception) {
                 logcat(LogPriority.WARN, error) { "Unable to retire an earlier Home refresh" }
             }
@@ -268,6 +268,17 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
     override fun onStart(owner: LifecycleOwner) {
         Injekt.get<eu.kanade.domain.ui.ThemeController>().reconcile()
         SecureActivityDelegate.onApplicationStart()
+        eu.kanade.tachiyomi.data.releases.ReleaseMonitor.enqueue(this)
+        eu.kanade.tachiyomi.data.releases.ReleaseNotifications.afterCommit(this)
+        ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                eu.kanade.tachiyomi.data.releases.ReleaseReminders.schedule(this@App)
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                logcat(LogPriority.WARN, error) { "Unable to schedule release reminders" }
+            }
+        }
         RetroactiveTracking.onForeground()
         LibraryAutoTracking.onForeground()
         eu.kanade.tachiyomi.data.community.CommunityManager.lifecycle(this, true)

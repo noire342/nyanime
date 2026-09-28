@@ -37,7 +37,7 @@ class ChapterRepositoryImpl(
             }
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
-            emptyList()
+            throw e
         }
     }
 
@@ -77,6 +77,7 @@ class ChapterRepositoryImpl(
             handler.await { chaptersQueries.removeChaptersWithIds(chapterIds) }
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
+            throw e
         }
     }
 

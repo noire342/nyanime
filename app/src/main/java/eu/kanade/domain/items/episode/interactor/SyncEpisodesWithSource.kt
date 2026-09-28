@@ -9,6 +9,10 @@ import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadProvider
+import eu.kanade.tachiyomi.data.releases.ReleaseMedium
+import eu.kanade.tachiyomi.data.releases.ReleaseNotifications
+import eu.kanade.tachiyomi.data.releases.ReleaseStore
+import tachiyomi.data.handlers.anime.AnimeDatabaseHandler
 import tachiyomi.data.items.episode.EpisodeSanitizer
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.items.episode.interactor.GetEpisodesByAnimeId
@@ -21,6 +25,8 @@ import tachiyomi.domain.items.episode.repository.EpisodeRepository
 import tachiyomi.domain.items.episode.service.EpisodeRecognition
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.source.local.entries.anime.isLocal
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import java.lang.Long.max
 import java.time.ZonedDateTime
 import java.util.TreeSet
@@ -54,6 +60,8 @@ class SyncEpisodesWithSource(
         if (rawSourceEpisodes.isEmpty() && !source.isLocal()) {
             throw NoEpisodesException()
         }
+
+        require(rawSourceEpisodes.all { it.url.isNotBlank() }) { "Invalid item identifier in source snapshot" }
 
         val now = ZonedDateTime.now()
         val nowMillis = now.toInstant().toEpochMilli()
@@ -163,6 +171,17 @@ class SyncEpisodesWithSource(
                     fetchWindow,
                 )
             }
+            ReleaseStore().committed(
+                ReleaseMedium.ANIME,
+                anime.id,
+                emptyList(),
+                dbEpisodes.isEmpty(),
+                anime.status == eu.kanade.tachiyomi.animesource.model.SAnime.COMPLETED.toLong(),
+                airingAt = anime.nextEpisodeAiringAt.takeIf {
+                    it >
+                        0
+                }?.times(1000),
+            )
             return emptyList()
         }
 
@@ -204,8 +223,15 @@ class SyncEpisodesWithSource(
             if (!episode.isRecognizedNumber || episode.episodeNumber !in deletedEpisodeNumbers) return@map episode
 
             episode = episode.copy(
+                totalSeconds = removedEpisodes.filter { it.episodeNumber == episode.episodeNumber }
+                    .maxOfOrNull { it.totalSeconds } ?: 0,
                 seen = episode.episodeNumber in deletedSeenEpisodeNumbers,
                 bookmark = episode.episodeNumber in deletedBookmarkedEpisodeNumbers,
+                lastSecondSeen =
+                removedEpisodes.filter {
+                    it.episodeNumber == episode.episodeNumber
+                }.maxOfOrNull { it.lastSecondSeen }
+                    ?: 0,
             )
 
             // Try to to use the fetch date of the original entry to not pollute 'Updates' tab
@@ -218,25 +244,40 @@ class SyncEpisodesWithSource(
             episode
         }
 
-        if (removedEpisodes.isNotEmpty()) {
-            val toDeleteIds = removedEpisodes.map { it.id }
-            episodeRepository.removeEpisodesWithIds(toDeleteIds)
+        val added = Injekt.get<AnimeDatabaseHandler>().await(inTransaction = true) {
+            if (removedEpisodes.isNotEmpty()) {
+                val toDeleteIds = removedEpisodes.map { it.id }
+                episodeRepository.removeEpisodesWithIds(toDeleteIds)
+            }
+
+            if (updatedToAdd.isNotEmpty()) {
+                updatedToAdd = episodeRepository.addAllEpisodes(updatedToAdd)
+            }
+
+            if (updatedEpisodes.isNotEmpty()) {
+                val episodeUpdates = updatedEpisodes.map { it.toEpisodeUpdate() }
+                episodeRepository.updateAllEpisodes(episodeUpdates)
+            }
+            check(updateAnime.awaitUpdateFetchInterval(anime, now, fetchWindow))
+
+            // Set this anime as updated since episodes were changed
+            // Note that last_update actually represents last time the episode list changed at all
+            check(updateAnime.awaitUpdateLastUpdate(anime.id))
+            val notices = updatedToAdd.filterNot { it.url in changedOrDuplicateReadUrls }
+            ReleaseStore().committed(
+                ReleaseMedium.ANIME,
+                anime.id,
+                notices.map { it.id },
+                dbEpisodes.isEmpty(),
+                anime.status == eu.kanade.tachiyomi.animesource.model.SAnime.COMPLETED.toLong(),
+                airingAt = anime.nextEpisodeAiringAt.takeIf {
+                    it >
+                        0
+                }?.times(1000),
+            )
+            notices
         }
-
-        if (updatedToAdd.isNotEmpty()) {
-            updatedToAdd = episodeRepository.addAllEpisodes(updatedToAdd)
-        }
-
-        if (updatedEpisodes.isNotEmpty()) {
-            val episodeUpdates = updatedEpisodes.map { it.toEpisodeUpdate() }
-            updateEpisode.awaitAll(episodeUpdates)
-        }
-        updateAnime.awaitUpdateFetchInterval(anime, now, fetchWindow)
-
-        // Set this anime as updated since episodes were changed
-        // Note that last_update actually represents last time the episode list changed at all
-        updateAnime.awaitUpdateLastUpdate(anime.id)
-
-        return updatedToAdd.filterNot { it.url in changedOrDuplicateReadUrls }
+        ReleaseNotifications.afterCommit(Injekt.get<android.app.Application>())
+        return added
     }
 }
