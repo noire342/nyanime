@@ -684,7 +684,6 @@
     <string name="ready_update_install">Install now</string>
     <string name="home_loading_content">Loading content</string>
     <string name="nyanime_theme_choice_title">Choose your Nyanime look</string>
-    <string name="nyanime_theme_choice_description">Your stories, your style. Choose the look you enjoy most.</string>
     <string name="nyanime_theme_dark">Dark</string>
     <string name="nyanime_theme_light">Light</string>
     <string name="nyanime_theme_system">Follow system</string>

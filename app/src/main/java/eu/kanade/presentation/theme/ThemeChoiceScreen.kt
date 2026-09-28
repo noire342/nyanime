@@ -96,11 +96,6 @@ fun ThemeChoiceScreen(
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                     )
-                    Text(
-                        stringResource(AYMR.strings.nyanime_theme_choice_description),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
             item { ThemeModeCards(selectedMode, onSelect, enabled = !saving, animationsEnabled = animationsEnabled) }

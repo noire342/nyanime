@@ -593,7 +593,6 @@
     <string name="ready_update_install">Installa ora</string>
     <string name="home_loading_content">Caricamento dei contenuti</string>
     <string name="nyanime_theme_choice_title">Scegli l’aspetto di Nyanime</string>
-    <string name="nyanime_theme_choice_description">Le tue storie, il tuo stile. Scegli l’aspetto che preferisci.</string>
     <string name="nyanime_theme_dark">Scuro</string>
     <string name="nyanime_theme_light">Chiaro</string>
     <string name="nyanime_theme_system">Segui il sistema</string>
