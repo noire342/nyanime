@@ -45,8 +45,15 @@ internal data class ScheduleRecord(
     val attemptedAt: Long,
     val error: String,
 ) {
-    fun due(now: Long) =
-        now - attemptedAt >= (if (error.isEmpty()) 7 * ReleasePolicy.DAY else 15 * ReleasePolicy.MINUTE)
+    fun due(now: Long): Boolean {
+        val ttl = when {
+            error.isNotEmpty() -> 15 * ReleasePolicy.MINUTE
+            snapshot?.status.equals("Finished", ignoreCase = true) -> 7 * ReleasePolicy.DAY
+            else -> 6 * ReleasePolicy.HOUR
+        }
+        val age = now - attemptedAt
+        return attemptedAt == 0L || age < 0 || age >= ttl
+    }
 }
 
 /** Parse only explicitly announced dates. Regular weekly air times are never extrapolated. */
@@ -208,17 +215,17 @@ internal object ScheduleParser {
                         snapshot.status,
                     )
             }
-            for ((type, at) in snapshot.premieres) {
-                if (at == 0L &&
-                    (type == preferred || type == ScheduleAirType.RAW && !snapshot.premieres.containsKey(preferred))
-                ) {
+            val premiereType = preferred.takeIf { it in snapshot.premieres }
+                ?: ScheduleAirType.RAW.takeIf { it in snapshot.premieres }
+                ?: snapshot.premieres.keys.minByOrNull { it.ordinal }
+            premiereType?.let { type ->
+                val at = snapshot.premieres.getValue(type)
+                if (at == 0L) {
                     result.remove(record.entryId to 1)
-                    continue
+                    return@let
                 }
                 // Keep recently due premieres so the alarm can consume them after its scheduled instant.
-                if (at < now - 2 * ReleasePolicy.DAY || snapshot.broadcasts.any { it.episode == 1 }) continue
-                if (type != preferred && snapshot.premieres.containsKey(preferred)) continue
-                if (type != preferred && type != ScheduleAirType.RAW) continue
+                if (at < now - 2 * ReleasePolicy.DAY || snapshot.broadcasts.any { it.episode == 1 }) return@let
                 val broadcast = ScheduleBroadcast(1, at, type, remindedAt = snapshot.premiereRemindedAt)
                 val variants = snapshot.premieres.map { (channel, time) ->
                     ScheduleBroadcast(1, time, channel, remindedAt = snapshot.premiereRemindedAt)

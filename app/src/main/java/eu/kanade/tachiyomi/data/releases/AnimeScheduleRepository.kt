@@ -121,8 +121,9 @@ internal class AnimeScheduleRepository(private val db: AnimeDatabaseHandler = In
         if (cached.isEmpty()) return@withLock
         val now = System.currentTimeMillis()
         val times = mutableSetOf(now, now + 7 * ReleasePolicy.DAY)
+        val cachedIds = cached.map { it.entryId }.toSet()
         for (event in AiringRepository().events().first()) {
-            if (event.entryId in cached.map { it.entryId } && event.airingAt > now) times += event.airingAt
+            if (event.entryId in cachedIds && event.airingAt > now) times += event.airingAt
         }
         try {
             val rows = timetableRows(times)

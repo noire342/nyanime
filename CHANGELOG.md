@@ -20,6 +20,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 
 - Collegamento opzionale, inizialmente disattivato, con guida nel browser interno,
   verifica del token e salvataggio cifrato sul dispositivo; nessun token incluso nell’APK.
+- Guida con passaggio corrente, sito completo e consenso ai soli cookie necessari
+  configurato prima dell’accesso; scelte già salvate sul sito conservate.
 - Orari RAW, SUB inglese e DUB inglese distinti, première, rinvii, date eccezionali
   e piattaforme integrate nell’agenda esistente e nelle schede anime.
 - Associazione tramite ID di catalogo verificati, cache condivisa degli orari e rispetto

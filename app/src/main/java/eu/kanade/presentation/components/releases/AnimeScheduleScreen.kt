@@ -2,23 +2,33 @@ package eu.kanade.presentation.components.releases
 
 import android.content.ClipDescription
 import android.content.ClipboardManager
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -42,15 +52,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.motion.ModernMotion
+import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.releases.AiringRefreshJob
+import eu.kanade.tachiyomi.data.releases.AnimeScheduleBrowserConsent
 import eu.kanade.tachiyomi.data.releases.AnimeScheduleException
 import eu.kanade.tachiyomi.data.releases.AnimeSchedulePreferences
 import eu.kanade.tachiyomi.data.releases.AnimeScheduleRepository
@@ -58,10 +72,13 @@ import eu.kanade.tachiyomi.data.releases.ReleaseAgendaWidget
 import eu.kanade.tachiyomi.data.releases.ReleaseMedium
 import eu.kanade.tachiyomi.data.releases.ReleaseReminders
 import eu.kanade.tachiyomi.data.releases.ScheduleAirType
+import eu.kanade.tachiyomi.util.system.setDefaultSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.util.collectAsState
 
@@ -163,9 +180,6 @@ class AnimeScheduleScreen : Screen() {
                             stringResource(R.string.schedule_channel_description),
                             style = MaterialTheme.typography.bodySmall,
                         )
-                        OutlinedButton(onClick = {
-                            ReleaseAgendaWidget.pin(context)
-                        }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.schedule_widget)) }
                         TextButton(onClick = {
                             scope.launch {
                                 withContext(Dispatchers.IO) { AnimeScheduleRepository().disconnect() }
@@ -190,6 +204,7 @@ class AnimeScheduleScreen : Screen() {
                             singleLine = true,
                             label = { Text(stringResource(R.string.schedule_token)) },
                             visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             enabled = !busy,
                         )
                         TextButton(enabled = !busy, onClick = {
@@ -243,6 +258,9 @@ class AnimeScheduleScreen : Screen() {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    OutlinedButton(onClick = {
+                        ReleaseAgendaWidget.pin(context)
+                    }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.schedule_widget)) }
                     Text(
                         stringResource(R.string.schedule_privacy),
                         style = MaterialTheme.typography.bodySmall,
@@ -271,14 +289,20 @@ class AnimeScheduleScreen : Screen() {
 }
 
 /** The guide surrounds the real HTTPS page. No form cropping, credential scraping or JS bridge. */
-@Composable private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit) {
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit) {
     val context = LocalContext.current
     val uri = LocalUriHandler.current
+    val scope = rememberCoroutineScope()
     var view by remember { mutableStateOf<WebView?>(null) }
     var page by remember { mutableStateOf("https://animeschedule.net/login") }
     var apiPage by remember { mutableStateOf<String?>(null) }
-    var expanded by rememberSaveable { mutableStateOf(true) }
+    var expanded by rememberSaveable { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
+    var failed by remember { mutableStateOf(false) }
+    var consentConfigured by remember { mutableStateOf<Boolean?>(null) }
+    val motion = appMotionEnabled()
     BackHandler { if (view?.canGoBack() == true) view?.goBack() else onDone() }
     DisposableEffect(Unit) {
         onDispose {
@@ -289,33 +313,71 @@ class AnimeScheduleScreen : Screen() {
     }
     Column(modifier) {
         Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { expanded = !expanded }) { Text(stringResource(R.string.schedule_browser_guide)) }
-                if (expanded) {
-                    Text(
-                        stringResource(R.string.schedule_browser_steps),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                Modifier.fillMaxWidth().animateContentSize(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0))
+                    .heightIn(max = 240.dp).verticalScroll(rememberScrollState()).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    stringResource(
+                        if (apiPage ==
+                            null
+                        ) {
+                            R.string.schedule_browser_login_title
+                        } else {
+                            R.string.schedule_browser_token_title
+                        },
+                    ),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    stringResource(
+                        if (expanded) {
+                            R.string.schedule_browser_steps
+                        } else if (apiPage == null) {
+                            if (consentConfigured == false) {
+                                R.string.schedule_browser_login_help
+                            } else {
+                                R.string.schedule_browser_login_ready_help
+                            }
+                        } else {
+                            R.string.schedule_browser_token_help
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     apiPage?.let { target ->
                         TextButton(onClick = {
                             view?.loadUrl(target)
                         }) { Text(stringResource(R.string.schedule_browser_api)) }
                     }
-                    TextButton(onClick = { uri.openUri(page) }) {
-                        Icon(Icons.Outlined.OpenInNew, null)
-                        Text(stringResource(R.string.schedule_browser_external), Modifier.padding(start = 6.dp))
+                    TextButton(onClick = { expanded = !expanded }) {
+                        Text(
+                            stringResource(
+                                if (expanded) R.string.schedule_browser_hide_guide else R.string.schedule_browser_guide,
+                            ),
+                        )
+                    }
+                    IconButton(onClick = { uri.openUri(page) }) {
+                        Icon(Icons.Outlined.OpenInNew, stringResource(R.string.schedule_browser_external))
+                    }
+                }
+                if (failed) {
+                    Text(stringResource(R.string.schedule_browser_error), style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { view?.loadUrl(page) }) {
+                        Text(stringResource(R.string.schedule_browser_retry))
                     }
                 }
             }
         }
-        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        Box(Modifier.fillMaxWidth().height(4.dp)) {
+            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        }
         AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = {
             WebView(context).apply {
                 view = this
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
+                setDefaultSettings()
                 settings.allowFileAccess = false
                 settings.allowContentAccess = false
                 settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
@@ -338,13 +400,14 @@ class AnimeScheduleScreen : Screen() {
                     ) {
                         loading =
                             true
+                        failed = false
                         if (url != null) page = url
                     }
                     override fun onPageFinished(webView: WebView, url: String?) {
                         loading = false
                         // Read navigation links only, never inputs or page text containing a secret.
                         webView.evaluateJavascript(
-                            "Array.from(document.querySelectorAll('a[href]')).map(a=>a.getAttribute('href')).find(h=>/^\\/users\\/[^/]+\\/settings(?:\\/api)?$/.test(h)) || ''",
+                            "Array.from(document.querySelectorAll('a[href]')).map(a=>new URL(a.href,location.href)).filter(u=>u.origin===location.origin).map(u=>u.pathname).find(h=>/^\\/users\\/[^/]+\\/settings(?:\\/api)?$/.test(h)) || ''",
                         ) { result ->
                             val path = runCatching {
                                 kotlinx.serialization.json.Json.decodeFromString<String>(result)
@@ -357,8 +420,59 @@ class AnimeScheduleScreen : Screen() {
                             }
                         }
                     }
+                    override fun onReceivedError(
+                        webView: WebView,
+                        request: WebResourceRequest,
+                        error: android.webkit.WebResourceError,
+                    ) {
+                        if (request.isForMainFrame) {
+                            failed = true
+                            loading = false
+                        }
+                    }
+                    override fun onReceivedHttpError(
+                        webView: WebView,
+                        request: WebResourceRequest,
+                        response: android.webkit.WebResourceResponse,
+                    ) {
+                        if (request.isForMainFrame) {
+                            failed = true
+                            loading = false
+                        }
+                    }
                 }
-                loadUrl(page)
+                val browser = this
+                // Existing website choices are preserved. No other WebView or domain is configured here.
+                scope.launch {
+                    val manager = CookieManager.getInstance()
+                    val existing = manager.getCookie(AnimeScheduleBrowserConsent.ORIGIN)
+                    val alreadyAccepted = AnimeScheduleBrowserConsent.alreadyAccepted(existing)
+                    val consent = if (alreadyAccepted) {
+                        null
+                    } else {
+                        try {
+                            withTimeoutOrNull(5_000) {
+                                withContext(Dispatchers.IO) { AnimeScheduleBrowserConsent().necessaryCookie() }
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                    if (consent == null) {
+                        consentConfigured = alreadyAccepted
+                        browser.loadUrl(page)
+                    } else {
+                        manager.setCookie(AnimeScheduleBrowserConsent.ORIGIN, consent) { accepted ->
+                            if (scope.isActive && view === browser) {
+                                consentConfigured = accepted
+                                manager.flush()
+                                browser.loadUrl(page)
+                            }
+                        }
+                    }
+                }
             }
         })
         Button(onClick = onDone, modifier = Modifier.fillMaxWidth().padding(16.dp)) {

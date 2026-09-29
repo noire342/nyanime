@@ -620,7 +620,9 @@ private fun AnimeScreenSmallImpl(
                         }
 
                         FetchType.Episodes -> {
-                            if (showNextEpisodeAirTime && state.airingTime <= 0L) {
+                            if (showNextEpisodeAirTime &&
+                                (state.airingTime <= 0L || state.anime.status.toInt() == SAnime.COMPLETED)
+                            ) {
                                 item(key = "schedule-details", span = { GridItemSpan(maxLineSpan) }) {
                                     eu.kanade.presentation.components.releases.ScheduleEpisodeCard(state.anime.id) {}
                                 }
@@ -980,7 +982,9 @@ fun AnimeScreenLargeImpl(
                                 }
 
                                 FetchType.Episodes -> {
-                                    if (showNextEpisodeAirTime && state.airingTime <= 0L) {
+                                    if (showNextEpisodeAirTime &&
+                                        (state.airingTime <= 0L || state.anime.status.toInt() == SAnime.COMPLETED)
+                                    ) {
                                         item(key = "schedule-details", span = { GridItemSpan(maxLineSpan) }) {
                                             eu.kanade.presentation.components.releases.ScheduleEpisodeCard(
                                                 state.anime.id,

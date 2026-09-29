@@ -75,6 +75,30 @@ class AnimeScheduleTest {
         )
     }
 
+    @Test fun dubOnlyPremiereRemainsVisibleWhenSubIsPreferred() {
+        val snapshot = ScheduleSnapshot("sample-series", premieres = mapOf(ScheduleAirType.DUB to now))
+        val result = overlay(snapshot).single()
+        assertEquals(now, result.airingAt)
+        assertEquals(ScheduleAirType.DUB, result.variants.single().type)
+    }
+
+    @Test fun activeSeriesMetadataIsRefreshedBeforeAWeekOfPossibleDelays() {
+        val cached = record(ScheduleSnapshot("sample-series", status = "Ongoing"))
+        assertFalse(cached.due(now + 5 * ReleasePolicy.HOUR))
+        assertTrue(cached.due(now + 6 * ReleasePolicy.HOUR))
+    }
+
+    @Test fun finishedSeriesMetadataDoesNotNeedFrequentRequests() {
+        val cached = record(ScheduleSnapshot("sample-series", status = "Finished"))
+        assertFalse(cached.due(now + 6 * ReleasePolicy.DAY))
+        assertTrue(cached.due(now + 7 * ReleasePolicy.DAY))
+    }
+
+    @Test fun aClockCorrectionCannotFreezeMetadataRefreshes() {
+        val cached = record(ScheduleSnapshot("sample-series", status = "Ongoing"))
+        assertTrue(cached.due(now - ReleasePolicy.DAY))
+    }
+
     @Test fun distantFallbackDatesRemainInTheAgenda() {
         val distant = AiringEvent(1, 99, now + 96 * ReleasePolicy.DAY, 47, 0)
         val result =

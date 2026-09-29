@@ -1,7 +1,7 @@
 <resources>
     <string name="schedule_heading">Uscite, con più precisione</string>
     <string name="schedule_description">Aggiungi première, variazioni degli orari e piattaforme alla tua agenda. AnimeSchedule arricchisce i titoli che segui con un collegamento facoltativo.</string>
-    <string name="schedule_languages">RAW · Giappone / SUB · Inglese / DUB · Inglese</string>
+    <string name="schedule_languages">RAW giapponese · SUB e DUB inglesi</string>
     <string name="schedule_use">Usa AnimeSchedule</string>
     <string name="schedule_connected">Collegato · solo ID verificati</string>
     <string name="schedule_paused">In pausa · resta attiva la normale agenda</string>
@@ -21,11 +21,19 @@
     <string name="schedule_fallback">Se il collegamento è disattivato o non disponibile, l’agenda continua con il catalogo e le estensioni già utilizzati. Durante un’interruzione di rete, gli orari già verificati restano salvati per un breve periodo.</string>
     <string name="schedule_privacy">Il token è cifrato su questo dispositivo ed escluso dai backup portabili. Vengono inviati solo gli ID dei cataloghi; cronologia, dettagli delle fonti e URL di riproduzione restano privati.</string>
     <string name="schedule_credit">Orari forniti da AnimeSchedule ↗</string>
-    <string name="schedule_browser_guide">Guida · mostra / nascondi</string>
-    <string name="schedule_browser_steps">1. Accedi o registrati.\n2. Apri le impostazioni del tuo profilo, poi API. Crea un’applicazione e copia il token Bearer (non un token OAuth).\n3. Tocca “Ho il token” per incollarlo e verificarlo.\nIl sito originale resta interamente accessibile. Se necessario, puoi accedere dal browser.</string>
+    <string name="schedule_browser_guide">Mostra tutti i passaggi</string>
+    <string name="schedule_browser_hide_guide">Nascondi i passaggi</string>
+    <string name="schedule_browser_login_title">1 · Accedi ad AnimeSchedule</string>
+    <string name="schedule_browser_token_title">2 · Crea il token dell’app</string>
+    <string name="schedule_browser_login_help">Usa Login per accedere oppure Sign up per registrarti. Se appare la scelta dei cookie, confermala con Accept selected.</string>
+    <string name="schedule_browser_login_ready_help">Nel sito qui sotto, premi Login per accedere oppure Sign up per creare il tuo account.</string>
+    <string name="schedule_browser_token_help">Apri le impostazioni API, crea un’applicazione chiamata Nyanime e copia il token Bearer.</string>
+    <string name="schedule_browser_steps">1. Accedi o registrati.\n2. Apri le impostazioni del tuo profilo, poi API. Crea un’applicazione e copia il token Bearer (non un token OAuth).\n3. Tocca “Ho copiato il token” per incollarlo e verificarlo.\nIl sito originale resta interamente accessibile. Se necessario, puoi accedere dal browser.</string>
     <string name="schedule_browser_api">Vai alle impostazioni API</string>
     <string name="schedule_browser_external">Browser</string>
-    <string name="schedule_browser_done">Ho il token</string>
+    <string name="schedule_browser_done">Ho copiato il token</string>
+    <string name="schedule_browser_error">La pagina non è disponibile. Puoi riprovare o continuare nel browser.</string>
+    <string name="schedule_browser_retry">Riprova</string>
     <string name="schedule_error_auth">Il token non è stato riconosciuto. Copia il token Bearer dell’applicazione dalle impostazioni API e collega di nuovo.</string>
     <string name="schedule_error_limit">AnimeSchedule richiede una pausa. Le richieste riprenderanno automaticamente; l’agenda salvata resta disponibile.</string>
     <string name="schedule_error_identity">Questo titolo non ha una corrispondenza univoca verificata su AnimeSchedule. Resta disponibile il catalogo abituale.</string>

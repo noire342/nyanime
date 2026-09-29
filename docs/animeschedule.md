@@ -15,7 +15,12 @@ configurazione nell’intestazione di **Le tue uscite**.
    personale, ad esempio chiamata Nyanime, e copia il suo **Bearer token**.
    Quando il sito rende disponibile il collegamento, la guida offre il pulsante
    per raggiungere direttamente le impostazioni API.
-3. Tocca **Ho il token**, **Incolla token**, poi **Verifica e attiva**.
+3. Tocca **Ho copiato il token**, **Incolla token**, poi **Verifica e attiva**.
+
+Nel solo browser guidato, prima dell’accesso, il sito genera il consenso ai cookie
+necessari. I cookie di analisi non vengono attivati automaticamente; una scelta
+già salvata sul sito viene conservata. Se il servizio del consenso non risponde,
+resta disponibile la scelta originale del sito, senza dichiarare un consenso riuscito.
 
 Il sito resta interamente accessibile; la guida si può chiudere per liberare
 spazio. Il pulsante Browser permette di continuare nel browser di sistema
