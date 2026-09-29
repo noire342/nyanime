@@ -16,6 +16,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   apertura diretta e collegamenti ai capitoli conservati per ciascuna estensione.
 - Recupero progressivo delle identità senza limite ai primi otto risultati,
   mantenendo posizione delle schede e scorrimento durante gli aggiornamenti.
+- La Home Manga apre direttamente con filtri e contenuti, senza intestazione e
+  scorciatoia duplicate; la Libreria rimane nella navigazione principale.
 - Identità discordanti restano separate; cambiare fonte non migra automaticamente
   libreria, download o progresso. Dati e logica dei siti restano nelle estensioni.
 

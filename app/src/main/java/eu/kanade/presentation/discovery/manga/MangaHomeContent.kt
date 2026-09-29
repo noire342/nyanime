@@ -35,7 +35,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -104,7 +103,6 @@ fun MangaHomeContent(
     onRetry: (String) -> Unit,
     onUpdates: () -> Unit,
     onUpdate: (MangaUpdatesWithRelations) -> Unit,
-    onLibrary: () -> Unit,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
 ) {
@@ -182,36 +180,6 @@ fun MangaHomeContent(
                 contentPadding = PaddingValues(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                item("heading") {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                if (state.mixed) "Manga" else home?.title ?: "Manga",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            home?.let {
-                                Text(
-                                    if (state.mixed) "Dalle tue fonti" else it.sourceName,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-                item("library-shortcut") {
-                    FilledTonalButton(
-                        onClick = onLibrary,
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                    ) {
-                        Icon(Icons.AutoMirrored.Outlined.MenuBook, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Vai alla tua biblioteca")
-                    }
-                }
                 if (categories.isNotEmpty()) {
                     item("categories") {
                         LazyRow(

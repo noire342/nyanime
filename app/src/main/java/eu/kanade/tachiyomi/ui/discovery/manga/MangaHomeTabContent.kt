@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.discovery.HomeLoadingTransition
 import eu.kanade.presentation.discovery.HomeMangaLoadingSkeleton
@@ -26,7 +25,6 @@ import eu.kanade.tachiyomi.ui.browse.manga.source.browse.BrowseMangaSourceScreen
 import eu.kanade.tachiyomi.ui.discovery.DiscoveryHomePage
 import eu.kanade.tachiyomi.ui.discovery.DiscoveryTab
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
-import eu.kanade.tachiyomi.ui.library.LibrariesTab
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.ui.updates.AcknowledgeUpdateNoticeWhenVisible
@@ -47,7 +45,6 @@ internal fun MangaHomeTabContent(
     val model = page.model
     val state by model.state.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
-    val tabNavigator = LocalTabNavigator.current
     val homeKey = state.selected?.key.orEmpty()
     val seenNotices = remember { Injekt.get<UiPreferences>().lastSeenMangaUpdateNotice() }
     val lastSeenAt by seenNotices.changes().collectAsState(initial = seenNotices.get())
@@ -124,10 +121,6 @@ internal fun MangaHomeTabContent(
                 onUpdate = { update ->
                     model.dismissUpdate(update)
                     context.startActivity(ReaderActivity.newIntent(context, update.mangaId, update.chapterId))
-                },
-                onLibrary = {
-                    LibrariesTab.showManga()
-                    tabNavigator.current = LibrariesTab
                 },
                 listState = listState,
             )
