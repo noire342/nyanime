@@ -139,6 +139,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         // Show notification to disable Incognito Mode when it's enabled
         basePreferences.incognitoMode().changes()
             .onEach { enabled ->
+                scope.launch(Dispatchers.IO) { eu.kanade.tachiyomi.data.releases.ReleaseAgendaWidget.refresh(this@App) }
                 if (enabled) {
                     disableIncognitoReceiver.register()
                     notify(

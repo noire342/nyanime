@@ -122,6 +122,7 @@ object ReleaseNotifications {
         if (!changed) return@withLock
         try {
             tachiyomi.presentation.widget.ReleaseWidgetUpdater.refresh(context)
+            ReleaseAgendaWidget.refresh(context)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

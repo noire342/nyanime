@@ -227,6 +227,11 @@ object SettingsLibraryScreen : SearchableSettings {
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_library_update),
             preferenceItems = persistentListOf(
+                Preference.PreferenceItem.TextPreference(
+                    title = "AnimeSchedule",
+                    subtitle = context.getString(eu.kanade.tachiyomi.R.string.schedule_settings_description),
+                    onClick = { navigator.push(eu.kanade.presentation.components.releases.AnimeScheduleScreen()) },
+                ),
                 Preference.PreferenceItem.SwitchPreference(
                     preference = eu.kanade.tachiyomi.data.releases.ReleasePreferences().unifiedAgenda,
                     title = context.getString(eu.kanade.tachiyomi.R.string.release_unified),

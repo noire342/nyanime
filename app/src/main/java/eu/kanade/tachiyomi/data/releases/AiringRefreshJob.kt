@@ -44,6 +44,8 @@ class AiringRefreshJob(context: Context, parameters: WorkerParameters) : Corouti
         }
         if (initialized != true) return Result.retry()
         val repository = AiringRepository()
+        val enhanced = AnimeScheduleRepository()
+        enhanced.refreshTimetables()
         val now = System.currentTimeMillis()
         val candidates = loadCandidates(repository, now)
         val batch = AiringRefreshQueue.batch(candidates, now)
@@ -57,8 +59,11 @@ class AiringRefreshJob(context: Context, parameters: WorkerParameters) : Corouti
                 repository.markUnavailable(candidate.entryId, startedAt)
                 logcat(LogPriority.WARN) { "Airing check timed out for entry ${candidate.entryId}" }
             }
+            if (candidate.scheduleDue) enhanced.refresh(entry)
         }
+        ReleaseStore().alignSchedule(repository.effectiveEvents().first())
         ReleaseReminders.schedule(applicationContext)
+        eu.kanade.tachiyomi.data.releases.ReleaseAgendaWidget.refresh(applicationContext)
         if (AiringRefreshQueue.hasColdBacklog(candidates, batch.map { it.entryId }.toSet())) {
             enqueue(applicationContext, continuation = true)
         }
@@ -74,7 +79,19 @@ class AiringRefreshJob(context: Context, parameters: WorkerParameters) : Corouti
             val tracks = Injekt.get<AnimeTrackRepository>().getTracksByAnimeId(id)
             val hasId = AiringCatalogReference.from(entry, tracks).hasId ||
                 tracks.any { it.trackerId == TrackerManager.SIMKL && it.remoteId > 0 }
-            if (hasId) candidates += AiringRefreshQueue.Candidate(id, repository.cache(id), id in upcoming)
+            val enhanced = AnimeScheduleRepository().needsMapping(entry, now)
+            if (hasId ||
+                enhanced.first
+            ) {
+                candidates +=
+                    AiringRefreshQueue.Candidate(
+                        id,
+                        repository.cache(id),
+                        id in upcoming,
+                        enhanced.first,
+                        enhanced.second,
+                    )
+            }
         }
         return candidates
     }

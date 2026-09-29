@@ -82,3 +82,6 @@ SELECT r.* FROM release_notice r JOIN episodes i ON i._id = r.item_id WHERE i.se
 
 markMetadata:
 UPDATE release_check SET metadata_at = ? WHERE entry_id = ?;
+
+bringForward:
+UPDATE release_check SET next_check = :nextCheck WHERE entry_id = :entryId AND failures = 0 AND next_check > :nextCheck;

@@ -89,6 +89,17 @@ class ReleaseStore(
         }
     } ?: ReleaseCheckState()
 
+    suspend fun alignSchedule(events: List<AiringEvent>, now: Long = System.currentTimeMillis()) {
+        for ((id, dates) in events.groupBy { it.entryId }) {
+            if (ReleaseEligibility.source(ReleaseMedium.ANIME, id) == null) continue
+            val state = check(ReleaseMedium.ANIME, id)
+            if (state.failures > 0 || state.lastSuccess == 0L) continue
+            val at = dates.firstOrNull { it.airingAt >= now - 6 * ReleasePolicy.HOUR }?.airingAt ?: continue
+            val next = now + ReleasePolicy.interval(now, at, true, false)
+            anime.await { releaseMonitorQueries.bringForward(next, id) }
+        }
+    }
+
     suspend fun markAttempt(medium: ReleaseMedium, id: Long, now: Long) {
         when (medium) {
             ReleaseMedium.ANIME -> anime.await { releaseMonitorQueries.markAttempt(id, now) }
@@ -132,7 +143,7 @@ class ReleaseStore(
                 val absent = airingQueries.getEntryEvents(id).executeAsList().firstOrNull {
                     it.airing_at >= now - 2 * ReleasePolicy.DAY && it.episode.toDouble() !in numbers
                 }
-                announced = absent?.airing_at ?: airingAt
+                announced = airingAt ?: absent?.airing_at
                 missing = absent != null
                 verifiedComplete = completed &&
                     catalog?.finished == 1L &&

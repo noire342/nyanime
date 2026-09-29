@@ -313,7 +313,14 @@ fun NextEpisodeAiringListItem(
     title: String,
     airingAtMillis: Long,
     modifier: Modifier = Modifier,
+    animeId: Long? = null,
 ) {
+    if (animeId != null) {
+        eu.kanade.presentation.components.releases.ScheduleEpisodeCard(animeId, modifier) {
+            NextEpisodeAiringListItem(title, airingAtMillis, modifier)
+        }
+        return
+    }
     val duration = upcomingAiringDuration(airingAtMillis) ?: return
     val locale = LocalConfiguration.current.locales[0]
     val scheduledDate = remember(airingAtMillis, locale) {

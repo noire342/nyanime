@@ -230,6 +230,7 @@ object HomeScreen : Screen() {
                             is Tab.Home -> eu.kanade.tachiyomi.ui.discovery.DiscoveryTab
                             is Tab.AnimeLib -> LibrariesTab.also { LibrariesTab.showAnime() }
                             is Tab.Library -> LibrariesTab.also { LibrariesTab.showManga() }
+                            is Tab.Releases -> eu.kanade.tachiyomi.ui.releases.ReleasesTab
                             is Tab.Updates -> UpdatesTab
                             is Tab.History -> HistoriesTab
                             is Tab.Browse -> {
@@ -438,6 +439,7 @@ object HomeScreen : Screen() {
         data object Home : Tab
         data class AnimeLib(val animeIdToOpen: Long? = null) : Tab
         data class Library(val mangaIdToOpen: Long? = null) : Tab
+        data object Releases : Tab
         data object Updates : Tab
         data object History : Tab
         data class Browse(val toExtensions: Boolean = false, val anime: Boolean = false) : Tab

@@ -16,6 +16,19 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 - Rapporti dei test e diagnostica di compilazione conservati in caso di fallimento,
   senza allegare dump di memoria del processo.
 
+## 29 settembre 2026 — AnimeSchedule facoltativo e configurazione guidata
+
+- Collegamento opzionale, inizialmente disattivato, con guida nel browser interno,
+  verifica del token e salvataggio cifrato sul dispositivo; nessun token incluso nell’APK.
+- Orari RAW, SUB inglese e DUB inglese distinti, première, rinvii, date eccezionali
+  e piattaforme integrate nell’agenda esistente e nelle schede anime.
+- Associazione tramite ID di catalogo verificati, cache condivisa degli orari e rispetto
+  dei limiti del servizio. Il catalogo abituale rimane disponibile senza configurazione.
+- Trasmissione preferita per promemoria e controlli mirati delle disponibilità;
+  orario annunciato distinto dal contenuto effettivamente trovato nell’estensione.
+- Widget “Le tue uscite” basato sulla stessa agenda locale anime e manga, con
+  apertura diretta e rispetto della modalità incognito e della privacy delle notifiche.
+
 ## 29 settembre 2026 — Agenda futura e verifica degli orari
 
 - Verifiche degli orari in una coda indipendente dagli aggiornamenti degli

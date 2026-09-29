@@ -29,6 +29,8 @@ data class AiringEvent(
     val airingAt: Long,
     val catalogId: Long,
     val remindedAt: Long = 0,
+    val variants: List<ScheduleBroadcast> = emptyList(),
+    val scheduleStatus: String = "",
 )
 data class AiringCache(
     val verifiedAt: Long = 0,
@@ -40,6 +42,29 @@ data class AiringCache(
 
 /** Public catalog metadata only. Source identification remains the extension's responsibility. */
 class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
+    fun effectiveEvents(): Flow<List<AiringEvent>> {
+        val preferences = AnimeSchedulePreferences()
+        return kotlinx.coroutines.flow.combine(
+            events(),
+            AnimeScheduleRepository().records(),
+            preferences.enabled.changes(),
+            preferences.connected.changes(),
+            preferences.preferredType.changes(),
+        ) { base, records, enabled, connected, type ->
+            if (enabled && connected) {
+                ScheduleParser.overlay(
+                    base,
+                    AnimeScheduleRepository().validRecords(records),
+                    ScheduleAirType.entries.firstOrNull {
+                        it.name == type
+                    } ?: ScheduleAirType.SUB,
+                    System.currentTimeMillis(),
+                )
+            } else {
+                base
+            }
+        }
+    }
     fun caches(): Flow<Map<Long, AiringCache>> = db.subscribeToList {
         airingQueries.getCaches { id, verified, attempted, status, total, finished ->
             id to AiringCache(verified, attempted, status, total.toInt(), finished != 0L)
@@ -50,6 +75,19 @@ class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
         airingQueries.getEvents { entry, episode, time, catalog, reminded ->
             AiringEvent(entry, episode.toInt(), time, catalog, reminded)
         }
+    }
+
+    suspend fun effectiveEntryEvents(id: Long): List<AiringEvent> {
+        val base = entryEvents(id)
+        val preferences = AnimeSchedulePreferences()
+        if (!preferences.enabled.get() || !preferences.connected.get()) return base
+        val records = AnimeScheduleRepository().record(id)?.let { listOf(it) }.orEmpty()
+        return ScheduleParser.overlay(
+            base,
+            AnimeScheduleRepository().validRecords(records),
+            preferences.type,
+            System.currentTimeMillis(),
+        )
     }
 
     suspend fun entryEvents(id: Long): List<AiringEvent> = db.awaitList {
@@ -163,8 +201,10 @@ class AiringRepository(private val db: AnimeDatabaseHandler = Injekt.get()) {
         }
     }
 
-    suspend fun reminded(event: AiringEvent) = db.await {
-        airingQueries.markReminded(System.currentTimeMillis(), event.entryId, event.episode.toLong())
+    suspend fun reminded(event: AiringEvent) {
+        if (event.variants.isNotEmpty()) AnimeScheduleRepository().reminded(event)
+        // Also consume the fallback reminder so switching providers cannot notify twice.
+        db.await { airingQueries.markReminded(System.currentTimeMillis(), event.entryId, event.episode.toLong()) }
     }
 
     internal suspend fun markUnavailable(id: Long, startedAt: Long) = locks[id.hashCode() and 63].withLock {

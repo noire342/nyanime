@@ -537,6 +537,7 @@ class MainActivity : BaseActivity() {
                 navigator.popUntilRoot()
                 HomeScreen.Tab.AnimeLib(idToOpen)
             }
+            eu.kanade.tachiyomi.data.releases.ReleaseAgendaWidget.OPEN -> HomeScreen.Tab.Releases
             Constants.SHORTCUT_UPDATES -> HomeScreen.Tab.Updates
             Constants.SHORTCUT_HISTORY -> HomeScreen.Tab.History
             Constants.SHORTCUT_SOURCES -> HomeScreen.Tab.Browse(false)

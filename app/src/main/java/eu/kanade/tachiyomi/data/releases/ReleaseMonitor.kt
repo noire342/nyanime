@@ -141,8 +141,9 @@ class ReleaseMonitor(context: Context, parameters: WorkerParameters) : Coroutine
                             emptyList(),
                             false,
                             fresh.status == 2L,
-                            AiringRepository().entryEvents(anime.id).firstOrNull {
-                                it.airingAt > System.currentTimeMillis()
+                            AiringRepository().effectiveEntryEvents(anime.id).firstOrNull {
+                                it.entryId == anime.id &&
+                                    it.airingAt > System.currentTimeMillis()
                             }?.airingAt,
                         )
                     }

@@ -620,6 +620,11 @@ private fun AnimeScreenSmallImpl(
                         }
 
                         FetchType.Episodes -> {
+                            if (showNextEpisodeAirTime && state.airingTime <= 0L) {
+                                item(key = "schedule-details", span = { GridItemSpan(maxLineSpan) }) {
+                                    eu.kanade.presentation.components.releases.ScheduleEpisodeCard(state.anime.id) {}
+                                }
+                            }
                             if (state.airingTime > 0L &&
                                 showNextEpisodeAirTime &&
                                 state.anime.status.toInt() != SAnime.COMPLETED
@@ -630,6 +635,7 @@ private fun AnimeScreenSmallImpl(
                                     span = { GridItemSpan(maxLineSpan) },
                                 ) {
                                     NextEpisodeAiringListItem(
+                                        animeId = state.anime.id,
                                         title = stringResource(
                                             AYMR.strings.display_mode_episode,
                                             formatEpisodeNumber(state.airingEpisodeNumber),
@@ -974,6 +980,14 @@ fun AnimeScreenLargeImpl(
                                 }
 
                                 FetchType.Episodes -> {
+                                    if (showNextEpisodeAirTime && state.airingTime <= 0L) {
+                                        item(key = "schedule-details", span = { GridItemSpan(maxLineSpan) }) {
+                                            eu.kanade.presentation.components.releases.ScheduleEpisodeCard(
+                                                state.anime.id,
+                                            ) {
+                                            }
+                                        }
+                                    }
                                     if (state.airingTime > 0L &&
                                         showNextEpisodeAirTime &&
                                         state.anime.status.toInt() != SAnime.COMPLETED
@@ -984,6 +998,7 @@ fun AnimeScreenLargeImpl(
                                             span = { GridItemSpan(maxLineSpan) },
                                         ) {
                                             NextEpisodeAiringListItem(
+                                                animeId = state.anime.id,
                                                 title = stringResource(
                                                     AYMR.strings.display_mode_episode,
                                                     formatEpisodeNumber(state.airingEpisodeNumber),

@@ -321,6 +321,11 @@
             </intent-filter>
         </activity>
 
+        <receiver android:name=".data.releases.ReleaseAgendaWidget" android:exported="false" android:label="@string/release_title">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_release_agenda_info" />
+        </receiver>
+
         <receiver android:name=".data.releases.ReleaseReminderReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

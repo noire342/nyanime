@@ -93,6 +93,7 @@ fun cafe.adriel.voyager.core.screen.Screen.ReleaseCalendar(
         },
         allowAllMedia = unified,
         onStatus = { showIssues = true },
+        onSchedule = { navigator.push(AnimeScheduleScreen()) },
     )
     if (showIssues) {
         AiringIssuesSheet(

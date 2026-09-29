@@ -71,7 +71,7 @@ object ReleaseReminders {
         val store = ReleaseStore()
         val followed = store.monitoredIds(ReleaseMedium.ANIME).toSet()
         val result = mutableListOf<AiringEvent>()
-        for (event in AiringRepository().events().first()) {
+        for (event in AiringRepository().effectiveEvents().first()) {
             if (event.remindedAt != 0L || event.entryId !in followed) continue
             if (!store.subscription(ReleaseMedium.ANIME, event.entryId).reminder) continue
             if (ReleaseEligibility.source(ReleaseMedium.ANIME, event.entryId) == null) continue
@@ -99,7 +99,7 @@ object ReleaseReminders {
                     if (hidden) {
                         context.getString(R.string.release_reminder_description)
                     } else {
-                        context.getString(R.string.release_broadcast_label, event.episode.toString())
+                        eu.kanade.presentation.components.releases.scheduleBroadcastLabel(context, event)
                     },
                 )
                 .setContentIntent(
@@ -137,6 +137,7 @@ class ReleaseReminderReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
+                ReleaseStore().alignSchedule(AiringRepository().effectiveEvents().first())
                 ReleaseReminders.schedule(context.applicationContext)
                 if (intent.action != "nyanime.release.REMIND") ReleaseMonitor.setup(context.applicationContext)
                 ReleaseMonitor.enqueue(context.applicationContext)

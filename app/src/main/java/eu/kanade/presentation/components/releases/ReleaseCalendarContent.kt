@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -80,6 +81,7 @@ data class ReleaseAgendaItem(
     val number: Double? = null,
     val sourceLabel: String = "",
     val choices: List<ReleaseAgendaItem> = emptyList(),
+    val broadcasts: List<eu.kanade.tachiyomi.data.releases.ScheduleBroadcast> = emptyList(),
 ) {
     val date: LocalDate get() = Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault()).toLocalDate()
 }
@@ -104,6 +106,7 @@ fun ReleaseCalendarContent(
     allowAllMedia: Boolean = true,
     today: LocalDate = LocalDate.now(),
     onStatus: (() -> Unit)? = null,
+    onSchedule: (() -> Unit)? = null,
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val locale = LocalConfiguration.current.locales[0]
@@ -124,6 +127,11 @@ fun ReleaseCalendarContent(
                 null
             },
             actions = {
+                if (onSchedule != null) {
+                    IconButton(onClick = onSchedule) {
+                        Icon(androidx.compose.material.icons.Icons.Outlined.Tune, "AnimeSchedule")
+                    }
+                }
                 IconButton(enabled = !loading, onClick = onRefresh) {
                     Icon(Icons.Outlined.Refresh, stringResource(R.string.release_check_now))
                 }
@@ -369,6 +377,7 @@ private fun LazyItemScope.ReleaseCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (item.broadcasts.isNotEmpty()) ScheduleBroadcastRows(item.broadcasts)
                 if (item.choices.isNotEmpty()) {
                     Text(
                         stringResource(R.string.release_source_choices, item.choices.size),
