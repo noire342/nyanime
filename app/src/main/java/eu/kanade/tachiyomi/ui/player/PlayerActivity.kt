@@ -370,6 +370,7 @@ class PlayerActivity : BaseActivity() {
             }
         }
         UltraPlaybackGuard.enterPlayer()
+        PlayerLifecycle.acquired()
         setContentView(binding.root)
         privacyDisplayController?.registerView(binding.player, PrivacyArea.VIDEO)
         privacyDisplayController?.registerNsfwView(binding.player, PrivacyArea.VIDEO) { viewModel.currentAnime.value }
@@ -486,6 +487,7 @@ class PlayerActivity : BaseActivity() {
         player.destroy()
 
         super.onDestroy()
+        PlayerLifecycle.released()
     }
 
     override fun onPause() {

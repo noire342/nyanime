@@ -64,6 +64,10 @@ cambi di episodio mantengono il comportamento di ripresa esistente. La pagina
 viene validata sulle pagine caricate del capitolo; una pagina inesistente genera
 un errore, senza spostare silenziosamente il lettore su un’altra pagina.
 
+La riapertura durante una riproduzione attende il rilascio nativo del vecchio
+player prima di avviare quello nuovo. L’attesa è cancellabile e dipende dal
+ciclo di vita, senza ritardi fissi o una seconda inizializzazione MPV concorrente.
+
 Una stanza o un Cast attivi fermano il collegamento a un episodio/capitolo
 prima che venga chiuso il player corrente, con un messaggio che invita a
 terminare la sessione. Se una sessione viene attivata durante la risoluzione,
@@ -78,3 +82,5 @@ URL opachi, posizioni e pagine, varianti dall’inizio, versione sconosciuta,
 payload malformati/sovradimensionati e assenza di campi privati nel contratto.
 La verifica su dispositivo deve includere l’apertura sia a freddo sia mentre
 player/lettore sono già aperti, il ritorno alla scheda e un’estensione assente.
+`PlayerLifecycleTest` verifica che l’apertura attenda il rilascio e che annullare
+il collegamento non cancelli la proprietà del player ancora attivo.

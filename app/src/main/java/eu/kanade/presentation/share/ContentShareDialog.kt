@@ -179,7 +179,7 @@ private fun ContentSharePanel(link: ContentLink, onSend: (ContentLink, Boolean) 
     }
     var selected by rememberSaveable { mutableIntStateOf(choices.lastIndex) }
     Column(
-        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+        modifier = Modifier.fillMaxWidth()
             .navigationBarsPadding().padding(horizontal = 24.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -187,37 +187,52 @@ private fun ContentSharePanel(link: ContentLink, onSend: (ContentLink, Boolean) 
             Modifier.align(Alignment.CenterHorizontally).size(width = 36.dp, height = 4.dp)
                 .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(2.dp)),
         )
-        Text(stringResource(AYMR.strings.content_share_title), style = MaterialTheme.typography.headlineSmall)
-        Text(link.title, style = MaterialTheme.typography.titleLarge, maxLines = 4, overflow = TextOverflow.Ellipsis)
-        link.itemTitle?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Text(
-            stringResource(AYMR.strings.content_share_help),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        choices.forEachIndexed { index, (_, label) ->
-            val color by animateColorAsState(
-                if (index ==
-                    selected
-                ) {
-                    MaterialTheme.colorScheme.secondaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainer
-                },
-                animationSpec = if (motionEnabled) tween(ModernMotion.RESIZE_MILLIS) else snap(),
-                label = "shareChoice",
+        Column(
+            modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(stringResource(AYMR.strings.content_share_title), style = MaterialTheme.typography.headlineSmall)
+            Text(
+                link.title,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
             )
-            Surface(shape = MaterialTheme.shapes.large, color = color) {
-                Row(
-                    Modifier.fillMaxWidth().selectable(index == selected, role = Role.RadioButton) { selected = index }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    RadioButton(index == selected, onClick = null)
-                    Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            link.itemTitle?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                stringResource(AYMR.strings.content_share_help),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            choices.forEachIndexed { index, (_, label) ->
+                val color by animateColorAsState(
+                    if (index ==
+                        selected
+                    ) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainer
+                    },
+                    animationSpec = if (motionEnabled) tween(ModernMotion.RESIZE_MILLIS) else snap(),
+                    label = "shareChoice",
+                )
+                Surface(shape = MaterialTheme.shapes.large, color = color) {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .selectable(index == selected, role = Role.RadioButton) { selected = index }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        RadioButton(index == selected, onClick = null)
+                        Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }

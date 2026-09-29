@@ -33,6 +33,7 @@ import eu.kanade.tachiyomi.data.watch.WatchTogetherManager
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.player.PlayerActivity
+import eu.kanade.tachiyomi.ui.player.PlayerLifecycle
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
@@ -61,6 +62,9 @@ class SharedContentScreen(encoded: String) : Screen() {
 
         LaunchedEffect(resolved, occupied) {
             if (resolved != null && !handled && !occupied) {
+                if (resolved.itemId != null && resolved.link.medium == SharedMedium.ANIME) {
+                    PlayerLifecycle.awaitReleased()
+                }
                 handled = true
                 openEntry(resolved.link.medium, resolved.entryId)
                 resolved.itemId?.let { item ->
@@ -138,6 +142,10 @@ class SharedContentScreen(encoded: String) : Screen() {
                         Button(onClick = { openEntry(current.link.medium, current.entryId) }) {
                             Text(stringResource(AYMR.strings.content_share_entry))
                         }
+                    } else {
+                        CircularProgressIndicator()
+                        Text(stringResource(AYMR.strings.content_open_loading), textAlign = TextAlign.Center)
+                        TextButton(onClick = { navigator.pop() }) { Text(stringResource(MR.strings.action_cancel)) }
                     }
                 }
             }
