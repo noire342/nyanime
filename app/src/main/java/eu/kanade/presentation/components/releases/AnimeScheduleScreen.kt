@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -40,15 +41,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -65,9 +69,11 @@ import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.releases.AiringRefreshJob
 import eu.kanade.tachiyomi.data.releases.AnimeScheduleBrowserConsent
+import eu.kanade.tachiyomi.data.releases.AnimeScheduleBrowserGuide
 import eu.kanade.tachiyomi.data.releases.AnimeScheduleException
 import eu.kanade.tachiyomi.data.releases.AnimeSchedulePreferences
 import eu.kanade.tachiyomi.data.releases.AnimeScheduleRepository
+import eu.kanade.tachiyomi.data.releases.GuideState
 import eu.kanade.tachiyomi.data.releases.ReleaseAgendaWidget
 import eu.kanade.tachiyomi.data.releases.ReleaseMedium
 import eu.kanade.tachiyomi.data.releases.ReleaseReminders
@@ -75,10 +81,13 @@ import eu.kanade.tachiyomi.data.releases.ScheduleAirType
 import eu.kanade.tachiyomi.util.system.setDefaultSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.util.collectAsState
 
@@ -109,7 +118,33 @@ class AnimeScheduleScreen : Screen() {
             AppBar(title = "AnimeSchedule", navigateUp = { if (browsing) browsing = false else navigator.pop() })
         }) { padding ->
             if (browsing) {
-                ScheduleSetupBrowser(Modifier.fillMaxSize().padding(padding), onDone = { browsing = false })
+                ScheduleSetupBrowser(
+                    Modifier.fillMaxSize().padding(padding),
+                    onDone = { browsing = false },
+                    onToken = { imported ->
+                        token = imported
+                        error = null
+                        browsing = false
+                        busy = true
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) { AnimeScheduleRepository().connect(imported) }
+                                token = ""
+                                changed()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Exception) {
+                                error = context.getString(
+                                    scheduleErrorResource(
+                                        (failure as? AnimeScheduleException)?.reason ?: "NETWORK",
+                                    ),
+                                )
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    },
+                )
             } else {
                 Column(
                     Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(20.dp),
@@ -190,7 +225,7 @@ class AnimeScheduleScreen : Screen() {
                         Text(stringResource(R.string.schedule_setup), style = MaterialTheme.typography.titleLarge)
                         ScheduleStep("1", stringResource(R.string.schedule_step_account))
                         ScheduleStep("2", stringResource(R.string.schedule_step_token))
-                        Button(onClick = {
+                        Button(enabled = !busy, onClick = {
                             browsing = true
                         }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.schedule_start)) }
                         ScheduleStep("3", stringResource(R.string.schedule_step_verify))
@@ -288,26 +323,83 @@ class AnimeScheduleScreen : Screen() {
     }
 }
 
-/** The guide surrounds the real HTTPS page. No form cropping, credential scraping or JS bridge. */
+/** Responsive original forms, restricted to the service origin. No native JS bridge or password access. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit) {
+private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit, onToken: (String) -> Unit) {
     val context = LocalContext.current
     val uri = LocalUriHandler.current
     val scope = rememberCoroutineScope()
     var view by remember { mutableStateOf<WebView?>(null) }
-    var page by remember { mutableStateOf("https://animeschedule.net/login") }
-    var apiPage by remember { mutableStateOf<String?>(null) }
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    var page by remember { mutableStateOf(AnimeScheduleBrowserGuide.LOGIN) }
+    var guide by remember { mutableStateOf(GuideState(stage = "LOGIN")) }
+    var fullSite by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
     var failed by remember { mutableStateOf(false) }
     var consentConfigured by remember { mutableStateOf<Boolean?>(null) }
+    var importing by remember { mutableStateOf(false) }
+    var importFailed by remember { mutableStateOf(false) }
+    val latestToken by rememberUpdatedState(onToken)
+    val labels = mapOf(
+        "username" to stringResource(R.string.schedule_form_username),
+        "login" to stringResource(R.string.schedule_form_login),
+        "name" to stringResource(R.string.schedule_form_name),
+        "create" to stringResource(R.string.schedule_form_create),
+        "select" to stringResource(R.string.schedule_form_select),
+        "register" to stringResource(R.string.schedule_form_register),
+        "confirmPassword" to stringResource(R.string.schedule_form_confirm_password),
+    )
+    val script = remember { context.assets.open("animeschedule-setup.js").bufferedReader().use { it.readText() } }
+    val installScript = remember(labels) { "$script(${Json.encodeToString(labels)})" }
     val motion = appMotionEnabled()
-    BackHandler { if (view?.canGoBack() == true) view?.goBack() else onDone() }
+    val latestMotion by rememberUpdatedState(motion)
+    val fontScale = LocalConfiguration.current.fontScale
+    fun reveal(browser: WebView) {
+        browser.animate().cancel()
+        if (latestMotion &&
+            browser.alpha < 1f
+        ) {
+            browser.animate().alpha(1f).setDuration(180).start()
+        } else {
+            browser.alpha = 1f
+        }
+        loading = false
+    }
+    fun update(browser: WebView, result: String?) {
+        if (view !== browser || !AnimeScheduleBrowserGuide.ownPage(browser.url)) return
+        val parsed = AnimeScheduleBrowserGuide.state(result) ?: return
+        guide = parsed
+        val target = AnimeScheduleBrowserGuide.apiTarget(parsed.target)
+        if (!fullSite && target != null && target != browser.url) {
+            browser.loadUrl(target)
+        } else {
+            reveal(browser)
+        }
+    }
+    BackHandler {
+        if (guide.stage in listOf("OTHER", "RESET", "VERIFY") && view?.canGoBack() == true) view?.goBack() else onDone()
+    }
+    // Read structural state only. Covers AJAX-created credentials without exporting them on load.
+    LaunchedEffect(view, loading, page) {
+        val browser = view ?: return@LaunchedEffect
+        while (isActive && view === browser) {
+            delay(700)
+            if (!loading && AnimeScheduleBrowserGuide.ownPage(browser.url)) {
+                val currentUrl = browser.url
+                browser.evaluateJavascript("window.nyanimeScheduleSetup?.state() || null") {
+                    if (currentUrl == browser.url) update(browser, it)
+                }
+            }
+        }
+    }
     DisposableEffect(Unit) {
         onDispose {
-            view?.stopLoading()
-            view?.destroy()
+            view?.apply {
+                animate().cancel()
+                stopLoading()
+                webViewClient = WebViewClient()
+                destroy()
+            }
             view = null
         }
     }
@@ -315,52 +407,85 @@ private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit) {
         Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Column(
                 Modifier.fillMaxWidth().animateContentSize(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0))
-                    .heightIn(max = 240.dp).verticalScroll(rememberScrollState()).padding(16.dp),
+                    .heightIn(max = 210.dp).verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     stringResource(
-                        if (apiPage ==
-                            null
-                        ) {
-                            R.string.schedule_browser_login_title
-                        } else {
-                            R.string.schedule_browser_token_title
+                        when (guide.stage) {
+                            "TOKEN" -> R.string.schedule_browser_connect_title
+                            "CREATE" -> R.string.schedule_browser_token_title
+                            "OTHER" -> R.string.schedule_browser_full_title
+                            else -> R.string.schedule_browser_login_title
                         },
                     ),
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Text(
                     stringResource(
-                        if (expanded) {
-                            R.string.schedule_browser_steps
-                        } else if (apiPage == null) {
+                        if (guide.stage in listOf("RESET", "VERIFY")) {
+                            R.string.schedule_browser_recovery_help
+                        } else if (guide.stage == "ACCOUNT") {
+                            R.string.schedule_browser_register_help
+                        } else if (guide.stage == "LOGIN") {
                             if (consentConfigured == false) {
                                 R.string.schedule_browser_login_help
                             } else {
                                 R.string.schedule_browser_login_ready_help
                             }
+                        } else if (guide.stage == "CREATE") {
+                            R.string.schedule_browser_create_help
+                        } else if (guide.stage == "TOKEN") {
+                            R.string.schedule_browser_connect_help
                         } else {
-                            R.string.schedule_browser_token_help
+                            R.string.schedule_browser_full_help
                         },
                     ),
                     style = MaterialTheme.typography.bodySmall,
                 )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    apiPage?.let { target ->
-                        TextButton(onClick = {
-                            view?.loadUrl(target)
-                        }) { Text(stringResource(R.string.schedule_browser_api)) }
+                if (guide.stage in listOf("LOGIN", "ACCOUNT")) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        FilterChip(
+                            selected = guide.stage == "LOGIN",
+                            onClick = { view?.loadUrl(AnimeScheduleBrowserGuide.LOGIN) },
+                            label = { Text(stringResource(R.string.schedule_form_login)) },
+                            modifier = Modifier.weight(1f),
+                        )
+                        FilterChip(
+                            selected = guide.stage == "ACCOUNT",
+                            onClick = { view?.loadUrl("https://animeschedule.net/signup") },
+                            label = { Text(stringResource(R.string.schedule_form_register)) },
+                            modifier = Modifier.weight(1f),
+                        )
                     }
-                    TextButton(onClick = { expanded = !expanded }) {
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        fullSite = !fullSite
+                        view?.evaluateJavascript("window.nyanimeScheduleSetup?.full($fullSite) || null") { result ->
+                            view?.let { update(it, result) }
+                        }
+                    }) {
                         Text(
                             stringResource(
-                                if (expanded) R.string.schedule_browser_hide_guide else R.string.schedule_browser_guide,
+                                if (fullSite) R.string.schedule_browser_guided else R.string.schedule_browser_full,
                             ),
                         )
                     }
                     IconButton(onClick = { uri.openUri(page) }) {
                         Icon(Icons.Outlined.OpenInNew, stringResource(R.string.schedule_browser_external))
+                    }
+                }
+                if (fullSite) {
+                    AnimeScheduleBrowserGuide.apiTarget(guide.api)?.let { target ->
+                        TextButton(onClick = { view?.loadUrl(target) }) {
+                            Text(stringResource(R.string.schedule_browser_api))
+                        }
+                    }
+                }
+                if (guide.stage in listOf("OTHER", "RESET", "VERIFY") && view?.canGoBack() == true) {
+                    TextButton(onClick = { view?.goBack() }) {
+                        Text(stringResource(R.string.schedule_browser_back))
                     }
                 }
                 if (failed) {
@@ -377,7 +502,12 @@ private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit) {
         AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = {
             WebView(context).apply {
                 view = this
+                alpha = 0f
+                setBackgroundColor(android.graphics.Color.rgb(17, 17, 20))
                 setDefaultSettings()
+                settings.useWideViewPort = false
+                settings.loadWithOverviewMode = false
+                settings.textZoom = (fontScale * 100).toInt().coerceIn(100, 200)
                 settings.allowFileAccess = false
                 settings.allowContentAccess = false
                 settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
@@ -385,9 +515,7 @@ private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit) {
                     override fun shouldOverrideUrlLoading(webView: WebView, request: WebResourceRequest): Boolean {
                         if (!request.isForMainFrame) return false
                         val url = request.url
-                        if (url.scheme == "https" &&
-                            url.host in listOf("animeschedule.net", "www.animeschedule.net")
-                        ) {
+                        if (AnimeScheduleBrowserGuide.ownPage(url.toString())) {
                             return false
                         }
                         if (url.scheme == "https") uri.openUri(url.toString())
@@ -400,24 +528,29 @@ private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit) {
                     ) {
                         loading =
                             true
+                        webView.animate().cancel()
+                        webView.alpha = 0f
                         failed = false
                         if (url != null) page = url
                     }
                     override fun onPageFinished(webView: WebView, url: String?) {
-                        loading = false
-                        // Read navigation links only, never inputs or page text containing a secret.
-                        webView.evaluateJavascript(
-                            "Array.from(document.querySelectorAll('a[href]')).map(a=>new URL(a.href,location.href)).filter(u=>u.origin===location.origin).map(u=>u.pathname).find(h=>/^\\/users\\/[^/]+\\/settings(?:\\/api)?$/.test(h)) || ''",
-                        ) { result ->
-                            val path = runCatching {
-                                kotlinx.serialization.json.Json.decodeFromString<String>(result)
-                            }.getOrNull()
-                            if (path != null &&
-                                Regex("/users/[A-Za-z0-9_-]+/settings(?:/api)?").matches(path)
-                            ) {
-                                apiPage =
-                                    "https://animeschedule.net" + path.removeSuffix("/api") + "/api"
+                        if (view !== webView || url != webView.url) return
+                        if (AnimeScheduleBrowserGuide.ownPage(webView.url)) {
+                            webView.evaluateJavascript(installScript) { result ->
+                                if (view !== webView || url != webView.url) return@evaluateJavascript
+                                if (fullSite) {
+                                    webView.evaluateJavascript("window.nyanimeScheduleSetup?.full(true) || null") {
+                                        update(webView, it)
+                                    }
+                                } else if (AnimeScheduleBrowserGuide.state(result) == null) {
+                                    // Unknown HTML/script failure must never leave the browser blank.
+                                    reveal(webView)
+                                } else {
+                                    update(webView, result)
+                                }
                             }
+                        } else {
+                            reveal(webView)
                         }
                     }
                     override fun onReceivedError(
@@ -427,7 +560,7 @@ private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit) {
                     ) {
                         if (request.isForMainFrame) {
                             failed = true
-                            loading = false
+                            reveal(webView)
                         }
                     }
                     override fun onReceivedHttpError(
@@ -437,7 +570,7 @@ private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit) {
                     ) {
                         if (request.isForMainFrame) {
                             failed = true
-                            loading = false
+                            reveal(webView)
                         }
                     }
                 }
@@ -460,6 +593,7 @@ private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit) {
                             null
                         }
                     }
+                    if (view !== browser || !scope.isActive) return@launch
                     if (consent == null) {
                         consentConfigured = alreadyAccepted
                         browser.loadUrl(page)
@@ -475,8 +609,50 @@ private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit) {
                 }
             }
         })
-        Button(onClick = onDone, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(stringResource(R.string.schedule_browser_done))
+        if (guide.stage == "TOKEN") {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Button(
+                    enabled = guide.tokenAvailable && !importing && !loading,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        val browser = view
+                        if (browser != null && AnimeScheduleBrowserGuide.tokenPage(browser.url)) {
+                            importing = true
+                            importFailed = false
+                            val originalUrl = browser.url
+                            browser.evaluateJavascript("window.nyanimeScheduleSetup?.token() || ''") { result ->
+                                if (view !== browser) return@evaluateJavascript
+                                importing = false
+                                val token = AnimeScheduleBrowserGuide.token(result)
+                                if (token != null &&
+                                    originalUrl == browser.url &&
+                                    AnimeScheduleBrowserGuide.tokenPage(browser.url)
+                                ) {
+                                    latestToken(token)
+                                } else {
+                                    importFailed = true
+                                }
+                            }
+                        }
+                    },
+                ) { Text(stringResource(R.string.schedule_browser_connect)) }
+                if (importFailed) {
+                    Text(
+                        stringResource(R.string.schedule_browser_import_error),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                TextButton(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.schedule_browser_manual))
+                }
+            }
+        } else {
+            TextButton(onClick = onDone, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                Text(stringResource(R.string.schedule_browser_manual))
+            }
         }
     }
 }

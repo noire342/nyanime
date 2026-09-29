@@ -11,21 +11,31 @@ Apri **Impostazioni → Libreria → AnimeSchedule**, oppure il pulsante di
 configurazione nell’intestazione di **Le tue uscite**.
 
 1. Tocca **Apri la configurazione guidata**, poi accedi o registrati sul sito.
-2. Apri le impostazioni del tuo profilo, quindi **API**. Crea un’applicazione
-   personale, ad esempio chiamata Nyanime, e copia il suo **Bearer token**.
-   Quando il sito rende disponibile il collegamento, la guida offre il pulsante
-   per raggiungere direttamente le impostazioni API.
-3. Tocca **Ho copiato il token**, **Incolla token**, poi **Verifica e attiva**.
+2. Dopo l’accesso, la guida apre automaticamente le impostazioni API. Se non hai
+   ancora applicazioni, mostra il modulo con il nome Nyanime già compilato.
+   Leggi i termini API, confermali e tocca **Crea collegamento**. Non servono
+   redirect OAuth né permessi di modifica delle liste personali.
+3. Tocca **Collega a Nyanime** per verificare e salvare il token. Se ci sono più
+   applicazioni, scegli esplicitamente quella da usare. Il token resta nascosto.
+
+Non hai un account? **Crea account** mostra il modulo di registrazione, mantenendo
+termini, controlli e verifica del sito. Se richiesta, completa la conferma email,
+poi torna su **Accedi**. L’app non legge né conserva la password di questi moduli.
 
 Nel solo browser guidato, prima dell’accesso, il sito genera il consenso ai cookie
 necessari. I cookie di analisi non vengono attivati automaticamente; una scelta
 già salvata sul sito viene conservata. Se il servizio del consenso non risponde,
 resta disponibile la scelta originale del sito, senza dichiarare un consenso riuscito.
 
-Il sito resta interamente accessibile; la guida si può chiudere per liberare
-spazio. Il pulsante Browser permette di continuare nel browser di sistema
+La vista guidata mantiene i moduli originali e nasconde la navigazione non necessaria;
+i controlli si adattano alla larghezza e ai caratteri del dispositivo. **Sito completo**
+ripristina la pagina senza ricaricare i campi. Il pulsante Browser permette di continuare nel browser di sistema
 se il login o una verifica lo richiedono. Il sito può cambiare la propria
-interfaccia: Nyanime non ritaglia i moduli e non legge password o token dalla pagina.
+interfaccia: una pagina non riconosciuta resta visibile interamente. Non vengono
+inviati comandi automatici di registrazione, accettazione dei termini o creazione
+di credenziali. Solo **Collega a Nyanime**, premuto dall’utente, importa il token
+Bearer della sezione applicazioni sul dominio HTTPS verificato. Password e secret
+OAuth non vengono letti. L’inserimento manuale resta disponibile in ogni passaggio.
 
 Il servizio richiede un token di applicazione per gli endpoint del catalogo.
 Un token OAuth dell’account non è un sostituto. Il token personale non deve
@@ -94,3 +104,20 @@ per nascondere i contenuti delle notifiche oscurano i titoli nel widget.
 [schema degli orari](https://img.animeschedule.net/api/v3/documentation/anime),
 [limiti delle richieste](https://img.animeschedule.net/api/v3/documentation/ratelimits).
 Orari forniti da [AnimeSchedule](https://animeschedule.net).
+
+## Controlli della configurazione guidata
+
+I test JVM `AnimeScheduleBrowserGuideTest` verificano origine, percorsi e risultati
+di importazione. Per i moduli originali e le variazioni AJAX:
+
+```sh
+cd scripts/animeschedule-browser-tests
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm test
+```
+
+Sono controllati registrazione, termini non preselezionati, CAPTCHA preservato,
+recupero accesso, selezione esplicita fra applicazioni, assenza di token nei messaggi
+di stato, sito completo senza perdita dei campi e ripiego con HTML non riconosciuto.
+Questi controlli non sostituiscono la prova sul dispositivo o la verifica del token
+con il servizio; nessuna credenziale reale è inclusa nei test.
