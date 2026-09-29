@@ -46,7 +46,7 @@ fun privacyDisplayPreferences(): Preference.PreferenceGroup {
                 },
             ) +
                 PrivacyArea.entries.map { area ->
-                    val areaCapability = PrivacyDisplayRuntime.capability(area)
+                    val areaCapability = PrivacyDisplayRuntime.capability()
                     val areaAvailable = areaCapability == PrivacyDisplayCapability.Available
                     val areaPreference = remember(area) { preferences.area(area) }
                     Preference.PreferenceItem.CustomPreference(
@@ -93,7 +93,6 @@ fun privacyCapabilityDescription(capability: PrivacyDisplayCapability): String =
         PrivacyUnavailableReason.FIRMWARE -> AYMR.strings.privacy_display_no_firmware
         PrivacyUnavailableReason.DISPLAY -> AYMR.strings.privacy_display_no_display
         PrivacyUnavailableReason.WINDOW_MODE -> AYMR.strings.privacy_display_no_window
-        PrivacyUnavailableReason.NOT_VALIDATED -> AYMR.strings.privacy_display_not_validated
         null -> AYMR.strings.privacy_display_available
     },
 )

@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.ui.privacy
 
-import android.os.Build
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import nyanime.privacy.display.AndroidPrivacyDisplayBackends
@@ -18,13 +17,8 @@ object PrivacyDisplayRuntime {
     }
     val backend by lazy { AndroidPrivacyDisplayBackends.create() }
 
-    fun capability(area: PrivacyArea? = null): PrivacyDisplayCapability {
+    fun capability(): PrivacyDisplayCapability {
         if (mutableFailure.value != null) return PrivacyDisplayCapability.Unavailable(PrivacyUnavailableReason.FIRMWARE)
-        if (backend.capability != PrivacyDisplayCapability.Available) return backend.capability
-        return if (PrivacyDisplayVerifiedDevices.supports(Build.MODEL, Build.FINGERPRINT, area)) {
-            PrivacyDisplayCapability.Available
-        } else {
-            PrivacyDisplayCapability.Unavailable(PrivacyUnavailableReason.NOT_VALIDATED)
-        }
+        return backend.capability
     }
 }

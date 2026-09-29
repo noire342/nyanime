@@ -620,7 +620,6 @@
     <string name="privacy_display_no_firmware">La protezione non è applicabile con il firmware attuale.</string>
     <string name="privacy_display_no_display">Non disponibile sui display esterni.</string>
     <string name="privacy_display_no_window">Non disponibile in PiP, multifinestra e finestre aggiuntive.</string>
-    <string name="privacy_display_not_validated">Serve una verifica fisica per questo dispositivo e firmware.</string>
     <string name="privacy_display_available">Si applica automaticamente alle aree che scegli.</string>
     <string name="privacy_display_summary">Limita la visione laterale sui display compatibili. L’effetto dipende da angolo e luminosità. La protezione delle catture è un’impostazione separata.</string>
     <string name="privacy_display_interrupted">La protezione laterale non è applicata. Video e lettura continuano normalmente. Puoi consultarne lo stato nelle impostazioni di Sicurezza.</string>

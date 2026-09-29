@@ -5,7 +5,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import eu.kanade.tachiyomi.ui.privacy.PrivacyDisplayRuntime
 import nyanime.privacy.display.PrivacyDisplayCapability
 import nyanime.privacy.display.PrivacyDisplayState
@@ -17,7 +16,7 @@ fun PlayerPrivacyEntry() {
     val controller = LocalContext.current.baseActivity()?.privacyDisplayController ?: return
     val state by controller.state.collectAsState()
     val requested by controller.videoEnabled.collectAsState()
-    val runtimeCapability = PrivacyDisplayRuntime.capability(PrivacyArea.VIDEO)
+    val runtimeCapability = PrivacyDisplayRuntime.capability()
     if (runtimeCapability != PrivacyDisplayCapability.Available && state !is PrivacyDisplayState.Failed) return
     val capability = when (val current = state) {
         is PrivacyDisplayState.Unavailable -> PrivacyDisplayCapability.Unavailable(current.reason)

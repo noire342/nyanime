@@ -1,6 +1,6 @@
 package nyanime.privacy.display
 
-enum class PrivacyUnavailableReason { HARDWARE, FIRMWARE, DISPLAY, WINDOW_MODE, NOT_VALIDATED }
+enum class PrivacyUnavailableReason { HARDWARE, FIRMWARE, DISPLAY, WINDOW_MODE }
 
 sealed interface PrivacyDisplayCapability {
     data object Available : PrivacyDisplayCapability

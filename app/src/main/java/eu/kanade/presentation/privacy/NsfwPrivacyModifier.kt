@@ -28,7 +28,7 @@ private fun Modifier.contentPrivacy(
     val view = LocalView.current
     val controller = remember(view) { view.context.baseActivity()?.privacyDisplayController }
     if (controller == null ||
-        PrivacyDisplayRuntime.capability(PrivacyArea.NSFW) != PrivacyDisplayCapability.Available
+        PrivacyDisplayRuntime.capability() != PrivacyDisplayCapability.Available
     ) {
         return@composed this
     }

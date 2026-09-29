@@ -136,7 +136,7 @@ class PrivacyDisplayController(
     }
 
     private fun enabledAreasForPolicy(): Set<PrivacyArea> = PrivacyArea.entries.filterTo(mutableSetOf()) {
-        policy.permits(it) && PrivacyDisplayRuntime.capability(it) == PrivacyDisplayCapability.Available
+        policy.permits(it) && PrivacyDisplayRuntime.capability() == PrivacyDisplayCapability.Available
     }
 
     private fun reconcileListener() {
@@ -196,7 +196,7 @@ class PrivacyDisplayController(
         val dy = screen[1] - window[1]
         val regions = declarations.values.mapNotNull { declaration ->
             if (!selected(declaration) ||
-                PrivacyDisplayRuntime.capability(declaration.area) != PrivacyDisplayCapability.Available
+                PrivacyDisplayRuntime.capability() != PrivacyDisplayCapability.Available
             ) {
                 return@mapNotNull null
             }
