@@ -6,9 +6,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.os.Build
-import eu.kanade.domain.ui.ThemeModeApplier
 import eu.kanade.domain.ui.model.ThemeMode
-import eu.kanade.domain.ui.model.setAppCompatDelegateThemeMode
 import eu.kanade.domain.ui.resolveDarkTheme
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
@@ -20,17 +18,12 @@ class LauncherIconController(
     context: Context,
     private val systemDark: () -> Boolean = ::systemDarkTheme,
     private val sdkInt: Int = Build.VERSION.SDK_INT,
-) : ThemeModeApplier {
+) {
     private val packageManager = context.packageManager
     private val red = ComponentName(context.packageName, "eu.kanade.tachiyomi.ui.main.LauncherRed")
     private val orange = ComponentName(context.packageName, "eu.kanade.tachiyomi.ui.main.LauncherOrange")
 
-    override fun apply(mode: ThemeMode) {
-        setAppCompatDelegateThemeMode(mode)
-        reconcile(mode)
-    }
-
-    override fun reconcile(mode: ThemeMode) {
+    fun reconcile(mode: ThemeMode) {
         val selected = if (resolveDarkTheme(mode, systemDark())) red else orange
         val previous = if (selected == red) orange else red
         try {

@@ -11,8 +11,8 @@ import eu.kanade.domain.ui.ThemeModeApplier
 import eu.kanade.domain.ui.ThemeSettingsRepository
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.tachiyomi.core.security.SecurityPreferences
+import eu.kanade.tachiyomi.data.theme.AndroidThemeModeApplier
 import eu.kanade.tachiyomi.data.theme.AndroidThemeSettingsRepository
-import eu.kanade.tachiyomi.data.theme.LauncherIconController
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.ui.player.settings.AdvancedPlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
@@ -44,7 +44,7 @@ class PreferenceModule(val app: Application) : InjektModule {
         addSingletonFactory<ThemeSettingsRepository> {
             AndroidThemeSettingsRepository(PreferenceManager.getDefaultSharedPreferences(app))
         }
-        addSingletonFactory<ThemeModeApplier> { LauncherIconController(app) }
+        addSingletonFactory<ThemeModeApplier> { AndroidThemeModeApplier(app) }
         addSingletonFactory { ThemeController(get(), get()) }
         addSingletonFactory {
             NetworkPreferences(

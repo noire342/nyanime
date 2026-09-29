@@ -8,6 +8,16 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 29 settembre 2026 — Splash coerente con il tema scelto
+
+- Su Android 12 e successivi, splash e sfondo iniziale rispettano la modalità
+  Chiaro o Scuro scelta nell’app, anche se il telefono usa il tema opposto.
+  Segui il sistema rimuove la forzatura e segue i cambiamenti di Android.
+- Gestione del tema nativo separata da quella dell’icona; preferenze e conferma
+  iniziale conservate. Sulle versioni precedenti rimane la compatibilità AppCompat.
+- Il primo avvio dopo l’aggiornamento può mostrare ancora la splash precedente
+  prima che Android registri la preferenza per gli avvii successivi.
+
 ## 29 settembre 2026 — Promemoria del giorno prima
 
 - Avviso facoltativo 24 ore prima dell’episodio, attivo inizialmente e utilizzabile
