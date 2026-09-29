@@ -59,6 +59,15 @@ class AnimeScheduleTest {
         assertTrue(ScheduleParser.snapshot(metadata, rows).broadcasts.isEmpty())
     }
 
+    @Test fun structuredOptionalMetadataDoesNotBreakTheSchedule() {
+        val data = Json.parseToJsonElement(
+            """{"route":"sample-series","status":"Ongoing","delayedDesc":{},"subDelayedTimetable":[]}""",
+        ).jsonObject
+        val snapshot = ScheduleParser.snapshot(data, emptyList())
+        assertEquals("sample-series", snapshot.route)
+        assertTrue(snapshot.delay.isEmpty())
+    }
+
     @Test fun preferredBroadcastAndOtherChannelsRemainDistinct() {
         val sub = broadcast(ScheduleAirType.SUB, now + 2 * ReleasePolicy.HOUR)
         val raw = broadcast(ScheduleAirType.RAW)

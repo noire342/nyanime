@@ -47,6 +47,24 @@ test('full website restores layout without reloading or losing entered values', 
     assert.equal(w.nyanimeScheduleSetup.state().cropped, true);
     w.close();
 });
+test('original form padding cannot add width beyond the guided viewport', () => {
+    const dom = page('/login', `<style>.form-container { width:30em; }
+        .form { display:flex; flex-direction:column; padding:0 2em 2em; }</style>${account.replace('<form>', '<form class="form">')}`);
+    const w=dom.window, form=w.document.querySelector('form');
+    const style=w.getComputedStyle(form);
+    assert.equal(style.boxSizing, 'border-box');
+    assert.equal(style.paddingLeft, '0px');
+    assert.equal(style.paddingRight, '0px');
+    assert.equal(style.maxWidth, '100%');
+    w.nyanimeScheduleSetup.full(true);
+    assert.equal(w.getComputedStyle(form).paddingLeft, '2em');
+    w.close();
+});
+test('registration confirmation headings remain visible when there is no input form', () => {
+    const dom = page('/signup', '<div class="form-container"><div class="form-title-container"><h1>Check your email</h1></div></div>');
+    assert.ok(!dom.window.document.querySelector('[data-ny-root]').hasAttribute('data-ny-form'));
+    dom.window.close();
+});
 test('registration preserves mandatory confirmation, agreement and challenge without checking or submitting', () => {
     const dom = page('/signup', account.replace('<button', '<input id="password-confirmation" type="password"><input name="terms-agreement" type="checkbox" required><button'));
     const w = dom.window;

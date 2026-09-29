@@ -10,9 +10,20 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
 import java.net.URI
 
-internal class AnimeScheduleException(val reason: String, val retryAt: Long = 0) : Exception(reason)
+internal class AnimeScheduleException(val reason: String, val retryAt: Long = 0, val status: Int = 0) : Exception(
+    reason,
+)
+
+/** Only transport failures mean unreachable. Never expose exception messages or response bodies. */
+internal fun animeScheduleFailureReason(error: Exception): String = when (error) {
+    is AnimeScheduleException -> error.reason
+    is IOException -> "NETWORK"
+    is IllegalArgumentException, is IllegalStateException -> "DATA"
+    else -> "LOCAL"
+}
 
 /** Application tokens only: OAuth account tokens cannot authorize these catalogue endpoints. */
 internal class AnimeScheduleClient(
@@ -44,7 +55,13 @@ internal class AnimeScheduleClient(
         val matches = mutableListOf<JsonObject>()
         var page = 1
         do {
-            val body = request("anime", listOf(filter, "page" to "$page"))
+            val body = try {
+                request("anime", listOf(filter, "page" to "$page"))
+            } catch (error: AnimeScheduleException) {
+                // The API returns 404, rather than an empty page, when no anime has this ID.
+                if (error.reason == "IDENTITY" && page == 1) return null
+                throw error
+            }
             val rows = ScheduleParser.animePage(body)
             matches += rows.filter { matchesReference(it, reference, anidb) }
             require(page < 100 || rows.size < 18) { "Schedule pagination did not terminate" }
@@ -72,21 +89,30 @@ internal class AnimeScheduleClient(
                 nextRequestAt = maxOf(nextRequestAt, reset ?: nextRequestAt)
             }
             when (response.code) {
-                401, 403 -> throw AnimeScheduleException("AUTH")
+                401, 403 -> throw AnimeScheduleException("AUTH", status = response.code)
                 429 -> {
                     nextRequestAt = maxOf(nextRequestAt, reset ?: (System.currentTimeMillis() + 60_000))
-                    throw AnimeScheduleException("RATE_LIMIT", nextRequestAt)
+                    throw AnimeScheduleException("RATE_LIMIT", nextRequestAt, response.code)
+                }
+                404 -> if (path == "anime" || path.startsWith("anime/")) {
+                    throw AnimeScheduleException("IDENTITY", status = response.code)
                 }
             }
-            if (!response.isSuccessful) throw AnimeScheduleException("NETWORK")
+            if (!response.isSuccessful) throw AnimeScheduleException("SERVER", status = response.code)
             response.body.string()
         }
     }
 
     companion object {
         private fun catalogId(url: String, hosts: Set<String>, prefix: String): Long? = try {
-            val uri = URI(if (url.startsWith("//")) "https:$url" else url)
+            val normalized = when {
+                url.startsWith("//") -> "https:$url"
+                "://" !in url -> "https://$url"
+                else -> url
+            }
+            val uri = URI(normalized)
             if (uri.scheme !in setOf("https", "http") ||
+                uri.userInfo != null ||
                 uri.host?.lowercase() !in hosts ||
                 !uri.path.startsWith(prefix)
             ) {

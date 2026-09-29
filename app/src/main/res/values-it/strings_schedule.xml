@@ -58,6 +58,9 @@
     <string name="schedule_error_limit">AnimeSchedule richiede una pausa. Le richieste riprenderanno automaticamente; l’agenda salvata resta disponibile.</string>
     <string name="schedule_error_identity">Questo titolo non ha una corrispondenza univoca verificata su AnimeSchedule. Resta disponibile il catalogo abituale.</string>
     <string name="schedule_error_network">AnimeSchedule al momento non è raggiungibile. Controlla la connessione e riprova. L’agenda abituale resta disponibile.</string>
+    <string name="schedule_error_server">AnimeSchedule non ha completato la richiesta. Riproveremo automaticamente; l’agenda abituale resta disponibile.</string>
+    <string name="schedule_error_data">Questi dati di AnimeSchedule non sono leggibili. Gli orari già salvati e l’agenda abituale restano disponibili.</string>
+    <string name="schedule_error_local">Non è stato possibile completare il collegamento sul telefono. Riprova; l’agenda abituale resta disponibile.</string>
     <string name="schedule_raw">RAW · Trasmissione giapponese</string>
     <string name="schedule_sub">SUB · Sottotitoli inglesi</string>
     <string name="schedule_dub">DUB · Doppiaggio inglese</string>

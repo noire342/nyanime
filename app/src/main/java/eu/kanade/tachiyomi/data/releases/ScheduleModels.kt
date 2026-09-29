@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -67,7 +68,7 @@ internal object ScheduleParser {
     fun text(
         node: JsonObject,
         key: String,
-    ): String = node[key]?.jsonPrimitive?.content?.takeUnless { it == "null" }.orEmpty()
+    ): String = (node[key] as? JsonPrimitive)?.content?.takeUnless { it == "null" }.orEmpty()
     fun animePage(body: String): List<JsonObject> {
         val root = json.parseToJsonElement(body).jsonObject
         return (root["anime"] as? JsonArray ?: error("Missing anime page")).map { it.jsonObject }

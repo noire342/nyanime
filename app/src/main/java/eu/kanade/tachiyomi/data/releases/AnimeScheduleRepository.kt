@@ -8,6 +8,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonObject
+import logcat.LogPriority
+import tachiyomi.core.common.util.system.logcat
 import tachiyomi.data.handlers.anime.AnimeDatabaseHandler
 import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
@@ -56,7 +58,7 @@ internal class AnimeScheduleRepository(private val db: AnimeDatabaseHandler = In
         val reference = reference(entry)
         if (!reference.first.hasId && reference.second == null) return false to false
         val cached = record(entry.id)
-        val cold = cached == null || cached.reference != key(reference)
+        val cold = cached == null || cached.reference != key(reference) || cached.attemptedAt == 0L
         return (cold || cached!!.due(now)) to cold
     }
 
@@ -78,6 +80,7 @@ internal class AnimeScheduleRepository(private val db: AnimeDatabaseHandler = In
             }
             if (metadata == null) {
                 save(ScheduleRecord(entry.id, fingerprint, null, 0, now, "IDENTITY"))
+                preferences.state.set("")
                 return
             }
             val rows = timetableRows(setOf(now, entry.nextEpisodeAiringAt * 1000).filter { it > 0 })
@@ -233,7 +236,7 @@ internal class AnimeScheduleRepository(private val db: AnimeDatabaseHandler = In
 
     suspend fun connect(token: String) {
         val normalized = token.trim().removePrefix("Bearer ").trim()
-        require(normalized.length in 16..8192 && normalized.none(Char::isWhitespace))
+        if (normalized.length !in 16..8192 || normalized.any(Char::isWhitespace)) throw AnimeScheduleException("AUTH")
         val probe = newClient { normalized }
         val week = ScheduleParser.week(System.currentTimeMillis())
         probe.timetable(week.first, week.second)
@@ -263,8 +266,12 @@ internal class AnimeScheduleRepository(private val db: AnimeDatabaseHandler = In
         )
     }
     private fun failure(error: Exception): String {
-        val reason = (error as? AnimeScheduleException)?.reason ?: "NETWORK"
-        preferences.state.set(reason)
+        val reason = animeScheduleFailureReason(error)
+        preferences.state.set(reason.takeUnless { it == "IDENTITY" }.orEmpty())
+        logcat(LogPriority.WARN) {
+            "AnimeSchedule check: $reason, HTTP ${(error as? AnimeScheduleException)?.status ?: 0}, " +
+                "type ${error.javaClass.simpleName}"
+        }
         if (reason == "AUTH") preferences.connected.set(false)
         if (error is AnimeScheduleException && error.retryAt > 0) preferences.retryAt.set(error.retryAt)
         return reason

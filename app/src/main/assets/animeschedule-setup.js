@@ -27,7 +27,11 @@
             max-width: 600px !important; min-width: 0 !important; margin: 0 auto !important;
             padding: 20px 16px 32px !important; border: 0 !important; box-shadow: none !important;
             background: transparent !important; color: #f5f5f7 !important; }
-        html[data-ny-schedule] [data-ny-root] form { width: 100% !important; min-width: 0 !important; }
+        html[data-ny-schedule] [data-ny-root] form { box-sizing: border-box !important;
+            width: 100% !important; min-width: 0 !important; max-width: 100% !important;
+            padding: 0 !important; margin: 0 !important; }
+        html[data-ny-schedule] [data-ny-root] { overflow-wrap: anywhere; }
+        html[data-ny-schedule] [data-ny-root] .password-input-wrapper { width: 100%; min-width: 0; }
         html[data-ny-schedule] [data-ny-root] .input-wrapper,
         html[data-ny-schedule] [data-ny-root] .input-wrapper-custom { margin: 0 0 20px !important; }
         html[data-ny-schedule] [data-ny-root] input:not([type=checkbox]):not([type=hidden]):not([type=file]),
@@ -39,9 +43,11 @@
         html[data-ny-schedule] [data-ny-root] #submit,
         html[data-ny-schedule] .ny-schedule-select { width: 100%; min-height: 52px;
             border-radius: 16px; background: #f5f5f7; color: #141418; font-size: 16px; font-weight: 600; }
-        html[data-ny-schedule] [data-ny-kind=LOGIN] .form-title-container,
-        html[data-ny-schedule] [data-ny-kind=ACCOUNT] .form-title-container { display: none; }
-        html[data-ny-schedule] [data-ny-root] #login-links { line-height: 2.2; padding: 12px 0; }
+        html[data-ny-schedule] [data-ny-kind=LOGIN][data-ny-form] .form-title-container,
+        html[data-ny-schedule] [data-ny-kind=ACCOUNT][data-ny-form] .form-title-container { display: none; }
+        html[data-ny-schedule] [data-ny-root] #login-links,
+        html[data-ny-schedule] [data-ny-root] #sign-up-links { line-height: 2.2; padding: 12px 0;
+            white-space: normal; max-width: 100%; }
         html[data-ny-schedule] [data-ny-root] .app-token,
         html[data-ny-schedule] [data-ny-root] .app-secret { display: none !important; }
         html[data-ny-schedule] [data-ny-root] .app-container { max-width: 100%; box-sizing: border-box;
@@ -56,9 +62,10 @@
         !!node.querySelector('iframe[src*="recaptcha"], iframe[src*="hcaptcha"], #as-notice-panel, .error, .status-text-container');
     const hidden = (node) => { if (node) node.setAttribute('data-ny-hidden', ''); };
     const reset = () => {
-        document.querySelectorAll('[data-ny-path], [data-ny-hidden], [data-ny-root], [data-ny-kind]').forEach(n => {
+        document.querySelectorAll('[data-ny-path], [data-ny-hidden], [data-ny-root], [data-ny-kind], [data-ny-form]').forEach(n => {
             n.removeAttribute('data-ny-path'); n.removeAttribute('data-ny-hidden'); n.removeAttribute('data-ny-root');
             n.removeAttribute('data-ny-kind');
+            n.removeAttribute('data-ny-form');
         });
     };
     function crop() {
@@ -67,6 +74,7 @@
         document.documentElement.setAttribute('data-ny-schedule', '');
         root.setAttribute('data-ny-root', '');
         root.setAttribute('data-ny-kind', stage);
+        if (root.querySelector('form')) root.setAttribute('data-ny-form', '');
         for (let n = root; n && n !== document.body; n = n.parentElement) {
             const parent = n.parentElement;
             if (!parent) break;

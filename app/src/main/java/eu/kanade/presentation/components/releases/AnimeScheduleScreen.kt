@@ -70,7 +70,6 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.releases.AiringRefreshJob
 import eu.kanade.tachiyomi.data.releases.AnimeScheduleBrowserConsent
 import eu.kanade.tachiyomi.data.releases.AnimeScheduleBrowserGuide
-import eu.kanade.tachiyomi.data.releases.AnimeScheduleException
 import eu.kanade.tachiyomi.data.releases.AnimeSchedulePreferences
 import eu.kanade.tachiyomi.data.releases.AnimeScheduleRepository
 import eu.kanade.tachiyomi.data.releases.GuideState
@@ -78,6 +77,7 @@ import eu.kanade.tachiyomi.data.releases.ReleaseAgendaWidget
 import eu.kanade.tachiyomi.data.releases.ReleaseMedium
 import eu.kanade.tachiyomi.data.releases.ReleaseReminders
 import eu.kanade.tachiyomi.data.releases.ScheduleAirType
+import eu.kanade.tachiyomi.data.releases.animeScheduleFailureReason
 import eu.kanade.tachiyomi.util.system.setDefaultSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -136,7 +136,7 @@ class AnimeScheduleScreen : Screen() {
                             } catch (failure: Exception) {
                                 error = context.getString(
                                     scheduleErrorResource(
-                                        (failure as? AnimeScheduleException)?.reason ?: "NETWORK",
+                                        animeScheduleFailureReason(failure),
                                     ),
                                 )
                             } finally {
@@ -266,8 +266,7 @@ class AnimeScheduleScreen : Screen() {
                                     error =
                                         context.getString(
                                             scheduleErrorResource(
-                                                (failure as? AnimeScheduleException)?.reason
-                                                    ?: if (failure is IllegalArgumentException) "AUTH" else "NETWORK",
+                                                animeScheduleFailureReason(failure),
                                             ),
                                         )
                                 } finally {
@@ -505,7 +504,7 @@ private fun ScheduleSetupBrowser(modifier: Modifier, onDone: () -> Unit, onToken
                 alpha = 0f
                 setBackgroundColor(android.graphics.Color.rgb(17, 17, 20))
                 setDefaultSettings()
-                settings.useWideViewPort = false
+                settings.useWideViewPort = true
                 settings.loadWithOverviewMode = false
                 settings.textZoom = (fontScale * 100).toInt().coerceIn(100, 200)
                 settings.allowFileAccess = false
@@ -661,5 +660,8 @@ internal fun scheduleErrorResource(reason: String): Int = when (reason) {
     "AUTH" -> R.string.schedule_error_auth
     "RATE_LIMIT" -> R.string.schedule_error_limit
     "IDENTITY" -> R.string.schedule_error_identity
+    "SERVER" -> R.string.schedule_error_server
+    "DATA" -> R.string.schedule_error_data
+    "LOCAL" -> R.string.schedule_error_local
     else -> R.string.schedule_error_network
 }

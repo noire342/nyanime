@@ -65,6 +65,12 @@ dei limiti del servizio. I rinvii noti sostituiscono le vecchie date dello
 stesso episodio. Le date lontane già confermate dal catalogo abituale restano
 nell’agenda se AnimeSchedule non fornisce una sostituzione.
 
+I link restituiti dal catalogo possono essere completi, iniziare con `//` o non
+avere uno schema: vengono normalizzati prima della verifica del dominio e dell’ID.
+Una risposta 404 al filtro per ID indica un titolo assente dal catalogo, non un
+servizio irraggiungibile. In quel caso si conserva il catalogo abituale. Problemi
+di rete, servizio o formato dei dati sono segnalati separatamente.
+
 La tempestività delle notifiche dipende dai permessi Android, dalla disponibilità
 dei dati e della rete. Per gli orari annunciati si usa il sistema dei promemoria
 esistente; **Stato delle uscite** permette di verificare notifiche e allarmi.

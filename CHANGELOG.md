@@ -25,12 +25,19 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   Sito completo e inserimento manuale sempre disponibili; password mai lette dall’app.
 - Consenso ai soli cookie necessari configurato prima dell’accesso; scelte già
   salvate sul sito conservate. Termini e verifiche di registrazione restano visibili.
+- Moduli guidati senza larghezza aggiunta dai margini del sito: campi e collegamenti
+  contenuti nello schermo stretto, messaggi di conferma della registrazione preservati.
 - Orari RAW, SUB inglese e DUB inglese distinti, première, rinvii, date eccezionali
   e piattaforme integrate nell’agenda esistente e nelle schede anime.
 - Conto alla rovescia della scheda e dettaglio degli orari coordinati con la
   trasmissione preferita; un rinvio senza data non conserva un vecchio conto alla rovescia.
 - Associazione tramite ID di catalogo verificati, cache condivisa degli orari e rispetto
   dei limiti del servizio. Il catalogo abituale rimane disponibile senza configurazione.
+- Link di catalogo senza schema HTTPS riconosciuti e controllati per dominio e ID;
+  titoli assenti dal catalogo distinti dagli errori di rete. Recupero automatico delle
+  associazioni fallite nella prova precedente, senza perdere il collegamento salvato.
+- Errori di rete, servizio, formato e salvataggio distinti, con diagnostica priva di
+  token e contenuti privati: un titolo non trovato non segnala il servizio irraggiungibile.
 - Trasmissione preferita per promemoria e controlli mirati delle disponibilità;
   orario annunciato distinto dal contenuto effettivamente trovato nell’estensione.
 - Widget “Le tue uscite” basato sulla stessa agenda locale anime e manga, con

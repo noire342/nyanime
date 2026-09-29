@@ -58,6 +58,9 @@
     <string name="schedule_error_limit">AnimeSchedule requests a pause. Requests will resume automatically; your saved agenda remains available.</string>
     <string name="schedule_error_identity">This title has no unambiguous verified match on AnimeSchedule. The usual catalog remains available.</string>
     <string name="schedule_error_network">AnimeSchedule is currently unreachable. Check your connection and try again. The usual agenda remains available.</string>
+    <string name="schedule_error_server">AnimeSchedule could not complete this request. We will retry automatically; your usual agenda remains available.</string>
+    <string name="schedule_error_data">These AnimeSchedule data could not be read. Saved dates and your usual agenda remain available.</string>
+    <string name="schedule_error_local">The connection could not be completed on this phone. Try again; your usual agenda remains available.</string>
     <string name="schedule_raw">RAW · Japanese broadcast</string>
     <string name="schedule_sub">SUB · English subtitles</string>
     <string name="schedule_dub">DUB · English dub</string>
