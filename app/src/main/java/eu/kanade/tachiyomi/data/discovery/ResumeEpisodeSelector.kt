@@ -16,6 +16,7 @@ class ResumeEpisodeSelector(
     private val next: GetNextEpisodes,
     private val history: GetAnimeHistory,
     private val cues: EpisodeEndingCueStore,
+    private val completion: NearEndingCompletion,
 ) {
     suspend fun selectForAnime(
         animeId: Long,
@@ -33,15 +34,19 @@ class ResumeEpisodeSelector(
         val episodes = next.await(animeId, onlyUnseen = false)
         val currentIndex = episodes.indexOfFirst { it.id == fromEpisodeId }
         val current = episodes.getOrNull(currentIndex)
+        val cue = current?.takeUnless { it.seen }?.let { cues.get(it.id) }
         val advance = current != null &&
             (
                 current.seen ||
                     shouldAdvanceResume(
                         current.lastSecondSeen,
                         current.totalSeconds,
-                        cues.get(current.id),
+                        cue,
                     )
                 )
+        if (advance && current != null && !current.seen) {
+            completion.completeIfReached(animeId, current, cue)
+        }
         val candidates = episodes.drop(if (currentIndex < 0) 0 else currentIndex + if (advance) 1 else 0)
         val selected = candidates.firstOrNull { !it.seen && eligible(it) } ?: return null
         val finale = current?.takeIf {

@@ -17,6 +17,7 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.track.anime.interactor.GetAnimeTracks
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaDuration
 
@@ -62,13 +63,14 @@ class DelayedAnimeTrackingUpdateJob(private val context: Context, workerParams: 
     companion object {
         private const val TAG = "DelayedAnimeTrackingUpdate"
 
-        fun setupTask(context: Context) {
+        fun setupTask(context: Context, initialDelay: Duration = Duration.ZERO) {
             val constraints = Constraints(
                 requiredNetworkType = NetworkType.CONNECTED,
             )
 
             val request = OneTimeWorkRequestBuilder<DelayedAnimeTrackingUpdateJob>()
                 .setConstraints(constraints)
+                .setInitialDelay(initialDelay.toJavaDuration())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5.minutes.toJavaDuration())
                 .addTag(TAG)
                 .build()

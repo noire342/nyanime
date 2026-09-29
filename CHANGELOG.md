@@ -11,9 +11,11 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 ## 29 settembre 2026 — Ripresa intelligente degli episodi
 
 - “Continua a guardare” propone il prossimo episodio quando restano pochi secondi
-  oppure la riproduzione è quasi al termine dei titoli di coda riconosciuti.
-- Il finale resta accessibile dalla scheda di ripresa; il suggerimento non anticipa
-  lo stato “visto” o il tracking. I marker finali sono conservati nel backup.
+  oppure la riproduzione arriva a cinque secondi dall'inizio della sigla finale riconosciuta.
+- Il finale resta accessibile dalla scheda di ripresa. Alla successiva apertura
+  della Home o di una scheda di ripresa, il marker verificato aggiorna “visto”
+  e accoda il tracking, senza modificare la riproduzione.
+  I marker finali sono conservati nel backup.
 - Home, scheda, libreria e cronologia condividono la scelta dell'episodio da riprendere.
 
 ## 29 settembre 2026 — Manga unificati e cambio fonte

@@ -4,9 +4,11 @@ import eu.kanade.domain.base.BasePreferences
 import eu.kanade.tachiyomi.data.discovery.DiscoveryPlaybackService
 import eu.kanade.tachiyomi.data.discovery.EpisodeEndingCue
 import eu.kanade.tachiyomi.data.discovery.EpisodeEndingCueStore
+import eu.kanade.tachiyomi.data.discovery.NearEndingCompletion
 import eu.kanade.tachiyomi.data.discovery.ResumeEpisodeSelector
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
@@ -49,7 +51,8 @@ class DiscoveryPlaybackTest {
     private val base = mockk<BasePreferences>()
     private val next = GetNextEpisodes(episodes, getAnime, mockk<AnimeHistoryRepository>())
     private val cues = mockk<EpisodeEndingCueStore>()
-    private val selector = ResumeEpisodeSelector(next, history, cues)
+    private val completion = mockk<NearEndingCompletion>(relaxed = true)
+    private val selector = ResumeEpisodeSelector(next, history, cues, completion)
     private val service = DiscoveryPlaybackService(selector, downloads, base)
 
     private fun prepare(seen: Boolean = false) {
@@ -113,15 +116,16 @@ class DiscoveryPlaybackTest {
     }
 
     @Test
-    fun `ending cue proposes next without marking current seen`() = runBlocking {
+    fun `ending cue proposes next and requests completion`() = runBlocking {
         prepare()
-        val unfinished = first.copy(lastSecondSeen = 920_000, totalSeconds = 1_200_000)
+        val unfinished = first.copy(lastSecondSeen = 835_000, totalSeconds = 1_200_000)
         coEvery { episodes.await(1) } returns listOf(unfinished, second)
         coEvery { cues.get(first.id) } returns EpisodeEndingCue(1_200_000, 840_000, 940_000)
         val selection = selector.selectForAnime(anime.id)
         assertEquals(second.id, selection?.episode?.id)
         assertEquals(unfinished.id, selection?.finale?.id)
         assertEquals(false, unfinished.seen)
+        coVerify(exactly = 1) { completion.completeIfReached(anime.id, unfinished, any()) }
     }
 
     @Test
@@ -132,6 +136,16 @@ class DiscoveryPlaybackTest {
         val selection = selector.selectForAnime(anime.id)
         assertEquals(second.id, selection?.episode?.id)
         assertEquals(stopped.id, selection?.finale?.id)
+    }
+
+    @Test
+    fun `already seen episode advances even before a recognized ending`() = runBlocking {
+        prepare(seen = true)
+        val stopped = first.copy(seen = true, lastSecondSeen = 700_000, totalSeconds = 1_200_000)
+        coEvery { episodes.await(1) } returns listOf(stopped, second)
+        coEvery { cues.get(first.id) } returns EpisodeEndingCue(1_200_000, 840_000, 940_000)
+        assertEquals(second.id, selector.selectForAnime(anime.id)?.episode?.id)
+        coVerify(exactly = 0) { completion.completeIfReached(any(), any(), any()) }
     }
 
     @Test

@@ -2191,7 +2191,10 @@ class PlayerActivity : BaseActivity() {
         viewModel.startAutoTracking()
 
         viewModel.waitingSkipIntro = playerPreferences.waitingTimeIntroSkip().get()
-        if (!playerPreferences.aniSkipEnabled().get()) {
+        if (!viewModel.introSkipEnabled ||
+            !playerPreferences.aniSkipEnabled().get() ||
+            (playerPreferences.disableAniSkipOnChapters().get() && viewModel.chapters.value.isNotEmpty())
+        ) {
             return
         }
         val animeId = viewModel.currentAnime.value?.id ?: return
@@ -2211,11 +2214,6 @@ class PlayerActivity : BaseActivity() {
                 return@withContext
             }
             viewModel.recordEndingCue(episodeId, duration, stamps)
-            if (!viewModel.introSkipEnabled ||
-                (playerPreferences.disableAniSkipOnChapters().get() && viewModel.chapters.value.isNotEmpty())
-            ) {
-                return@withContext
-            }
             viewModel.updateChapters(
                 ChapterUtils.mergeChapters(viewModel.chapters.value, stamps, duration),
             )

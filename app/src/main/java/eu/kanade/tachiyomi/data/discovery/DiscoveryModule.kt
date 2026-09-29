@@ -70,7 +70,8 @@ class DiscoveryModule(private val app: Application) : InjektModule {
             DiscoverySourceService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get())
         }
         addSingletonFactory<EpisodeEndingCueStore> { SqlEpisodeEndingCueStore(get()) }
-        addSingletonFactory { ResumeEpisodeSelector(get(), get(), get()) }
+        addSingletonFactory { NearEndingCompletion(get(), get(), get(), get(), get(), get(), get(), get(), app) }
+        addSingletonFactory { ResumeEpisodeSelector(get(), get(), get(), get()) }
         addSingletonFactory { DiscoveryPlaybackService(get(), get(), get()) }
         addSingletonFactory { tachiyomi.domain.discovery.CatalogSeriesEvidence(get()) }
         addSingletonFactory { SmartSourceResolver(get(), get(), get(), get(), get(), get(), get()) }

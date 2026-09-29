@@ -13,9 +13,10 @@ class EpisodeEndingCueTest {
     private val ending = EpisodeEndingCue(duration, 840_000L, 940_000L)
 
     @Test
-    fun `ending only advances near its end`() {
-        assertFalse(shouldAdvanceResume(860_000L, duration, ending))
-        assertTrue(shouldAdvanceResume(920_000L, duration, ending))
+    fun `ending advances five seconds before its start and through post credits`() {
+        assertFalse(shouldAdvanceResume(834_000L, duration, ending))
+        assertTrue(shouldAdvanceResume(835_000L, duration, ending))
+        assertTrue(shouldAdvanceResume(1_000_000L, duration, ending))
     }
 
     @Test
@@ -24,6 +25,13 @@ class EpisodeEndingCueTest {
         assertTrue(shouldAdvanceResume(1_145_000L, duration, null))
         assertFalse(shouldAdvanceResume(260_000L, 300_000L, null))
         assertTrue(shouldAdvanceResume(286_000L, 300_000L, null))
+    }
+
+    @Test
+    fun `known ending takes priority over duration fallback`() {
+        val lateEnding = EpisodeEndingCue(duration, 1_180_000L, 1_195_000L)
+        assertFalse(shouldAdvanceResume(1_150_000L, duration, lateEnding))
+        assertTrue(shouldAdvanceResume(1_175_000L, duration, lateEnding))
     }
 
     @Test

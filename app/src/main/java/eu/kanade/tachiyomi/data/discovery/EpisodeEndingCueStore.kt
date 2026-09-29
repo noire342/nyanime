@@ -29,10 +29,10 @@ data class EpisodeEndingCue(val durationMs: Long, val startMs: Long, val endMs: 
 
 internal fun shouldAdvanceResume(positionMs: Long, durationMs: Long, cue: EpisodeEndingCue?): Boolean {
     if (durationMs < 120_000L || positionMs <= 0 || positionMs > durationMs + 2_000L) return false
-    if (durationMs - positionMs <= min(60_000L, durationMs / 20)) return true
-    if (cue == null || !cue.matches(durationMs)) return false
-    val endingThreshold = max(cue.startMs + 10_000L, cue.endMs - 30_000L)
-    return positionMs >= endingThreshold && positionMs <= cue.endMs
+    if (cue != null && cue.matches(durationMs)) {
+        return positionMs >= (cue.startMs - 5_000L).coerceAtLeast(0L)
+    }
+    return durationMs - positionMs <= min(60_000L, durationMs / 20)
 }
 
 interface EpisodeEndingCueStore {
