@@ -91,6 +91,8 @@ import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
 import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
+import eu.kanade.tachiyomi.ui.privacy.PrivacyMedia
+import eu.kanade.tachiyomi.ui.privacy.observeContentIncognito
 import eu.kanade.tachiyomi.ui.privacy.registerNsfwView
 import eu.kanade.tachiyomi.util.system.powerManager
 import eu.kanade.tachiyomi.util.system.toShareIntent
@@ -103,6 +105,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -318,11 +321,17 @@ class PlayerActivity : BaseActivity() {
         setContentView(binding.root)
         privacyDisplayController?.registerView(binding.player, PrivacyArea.VIDEO)
         privacyDisplayController?.registerNsfwView(binding.player, PrivacyArea.VIDEO) { viewModel.currentAnime.value }
-
         setupPlayerMPV()
         setupPlayerAudio()
         setupMediaSession()
         setupPlayerOrientation()
+
+        // Creating the view model reads native state, so bind only after MPV initialization.
+        privacyDisplayController?.observeContentIncognito(
+            PrivacyArea.VIDEO,
+            PrivacyMedia.VIDEO,
+            viewModel.currentAnime.map { it?.source },
+        )
 
         castController.state.distinctUntilChangedBy { it.active || it.connecting }.onEach { cast ->
             setupPlayerOrientation()

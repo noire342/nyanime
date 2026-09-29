@@ -67,6 +67,8 @@ import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
+import eu.kanade.tachiyomi.ui.privacy.PrivacyMedia
+import eu.kanade.tachiyomi.ui.privacy.observeContentIncognito
 import eu.kanade.tachiyomi.ui.privacy.registerNsfwView
 import eu.kanade.tachiyomi.ui.reader.ReaderViewModel.SetAsCoverResult.AddToLibraryFirst
 import eu.kanade.tachiyomi.ui.reader.ReaderViewModel.SetAsCoverResult.Error
@@ -174,6 +176,11 @@ class ReaderActivity : BaseActivity() {
             PrivacyArea.READER,
         )
         privacyDisplayController?.registerNsfwView(binding.viewerContainer, PrivacyArea.READER) { viewModel.manga }
+        privacyDisplayController?.observeContentIncognito(
+            PrivacyArea.READER,
+            PrivacyMedia.MANGA,
+            viewModel.state.map { it.manga?.source },
+        )
 
         if (viewModel.needsInit()) {
             val manga = intent.extras?.getLong("manga", -1) ?: -1L

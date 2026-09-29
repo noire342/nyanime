@@ -30,7 +30,7 @@ Lo sfondo del lettore manga resta configurabile indipendentemente.
 | **Cast con telecomando** | Trasmetti a Google Cast, UPnP/DLNA o alle app Nyanime TV compatibili e continua a usare l'app dal telefono, con controlli e ripresa locale. |
 | **Player curato** | Usa tracce audio e sottotitoli, gesti, PiP, AniSkip, timer di sospensione e passaggio al prossimo episodio. |
 | **Manga completo** | Mantieni libreria e lettore legacy, con Home opzionali, aggiornamenti dei capitoli e tutte le modalità di lettura. |
-| **Protezione laterale hardware (in verifica)** | Proteggi le aree personali sui display compatibili, con opzione NSFW basata sui metadati. Modalità abilitate soltanto dopo verifica fisica; [requisiti e APK di prova](docs/privacy-display.md). |
+| **Protezione laterale hardware** | Proteggi video, manga, schede e aree personali sui display compatibili. Comandi temporanei, modalità “Solo in incognito” e opzione NSFW basata sui metadati; [compatibilità e limiti](docs/privacy-display.md). |
 
 Il [sync tra dispositivi](docs/personal-sync.md), profili, amicizie, feed, chat e presenza social sono
 temporaneamente disattivati e non compaiono nell’app. Il codice e i dati locali

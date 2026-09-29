@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
+import eu.kanade.tachiyomi.ui.privacy.PrivacyDisplayPresentation
 import eu.kanade.tachiyomi.ui.privacy.PrivacyDisplayRuntime
 import nyanime.privacy.display.PrivacyDisplayCapability
 import nyanime.privacy.display.PrivacyDisplayState
@@ -18,26 +19,35 @@ import tachiyomi.presentation.core.i18n.stringResource
 fun PrivacySessionEntry(area: PrivacyArea, sessionDescription: String, horizontalPadding: Dp = 16.dp) {
     val controller = LocalContext.current.baseActivity()?.privacyDisplayController ?: return
     val state by controller.state.collectAsState()
-    val requestedAreas by controller.requestedAreas.collectAsState()
+    val policy by controller.configuration.collectAsState()
     val failure by PrivacyDisplayRuntime.failure.collectAsState()
     val capability = PrivacyDisplayRuntime.capability()
-    val available = capability == PrivacyDisplayCapability.Available
-    val subtitle = when {
-        failure != null -> privacyCapabilityDescription(capability)
-        !available -> privacyCapabilityDescription(capability)
-        state is PrivacyDisplayState.Unavailable ->
-            privacyCapabilityDescription(
-                PrivacyDisplayCapability.Unavailable((state as PrivacyDisplayState.Unavailable).reason),
-            )
-        state is PrivacyDisplayState.Applied -> stringResource(AYMR.strings.privacy_display_applied)
-        else -> sessionDescription
-    }
+    val presentation = PrivacyDisplayPresentation.from(policy, capability, state, area, failed = failure != null)
+    PrivacySessionControl(
+        presentation,
+        capability,
+        state,
+        sessionDescription,
+        onToggle = { controller.setTemporaryOverride(area, it) },
+        horizontalPadding = horizontalPadding,
+    )
+}
+
+@Composable
+internal fun PrivacySessionControl(
+    presentation: PrivacyDisplayPresentation,
+    capability: PrivacyDisplayCapability,
+    state: PrivacyDisplayState,
+    sessionDescription: String,
+    onToggle: (Boolean) -> Unit,
+    horizontalPadding: Dp = 16.dp,
+) {
     PrivacyToggleRow(
         title = stringResource(AYMR.strings.privacy_display_title),
-        subtitle = subtitle,
-        checked = area in requestedAreas,
-        enabled = available,
-        onToggle = { controller.setTemporaryOverride(area, it) },
+        subtitle = privacyStatusDescription(presentation, capability, state) + "\n" + sessionDescription,
+        checked = presentation.requested,
+        enabled = presentation.canToggle,
+        onToggle = onToggle,
         horizontalPadding = horizontalPadding,
     )
 }

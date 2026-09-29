@@ -22,6 +22,7 @@ import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.SubtitlePreferences
 import eu.kanade.tachiyomi.ui.privacy.PrivacyContentIndex
 import eu.kanade.tachiyomi.ui.privacy.PrivacyDisplayPreferences
+import eu.kanade.tachiyomi.ui.privacy.PrivacyIncognitoResolver
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.system.isDebugBuildType
 import tachiyomi.core.common.preference.AndroidPreferenceStore
@@ -60,6 +61,7 @@ class PreferenceModule(val app: Application) : InjektModule {
         }
         addSingletonFactory { PrivacyDisplayPreferences(get()) }
         addSingletonFactory { PrivacyContentIndex(get(), get()) }
+        addSingletonFactory { PrivacyIncognitoResolver(get(), get()) }
         addSingletonFactory {
             LibraryPreferences(get())
         }

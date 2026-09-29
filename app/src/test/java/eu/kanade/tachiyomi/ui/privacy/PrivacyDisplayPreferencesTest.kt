@@ -25,9 +25,11 @@ class PrivacyDisplayPreferencesTest {
     @Test fun optInDefaultsAndPortableSettingsRemainSeparateFromLocalEvidence() {
         val preferences = preferences()
         assertFalse(preferences.enabled().get())
+        assertFalse(preferences.onlyInIncognito().get())
         assertTrue(PrivacyArea.entries.filter { it != PrivacyArea.NSFW }.all { preferences.area(it).get() })
         assertFalse(preferences.area(PrivacyArea.NSFW).get())
         assertTrue(BackupPreferencePolicy.isPortable(preferences.enabled().key()))
+        assertTrue(BackupPreferencePolicy.isPortable(preferences.onlyInIncognito().key()))
         assertTrue(PrivacyArea.entries.all { BackupPreferencePolicy.isPortable(preferences.area(it).key()) })
         assertFalse(BackupPreferencePolicy.isPortable(preferences.everApplied().key()))
         assertFalse(BackupPreferencePolicy.isPortable(preferences.warningShown().key()))

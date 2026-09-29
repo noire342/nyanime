@@ -15,6 +15,11 @@ import eu.kanade.presentation.more.settings.widget.InfoWidget
 import eu.kanade.presentation.more.settings.widget.PreferenceGroupHeader
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
+import eu.kanade.tachiyomi.ui.privacy.PrivacyDisplayPolicy
+import eu.kanade.tachiyomi.ui.privacy.PrivacyDisplayPresentation
+import nyanime.privacy.display.PrivacyDisplayCapability
+import nyanime.privacy.display.PrivacyDisplayState
+import nyanime.privacy.display.PrivacyUnavailableReason
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.i18n.stringResource
 
@@ -55,6 +60,13 @@ private fun PrivacyPreview(available: Boolean, modern: Boolean, dark: Boolean) {
                     onToggle = {},
                 )
                 if (available) {
+                    PrivacyToggleRow(
+                        title = stringResource(AYMR.strings.privacy_display_only_incognito),
+                        subtitle = stringResource(AYMR.strings.privacy_display_only_incognito_summary),
+                        checked = false,
+                        enabled = true,
+                        onToggle = {},
+                    )
                     PrivacyArea.entries.forEach { area ->
                         PrivacyToggleRow(
                             title = privacyAreaTitle(area),
@@ -65,6 +77,40 @@ private fun PrivacyPreview(available: Boolean, modern: Boolean, dark: Boolean) {
                     }
                 }
                 InfoWidget(stringResource(AYMR.strings.privacy_display_summary))
+            }
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "PrivacyReaderIncognitoNarrow", widthDp = 280, heightDp = 520, fontScale = 1.5f, locale = "it")
+@Composable
+fun PrivacyReaderIncognitoPreview() = PrivacySessionPreview(true, true)
+
+@PreviewTest
+@Preview(name = "PrivacyReaderLegacyUnsupported", widthDp = 280, heightDp = 520, fontScale = 1.5f, locale = "it")
+@Composable
+fun PrivacyReaderUnsupportedPreview() = PrivacySessionPreview(false, false)
+
+@Composable
+private fun PrivacySessionPreview(available: Boolean, modern: Boolean) {
+    val capability = if (available) {
+        PrivacyDisplayCapability.Available
+    } else {
+        PrivacyDisplayCapability.Unavailable(PrivacyUnavailableReason.HARDWARE)
+    }
+    val state = PrivacyDisplayState.Disabled
+    val policy = PrivacyDisplayPolicy(available, setOf(PrivacyArea.READER), onlyInIncognito = true)
+    TachiyomiPreviewTheme(modernUi = modern, darkTheme = modern) {
+        Scaffold(topBar = { AppBar(title = "Lettore", navigateUp = {}) }) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+                PrivacySessionControl(
+                    PrivacyDisplayPresentation.from(policy, capability, state, PrivacyArea.READER),
+                    capability,
+                    state,
+                    stringResource(AYMR.strings.privacy_display_reader_session),
+                    onToggle = {},
+                )
             }
         }
     }

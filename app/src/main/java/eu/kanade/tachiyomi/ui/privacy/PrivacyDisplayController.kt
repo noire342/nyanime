@@ -9,10 +9,16 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import nyanime.privacy.display.AndroidPrivacyDisplayTarget
 import nyanime.privacy.display.PrivacyBounds
@@ -23,20 +29,24 @@ import nyanime.privacy.display.PrivacyRegion
 import nyanime.privacy.display.PrivacyUnavailableReason
 import nyanime.privacy.display.PrivacyViewGeometry
 import tachiyomi.core.common.i18n.stringResource
+import tachiyomi.core.common.preference.Preference
 import tachiyomi.i18n.aniyomi.AYMR
 
 /** Lifecycle/geometry bridge. It never touches the native player or its playback state. */
 class PrivacyDisplayController(
     private val activity: BaseActivity,
     private val preferences: PrivacyDisplayPreferences,
+    globalIncognito: Preference<Boolean>,
 ) : DefaultLifecycleObserver, ViewTreeObserver.OnPreDrawListener {
     private data class Declaration(
         val area: PrivacyArea,
         val scope: PrivacyArea,
+        val incognito: Boolean?,
         val rootView: () -> View,
         val boundsInWindow: () -> PrivacyBounds?,
     )
     private val declarations = linkedMapOf<Any, Declaration>()
+    private val contextJobs = mutableMapOf<PrivacyArea, Job>()
     private var host: View? = null
     private var observedTree: ViewTreeObserver? = null
     private var session: PrivacyDisplaySession<AndroidPrivacyDisplayTarget>? = null
@@ -46,18 +56,24 @@ class PrivacyDisplayController(
     private var policy = PrivacyDisplayPolicy(
         enabled = preferences.enabled().get(),
         selectedAreas = PrivacyArea.entries.filterTo(mutableSetOf()) { preferences.area(it).get() },
+        onlyInIncognito = preferences.onlyInIncognito().get(),
+        incognito = globalIncognito.get(),
     )
+    private val mutableConfiguration = MutableStateFlow(policy)
+    val configuration: StateFlow<PrivacyDisplayPolicy> = mutableConfiguration
     private val mutableState = MutableStateFlow<PrivacyDisplayState>(PrivacyDisplayState.Disabled)
     val state: StateFlow<PrivacyDisplayState> = mutableState
-    private val mutableRequestedAreas = MutableStateFlow(requestedAreasForPolicy())
-    val requestedAreas: StateFlow<Set<PrivacyArea>> = mutableRequestedAreas
-    private val mutableEnabledAreas = MutableStateFlow(enabledAreasForPolicy())
-    val enabledAreas: StateFlow<Set<PrivacyArea>> = mutableEnabledAreas
+    private val mutableEligibleAreas = MutableStateFlow(eligibleAreasForPolicy())
+    val eligibleAreas: StateFlow<Set<PrivacyArea>> = mutableEligibleAreas
 
     init {
         activity.lifecycle.addObserver(this)
         combine(
-            listOf(preferences.enabled().changes()) +
+            listOf(
+                preferences.enabled().changes(),
+                preferences.onlyInIncognito().changes(),
+                globalIncognito.changes(),
+            ) +
                 PrivacyArea.entries.map {
                     preferences.area(it).changes()
                 },
@@ -66,8 +82,14 @@ class PrivacyDisplayController(
         }.onEach { values ->
             policy = policy.copy(
                 enabled = values[0],
-                selectedAreas = PrivacyArea.entries.filterIndexed { index, _ -> values[index + 1] }.toSet(),
+                onlyInIncognito = values[1],
+                incognito = values[2],
+                selectedAreas = PrivacyArea.entries.filterIndexed { index, _ -> values[index + 3] }.toSet(),
             )
+            updatePolicyState()
+            reconcileListener()
+        }.launchIn(activity.lifecycleScope)
+        PrivacyDisplayRuntime.failure.onEach {
             updatePolicyState()
             reconcileListener()
         }.launchIn(activity.lifecycleScope)
@@ -80,16 +102,39 @@ class PrivacyDisplayController(
         reconcileListener()
     }
 
+    /** Context observations are dormant unless automatic incognito protection can use them. */
+    fun observeIncognito(scope: PrivacyArea, states: Flow<Boolean>) {
+        if (closed) return
+        contextJobs.remove(scope)?.cancel()
+        contextJobs[scope] = combine(configuration, PrivacyDisplayRuntime.failure) { config, _ ->
+            PrivacyDisplayRuntime.capability() == PrivacyDisplayCapability.Available &&
+                config.enabled &&
+                config.onlyInIncognito &&
+                config.temporaryOverrides[scope] == null &&
+                (config.canRequest(scope) || config.canRequest(PrivacyArea.NSFW, scope))
+        }.distinctUntilChanged().flatMapLatest { needed ->
+            if (needed) states.map<Boolean, Boolean?> { it } else flowOf(null)
+        }.onEach { incognito ->
+            val next = policy.withIncognitoContext(scope, incognito)
+            if (next != policy) {
+                policy = next
+                updatePolicyState()
+                reconcileListener()
+            }
+        }.launchIn(activity.lifecycleScope)
+    }
+
     /** Window-relative pixels; the controller alone translates them to display pixels. */
     fun register(
         key: Any,
         area: PrivacyArea,
         scope: PrivacyArea = area,
+        incognito: Boolean? = null,
         rootView: () -> View,
         boundsInWindow: () -> PrivacyBounds?,
     ) {
         if (closed) return
-        declarations[key] = Declaration(area, scope, rootView, boundsInWindow)
+        declarations[key] = Declaration(area, scope, incognito, rootView, boundsInWindow)
         reconcileListener()
     }
 
@@ -99,7 +144,7 @@ class PrivacyDisplayController(
     }
 
     fun registerView(view: View, area: PrivacyArea, scope: PrivacyArea = area, eligible: () -> Boolean = { true }) {
-        register(view to area, area, scope, { view.rootView }) {
+        register(view to area, area, scope, rootView = { view.rootView }) {
             if (eligible()) PrivacyViewGeometry.boundsInWindow(view) else null
         }
     }
@@ -123,22 +168,21 @@ class PrivacyDisplayController(
         target = null
         host = null
         declarations.clear()
+        contextJobs.values.forEach { it.cancel() }
+        contextJobs.clear()
         owner.lifecycle.removeObserver(this)
     }
 
-    private fun selected(declaration: Declaration) = policy.permits(declaration.area, declaration.scope)
+    private fun selected(declaration: Declaration) =
+        policy.permits(declaration.area, declaration.scope, declaration.incognito)
 
     private fun updatePolicyState() {
-        mutableRequestedAreas.value = requestedAreasForPolicy()
-        mutableEnabledAreas.value = enabledAreasForPolicy()
+        mutableConfiguration.value = policy
+        mutableEligibleAreas.value = eligibleAreasForPolicy()
     }
 
-    private fun requestedAreasForPolicy(): Set<PrivacyArea> = PrivacyArea.entries.filterTo(mutableSetOf()) {
-        policy.permits(it)
-    }
-
-    private fun enabledAreasForPolicy(): Set<PrivacyArea> = PrivacyArea.entries.filterTo(mutableSetOf()) {
-        policy.permits(it) && PrivacyDisplayRuntime.capability() == PrivacyDisplayCapability.Available
+    private fun eligibleAreasForPolicy(): Set<PrivacyArea> = PrivacyArea.entries.filterTo(mutableSetOf()) {
+        policy.canRequest(it) && PrivacyDisplayRuntime.capability() == PrivacyDisplayCapability.Available
     }
 
     private fun reconcileListener() {

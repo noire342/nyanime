@@ -618,7 +618,7 @@
     <string name="privacy_display_search">Ricerca</string>
     <string name="privacy_display_nsfw">Contenuti e fonti NSFW</string>
     <string name="privacy_display_no_hardware">Questo dispositivo non ha un display privacy compatibile.</string>
-    <string name="privacy_display_no_firmware">La protezione non è applicabile con il firmware attuale.</string>
+    <string name="privacy_display_no_firmware">La protezione non è disponibile con il sistema attuale.</string>
     <string name="privacy_display_no_display">Non disponibile sui display esterni.</string>
     <string name="privacy_display_no_window">Non disponibile in PiP, multifinestra e finestre aggiuntive.</string>
     <string name="privacy_display_available">Si applica automaticamente alle aree che scegli.</string>
@@ -627,4 +627,11 @@
     <string name="privacy_display_applied">Protezione richiesta. L’effetto dipende dal display.</string>
     <string name="privacy_display_player_session">Solo per questa riproduzione.</string>
     <string name="privacy_display_reader_session">Solo per questa sessione di lettura.</string>
+    <string name="privacy_display_only_incognito">Solo in incognito</string>
+    <string name="privacy_display_only_incognito_summary">Protegge automaticamente le aree selezionate soltanto durante l’incognito. Restano disponibili i comandi temporanei di player e lettore.</string>
+    <string name="privacy_display_disabled">Disattivata.</string>
+    <string name="privacy_display_waiting_incognito">Si attiverà nelle aree scelte durante l’incognito.</string>
+    <string name="privacy_display_waiting_area">In attesa di un’area selezionata.</string>
+    <string name="privacy_display_suspended">Temporaneamente sospesa. %s</string>
+    <string name="privacy_display_failed">Protezione non disponibile in questa sessione. L’app continua normalmente.</string>
 </resources>

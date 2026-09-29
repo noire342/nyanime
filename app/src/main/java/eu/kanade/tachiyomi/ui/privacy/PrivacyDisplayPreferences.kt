@@ -16,6 +16,7 @@ enum class PrivacyArea(val key: String) {
 
 class PrivacyDisplayPreferences(private val store: PreferenceStore) {
     fun enabled() = store.getBoolean("privacy_display_enabled", false)
+    fun onlyInIncognito() = store.getBoolean("privacy_display_only_incognito", false)
     fun area(area: PrivacyArea) = store.getBoolean("privacy_display_area_${area.key}", area != PrivacyArea.NSFW)
 
     // Installation state is excluded by the existing backup preference policy.

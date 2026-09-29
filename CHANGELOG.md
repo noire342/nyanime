@@ -8,6 +8,14 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 29 settembre 2026 — Protezione laterale integrata
+
+- Compatibilità rilevata dall’hardware e dalle API, senza vincolo sul firmware esatto.
+- Protezione selezionabile per le schede dei titoli, con copertina, descrizione ed episodi o capitoli.
+- Comando temporaneo nel lettore manga, condiviso con quello del player.
+- Opzione “Solo in incognito” per le aree scelte, rispettando anche l’incognito della fonte corrente.
+- Stato più chiaro nelle impostazioni e nei comandi della sessione: attesa, richiesta, sospensione ed errore.
+
 ## 29 settembre 2026 — Manga in altre lingue visibili inizialmente
 
 - “Mostra manga in altre lingue” è ora attivo di default per chi non ha ancora

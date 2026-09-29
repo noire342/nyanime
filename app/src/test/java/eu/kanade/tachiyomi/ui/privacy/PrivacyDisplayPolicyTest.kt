@@ -5,6 +5,52 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class PrivacyDisplayPolicyTest {
+    @Test fun incognitoModeRequiresMasterAndKeepsAreaSelection() {
+        val policy = PrivacyDisplayPolicy(
+            true,
+            setOf(PrivacyArea.READER),
+            onlyInIncognito = true,
+        )
+        assertTrue(policy.canRequest(PrivacyArea.READER))
+        assertFalse(policy.permits(PrivacyArea.READER))
+        assertTrue(policy.copy(incognito = true).permits(PrivacyArea.READER))
+        assertFalse(policy.copy(incognito = true).permits(PrivacyArea.VIDEO))
+        assertFalse(policy.copy(enabled = false, incognito = true).permits(PrivacyArea.READER))
+    }
+
+    @Test fun contentIncognitoDoesNotProtectUnrelatedMixedScreenRegions() {
+        val policy = PrivacyDisplayPolicy(true, PrivacyArea.entries.toSet(), onlyInIncognito = true)
+        assertTrue(policy.permits(PrivacyArea.DETAILS, incognitoContext = true))
+        assertFalse(policy.permits(PrivacyArea.LIBRARY))
+        assertFalse(policy.permits(PrivacyArea.DETAILS, incognitoContext = false))
+        val privateReader = policy.withIncognitoContext(PrivacyArea.READER, true)
+        assertTrue(privateReader.permits(PrivacyArea.READER))
+        assertTrue(privateReader.permits(PrivacyArea.NSFW, PrivacyArea.READER))
+        assertFalse(privateReader.permits(PrivacyArea.VIDEO))
+        assertFalse(privateReader.withIncognitoContext(PrivacyArea.READER, null).permits(PrivacyArea.READER))
+    }
+
+    @Test fun temporaryChoiceOverridesIncognitoButDoesNotPersistOrLeakToAnotherScope() {
+        val policy = PrivacyDisplayPolicy(true, PrivacyArea.entries.toSet(), onlyInIncognito = true)
+        val manual = policy.withTemporaryOverride(PrivacyArea.READER, true)
+        assertTrue(manual.permits(PrivacyArea.READER))
+        assertFalse(manual.permits(PrivacyArea.VIDEO))
+        val off = manual.copy(incognito = true).withTemporaryOverride(PrivacyArea.READER, false)
+        assertFalse(off.permits(PrivacyArea.READER))
+        assertFalse(off.permits(PrivacyArea.NSFW, PrivacyArea.READER))
+        assertTrue(off.permits(PrivacyArea.VIDEO))
+        assertFalse(manual.withTemporaryOverride(PrivacyArea.READER, null).permits(PrivacyArea.READER))
+        assertTrue(
+            policy.copy(enabled = false).withTemporaryOverride(PrivacyArea.READER, true).permits(PrivacyArea.READER),
+        )
+    }
+
+    @Test fun ordinaryModeIgnoresIncognitoContext() {
+        val policy = PrivacyDisplayPolicy(true, setOf(PrivacyArea.DETAILS))
+        assertTrue(policy.permits(PrivacyArea.DETAILS, incognitoContext = false))
+        assertTrue(policy.permits(PrivacyArea.DETAILS, incognitoContext = true))
+    }
+
     @Test fun detailsAndLibrariesCanBeSelectedIndependently() {
         val policy = PrivacyDisplayPolicy(true, setOf(PrivacyArea.DETAILS))
         assertTrue(policy.permits(PrivacyArea.DETAILS))

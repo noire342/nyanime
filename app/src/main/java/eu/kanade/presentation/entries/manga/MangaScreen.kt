@@ -62,8 +62,8 @@ import eu.kanade.presentation.entries.manga.components.MangaActionRow
 import eu.kanade.presentation.entries.manga.components.MangaAnimeContinuityCard
 import eu.kanade.presentation.entries.manga.components.MangaChapterListItem
 import eu.kanade.presentation.entries.manga.components.MangaInfoBox
+import eu.kanade.presentation.privacy.contentPrivacyRegion
 import eu.kanade.presentation.privacy.nsfwPrivacy
-import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.util.formatChapterNumber
 import eu.kanade.tachiyomi.data.download.manga.model.MangaDownload
 import eu.kanade.tachiyomi.data.track.MangaAnimeContinuity
@@ -306,7 +306,7 @@ private fun MangaScreenSmallImpl(
     })
 
     Scaffold(
-        modifier = Modifier.privacyRegion(PrivacyArea.DETAILS).nsfwPrivacy(state.manga),
+        modifier = Modifier.contentPrivacyRegion(PrivacyArea.DETAILS, state.manga).nsfwPrivacy(state.manga),
         topBar = {
             val selectedChapterCount: Int = remember(chapters) {
                 chapters.count { it.selected }
@@ -578,7 +578,7 @@ fun MangaScreenLargeImpl(
     })
 
     Scaffold(
-        modifier = Modifier.privacyRegion(PrivacyArea.DETAILS).nsfwPrivacy(state.manga),
+        modifier = Modifier.contentPrivacyRegion(PrivacyArea.DETAILS, state.manga).nsfwPrivacy(state.manga),
         topBar = {
             val selectedChapterCount = remember(chapters) {
                 chapters.count { it.selected }
