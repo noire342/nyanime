@@ -203,7 +203,11 @@ internal class AnimeScheduleRepository(private val db: AnimeDatabaseHandler = In
             val body = if (cached != null && now - cached.fetched_at in 0 until ttl) {
                 cached.payload
             } else {
-                val fetched = client.timetable(year, week)
+                val fetched = client.timetable(
+                    year,
+                    week,
+                    allowUnavailable = ScheduleParser.week(now) != (year to week),
+                )
                 db.await { scheduleQueries.saveWeek(key, fetched, now) }
                 fetched
             }

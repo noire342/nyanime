@@ -128,6 +128,25 @@ class AnimeScheduleClientTest {
         }
     }
 
+    @Test fun anUnpublishedWeekIsAnEmptyScheduleWithoutAnImmediateRetry() {
+        withApi(MockResponse.Builder().code(404).build()) { api, server ->
+            val body = runBlocking { api.timetable(2027, 5, allowUnavailable = true) }
+            assertTrue(ScheduleParser.timetable(body).isEmpty())
+            assertEquals(1, server.requestCount)
+        }
+    }
+
+    @Test fun anUnpublishedWeekCannotHideAnAuthenticationOrServerFailure() {
+        for ((status, reason) in listOf(401 to "AUTH", 403 to "AUTH", 500 to "SERVER")) {
+            withApi(MockResponse.Builder().code(status).build()) { api, _ ->
+                val error = assertThrows(AnimeScheduleException::class.java) {
+                    runBlocking { api.timetable(2027, 5, allowUnavailable = true) }
+                }
+                assertEquals(reason, error.reason)
+            }
+        }
+    }
+
     @Test fun malformedDataIsNotReportedAsAnUnreachableService() {
         withApi(body("{\"unexpected\":true}")) { api, _ ->
             val error = assertThrows(IllegalStateException::class.java) { runBlocking { api.timetable(2026, 40) } }

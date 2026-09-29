@@ -35,9 +35,10 @@ internal class AnimeScheduleClient(
     private val mutex = Mutex()
     private var nextRequestAt = 0L
 
-    suspend fun timetable(year: Int, week: Int): String = request(
+    suspend fun timetable(year: Int, week: Int, allowUnavailable: Boolean = false): String = request(
         "timetables/all",
         listOf("year" to "$year", "week" to "$week", "tz" to "UTC"),
+        allowUnavailable,
     ).also { ScheduleParser.timetable(it) }
 
     suspend fun detail(route: String): JsonObject {
@@ -70,7 +71,11 @@ internal class AnimeScheduleClient(
         return matches.distinctBy { ScheduleParser.text(it, "route") }.singleOrNull()
     }
 
-    private suspend fun request(path: String, parameters: List<Pair<String, String>>): String = mutex.withLock {
+    private suspend fun request(
+        path: String,
+        parameters: List<Pair<String, String>>,
+        allowUnavailableTimetable: Boolean = false,
+    ): String = mutex.withLock {
         val now = System.currentTimeMillis()
         if (nextRequestAt - now > 5_000) throw AnimeScheduleException("RATE_LIMIT", nextRequestAt)
         if (nextRequestAt > now) delay(nextRequestAt - now)
@@ -94,8 +99,13 @@ internal class AnimeScheduleClient(
                     nextRequestAt = maxOf(nextRequestAt, reset ?: (System.currentTimeMillis() + 60_000))
                     throw AnimeScheduleException("RATE_LIMIT", nextRequestAt, response.code)
                 }
-                404 -> if (path == "anime" || path.startsWith("anime/")) {
-                    throw AnimeScheduleException("IDENTITY", status = response.code)
+                404 -> {
+                    // Unpublished weeks return an empty 404, even with a valid application token.
+                    // Connection checks and the current week remain strict to catch an endpoint failure.
+                    if (path == "timetables/all" && allowUnavailableTimetable) return@use "[]"
+                    if (path == "anime" || path.startsWith("anime/")) {
+                        throw AnimeScheduleException("IDENTITY", status = response.code)
+                    }
                 }
             }
             if (!response.isSuccessful) throw AnimeScheduleException("SERVER", status = response.code)

@@ -71,6 +71,12 @@ Una risposta 404 al filtro per ID indica un titolo assente dal catalogo, non un
 servizio irraggiungibile. In quel caso si conserva il catalogo abituale. Problemi
 di rete, servizio o formato dei dati sono segnalati separatamente.
 
+Il servizio restituisce 404 anche per settimane non ancora pubblicate. Fuori dalla
+settimana corrente, queste risposte vengono conservate come orari assenti nella
+cache condivisa: non cancellano le date del catalogo abituale. La settimana corrente
+e la verifica iniziale del collegamento restano rigorose; errori di autenticazione,
+limiti e guasti del server non sono convertiti in calendari vuoti.
+
 La tempestività delle notifiche dipende dai permessi Android, dalla disponibilità
 dei dati e della rete. Per gli orari annunciati si usa il sistema dei promemoria
 esistente; **Stato delle uscite** permette di verificare notifiche e allarmi.
