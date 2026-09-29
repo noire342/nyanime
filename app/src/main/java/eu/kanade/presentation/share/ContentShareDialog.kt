@@ -16,6 +16,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -155,7 +156,6 @@ class ContentShareDialog : BottomSheetDialogFragment() {
 
 @Composable
 private fun ContentSharePanel(link: ContentLink, onSend: (ContentLink, Boolean) -> Unit) {
-    val motionEnabled = modernMotionEnabled()
     val choices = buildList {
         add(link.entryOnly() to stringResource(AYMR.strings.content_share_entry))
         if (link.itemUrl != null) {
@@ -178,71 +178,121 @@ private fun ContentSharePanel(link: ContentLink, onSend: (ContentLink, Boolean) 
         }
     }
     var selected by rememberSaveable { mutableIntStateOf(choices.lastIndex) }
-    Column(
-        modifier = Modifier.fillMaxWidth()
-            .navigationBarsPadding().padding(horizontal = 24.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Box(
-            Modifier.align(Alignment.CenterHorizontally).size(width = 36.dp, height = 4.dp)
-                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(2.dp)),
-        )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val compact = maxWidth >= 480.dp && maxHeight <= 480.dp
         Column(
-            modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxWidth()
+                .navigationBarsPadding().padding(horizontal = 24.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(stringResource(AYMR.strings.content_share_title), style = MaterialTheme.typography.headlineSmall)
-            Text(
-                link.title,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis,
+            Box(
+                Modifier.align(Alignment.CenterHorizontally).size(width = 36.dp, height = 4.dp)
+                    .background(
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                        RoundedCornerShape(2.dp),
+                    ),
             )
-            link.itemTitle?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (compact) {
+                Row(
+                    Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    ShareInformation(link, true, Modifier.weight(1f))
+                    ShareChoices(choices, selected, { selected = it }, Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ShareAction(choices[selected].first, false, onSend, Modifier.weight(1f))
+                    ShareAction(choices[selected].first, true, onSend, Modifier.weight(1f))
+                }
+            } else {
+                Column(
+                    Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    ShareInformation(link, false)
+                    ShareChoices(choices, selected, { selected = it })
+                }
+                ShareAction(choices[selected].first, false, onSend, Modifier.fillMaxWidth())
+                ShareAction(choices[selected].first, true, onSend, Modifier.fillMaxWidth())
             }
-            Text(
-                stringResource(AYMR.strings.content_share_help),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        }
+    }
+}
+
+@Composable
+private fun ShareInformation(link: ContentLink, compact: Boolean, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            stringResource(AYMR.strings.content_share_title),
+            style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
+        )
+        Text(
+            link.title,
+            style = MaterialTheme.typography.titleLarge,
+            maxLines = if (compact) 3 else 4,
+            overflow = TextOverflow.Ellipsis,
+        )
+        link.itemTitle?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Text(
+            stringResource(AYMR.strings.content_share_help),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ShareChoices(
+    choices: List<Pair<ContentLink, String>>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val motionEnabled = modernMotionEnabled()
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        choices.forEachIndexed { index, (_, label) ->
+            val color by animateColorAsState(
+                if (index == selected) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainer
+                },
+                animationSpec = if (motionEnabled) tween(ModernMotion.RESIZE_MILLIS) else snap(),
+                label = "shareChoice",
             )
-            choices.forEachIndexed { index, (_, label) ->
-                val color by animateColorAsState(
-                    if (index ==
-                        selected
-                    ) {
-                        MaterialTheme.colorScheme.secondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainer
-                    },
-                    animationSpec = if (motionEnabled) tween(ModernMotion.RESIZE_MILLIS) else snap(),
-                    label = "shareChoice",
-                )
-                Surface(shape = MaterialTheme.shapes.large, color = color) {
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .selectable(index == selected, role = Role.RadioButton) { selected = index }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        RadioButton(index == selected, onClick = null)
-                        Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    }
+            Surface(shape = MaterialTheme.shapes.large, color = color) {
+                Row(
+                    Modifier.fillMaxWidth().selectable(index == selected, role = Role.RadioButton) { onSelect(index) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    RadioButton(index == selected, onClick = null)
+                    Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 }
             }
         }
-        Button(onClick = { onSend(choices[selected].first, false) }, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Outlined.Share, contentDescription = null)
-            Text(stringResource(AYMR.strings.content_share_send), Modifier.padding(start = 8.dp))
-        }
-        OutlinedButton(onClick = { onSend(choices[selected].first, true) }, modifier = Modifier.fillMaxWidth()) {
+    }
+}
+
+@Composable
+private fun ShareAction(
+    link: ContentLink,
+    copy: Boolean,
+    onSend: (ContentLink, Boolean) -> Unit,
+    modifier: Modifier,
+) {
+    if (copy) {
+        OutlinedButton(onClick = { onSend(link, true) }, modifier = modifier) {
             Icon(Icons.Outlined.ContentCopy, contentDescription = null)
             Text(stringResource(AYMR.strings.content_share_copy), Modifier.padding(start = 8.dp))
+        }
+    } else {
+        Button(onClick = { onSend(link, false) }, modifier = modifier) {
+            Icon(Icons.Outlined.Share, contentDescription = null)
+            Text(stringResource(AYMR.strings.content_share_send), Modifier.padding(start = 8.dp))
         }
     }
 }

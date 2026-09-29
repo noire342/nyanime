@@ -15,7 +15,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 - Un unico pannello per schede, episodi e capitoli: scelta tra titolo, inizio
   dell’episodio/capitolo, minuto del player o pagina del lettore.
 - Pulsanti Condividi/Copia sempre raggiungibili anche nel player orizzontale;
-  il contenuto del pannello scorre senza nascondere le azioni.
+  disposizione compatta a due colonne sugli schermi larghi e bassi, con tutte
+  le destinazioni subito visibili e contenuto scorrevole per i testi grandi.
 - Aprire un episodio condiviso durante un’altra riproduzione attende il rilascio
   effettivo del vecchio player, evitando due inizializzazioni native sovrapposte.
 - Azione di condivisione anche selezionando un singolo episodio o capitolo;
