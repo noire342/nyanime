@@ -5,6 +5,25 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class PrivacyDisplayPolicyTest {
+    @Test fun detailsAndLibrariesCanBeSelectedIndependently() {
+        val policy = PrivacyDisplayPolicy(true, setOf(PrivacyArea.DETAILS))
+        assertTrue(policy.permits(PrivacyArea.DETAILS))
+        assertFalse(policy.permits(PrivacyArea.LIBRARY))
+        assertFalse(policy.permits(PrivacyArea.NSFW, PrivacyArea.DETAILS))
+    }
+
+    @Test fun readerOverrideCoversNsfwAndCanReturnToAutomaticWithoutPersisting() {
+        val policy = PrivacyDisplayPolicy(true, PrivacyArea.entries.toSet())
+        val disabled = policy.withTemporaryOverride(PrivacyArea.READER, false)
+        assertFalse(disabled.permits(PrivacyArea.READER))
+        assertFalse(disabled.permits(PrivacyArea.NSFW, PrivacyArea.READER))
+        assertTrue(disabled.permits(PrivacyArea.VIDEO))
+        assertTrue(disabled.withTemporaryOverride(PrivacyArea.READER, null).permits(PrivacyArea.READER))
+        val masterOff = policy.copy(enabled = false)
+        assertTrue(masterOff.withTemporaryOverride(PrivacyArea.READER, true).permits(PrivacyArea.READER))
+        assertFalse(masterOff.permits(PrivacyArea.READER))
+    }
+
     @Test fun libraryProtectionAndNsfwProtectionRemainIndependent() {
         val libraries = PrivacyDisplayPolicy(true, setOf(PrivacyArea.LIBRARY))
         assertTrue(libraries.permits(PrivacyArea.LIBRARY))

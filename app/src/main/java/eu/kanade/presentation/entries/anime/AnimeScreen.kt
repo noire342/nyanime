@@ -77,6 +77,7 @@ import eu.kanade.presentation.entries.components.EntryToolbar
 import eu.kanade.presentation.entries.components.ItemHeader
 import eu.kanade.presentation.entries.components.MissingItemCountListItem
 import eu.kanade.presentation.privacy.nsfwPrivacy
+import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.util.formatEpisodeNumber
 import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
 import eu.kanade.tachiyomi.animesource.model.FetchType
@@ -88,6 +89,7 @@ import eu.kanade.tachiyomi.ui.browse.anime.extension.details.AnimeSourcePreferen
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreenModel
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeSeasonItem
 import eu.kanade.tachiyomi.ui.entries.anime.EpisodeList
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import eu.kanade.tachiyomi.util.system.copyToClipboard
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.manga.model.Manga
@@ -386,7 +388,7 @@ private fun AnimeScreenSmallImpl(
         val density = LocalDensity.current
         val containerHeightPx = with(density) { this@BoxWithConstraints.maxHeight.roundToPx() }
         Scaffold(
-            modifier = Modifier.nsfwPrivacy(state.anime),
+            modifier = Modifier.privacyRegion(PrivacyArea.DETAILS).nsfwPrivacy(state.anime),
             topBar = {
                 val selectedEpisodeCount: Int = remember(episodes) {
                     episodes.count { it.selected }
@@ -778,7 +780,7 @@ fun AnimeScreenLargeImpl(
         val density = LocalDensity.current
         val containerHeightPx = with(density) { this@BoxWithConstraints.maxHeight.roundToPx() }
         Scaffold(
-            modifier = Modifier.nsfwPrivacy(state.anime),
+            modifier = Modifier.privacyRegion(PrivacyArea.DETAILS).nsfwPrivacy(state.anime),
             topBar = {
                 val selectedChapterCount = remember(episodes) {
                     episodes.count { it.selected }

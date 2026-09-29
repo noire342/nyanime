@@ -32,8 +32,8 @@ private fun Modifier.contentPrivacy(
     ) {
         return@composed this
     }
-    val enabled by controller.nsfwEnabled.collectAsState()
-    if (!enabled) return@composed this
+    val enabledAreas by controller.enabledAreas.collectAsState()
+    if (PrivacyArea.NSFW !in enabledAreas) return@composed this
     val index = remember { Injekt.get<PrivacyContentIndex>() }
     val ratings by index.ratings.collectAsState()
     this.privacyRegion(PrivacyArea.NSFW, enabled = classified(index, ratings))

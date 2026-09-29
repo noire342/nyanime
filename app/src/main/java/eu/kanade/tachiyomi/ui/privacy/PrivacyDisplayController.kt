@@ -49,10 +49,8 @@ class PrivacyDisplayController(
     )
     private val mutableState = MutableStateFlow<PrivacyDisplayState>(PrivacyDisplayState.Disabled)
     val state: StateFlow<PrivacyDisplayState> = mutableState
-    private val mutableVideoEnabled = MutableStateFlow(policy.permits(PrivacyArea.VIDEO))
-    val videoEnabled: StateFlow<Boolean> = mutableVideoEnabled
-    private val mutableNsfwEnabled = MutableStateFlow(policy.permits(PrivacyArea.NSFW))
-    val nsfwEnabled: StateFlow<Boolean> = mutableNsfwEnabled
+    private val mutableRequestedAreas = MutableStateFlow(requestedAreasForPolicy())
+    val requestedAreas: StateFlow<Set<PrivacyArea>> = mutableRequestedAreas
     private val mutableEnabledAreas = MutableStateFlow(enabledAreasForPolicy())
     val enabledAreas: StateFlow<Set<PrivacyArea>> = mutableEnabledAreas
 
@@ -70,14 +68,15 @@ class PrivacyDisplayController(
                 enabled = values[0],
                 selectedAreas = PrivacyArea.entries.filterIndexed { index, _ -> values[index + 1] }.toSet(),
             )
-            updateVideoPreference()
+            updatePolicyState()
             reconcileListener()
         }.launchIn(activity.lifecycleScope)
     }
 
-    fun setVideoOverride(enabled: Boolean) {
-        policy = policy.copy(temporaryOverrides = policy.temporaryOverrides + (PrivacyArea.VIDEO to enabled))
-        updateVideoPreference()
+    fun setTemporaryOverride(scope: PrivacyArea, enabled: Boolean?) {
+        if (closed) return
+        policy = policy.withTemporaryOverride(scope, enabled)
+        updatePolicyState()
         reconcileListener()
     }
 
@@ -129,10 +128,13 @@ class PrivacyDisplayController(
 
     private fun selected(declaration: Declaration) = policy.permits(declaration.area, declaration.scope)
 
-    private fun updateVideoPreference() {
-        mutableVideoEnabled.value = policy.permits(PrivacyArea.VIDEO)
-        mutableNsfwEnabled.value = policy.permits(PrivacyArea.NSFW)
+    private fun updatePolicyState() {
+        mutableRequestedAreas.value = requestedAreasForPolicy()
         mutableEnabledAreas.value = enabledAreasForPolicy()
+    }
+
+    private fun requestedAreasForPolicy(): Set<PrivacyArea> = PrivacyArea.entries.filterTo(mutableSetOf()) {
+        policy.permits(it)
     }
 
     private fun enabledAreasForPolicy(): Set<PrivacyArea> = PrivacyArea.entries.filterTo(mutableSetOf()) {
@@ -225,7 +227,7 @@ class PrivacyDisplayController(
         }
         if (next is PrivacyDisplayState.Failed) {
             PrivacyDisplayRuntime.recordFailure(next)
-            updateVideoPreference()
+            updatePolicyState()
             detachListener()
         }
     }

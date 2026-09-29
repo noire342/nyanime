@@ -6,9 +6,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import eu.kanade.presentation.privacy.PrivacySessionEntry
+import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderSettingsScreenModel
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.CheckboxItem
 import tachiyomi.presentation.core.components.SettingsChipRow
 import tachiyomi.presentation.core.components.SliderItem
@@ -53,6 +56,11 @@ internal fun ColumnScope.GeneralPage(screenModel: ReaderSettingsScreenModel) {
             )
         }
     }
+
+    PrivacySessionEntry(
+        area = PrivacyArea.READER,
+        sessionDescription = stringResource(AYMR.strings.privacy_display_reader_session),
+    )
 
     CheckboxItem(
         label = stringResource(MR.strings.pref_show_page_number),

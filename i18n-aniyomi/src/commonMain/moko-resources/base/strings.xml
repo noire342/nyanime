@@ -702,6 +702,7 @@
     <string name="privacy_display_enable">Use side-view protection</string>
     <string name="privacy_display_video">Video and subtitles</string>
     <string name="privacy_display_reader">Manga reader</string>
+    <string name="privacy_display_details">Title details</string>
     <string name="privacy_display_library">Anime and manga libraries</string>
     <string name="privacy_display_history">History</string>
     <string name="privacy_display_resume">Continue watching and reading</string>
@@ -714,6 +715,7 @@
     <string name="privacy_display_available">Automatically applies to the areas you choose.</string>
     <string name="privacy_display_summary">Limits side viewing on supported hardware. The effect depends on angle and brightness. Screenshot protection is a separate setting.</string>
     <string name="privacy_display_interrupted">Side-view protection is not applied. Playback and reading will continue. Check Security settings for its status.</string>
-    <string name="privacy_display_applied">Requested on the video area. Effect depends on the display.</string>
+    <string name="privacy_display_applied">Protection requested. Effect depends on the display.</string>
     <string name="privacy_display_player_session">For this playback session only.</string>
+    <string name="privacy_display_reader_session">For this reading session only.</string>
 </resources>
