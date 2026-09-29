@@ -248,7 +248,7 @@ data object DiscoveryTab : Tab {
                         SectionHeader("Continua a guardare") { navigator.push(HistoriesTab) }
                         ContinueWatchingRow(state.resume, { navigator.push(AnimeScreen(it)) }) { item ->
                             scope.launch {
-                                context.playDiscoveryEpisode(item.episode)
+                                context.playDiscoveryEpisode(item.episode, item.forcedStartPositionMs)
                             }
                         }
                         if (state.resume.data?.isEmpty() == true) {

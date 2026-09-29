@@ -217,7 +217,11 @@ private fun DiscoveryTab.SourceHomeReadyContent(
                         state.resume,
                         onOpen = { navigator.push(AnimeScreen(it)) },
                         emptyMessage = "I titoli che guardi in questa Home compariranno qui.",
-                    ) { item -> scope.launch { context.playDiscoveryEpisode(item.episode) } }
+                    ) { item ->
+                        scope.launch {
+                            context.playDiscoveryEpisode(item.episode, item.forcedStartPositionMs)
+                        }
+                    }
                 }
                 if (state.updates.data?.isNotEmpty() == true) {
                     item(key = "updates:" + source.id) {

@@ -683,6 +683,7 @@ class MainActivity : BaseActivity() {
             hosterIndex: Int = -1,
             videoIndex: Int = -1,
             hosterList: List<Hoster>? = null,
+            startPositionMs: Long? = null,
         ) {
             if (extPlayer) {
                 val sourceId = sourceId ?: (Injekt.get<GetAnime>().await(animeId)?.source ?: -1L)
@@ -700,6 +701,9 @@ class MainActivity : BaseActivity() {
                     withUIContext { Injekt.get<Application>().toast(e.message) }
                     null
                 } ?: return
+                startPositionMs?.takeIf { it >= 0 }?.let {
+                    intent.putExtra("position", it.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                }
                 externalPlayerResult?.launch(intent) ?: return
             } else {
                 context.startActivity(
@@ -710,6 +714,7 @@ class MainActivity : BaseActivity() {
                         hosterList,
                         hosterIndex,
                         videoIndex,
+                        startPositionMs,
                     ),
                 )
             }

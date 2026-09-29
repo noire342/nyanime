@@ -17,7 +17,13 @@ class BackupPayloadRoundTripTest {
     @Test fun olderPayloadWithoutNewOptionalFieldsStillDecodes() {
         val olderPayload = Backup(
             isLegacy = false,
-            backupAnime = listOf(BackupAnime(source = 42, url = "/older/show")),
+            backupAnime = listOf(
+                BackupAnime(
+                    source = 42,
+                    url = "/older/show",
+                    episodes = listOf(BackupEpisode(url = "/older/episode", name = "Episode")),
+                ),
+            ),
         )
 
         val decoded = ProtoBuf.decodeFromByteArray(
@@ -26,6 +32,7 @@ class BackupPayloadRoundTripTest {
         )
 
         assertEquals("/older/show", decoded.backupAnime.single().url)
+        assertEquals(0L, decoded.backupAnime.single().episodes.single().endingDurationMs)
         assertNull(decoded.backupHiddenResume)
     }
 
@@ -42,8 +49,11 @@ class BackupPayloadRoundTripTest {
                         BackupEpisode(
                             url = "/show/one/episode/2",
                             name = "Episode 2",
-                            lastSecondSeen = 812,
-                            totalSeconds = 1440,
+                            lastSecondSeen = 812_000,
+                            totalSeconds = 1_440_000,
+                            endingStartMs = 1_200_000,
+                            endingEndMs = 1_300_000,
+                            endingDurationMs = 1_440_000,
                         ),
                     ),
                 ),
@@ -69,8 +79,9 @@ class BackupPayloadRoundTripTest {
         assertFalse(restored.isLegacy)
         assertEquals(42L, restored.backupAnime.single().source)
         assertEquals("https://example.invalid/background.jpg", restored.backupAnime.single().backgroundUrl)
-        assertEquals(812L, restored.backupAnime.single().episodes.single().lastSecondSeen)
-        assertEquals(1440L, restored.backupAnime.single().episodes.single().totalSeconds)
+        assertEquals(812_000L, restored.backupAnime.single().episodes.single().lastSecondSeen)
+        assertEquals(1_440_000L, restored.backupAnime.single().episodes.single().totalSeconds)
+        assertEquals(1_300_000L, restored.backupAnime.single().episodes.single().endingEndMs)
         assertEquals(73L, restored.backupManga.single().source)
         assertEquals(17L, restored.backupManga.single().chapters.single().lastPageRead)
         assertEquals("/show/one", restored.backupHiddenResume?.entries?.single()?.url)

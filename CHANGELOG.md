@@ -8,6 +8,14 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 29 settembre 2026 — Ripresa intelligente degli episodi
+
+- “Continua a guardare” propone il prossimo episodio quando restano pochi secondi
+  oppure la riproduzione è quasi al termine dei titoli di coda riconosciuti.
+- Il finale resta accessibile dalla scheda di ripresa; il suggerimento non anticipa
+  lo stato “visto” o il tracking. I marker finali sono conservati nel backup.
+- Home, scheda, libreria e cronologia condividono la scelta dell'episodio da riprendere.
+
 ## 29 settembre 2026 — Manga unificati e cambio fonte
 
 - Riconoscimento delle fonti alternative tramite ID pubblici, condiviso tra

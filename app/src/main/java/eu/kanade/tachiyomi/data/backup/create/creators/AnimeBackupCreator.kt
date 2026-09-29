@@ -6,6 +6,7 @@ import eu.kanade.tachiyomi.data.backup.models.BackupAnimeHistory
 import eu.kanade.tachiyomi.data.backup.models.BackupEpisode
 import eu.kanade.tachiyomi.data.backup.models.backupAnimeTrackMapper
 import eu.kanade.tachiyomi.data.backup.models.backupEpisodeMapper
+import eu.kanade.tachiyomi.data.discovery.EpisodeEndingCueStore
 import tachiyomi.data.MemoColumnAdapter
 import tachiyomi.data.handlers.anime.AnimeDatabaseHandler
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
@@ -18,6 +19,7 @@ class AnimeBackupCreator(
     private val handler: AnimeDatabaseHandler = Injekt.get(),
     private val getCategories: GetAnimeCategories = Injekt.get(),
     private val getHistory: GetAnimeHistory = Injekt.get(),
+    private val endingCues: EpisodeEndingCueStore = Injekt.get(),
 ) {
 
     suspend operator fun invoke(animes: List<Anime>, options: BackupOptions): List<BackupAnime> {
@@ -32,12 +34,20 @@ class AnimeBackupCreator(
 
         if (options.chapters) {
             // Backup all the episodes
+            val cues = endingCues.forAnime(anime.id)
             handler.awaitList {
                 episodesQueries.getEpisodesByAnimeId(
                     animeId = anime.id,
                     mapper = backupEpisodeMapper,
                 )
             }
+                .onEach { episode ->
+                    cues[episode.url]?.let { cue ->
+                        episode.endingStartMs = cue.startMs
+                        episode.endingEndMs = cue.endMs
+                        episode.endingDurationMs = cue.durationMs
+                    }
+                }
                 .takeUnless(List<BackupEpisode>::isEmpty)
                 ?.let { animeObject.episodes = it }
         }

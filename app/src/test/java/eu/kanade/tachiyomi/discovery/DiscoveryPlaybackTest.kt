@@ -2,6 +2,9 @@ package eu.kanade.tachiyomi.discovery
 
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.tachiyomi.data.discovery.DiscoveryPlaybackService
+import eu.kanade.tachiyomi.data.discovery.EpisodeEndingCue
+import eu.kanade.tachiyomi.data.discovery.EpisodeEndingCueStore
+import eu.kanade.tachiyomi.data.discovery.ResumeEpisodeSelector
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import io.mockk.coEvery
 import io.mockk.every
@@ -45,7 +48,9 @@ class DiscoveryPlaybackTest {
     private val downloads = mockk<AnimeDownloadManager>()
     private val base = mockk<BasePreferences>()
     private val next = GetNextEpisodes(episodes, getAnime, mockk<AnimeHistoryRepository>())
-    private val service = DiscoveryPlaybackService(history, next, downloads, base)
+    private val cues = mockk<EpisodeEndingCueStore>()
+    private val selector = ResumeEpisodeSelector(next, history, cues)
+    private val service = DiscoveryPlaybackService(selector, downloads, base)
 
     private fun prepare(seen: Boolean = false) {
         coEvery { getAnime.await(1) } returns anime
@@ -53,6 +58,7 @@ class DiscoveryPlaybackTest {
         every { history.subscribe("") } returns
             flowOf(listOf(AnimeHistoryWithRelations(1, 10, 1, anime.title, 1.0, null, anime.asAnimeCover())))
         every { base.downloadedOnly().get() } returns false
+        coEvery { cues.get(any()) } returns null
     }
 
     @Test
@@ -91,7 +97,7 @@ class DiscoveryPlaybackTest {
         prepare()
         val persisted = first.copy(lastSecondSeen = 1_250_000, totalSeconds = 2_400_000, bookmark = true)
         coEvery { episodes.await(1) } returns listOf(persisted, second)
-        val recreated = DiscoveryPlaybackService(history, next, downloads, base)
+        val recreated = DiscoveryPlaybackService(selector, downloads, base)
         assertEquals(persisted, recreated.nextEpisode(anime))
         assertEquals(persisted, recreated.nextEpisode(anime))
     }
@@ -102,7 +108,36 @@ class DiscoveryPlaybackTest {
         val persistedNext = second.copy(lastSecondSeen = 90_000, totalSeconds = 1_400_000)
         coEvery { episodes.await(1) } returns listOf(first.copy(seen = true), persistedNext)
         assertEquals(persistedNext, service.nextEpisode(anime))
-        val recreated = DiscoveryPlaybackService(history, next, downloads, base)
+        val recreated = DiscoveryPlaybackService(selector, downloads, base)
         assertEquals(persistedNext, recreated.nextEpisode(anime))
+    }
+
+    @Test
+    fun `ending cue proposes next without marking current seen`() = runBlocking {
+        prepare()
+        val unfinished = first.copy(lastSecondSeen = 920_000, totalSeconds = 1_200_000)
+        coEvery { episodes.await(1) } returns listOf(unfinished, second)
+        coEvery { cues.get(first.id) } returns EpisodeEndingCue(1_200_000, 840_000, 940_000)
+        val selection = selector.selectForAnime(anime.id)
+        assertEquals(second.id, selection?.episode?.id)
+        assertEquals(unfinished.id, selection?.finale?.id)
+        assertEquals(false, unfinished.seen)
+    }
+
+    @Test
+    fun `seen episode stopped before post credits still exposes its finale`() = runBlocking {
+        prepare(seen = true)
+        val stopped = first.copy(seen = true, lastSecondSeen = 900_000, totalSeconds = 1_200_000)
+        coEvery { episodes.await(1) } returns listOf(stopped, second)
+        val selection = selector.selectForAnime(anime.id)
+        assertEquals(second.id, selection?.episode?.id)
+        assertEquals(stopped.id, selection?.finale?.id)
+    }
+
+    @Test
+    fun `near end without next episode leaves no resume card`() = runBlocking {
+        prepare()
+        coEvery { episodes.await(1) } returns listOf(first.copy(lastSecondSeen = 990_000, totalSeconds = 1_000_000))
+        assertNull(selector.selectForAnime(anime.id))
     }
 }

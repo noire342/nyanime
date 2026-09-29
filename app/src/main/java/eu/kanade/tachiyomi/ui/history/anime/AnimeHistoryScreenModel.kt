@@ -8,6 +8,7 @@ import eu.kanade.core.util.insertSeparators
 import eu.kanade.domain.entries.anime.interactor.UpdateAnime
 import eu.kanade.domain.track.anime.interactor.AddAnimeTracks
 import eu.kanade.presentation.history.anime.AnimeHistoryUiModel
+import eu.kanade.tachiyomi.data.discovery.ResumeEpisodeSelector
 import eu.kanade.tachiyomi.util.lang.toLocalDate
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -40,7 +42,6 @@ import tachiyomi.domain.entries.anime.interactor.GetAnime
 import tachiyomi.domain.entries.anime.interactor.GetDuplicateLibraryAnime
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.history.anime.interactor.GetAnimeHistory
-import tachiyomi.domain.history.anime.interactor.GetNextEpisodes
 import tachiyomi.domain.history.anime.interactor.RemoveAnimeHistory
 import tachiyomi.domain.history.anime.model.AnimeHistoryWithRelations
 import tachiyomi.domain.history.anime.model.forSources
@@ -56,7 +57,7 @@ class AnimeHistoryScreenModel(
     private val getDuplicateLibraryAnime: GetDuplicateLibraryAnime = Injekt.get(),
     private val getHistory: GetAnimeHistory = Injekt.get(),
     private val getAnime: GetAnime = Injekt.get(),
-    private val getNextEpisodes: GetNextEpisodes = Injekt.get(),
+    private val resumeSelector: ResumeEpisodeSelector = Injekt.get(),
     private val libraryPreferences: LibraryPreferences = Injekt.get(),
     private val removeHistory: RemoveAnimeHistory = Injekt.get(),
     private val setAnimeCategories: SetAnimeCategories = Injekt.get(),
@@ -109,18 +110,16 @@ class AnimeHistoryScreenModel(
     }
 
     suspend fun getNextEpisode(): Episode? {
-        return withIOContext { getNextEpisodes.await(onlyUnseen = false).firstOrNull() }
+        return withIOContext {
+            val last = getHistory.subscribe("").first().firstOrNull() ?: return@withIOContext null
+            resumeSelector.select(last.animeId, last.episodeId)?.episode
+        }
     }
 
     fun getNextEpisodeForAnime(animeId: Long, episodeId: Long) {
         screenModelScope.launchIO {
-            sendNextEpisodeEvent(getNextEpisodes.await(animeId, episodeId, onlyUnseen = false))
+            _events.send(Event.OpenEpisode(resumeSelector.select(animeId, episodeId)?.episode))
         }
-    }
-
-    private suspend fun sendNextEpisodeEvent(episodes: List<Episode>) {
-        val episode = episodes.firstOrNull()
-        _events.send(Event.OpenEpisode(episode))
     }
 
     fun removeFromHistory(history: AnimeHistoryWithRelations) {

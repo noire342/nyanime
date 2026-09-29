@@ -21,6 +21,7 @@ import eu.kanade.domain.entries.anime.interactor.UpdateAnime
 import eu.kanade.domain.entries.anime.model.downloadedFilter
 import eu.kanade.domain.entries.anime.model.seasonDownloadedFilter
 import eu.kanade.domain.items.episode.interactor.SetSeenStatus
+import eu.kanade.domain.items.episode.model.applyFilters
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.track.anime.interactor.AddAnimeTracks
 import eu.kanade.domain.track.anime.interactor.RefreshAnimeTracks
@@ -35,6 +36,7 @@ import eu.kanade.tachiyomi.animesource.UnmeteredSource
 import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.Video
+import eu.kanade.tachiyomi.data.discovery.ResumeEpisodeSelector
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
@@ -52,7 +54,6 @@ import eu.kanade.tachiyomi.ui.entries.anime.track.AnimeTrackItem
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.util.AniChartApi
-import eu.kanade.tachiyomi.util.episode.getNextUnseen
 import eu.kanade.tachiyomi.util.removeCovers
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.ImmutableList
@@ -156,6 +157,7 @@ class AnimeScreenModel(
     private val setAnimeCategories: SetAnimeCategories = Injekt.get(),
     private val animeRepository: AnimeRepository = Injekt.get(),
     private val getEpisodesByAnimeId: GetEpisodesByAnimeId = Injekt.get(),
+    private val resumeSelector: ResumeEpisodeSelector = Injekt.get(),
     private val filterEpisodesForDownload: FilterEpisodesForDownload = Injekt.get(),
     private val updateAnimeFromRemote: UpdateAnimeFromRemote = Injekt.get(),
     private val torrentServerUtils: TorrentServerUtils = Injekt.get(),
@@ -848,15 +850,20 @@ class AnimeScreenModel(
     }
 
     suspend fun getNextUnseenEpisode(anime: Anime): Episode? {
-        return getEpisodesByAnimeId.await(anime.id).getNextUnseen(anime, downloadManager)
+        val eligibleIds = getEpisodesByAnimeId.await(anime.id)
+            .applyFilters(anime, downloadManager)
+            .mapTo(mutableSetOf()) { it.id }
+        return resumeSelector.selectForAnime(anime.id) { it.id in eligibleIds }?.episode
     }
 
     /**
      * Returns the next unseen episode or null if everything is seen.
      */
-    fun getNextUnseenEpisode(): Episode? {
+    suspend fun getNextUnseenEpisode(): Episode? {
         val successState = successState ?: return null
-        return successState.episodes.getNextUnseen(successState.anime)
+        val eligibleIds = successState.episodes.applyFilters(successState.anime)
+            .mapTo(mutableSetOf()) { it.episode.id }
+        return resumeSelector.selectForAnime(successState.anime.id) { it.id in eligibleIds }?.episode
     }
 
     private fun getUnseenEpisodes(): List<Episode> {

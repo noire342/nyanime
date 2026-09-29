@@ -6,6 +6,8 @@ import eu.kanade.tachiyomi.data.backup.models.BackupAnimeHistory
 import eu.kanade.tachiyomi.data.backup.models.BackupAnimeTracking
 import eu.kanade.tachiyomi.data.backup.models.BackupCategory
 import eu.kanade.tachiyomi.data.backup.models.BackupEpisode
+import eu.kanade.tachiyomi.data.discovery.EpisodeEndingCue
+import eu.kanade.tachiyomi.data.discovery.EpisodeEndingCueStore
 import tachiyomi.data.AnimeUpdateStrategyColumnAdapter
 import tachiyomi.data.FetchTypeColumnAdapter
 import tachiyomi.data.MemoColumnAdapter
@@ -33,6 +35,7 @@ class AnimeRestorer(
     private val updateAnime: UpdateAnime = Injekt.get(),
     private val getTracks: GetAnimeTracks = Injekt.get(),
     private val insertTrack: InsertAnimeTrack = Injekt.get(),
+    private val endingCues: EpisodeEndingCueStore = Injekt.get(),
     fetchInterval: AnimeFetchInterval = Injekt.get(),
 ) {
 
@@ -217,6 +220,23 @@ class AnimeRestorer(
 
         insertNewEpisodes(newEpisodes)
         updateExistingEpisodes(existingEpisodes)
+
+        val restoredByUrl = getEpisodesByAnimeId.await(anime.id).associateBy { it.url }
+        backupEpisodes.forEach { backup ->
+            val episode = restoredByUrl[backup.url] ?: return@forEach
+            val cue = EpisodeEndingCue(
+                backup.endingDurationMs,
+                backup.endingStartMs,
+                backup.endingEndMs,
+            )
+            if (cue.startMs > 0 &&
+                cue.endMs > cue.startMs &&
+                cue.endMs <= cue.durationMs &&
+                cue.matches(episode.totalSeconds)
+            ) {
+                endingCues.save(episode.id, cue)
+            }
+        }
     }
 
     private fun Episode.forComparison() =

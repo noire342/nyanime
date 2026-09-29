@@ -69,7 +69,9 @@ class DiscoveryModule(private val app: Application) : InjektModule {
         addSingletonFactory {
             DiscoverySourceService(get(), get(), get(), get(), get(), get(), get(), get(), get(), get())
         }
-        addSingletonFactory { DiscoveryPlaybackService(get(), get(), get(), get()) }
+        addSingletonFactory<EpisodeEndingCueStore> { SqlEpisodeEndingCueStore(get()) }
+        addSingletonFactory { ResumeEpisodeSelector(get(), get(), get()) }
+        addSingletonFactory { DiscoveryPlaybackService(get(), get(), get()) }
         addSingletonFactory { tachiyomi.domain.discovery.CatalogSeriesEvidence(get()) }
         addSingletonFactory { SmartSourceResolver(get(), get(), get(), get(), get(), get(), get()) }
         addSingletonFactory { ResumeVisibility(get()) }
@@ -78,7 +80,7 @@ class DiscoveryModule(private val app: Application) : InjektModule {
         addSingletonFactory {
             LocalHomeSections { resume, sourceId ->
                 LocalHomeSectionProvider(
-                    get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
+                    get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(),
                     resume, sourceId, get(),
                 )
             }

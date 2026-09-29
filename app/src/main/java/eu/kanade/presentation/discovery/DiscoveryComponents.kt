@@ -422,6 +422,13 @@ fun LocalAnimeRow(
                                     onClick = openDetails,
                                 ),
                             ) {
+                                if (item.finale != null) {
+                                    Text(
+                                        "PROSSIMO EPISODIO",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
                                 Text(
                                     item.anime.title,
                                     maxLines = 2,
@@ -437,6 +444,19 @@ fun LocalAnimeRow(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                item.finale?.let { finale ->
+                                    TextButton(onClick = {
+                                        onPlay(
+                                            item.copy(
+                                                episode = finale,
+                                                finale = null,
+                                                forcedStartPositionMs = finale.lastSecondSeen,
+                                            ),
+                                        )
+                                    }) {
+                                        Text("Riprendi il finale")
+                                    }
+                                }
                             }
                             IconButton(onClick = openDetails, modifier = Modifier.size(48.dp)) {
                                 Icon(Icons.Outlined.Info, "Scheda di ${item.anime.title}")

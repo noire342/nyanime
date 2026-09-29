@@ -313,6 +313,20 @@ fun LocalAnimeRow(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+                if (item.finale != null) {
+                    Text("Prossimo episodio", style = MaterialTheme.typography.labelSmall)
+                    TextButton(onClick = {
+                        onPlay(
+                            item.copy(
+                                episode = item.finale,
+                                finale = null,
+                                forcedStartPositionMs = item.finale.lastSecondSeen,
+                            ),
+                        )
+                    }) {
+                        Text("Riprendi il finale")
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { onPlay(item) }, modifier = Modifier.weight(1f)) {
                         Text(if (item.progress > 0) "Riprendi" else "Guarda")

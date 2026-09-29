@@ -64,6 +64,8 @@ import eu.kanade.tachiyomi.data.cast.CastController
 import eu.kanade.tachiyomi.data.database.models.anime.Episode
 import eu.kanade.tachiyomi.data.database.models.anime.isRecognizedNumber
 import eu.kanade.tachiyomi.data.database.models.anime.toDomainEpisode
+import eu.kanade.tachiyomi.data.discovery.EpisodeEndingCue
+import eu.kanade.tachiyomi.data.discovery.EpisodeEndingCueStore
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
 import eu.kanade.tachiyomi.data.saver.Image
@@ -120,6 +122,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
@@ -153,6 +157,7 @@ import java.io.File
 import java.io.InputStream
 import java.util.Date
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.seconds
 
@@ -180,6 +185,7 @@ class PlayerViewModel @JvmOverloads constructor(
     private val getTracks: GetAnimeTracks = Injekt.get(),
     private val upsertHistory: UpsertAnimeHistory = Injekt.get(),
     private val updateEpisode: UpdateEpisode = Injekt.get(),
+    private val endingCues: EpisodeEndingCueStore = Injekt.get(),
     private val setAnimeViewerFlags: SetAnimeViewerFlags = Injekt.get(),
     internal val playerPreferences: PlayerPreferences = Injekt.get(),
     internal val gesturePreferences: GesturePreferences = Injekt.get(),
@@ -1625,9 +1631,7 @@ class PlayerViewModel @JvmOverloads constructor(
      */
     fun onSaveInstanceStateNonConfigurationChange() {
         val currentEpisode = currentEpisode.value ?: return
-        viewModelScope.launchNonCancellable {
-            saveEpisodeProgress(currentEpisode)
-        }
+        saveWatchingProgress(currentEpisode)
     }
 
     // ====== Initialize anime, episode, hoster, and video list ======
@@ -2116,7 +2120,9 @@ class PlayerViewModel @JvmOverloads constructor(
 
         val progress = playerPreferences.progressPreference().get()
         val shouldTrack = !incognitoMode || hasTrackers
-        if (seconds >= totalSeconds * progress && shouldTrack) {
+        if (seconds >= totalSeconds * progress && shouldTrack && !currentEp.seen) {
+            // The save scheduled below must capture the completed state even if playback stops here.
+            currentEp.seen = true
             viewModelScope.launchNonCancellable {
                 updateEpisodeProgressOnComplete(currentEp)
             }
@@ -2202,50 +2208,47 @@ class PlayerViewModel @JvmOverloads constructor(
         currentEpisode.value?.let { saveWatchingProgress(it) }
     }
 
+    fun recordEndingCue(episodeId: Long, durationSeconds: Int, stamps: List<TimeStamp>) {
+        if (incognitoMode) return
+        val cue = EpisodeEndingCue.from(stamps, durationSeconds)
+        viewModelScope.launchNonCancellable {
+            try {
+                if (cue == null) endingCues.remove(episodeId) else endingCues.save(episodeId, cue)
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e) { "Unable to retain episode ending marker" }
+            }
+        }
+    }
+
+    private val progressSaveMutex = Mutex()
+    private val progressSaveSequence = AtomicLong()
+    private val committedProgressSequence = mutableMapOf<Long, Long>()
+
     /**
      * Called when episode is changed in player or when activity is paused.
      */
     private fun saveWatchingProgress(episode: Episode) {
         val cast = CastController.get(activity.applicationContext).state.value
         if (remoteProgressOwned || cast.active || cast.connecting) return
+        val id = episode.id ?: return
+        val sequence = progressSaveSequence.incrementAndGet()
+        val update = EpisodeUpdate(
+            id = id,
+            seen = episode.seen,
+            bookmark = episode.bookmark,
+            fillermark = episode.fillermark,
+            lastSecondSeen = episode.last_second_seen,
+            totalSeconds = episode.total_seconds,
+            localOnly = incognitoMode,
+        )
         viewModelScope.launchNonCancellable {
-            saveEpisodeProgress(episode)
-            saveEpisodeHistory(episode)
-        }
-    }
-
-    /**
-     * Saves this [episode] progress (last second seen and whether it's seen).
-     * If incognito mode isn't on or has at least 1 tracker
-     */
-    private suspend fun saveEpisodeProgress(episode: Episode) {
-        if (remoteProgressOwned) return
-        if (!incognitoMode || hasTrackers) {
-            updateEpisode.await(
-                EpisodeUpdate(
-                    id = episode.id!!,
-                    seen = episode.seen,
-                    bookmark = episode.bookmark,
-                    fillermark = episode.fillermark,
-                    lastSecondSeen = episode.last_second_seen,
-                    totalSeconds = episode.total_seconds,
-                    localOnly = incognitoMode,
-                ),
-            )
-        }
-    }
-
-    /**
-     * Saves this [episode] last seen history if incognito mode isn't on.
-     */
-    private suspend fun saveEpisodeHistory(episode: Episode) {
-        if (remoteProgressOwned) return
-        if (!incognitoMode) {
-            val episodeId = episode.id!!
-            val seenAt = Date()
-            upsertHistory.await(
-                AnimeHistoryUpdate(episodeId, seenAt),
-            )
+            progressSaveMutex.withLock {
+                if (sequence <= (committedProgressSequence[id] ?: 0L)) return@withLock
+                if (remoteProgressOwned) return@withLock
+                if (!incognitoMode || hasTrackers) updateEpisode.await(update)
+                if (!incognitoMode) upsertHistory.await(AnimeHistoryUpdate(id, Date()))
+                committedProgressSequence[id] = sequence
+            }
         }
     }
 

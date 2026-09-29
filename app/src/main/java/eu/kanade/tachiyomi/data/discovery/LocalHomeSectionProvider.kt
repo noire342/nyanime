@@ -16,7 +16,6 @@ import tachiyomi.domain.discovery.SectionState
 import tachiyomi.domain.entries.anime.interactor.GetAnime
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.history.anime.interactor.GetAnimeHistory
-import tachiyomi.domain.history.anime.interactor.GetNextEpisodes
 import tachiyomi.domain.items.episode.interactor.GetEpisode
 import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
@@ -24,7 +23,13 @@ import tachiyomi.domain.updates.anime.interactor.GetAnimeUpdates
 import tachiyomi.source.local.entries.anime.isLocal
 import java.time.Instant
 
-data class LocalHomeItem(val anime: Anime, val episode: Episode, val updateKey: String? = null) {
+data class LocalHomeItem(
+    val anime: Anime,
+    val episode: Episode,
+    val updateKey: String? = null,
+    val finale: Episode? = null,
+    val forcedStartPositionMs: Long? = null,
+) {
     val progress: Float get() = if (episode.totalSeconds > 0) {
         (episode.lastSecondSeen.toFloat() / episode.totalSeconds).coerceIn(0f, 1f)
     } else {
@@ -36,7 +41,7 @@ private data class LocalEntry(val animeId: Long, val episodeId: Long, val update
 
 class LocalHomeSectionProvider(
     private val history: GetAnimeHistory,
-    private val next: GetNextEpisodes,
+    private val resumeSelector: ResumeEpisodeSelector,
     private val updates: GetAnimeUpdates,
     private val getAnime: GetAnime,
     private val getEpisode: GetEpisode,
@@ -47,16 +52,15 @@ class LocalHomeSectionProvider(
     private val sources: AnimeSourceManager,
     private val downloads: AnimeDownloadManager,
     private val sourceService: DiscoverySourceService,
+    private val endingCues: EpisodeEndingCueStore,
     private val resume: Boolean,
     private val sourceIds: Set<Long>? = null,
     private val visibility: ResumeVisibility,
 ) : HomeSectionProvider<LocalHomeItem> {
     override fun observe() = combine(
         if (resume) {
-            history.subscribe("").map { list ->
-                list.distinctBy { it.animeId }.map {
-                    LocalEntry(it.animeId, it.episodeId)
-                }
+            history.subscribe("").combine(endingCues.observeChanges()) { list, _ ->
+                list.distinctBy { it.animeId }.map { LocalEntry(it.animeId, it.episodeId) }
             }
         } else {
             updates.subscribe(Instant.now().minusSeconds(30 * 86_400))
@@ -90,18 +94,19 @@ class LocalHomeSectionProvider(
                 return@mapNotNull null
             }
             if (incognito.await(anime.source)) return@mapNotNull null
-            val episode = if (resume) {
-                next.await(animeId, episodeId, onlyUnseen = false).firstOrNull {
+            val selection = if (resume) {
+                resumeSelector.select(animeId, episodeId) {
                     !base.downloadedOnly().get() || isDownloaded(anime, it)
                 }
             } else {
-                getEpisode.await(episodeId)
+                getEpisode.await(episodeId)?.let(::ResumeEpisodeSelection)
             }
-            episode?.takeIf {
-                !base.downloadedOnly().get() || isDownloaded(anime, it)
+            selection?.takeIf {
+                val episode = it.episode
+                !base.downloadedOnly().get() || isDownloaded(anime, episode)
             }?.let {
                 accepted++
-                LocalHomeItem(anime, it, updateKey)
+                LocalHomeItem(anime, it.episode, updateKey, it.finale)
             }
         }
         SectionState(data = items, loading = false)

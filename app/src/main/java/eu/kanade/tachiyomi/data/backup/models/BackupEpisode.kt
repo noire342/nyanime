@@ -35,6 +35,11 @@ class BackupEpisode(
     @ProtoNumber(502) var summary: String? = null,
     @ProtoNumber(503) var previewUrl: String? = null,
 
+    // Optional Nyanime resume cue. Older .tachibk/.nyabk files simply omit these fields.
+    @ProtoNumber(504) var endingStartMs: Long = 0,
+    @ProtoNumber(505) var endingEndMs: Long = 0,
+    @ProtoNumber(506) var endingDurationMs: Long = 0,
+
 ) {
     fun toEpisodeImpl(): Episode {
         return Episode.create().copy(
