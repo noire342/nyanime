@@ -10,6 +10,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 
 ## 29 settembre 2026 — Notifiche delle uscite più leggibili
 
+- Nome del titolo sulla prima riga compatta; nome completo a capo nei dettagli
+  espansi, leggibile anche quando l'annuncio è lungo.
 - Titoli espliciti: “Domani esce un nuovo episodio di…” e “Oggi esce un nuovo
   episodio/capitolo di…”, con plurali per le uscite multiple.
 - Numero e ora in una riga breve; notifica espansa con data completa, trasmissione,

@@ -106,9 +106,11 @@ cambio orario/fuso e concessione del permesso per gli allarmi riprogrammano gli 
 **Stato del monitoraggio** permette di provare separatamente il canale dei nuovi
 contenuti e quello dei promemoria.
 
-Le notifiche iniziano con una frase esplicita, per esempio **Domani esce un nuovo
-episodio di «Titolo»**. La riga breve mostra numero e ora; la vista espansa separa
-data completa, tipo di trasmissione, piattaforme e disponibilità nella fonte.
+La vista compatta dà la prima riga al nome del titolo e la seconda a numero,
+giorno e ora: il nome non è preceduto da una frase che potrebbe nasconderlo.
+Espandendo la notifica compare l'annuncio completo, per esempio **Domani esce un
+nuovo episodio di «Titolo»**. Il corpo riporta il nome intero su più righe quando
+serve, poi data completa, tipo di trasmissione, piattaforme e disponibilità nella fonte.
 Gli avvisi dei contenuti già trovati usano **Oggi esce…** soltanto con una data di
 pubblicazione effettivamente fornita per tutti gli elementi. Senza questa prova,
 oppure con un recupero storico, mostrano **È disponibile…**. L’ora di rilevamento

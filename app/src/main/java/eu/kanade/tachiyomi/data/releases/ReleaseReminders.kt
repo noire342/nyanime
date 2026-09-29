@@ -124,7 +124,7 @@ object ReleaseReminders {
             )
             val notification = NotificationCompat.Builder(context, CHANNEL)
                 .setSmallIcon(R.drawable.ic_ani)
-                .setContentTitle(text.headline)
+                .setContentTitle(text.title)
                 .setContentText(text.summary)
                 .setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(text.headline).bigText(text.details))
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)

@@ -21,6 +21,7 @@ class ReleaseNotificationCopyTest {
     @Test fun tomorrowReminderHasAReadableHeadlineAndSeparateTimeAndDetails() {
         val event = AiringEvent(1, 12, now + ReleasePolicy.DAY, 42)
         val text = copy.reminder(title, event, now, ScheduleAirType.RAW)
+        assertEquals(title, text.title)
         assertEquals("Domani esce un nuovo episodio di «Titolo di prova»", text.headline)
         assertEquals("Episodio 12 · Domani, ore 16:00", text.summary)
         assertTrue(text.details.contains("Orario annunciato: 30 set 2026, ore 16:00"))
@@ -71,6 +72,8 @@ class ReleaseNotificationCopyTest {
         val text = copy.available(ReleaseMedium.MANGA, title, "Capitolo 4.5", 1, listOf(now - 3600_000), now, now)
         assertEquals("Oggi esce un nuovo capitolo di «Titolo di prova»", text.headline)
         assertEquals("Capitolo 4.5", text.summary)
+        assertEquals(title, text.title)
+        assertEquals(title, text.details.lineSequence().first())
         assertTrue(text.details.contains("Pubblicato il 29 set 2026"))
         assertTrue(text.details.contains("Rilevato: Oggi, ore 16:00"))
         assertFalse(text.details.contains("ore 15:00"))
@@ -106,10 +109,12 @@ class ReleaseNotificationCopyTest {
         assertFalse(text.details.contains("Rilevato:"))
     }
 
-    @Test fun longTitlesAndPunctuationRemainCompleteInTheExpandedHeadline() {
+    @Test fun longTitlesRemainFirstInCompactViewAndCompleteInWrappedDetails() {
         val long = "Un titolo molto lungo con numeri 100%, citazioni e una seconda parte: " + "parola ".repeat(15)
         val text = copy.reminder(long, AiringEvent(1, 2, now, 42), now, ScheduleAirType.RAW)
         assertTrue(text.headline.contains(long))
+        assertEquals(long, text.title)
+        assertEquals(long, text.details.lineSequence().first())
     }
 
     @Test fun privacyHidesTitlesEpisodeNumbersAndBroadcastMetadata() {
@@ -126,7 +131,7 @@ class ReleaseNotificationCopyTest {
             hidden = true,
         )
         for (text in listOf(reminder, available)) {
-            assertFalse((text.headline + text.summary + text.details).contains(title))
+            assertFalse((text.title + text.headline + text.summary + text.details).contains(title))
             assertFalse(text.details.contains("42"))
             assertFalse(text.details.contains("16:00"))
         }

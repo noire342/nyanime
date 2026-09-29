@@ -9,7 +9,12 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 
-data class ReleaseNotificationText(val headline: String, val summary: String, val details: String)
+data class ReleaseNotificationText(
+    val title: String,
+    val headline: String,
+    val summary: String,
+    val details: String,
+)
 
 internal interface ReleaseNotificationStrings {
     fun text(id: Int, vararg args: Any): String
@@ -60,6 +65,7 @@ internal class ReleaseNotificationCopy(
             },
         )
         val lines = buildList {
+            add(title)
             add(item)
             add(strings.text(R.string.release_notice_announced_at, fullDate, hour))
             add(type)
@@ -69,7 +75,7 @@ internal class ReleaseNotificationCopy(
             selected?.delayed?.takeIf { it.isNotBlank() }?.let { add(it.take(300)) }
             add(strings.text(R.string.release_notice_source_may_differ))
         }
-        return ReleaseNotificationText(headline, "$item · $whenShort", lines.joinToString("\n"))
+        return ReleaseNotificationText(title, headline, "$item · $whenShort", lines.joinToString("\n"))
     }
 
     fun available(
@@ -103,6 +109,7 @@ internal class ReleaseNotificationCopy(
         }
         val headline = strings.quantity(headlineId, count, title, count)
         val lines = buildList {
+            add(title)
             add(itemDescription)
             add(strings.text(R.string.release_notice_available_source))
             val days = publicationDates.filter { it in 1..now }.map(::date).distinct().sorted()
@@ -117,7 +124,7 @@ internal class ReleaseNotificationCopy(
                 add(strings.text(R.string.release_notice_detected_at, day(date(detectedAt), today), hour))
             }
         }
-        return ReleaseNotificationText(headline, itemDescription, lines.joinToString("\n"))
+        return ReleaseNotificationText(title, headline, itemDescription, lines.joinToString("\n"))
     }
 
     private fun date(at: Long): LocalDate = Instant.ofEpochMilli(at).atZone(zone).toLocalDate()
@@ -131,7 +138,7 @@ internal class ReleaseNotificationCopy(
     private fun privateCopy(): ReleaseNotificationText {
         val headline = strings.text(R.string.release_title)
         val text = strings.text(R.string.release_notice_private)
-        return ReleaseNotificationText(headline, text, text)
+        return ReleaseNotificationText(headline, headline, text, text)
     }
 
     companion object {

@@ -210,7 +210,7 @@ class AnimeLibraryUpdateNotifier(
         ) {
             setContentTitle(context.stringResource(AYMR.strings.notification_new_episodes))
             if (single != null) {
-                setContentTitle(single.headline)
+                setContentTitle(single.title)
                 setContentText(single.summary)
                 setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(single.headline).bigText(single.details))
             } else {
@@ -277,7 +277,7 @@ class AnimeLibraryUpdateNotifier(
         val icon = kotlinx.coroutines.withTimeoutOrNull(500) { getAnimeIcon(anime) }
         return context.notificationBuilder(Notifications.CHANNEL_NEW_CHAPTERS_EPISODES) {
             val text = newEpisodesText(anime, episodes, publicationDates)
-            setContentTitle(text.headline)
+            setContentTitle(text.title)
             setContentText(text.summary)
             setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(text.headline).bigText(text.details))
 

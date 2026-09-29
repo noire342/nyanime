@@ -192,7 +192,7 @@ class MangaLibraryUpdateNotifier(
         ) {
             setContentTitle(context.stringResource(MR.strings.notification_new_chapters))
             if (single != null) {
-                setContentTitle(single.headline)
+                setContentTitle(single.title)
                 setContentText(single.summary)
                 setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(single.headline).bigText(single.details))
             } else {
@@ -259,7 +259,7 @@ class MangaLibraryUpdateNotifier(
         val icon = kotlinx.coroutines.withTimeoutOrNull(500) { getMangaIcon(manga) }
         return context.notificationBuilder(Notifications.CHANNEL_NEW_CHAPTERS_EPISODES) {
             val text = newChaptersText(manga, chapters, publicationDates)
-            setContentTitle(text.headline)
+            setContentTitle(text.title)
             setContentText(text.summary)
             setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(text.headline).bigText(text.details))
 
