@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,9 +47,16 @@ class ReleaseStatusScreen : Screen() {
         val context = LocalContext.current
         val navigator = LocalNavigator.currentOrThrow
         var state by remember { mutableStateOf(ReleaseStatusSnapshot()) }
+        val preferences = remember { ReleasePreferences() }
+        val advance by preferences.advanceReminders.changes().collectAsState(preferences.advanceReminders.get())
+        val reminders by preferences.reminders.changes().collectAsState(preferences.reminders.get())
+        var canRemind by remember { mutableStateOf(ReleaseNotifications.canPost(context, ReleaseReminders.CHANNEL)) }
+        var exact by remember { mutableStateOf(ReleaseReminders.exactAllowed(context)) }
         LaunchedEffect(Unit) {
             while (true) {
                 state = withContext(Dispatchers.IO) { ReleaseStatus.snapshot() }
+                canRemind = ReleaseNotifications.canPost(context, ReleaseReminders.CHANNEL)
+                exact = ReleaseReminders.exactAllowed(context)
                 kotlinx.coroutines.delay(3_000)
             }
         }
@@ -126,7 +134,24 @@ class ReleaseStatusScreen : Screen() {
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Text(stringResource(R.string.release_reminder_description))
-                            if (!ReleaseReminders.exactAllowed(context) && Build.VERSION.SDK_INT >= 31) {
+                            Text(
+                                stringResource(
+                                    if (advance &&
+                                        reminders
+                                    ) {
+                                        R.string.release_advance_active
+                                    } else {
+                                        R.string.release_advance_inactive
+                                    },
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (!canRemind) Text(stringResource(R.string.release_notification_blocked))
+                            TextButton(onClick = {
+                                ReleaseStatus.showTestNotification(context, ReleaseReminders.CHANNEL)
+                            }) { Text(stringResource(R.string.release_test_reminder)) }
+                            if (!exact && Build.VERSION.SDK_INT >= 31) {
                                 Text(
                                     stringResource(R.string.release_approximate),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,

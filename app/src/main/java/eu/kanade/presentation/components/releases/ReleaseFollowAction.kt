@@ -80,6 +80,7 @@ fun RowScope.ReleaseFollowAction(medium: ReleaseMedium, entryId: Long, automatic
     )
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         ReleaseNotifications.afterCommit(context)
+        scope.launch { ReleaseReminders.schedule(context) }
     }
     val save: (ReleaseSubscription) -> Unit = { next ->
         scope.launch {
@@ -164,7 +165,7 @@ fun RowScope.ReleaseFollowAction(medium: ReleaseMedium, entryId: Long, automatic
                 if (medium == ReleaseMedium.ANIME) {
                     ReleaseOption(
                         stringResource(R.string.release_reminder),
-                        stringResource(R.string.release_reminder_description),
+                        stringResource(R.string.release_reminder_follow_description),
                         subscription.reminder,
                         !saving,
                     ) {

@@ -27,6 +27,10 @@ import tachiyomi.domain.entries.anime.repository.AnimeRepository
 import tachiyomi.domain.items.episode.repository.EpisodeRepository
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.text.DateFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.util.Date
 
 /** One alarm for the nearest reminder, not an alarm per title or a network polling timer. */
 object ReleaseReminders {
@@ -43,6 +47,7 @@ object ReleaseReminders {
     }
 
     private suspend fun scheduleLocked(context: Context) {
+        if (ReleaseRestoreGuard.active) return
         cancel(context)
         val preferences = ReleasePreferences()
         if (!preferences.enabled.get() ||
@@ -51,6 +56,19 @@ object ReleaseReminders {
         ) {
             return
         }
+        createChannel(context)
+        val events = eligibleEvents()
+        val now = System.currentTimeMillis()
+        val receipts = ReleaseReminderReceipts()
+        val reminders = ReleaseReminderPlan.pending(events, receipts.delivered(), preferences.advanceReminders.get())
+        for (reminder in reminders) {
+            if (reminder.at <= now) deliverDue(context, reminder, receipts, now)
+        }
+        val next = reminders.firstOrNull { it.at > now } ?: return
+        scheduleAlarm(context, next.at)
+    }
+
+    internal fun createChannel(context: Context) {
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(
                 CHANNEL,
@@ -58,57 +76,88 @@ object ReleaseReminders {
                 NotificationManager.IMPORTANCE_DEFAULT,
             ),
         )
-        val events = eligibleEvents()
-        val now = System.currentTimeMillis()
-        for (event in events) {
-            if (event.airingAt <= now) deliverDue(context, event, now)
-        }
-        val next = events.firstOrNull { it.airingAt > now } ?: return
-        scheduleAlarm(context, next.airingAt)
     }
 
     private suspend fun eligibleEvents(): List<AiringEvent> {
         val store = ReleaseStore()
         val followed = store.monitoredIds(ReleaseMedium.ANIME).toSet()
         val result = mutableListOf<AiringEvent>()
+        val eligible = mutableMapOf<Long, Boolean>()
         for (event in AiringRepository().effectiveEvents().first()) {
-            if (event.remindedAt != 0L || event.entryId !in followed) continue
-            if (!store.subscription(ReleaseMedium.ANIME, event.entryId).reminder) continue
-            if (ReleaseEligibility.source(ReleaseMedium.ANIME, event.entryId) == null) continue
+            if (event.entryId !in followed) continue
+            val allowed = eligible[event.entryId] ?: (
+                store.subscription(ReleaseMedium.ANIME, event.entryId).reminder &&
+                    ReleaseEligibility.source(ReleaseMedium.ANIME, event.entryId) != null
+                ).also { eligible[event.entryId] = it }
+            if (!allowed) continue
             result += event
         }
         return result
     }
 
-    private suspend fun deliverDue(context: Context, event: AiringEvent, now: Long) {
-        // A missed reminder from an old backup/offline period must not produce a flood.
-        if (now - event.airingAt > 15 * ReleasePolicy.MINUTE) {
-            AiringRepository().reminded(event)
-            return
+    private suspend fun deliverDue(
+        context: Context,
+        reminder: ReleaseReminder,
+        receipts: ReleaseReminderReceipts,
+        now: Long,
+    ) {
+        suspend fun acknowledge() {
+            receipts.record(reminder, now)
+            if (reminder.kind == ReleaseReminderKind.AIRING) {
+                reminder.events.forEach { AiringRepository().reminded(it) }
+            }
         }
+        // A missed reminder from an old backup/offline period must not produce a flood.
+        // Do not record it as delivered: a subsequently postponed date can still deserve an alert.
+        if (reminder.expired(now)) return
         if (!ReleaseNotifications.canPost(context, CHANNEL)) return
+        val event = reminder.event
         val anime = Injekt.get<AnimeRepository>().getAnimeById(event.entryId)
-        val seen = Injekt.get<EpisodeRepository>().getEpisodeByAnimeId(anime.id)
-            .any { it.seen && it.episodeNumber == event.episode.toDouble() }
+        val seen = reminder.events.any { edition ->
+            Injekt.get<EpisodeRepository>().getEpisodeByAnimeId(edition.entryId)
+                .any { it.seen && it.episodeNumber == event.episode.toDouble() }
+        }
         if (!seen) {
             val hidden = Injekt.get<SecurityPreferences>().hideNotificationContent().get()
+            val advance = reminder.kind == ReleaseReminderKind.ADVANCE
+            val description = if (hidden) {
+                context.getString(
+                    if (advance) R.string.release_advance_private else R.string.release_reminder_description,
+                )
+            } else if (advance) {
+                val format = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                val zone = ZoneId.systemDefault()
+                val tomorrow = Instant.ofEpochMilli(now).atZone(zone).toLocalDate().plusDays(1)
+                val date = Instant.ofEpochMilli(event.airingAt).atZone(zone).toLocalDate()
+                context.getString(
+                    if (date == tomorrow) R.string.release_advance_notification else R.string.release_advance_upcoming,
+                    eu.kanade.presentation.components.releases.scheduleBroadcastLabel(context, event),
+                    format.format(Date(event.airingAt)),
+                )
+            } else {
+                eu.kanade.presentation.components.releases.scheduleBroadcastLabel(context, event)
+            }
             val notification = NotificationCompat.Builder(context, CHANNEL)
                 .setSmallIcon(R.drawable.ic_ani)
                 .setContentTitle(if (hidden) context.getString(R.string.release_title) else anime.title)
-                .setContentText(
-                    if (hidden) {
-                        context.getString(R.string.release_reminder_description)
-                    } else {
-                        eu.kanade.presentation.components.releases.scheduleBroadcastLabel(context, event)
-                    },
-                )
+                .setContentText(description)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(description))
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
                 .setContentIntent(
                     NotificationReceiver.openEpisodePendingActivity(context, anime, Notifications.ID_NEW_EPISODES),
                 )
                 .setAutoCancel(true).setOnlyAlertOnce(true).build()
-            NotificationManagerCompat.from(context).notify("airing-${event.entryId}", event.episode, notification)
+            // Stable identity also makes replay after a process death replace the existing tray item.
+            val tag = "release-reminder-${reminder.keys.sorted().first()}-${reminder.kind.name}"
+            ReleaseNotifications.reserveSlot(context, tag, event.episode)
+            try {
+                NotificationManagerCompat.from(context).notify(tag, event.episode, notification)
+            } catch (_: SecurityException) {
+                // Permission can be revoked between the check and notify; keep the receipt pending.
+                return
+            }
         }
-        AiringRepository().reminded(event)
+        acknowledge()
     }
 
     private fun scheduleAlarm(context: Context, at: Long) {

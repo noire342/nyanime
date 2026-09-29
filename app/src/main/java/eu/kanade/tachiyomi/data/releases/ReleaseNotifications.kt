@@ -35,7 +35,9 @@ object ReleaseNotifications {
         val manager = context.getSystemService(NotificationManager::class.java)
         val active = manager.activeNotifications
         if (active.any { it.tag == tag && it.id == id }) return
-        val releases = active.filter { it.tag == "release-anime" || it.tag == "release-manga" }
+        val releases = active.filter {
+            it.tag == "release-anime" || it.tag == "release-manga" || it.tag?.startsWith("release-reminder-") == true
+        }
         val removeCount = maxOf(releases.size - 39, active.size - 44, 0).coerceAtMost(releases.size)
         releases.sortedBy { it.postTime }.take(removeCount).forEach { manager.cancel(it.tag, it.id) }
         // Removing an old tray notification never removes its item from Home or Updates.

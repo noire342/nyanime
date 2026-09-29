@@ -244,6 +244,7 @@ object SettingsLibraryScreen : SearchableSettings {
                     onValueChanged = {
                         ContextCompat.getMainExecutor(context).execute {
                             eu.kanade.tachiyomi.data.releases.ReleaseMonitor.setup(context)
+                            scope.launch { eu.kanade.tachiyomi.data.releases.ReleaseReminders.schedule(context) }
                         }
                         true
                     },
@@ -258,7 +259,20 @@ object SettingsLibraryScreen : SearchableSettings {
                     title = context.getString(eu.kanade.tachiyomi.R.string.release_reminder),
                     subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_reminder_description),
                     onValueChanged = {
-                        scope.launch { eu.kanade.tachiyomi.data.releases.ReleaseReminders.schedule(context) }
+                        ContextCompat.getMainExecutor(context).execute {
+                            scope.launch { eu.kanade.tachiyomi.data.releases.ReleaseReminders.schedule(context) }
+                        }
+                        true
+                    },
+                ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = eu.kanade.tachiyomi.data.releases.ReleasePreferences().advanceReminders,
+                    title = context.getString(eu.kanade.tachiyomi.R.string.release_advance_reminder),
+                    subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_advance_description),
+                    onValueChanged = {
+                        ContextCompat.getMainExecutor(context).execute {
+                            scope.launch { eu.kanade.tachiyomi.data.releases.ReleaseReminders.schedule(context) }
+                        }
                         true
                     },
                 ),

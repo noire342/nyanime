@@ -9,7 +9,16 @@
     <string name="release_available">New episodes and chapters</string>
     <string name="release_available_description">Notify me when new content is available in my source.</string>
     <string name="release_reminder">Broadcast reminder</string>
-    <string name="release_reminder_description">The announced original Japanese broadcast; availability in your source may differ.</string>
+    <string name="release_reminder_description">Notify me at the announced time. Availability in your source may differ.</string>
+    <string name="release_reminder_follow_description">Reminders at the announced time and, if enabled in settings, 24 hours before. Availability in your source may differ.</string>
+    <string name="release_advance_reminder">Remind me a day before</string>
+    <string name="release_advance_description">When broadcast reminders are enabled, also notify me 24 hours before. Works without AnimeSchedule too.</string>
+    <string name="release_advance_notification">Tomorrow · %1$s · %2$s</string>
+    <string name="release_advance_upcoming">Coming soon · %1$s · %2$s</string>
+    <string name="release_advance_private">An episode you follow is coming soon.</string>
+    <string name="release_advance_active">Day-before reminder enabled.</string>
+    <string name="release_advance_inactive">Day-before reminder disabled.</string>
+    <string name="release_test_reminder">Test a reminder</string>
     <string name="release_disabled">Automatic monitoring is disabled.</string>
     <string name="release_enable_monitor">Enable automatic updates</string>
     <string name="release_enable_notifications">Enable notifications</string>

@@ -157,6 +157,33 @@ class ReleaseSchemaTest(unittest.TestCase):
             ).fetchall())
             db.close()
 
+    def test_reminder_migration_and_schema_agree_without_consuming_broadcast(self):
+        path = ROOT / "data/src/main/sqldelightanime/dataanime/reminderReceipt.sq"
+        migration = ROOT / "data/src/main/sqldelightanime/migrations/146.sqm"
+        for schema in (migration.read_text(encoding="utf-8"), path.read_text(encoding="utf-8").split("getReceipts:")[0]):
+            db = sqlite3.connect(":memory:")
+            db.executescript(schema)
+            for _ in range(2):
+                db.execute(self.query(path, "recordReceipt"), ("catalog:42:3", "ADVANCE", 1000))
+            self.assertEqual([("catalog:42:3", "ADVANCE")], db.execute(self.query(path, "getReceipts")).fetchall())
+            db.execute(self.query(path, "recordReceipt"), ("catalog:42:3", "AIRING", 2000))
+            self.assertEqual(2, db.execute("SELECT COUNT(*) FROM reminder_receipt").fetchone()[0])
+            db.execute(self.query(path, "pruneReceipts"), (1500,))
+            self.assertEqual([("catalog:42:3", "AIRING")], db.execute(self.query(path, "getReceipts")).fetchall())
+            db.close()
+
+    def test_reminder_alias_receipts_roll_back_together(self):
+        path = ROOT / "data/src/main/sqldelightanime/dataanime/reminderReceipt.sq"
+        db = sqlite3.connect(":memory:")
+        db.executescript(path.read_text(encoding="utf-8").split("getReceipts:")[0])
+        with self.assertRaises(RuntimeError):
+            with db:
+                for key in ("catalog:42:3", "entry:7:3"):
+                    db.execute(self.query(path, "recordReceipt"), (key, "ADVANCE", 1000))
+                raise RuntimeError("interrupted acknowledgement")
+        self.assertEqual([], db.execute(self.query(path, "getReceipts")).fetchall())
+        db.close()
+
 
 if __name__ == "__main__":
     unittest.main()

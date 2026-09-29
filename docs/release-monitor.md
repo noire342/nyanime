@@ -84,8 +84,27 @@ non mediante gli ID numerici di un altro database.
 
 ## Promemoria e limiti verificabili
 
-Un solo allarme locale punta alla prossima trasmissione. L'autorizzazione Android
-per gli allarmi puntuali è facoltativa; senza di essa il promemoria può ritardare.
+Un solo allarme locale punta al prossimo avviso: 24 ore prima oppure all'orario
+della trasmissione. **Avvisami un giorno prima**, in Impostazioni > Libreria,
+è attivo inizialmente e si può disattivare separatamente; richiede i promemoria di
+trasmissione attivi. Funziona con le date AniList anche senza AnimeSchedule.
+Il promemoria anticipato e quello della trasmissione hanno ricevute distinte,
+persistenti e condivise tra edizioni con lo stesso ID di catalogo verificato.
+Visto in una di queste edizioni, esclusioni per titolo e incognito impediscono
+l'avviso. Le ricevute sono dati di consegna locali, non cronologia da importare
+su un altro telefono. Nessuna richiesta di rete è necessaria alla scadenza.
+
+L'autorizzazione Android per gli allarmi puntuali è facoltativa; senza di essa il
+promemoria può ritardare. Gli avvisi anticipati possono recuperare un ritardo di
+sei ore, quelli all'orario annunciato di due ore: oltre questa finestra non vengono
+inviati, per evitare raffiche dopo periodi offline. Un avviso saltato non viene
+registrato come consegnato; una data successivamente rinviata può essere riprogrammata.
+I permessi e il canale bloccati non consumano la ricevuta. Alla riapertura o al
+prossimo controllo si riprova entro la finestra; nessuna sequenza di allarmi viene
+creata soltanto per chiedere il permesso mancante. Riavvio, aggiornamento dell'app,
+cambio orario/fuso e concessione del permesso per gli allarmi riprogrammano gli avvisi.
+**Stato del monitoraggio** permette di provare separatamente il canale dei nuovi
+contenuti e quello dei promemoria.
 Date non più annunciate vengono rimosse soltanto dopo una risposta completa e
 valida, con numero e ora aggiornati insieme. Errori e pagine incomplete conservano
 l'ultima verifica riuscita. Gli orari seguono il fuso del dispositivo.
@@ -93,14 +112,18 @@ l'ultima verifica riuscita. Gli orari seguono il fuso del dispositivo.
 La disponibilità non può precedere la pubblicazione dell'estensione. I controlli
 periodici dipendono dalla rete e dalla pianificazione Android; un arresto forzato
 dell'app impedisce l'esecuzione fino alla riapertura. Non serve un token aggiuntivo.
-AnimeSchedule non fa parte di questa implementazione.
+AnimeSchedule è un'integrazione facoltativa: se collegato, i promemoria usano
+la trasmissione preferita; il calendario abituale resta il fallback.
 
 ## Verifiche
 
 - `ReleasePolicyTest`: finestre temporali, recupero da errori, decodifica delle
   date, formato dei backup e coordinamento/cancellazione degli aggiornamenti.
 - `scripts/tests/test_release_monitor_schema.py`: migrazioni effettive su SQLite,
-  rollback della coda, invii duplicati, esclusioni, visto/letto e cancellazione.
+  rollback della coda, invii duplicati, esclusioni, visto/letto, cancellazione e
+  ricevute separate per anticipo e trasmissione.
+- `ReleaseReminderPlanTest`: anticipo, deduplicazione per ID, cambio provider,
+  rinvii, ritardi, assenza di date e cambio dell'ora legale.
 - Le prove reali di layout e notifiche sono distinte dalle prove delle migrazioni;
   l'esecuzione pianificata a schermo spento va verificata per ogni dispositivo.
 

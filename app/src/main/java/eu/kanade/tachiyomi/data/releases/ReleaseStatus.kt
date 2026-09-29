@@ -32,8 +32,9 @@ object ReleaseStatus {
         )
     }
 
-    fun showTestNotification(context: Context) {
-        if (!ReleaseNotifications.canPost(context)) {
+    fun showTestNotification(context: Context, channel: String = Notifications.CHANNEL_NEW_CHAPTERS_EPISODES) {
+        if (channel == ReleaseReminders.CHANNEL) ReleaseReminders.createChannel(context)
+        if (!ReleaseNotifications.canPost(context, channel)) {
             context.startActivity(
                 Intent(
                     Settings.ACTION_APP_NOTIFICATION_SETTINGS,
@@ -42,9 +43,9 @@ object ReleaseStatus {
             return
         }
         NotificationManagerCompat.from(context).notify(
-            "release-test",
+            "release-test-$channel",
             23062,
-            NotificationCompat.Builder(context, Notifications.CHANNEL_NEW_CHAPTERS_EPISODES)
+            NotificationCompat.Builder(context, channel)
                 .setSmallIcon(R.drawable.ic_ani).setContentTitle("Nyanime")
                 .setContentText(context.getString(R.string.release_test_description)).setAutoCancel(true).build(),
         )

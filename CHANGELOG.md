@@ -8,6 +8,21 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 29 settembre 2026 — Promemoria del giorno prima
+
+- Avviso facoltativo 24 ore prima dell’episodio, attivo inizialmente e utilizzabile
+  anche con il calendario abituale senza collegare AnimeSchedule. Disattivabile da
+  Impostazioni → Libreria, senza perdere l’avviso all’orario della trasmissione.
+- Un solo allarme Android per il prossimo avviso, riprogrammato dopo riavvio,
+  aggiornamento, cambi dell’orario e dei permessi. Ricevute locali distinte per
+  anticipo e trasmissione evitano duplicati anche tra fonti con lo stesso ID verificato.
+- Recupero limitato degli avvisi ritardati, senza raffiche dopo lunghi periodi offline;
+  notifiche bloccate non registrate come consegnate. Titoli esclusi, episodi già visti
+  e modalità incognito rispettati.
+- Prova del canale dei promemoria nello Stato del monitoraggio e controlli Android
+  per gli avvisi puntuali. L’orario annunciato rimane distinto dalla disponibilità
+  effettiva del video nella fonte.
+
 ## 29 settembre 2026 — Memoria della compilazione GitHub
 
 - Profilo CI condiviso per preview e pull request: compilatore Kotlin nello stesso
