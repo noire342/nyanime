@@ -64,6 +64,23 @@ class LibraryShelfStatusTest {
         assertEquals(now + 30_000, statuses.getValue(4).nextReleaseAt)
     }
 
+    @Test
+    fun openingATitleClearsOnlyItsCurrentShelfNotices() {
+        val notices = listOf(
+            notice(itemId = 10, entryId = 1, number = 7.0),
+            notice(itemId = 11, entryId = 1, number = 8.0),
+            notice(itemId = 12, entryId = 2, number = 3.0),
+        )
+        val initial = animeShelfStatuses(notices, emptyList(), now = now)
+        val viewed = initial.getValue(1).noticeKeys
+        val after = animeShelfStatuses(notices, emptyList(), viewed = viewed, now = now)
+
+        assertFalse(after.containsKey(1))
+        assertEquals(1, after.getValue(2).newReleaseCount)
+        assertEquals(2, mangaShelfStatuses(notices.take(2), emptyList(), viewed = viewed, now = now)
+            .getValue(1).newReleaseCount)
+    }
+
     private fun notice(itemId: Long, entryId: Long, number: Double) = ReleaseStore.Notice(
         itemId = itemId,
         entryId = entryId,

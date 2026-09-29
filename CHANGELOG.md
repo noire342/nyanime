@@ -14,6 +14,9 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   progresso immediato e stati vuoti più utili.
 - Le nuove uscite vengono raccolte in cima finché non sono viste o lette.
 - La sezione “Tutti” riunisce Anime e Manga in un'unica raccolta ricercabile.
+- In “Tutti” la visualizzazione si può scegliere e ricordare; la griglia è
+  predefinita. Aprire un titolo rimuove i suoi avvisi già visti dalla raccolta
+  delle novità, senza segnare episodi o capitoli come guardati o letti.
 - Il passaggio tra “Tutti”, “Anime” e “Manga” mantiene ferma la testata e usa una
   dissolvenza discreta; filtri, categorie e azioni esistenti restano disponibili.
 - La Home usa un logo vettoriale trasparente coordinato ai temi chiaro e scuro,

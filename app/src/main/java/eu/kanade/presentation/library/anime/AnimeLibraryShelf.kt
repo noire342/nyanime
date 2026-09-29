@@ -16,6 +16,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.library.components.GlobalSearchItem
 import eu.kanade.presentation.library.components.LibraryShelfActionsSheet
 import eu.kanade.presentation.library.components.LibraryShelfItem
@@ -23,6 +24,7 @@ import eu.kanade.presentation.library.components.LibraryShelfPosition
 import eu.kanade.presentation.library.components.LibraryShelfSectionHeader
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.util.animateItemFastScroll
+import eu.kanade.tachiyomi.ui.library.acknowledgeShelfNotices
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -31,6 +33,8 @@ import tachiyomi.domain.library.anime.LibraryAnime
 import tachiyomi.presentation.core.components.FastScrollLazyColumn
 import tachiyomi.presentation.core.util.plus
 import tachiyomi.source.local.entries.anime.isLocal
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 @Composable
 internal fun AnimeLibraryShelf(
@@ -53,6 +57,15 @@ internal fun AnimeLibraryShelf(
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val motion = appMotionEnabled()
     val haptic = LocalHapticFeedback.current
+    val viewedNotices = remember { Injekt.get<UiPreferences>().viewedLibraryShelfNotices() }
+    fun open(item: AnimeLibraryItem) {
+        acknowledgeShelfNotices(viewedNotices, item.shelfStatus)
+        onClick(item.libraryAnime)
+    }
+    fun continueWatching(item: AnimeLibraryItem) {
+        acknowledgeShelfNotices(viewedNotices, item.shelfStatus)
+        onContinue(item.libraryAnime)
+    }
     val newsItems = remember(items) { items.filter { it.shelfStatus.newReleaseCount > 0 } }
     val shelfItems = remember(items) { items.filterNot { it.shelfStatus.newReleaseCount > 0 } }
     LaunchedEffect(Unit) {
@@ -95,8 +108,8 @@ internal fun AnimeLibraryShelf(
                     selection = selection,
                     downloading = downloading,
                     now = now,
-                    onClick = onClick,
-                    onContinue = onContinue,
+                    onClick = { open(item) },
+                    onContinue = { continueWatching(item) },
                     onDownload = { libraryAnime ->
                         downloading = downloading + libraryAnime.id
                         onDownload(libraryAnime)
@@ -127,8 +140,8 @@ internal fun AnimeLibraryShelf(
                     selection = selection,
                     downloading = downloading,
                     now = now,
-                    onClick = onClick,
-                    onContinue = onContinue,
+                    onClick = { open(item) },
+                    onContinue = { continueWatching(item) },
                     onDownload = { libraryAnime ->
                         downloading = downloading + libraryAnime.id
                         onDownload(libraryAnime)
@@ -163,8 +176,8 @@ internal fun AnimeLibraryShelf(
             isAnime = true,
             hasUnviewed = libraryAnime.unseenCount > 0,
             onDismiss = { menuItem = null },
-            onOpen = { onClick(libraryAnime) },
-            onContinue = { onContinue(libraryAnime) }.takeIf { libraryAnime.unseenCount > 0 },
+            onOpen = { open(item) },
+            onContinue = { continueWatching(item) }.takeIf { libraryAnime.unseenCount > 0 },
             onMarkViewed = { onMarkSeen(libraryAnime, true) },
             onMarkUnviewed = { onMarkSeen(libraryAnime, false) },
             onUpdate = onUpdate,

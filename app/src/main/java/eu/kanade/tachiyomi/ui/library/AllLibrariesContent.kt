@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
@@ -18,7 +19,10 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CollectionsBookmark
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.ViewModule
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,10 +55,17 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.domain.ui.UiPreferences
+import eu.kanade.presentation.library.components.DownloadsBadge
+import eu.kanade.presentation.library.components.EntryComfortableGridItem
+import eu.kanade.presentation.library.components.EntryCompactGridItem
+import eu.kanade.presentation.library.components.EntryListItem
+import eu.kanade.presentation.library.components.LazyLibraryGrid
 import eu.kanade.presentation.library.components.LibraryShelfActionsSheet
 import eu.kanade.presentation.library.components.LibraryShelfItem
 import eu.kanade.presentation.library.components.LibraryShelfPosition
 import eu.kanade.presentation.library.components.LibraryShelfSectionHeader
+import eu.kanade.presentation.library.components.UnviewedBadge
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.util.animateItemFastScroll
@@ -77,13 +88,17 @@ import kotlinx.coroutines.launch
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.domain.entries.anime.model.AnimeCover
 import tachiyomi.domain.entries.manga.model.MangaCover
+import tachiyomi.domain.library.model.LibraryDisplayMode
+import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.presentation.core.components.FastScrollLazyColumn
 import tachiyomi.presentation.core.components.material.Scaffold
+import tachiyomi.presentation.core.util.collectAsState
 import tachiyomi.presentation.core.util.plus
 import tachiyomi.source.local.entries.anime.isLocal
 import tachiyomi.source.local.entries.manga.isLocal
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import androidx.compose.foundation.lazy.grid.items as gridItems
 
 @Composable
 internal fun LibrariesTab.AllLibrariesContent() {
@@ -97,6 +112,9 @@ internal fun LibrariesTab.AllLibrariesContent() {
     val playerPreferences = remember { Injekt.get<PlayerPreferences>() }
     val snackbar = remember { SnackbarHostState() }
     var query by remember { mutableStateOf<String?>(null) }
+    val displayPreference = remember { Injekt.get<LibraryPreferences>().allDisplayMode() }
+    val displayMode by displayPreference.collectAsState()
+    val viewedNotices = remember { Injekt.get<UiPreferences>().viewedLibraryShelfNotices() }
 
     val animeItems = remember(animeState.library, query) {
         animeState.library.values
@@ -173,19 +191,24 @@ internal fun LibrariesTab.AllLibrariesContent() {
                     AllLibraryControls(
                         query = query,
                         count = entries.size,
+                        displayMode = displayMode,
+                        onDisplayMode = displayPreference::set,
                         onQueryChange = { query = it },
                         onRefresh = ::refreshAll,
                     )
                     AllLibraryShelf(
                         entries = entries,
+                        displayMode = displayMode,
                         contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
                         onOpen = { entry ->
+                            acknowledgeShelfNotices(viewedNotices, entry.status)
                             when (entry) {
                                 is UnifiedLibraryEntry.Anime -> navigator.push(AnimeScreen(entry.item.libraryAnime.id))
                                 is UnifiedLibraryEntry.Manga -> navigator.push(MangaScreen(entry.item.libraryManga.id))
                             }
                         },
                         onContinue = { entry ->
+                            acknowledgeShelfNotices(viewedNotices, entry.status)
                             when (entry) {
                                 is UnifiedLibraryEntry.Anime -> scope.launchIO {
                                     val episode = animeModel.getNextUnseenEpisode(entry.item.libraryAnime.anime)
@@ -241,11 +264,14 @@ internal fun LibrariesTab.AllLibrariesContent() {
 private fun AllLibraryControls(
     query: String?,
     count: Int,
+    displayMode: LibraryDisplayMode,
+    onDisplayMode: (LibraryDisplayMode) -> Unit,
     onQueryChange: (String?) -> Unit,
     onRefresh: () -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    var displayMenu by remember { mutableStateOf(false) }
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
         shape = RoundedCornerShape(15.dp),
@@ -274,6 +300,27 @@ private fun AllLibraryControls(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Box {
+                    IconButton(onClick = { displayMenu = true }) {
+                        Icon(Icons.Outlined.ViewModule, "Visualizzazione")
+                    }
+                    DropdownMenu(expanded = displayMenu, onDismissRequest = { displayMenu = false }) {
+                        allLibraryDisplayModes.forEach { (mode, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    onDisplayMode(mode)
+                                    displayMenu = false
+                                },
+                                leadingIcon = if (displayMode == mode) {
+                                    { Icon(Icons.Outlined.CollectionsBookmark, null) }
+                                } else {
+                                    null
+                                },
+                            )
+                        }
+                    }
+                }
                 IconButton(onClick = { onQueryChange("") }) {
                     Icon(Icons.Outlined.Search, stringResource(R.string.library_search_action))
                 }
@@ -309,9 +356,18 @@ private fun AllLibraryControls(
     }
 }
 
+private val allLibraryDisplayModes = listOf(
+    LibraryDisplayMode.CompactGrid to "Griglia",
+    LibraryDisplayMode.ComfortableGrid to "Griglia ampia",
+    LibraryDisplayMode.CoverOnlyGrid to "Solo copertine",
+    LibraryDisplayMode.List to "Elenco",
+    LibraryDisplayMode.Shelf to "Scaffale",
+)
+
 @Composable
 private fun AllLibraryShelf(
     entries: List<UnifiedLibraryEntry>,
+    displayMode: LibraryDisplayMode,
     contentPadding: PaddingValues,
     onOpen: (UnifiedLibraryEntry) -> Unit,
     onContinue: (UnifiedLibraryEntry) -> Unit,
@@ -340,72 +396,83 @@ private fun AllLibraryShelf(
         }
     }
 
-    FastScrollLazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = contentPadding + PaddingValues(horizontal = 12.dp, vertical = 7.dp),
-    ) {
-        if (news.isNotEmpty()) {
-            item(key = "all_news_header", contentType = "library_shelf_header") {
-                LibraryShelfSectionHeader(
-                    title = stringResource(R.string.library_shelf_news),
-                    count = news.size,
-                    isNews = true,
-                )
+    if (displayMode == LibraryDisplayMode.Shelf) {
+        FastScrollLazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = contentPadding + PaddingValues(horizontal = 12.dp, vertical = 7.dp),
+        ) {
+            if (news.isNotEmpty()) {
+                item(key = "all_news_header", contentType = "library_shelf_header") {
+                    LibraryShelfSectionHeader(
+                        title = stringResource(R.string.library_shelf_news),
+                        count = news.size,
+                        isNews = true,
+                    )
+                }
+            }
+            news.forEachIndexed { index, entry ->
+                item(key = "all_news_${entry.key}", contentType = "all_library_shelf_item") {
+                    UnifiedShelfRow(
+                        modifier = Modifier.then(if (motion) Modifier.animateItemFastScroll() else Modifier),
+                        entry = entry,
+                        index = index,
+                        groupSize = news.size,
+                        now = now,
+                        downloading = entry.key in downloading,
+                        onOpen = { onOpen(entry) },
+                        onContinue = { onContinue(entry) },
+                        onDownload = {
+                            downloading = downloading + entry.key
+                            onDownload(entry)
+                        },
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            menuEntry = entry
+                        },
+                    )
+                }
+            }
+            if (news.isNotEmpty() && library.isNotEmpty()) {
+                item(key = "all_library_header", contentType = "library_shelf_header") {
+                    LibraryShelfSectionHeader(
+                        title = stringResource(R.string.library_shelf_collection),
+                        count = library.size,
+                        isNews = false,
+                    )
+                }
+            }
+            library.forEachIndexed { index, entry ->
+                item(key = "all_library_${entry.key}", contentType = "all_library_shelf_item") {
+                    UnifiedShelfRow(
+                        modifier = Modifier.then(if (motion) Modifier.animateItemFastScroll() else Modifier),
+                        entry = entry,
+                        index = index,
+                        groupSize = library.size,
+                        now = now,
+                        downloading = entry.key in downloading,
+                        onOpen = { onOpen(entry) },
+                        onContinue = { onContinue(entry) },
+                        onDownload = {
+                            downloading = downloading + entry.key
+                            onDownload(entry)
+                        },
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            menuEntry = entry
+                        },
+                    )
+                }
             }
         }
-        news.forEachIndexed { index, entry ->
-            item(key = "all_news_${entry.key}", contentType = "all_library_shelf_item") {
-                UnifiedShelfRow(
-                    modifier = Modifier.then(if (motion) Modifier.animateItemFastScroll() else Modifier),
-                    entry = entry,
-                    index = index,
-                    groupSize = news.size,
-                    now = now,
-                    downloading = entry.key in downloading,
-                    onOpen = { onOpen(entry) },
-                    onContinue = { onContinue(entry) },
-                    onDownload = {
-                        downloading = downloading + entry.key
-                        onDownload(entry)
-                    },
-                    onLongClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        menuEntry = entry
-                    },
-                )
-            }
-        }
-        if (news.isNotEmpty() && library.isNotEmpty()) {
-            item(key = "all_library_header", contentType = "library_shelf_header") {
-                LibraryShelfSectionHeader(
-                    title = stringResource(R.string.library_shelf_collection),
-                    count = library.size,
-                    isNews = false,
-                )
-            }
-        }
-        library.forEachIndexed { index, entry ->
-            item(key = "all_library_${entry.key}", contentType = "all_library_shelf_item") {
-                UnifiedShelfRow(
-                    modifier = Modifier.then(if (motion) Modifier.animateItemFastScroll() else Modifier),
-                    entry = entry,
-                    index = index,
-                    groupSize = library.size,
-                    now = now,
-                    downloading = entry.key in downloading,
-                    onOpen = { onOpen(entry) },
-                    onContinue = { onContinue(entry) },
-                    onDownload = {
-                        downloading = downloading + entry.key
-                        onDownload(entry)
-                    },
-                    onLongClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        menuEntry = entry
-                    },
-                )
-            }
-        }
+    } else {
+        AllLibraryGridOrList(
+            entries = entries,
+            displayMode = displayMode,
+            contentPadding = contentPadding,
+            onOpen = onOpen,
+            onContinue = onContinue,
+            onLongClick = { menuEntry = it },
+        )
     }
 
     menuEntry?.let { entry ->
@@ -424,6 +491,81 @@ private fun AllLibraryShelf(
             onSelect = null,
             onRemove = null,
         )
+    }
+}
+
+@Composable
+private fun AllLibraryGridOrList(
+    entries: List<UnifiedLibraryEntry>,
+    displayMode: LibraryDisplayMode,
+    contentPadding: PaddingValues,
+    onOpen: (UnifiedLibraryEntry) -> Unit,
+    onContinue: (UnifiedLibraryEntry) -> Unit,
+    onLongClick: (UnifiedLibraryEntry) -> Unit,
+) {
+    if (displayMode == LibraryDisplayMode.List) {
+        FastScrollLazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = contentPadding + PaddingValues(vertical = 8.dp),
+        ) {
+            items(entries, key = { it.key }, contentType = { "all_library_list_item" }) { entry ->
+                EntryListItem(
+                    title = entry.title,
+                    coverData = entry.cover,
+                    contentLabels = entry.contentLabels,
+                    libraryStyle = true,
+                    onClick = { onOpen(entry) },
+                    onLongClick = { onLongClick(entry) },
+                    onClickContinueViewing = { onContinue(entry) }.takeIf { entry.unviewedCount > 0 },
+                    badge = {
+                        DownloadsBadge(count = entry.downloadCount)
+                        UnviewedBadge(count = entry.unviewedCount)
+                    },
+                )
+            }
+        }
+    } else {
+        LazyLibraryGrid(
+            modifier = Modifier.fillMaxSize(),
+            columns = 0,
+            contentPadding = contentPadding,
+            showTitle = displayMode != LibraryDisplayMode.CoverOnlyGrid,
+        ) {
+            gridItems(entries, key = { it.key }, contentType = { "all_library_grid_item" }) { entry ->
+                val onOpenEntry = { onOpen(entry) }
+                val onLongClickEntry = { onLongClick(entry) }
+                val onContinueEntry = { onContinue(entry) }.takeIf { entry.unviewedCount > 0 }
+                if (displayMode == LibraryDisplayMode.ComfortableGrid) {
+                    EntryComfortableGridItem(
+                        title = entry.title,
+                        coverData = entry.cover,
+                        contentLabels = entry.contentLabels,
+                        libraryStyle = true,
+                        onClick = onOpenEntry,
+                        onLongClick = onLongClickEntry,
+                        onClickContinueViewing = onContinueEntry,
+                        coverBadgeStart = {
+                            DownloadsBadge(count = entry.downloadCount)
+                            UnviewedBadge(count = entry.unviewedCount)
+                        },
+                    )
+                } else {
+                    EntryCompactGridItem(
+                        title = entry.title.takeIf { displayMode == LibraryDisplayMode.CompactGrid },
+                        coverData = entry.cover,
+                        contentLabels = entry.contentLabels,
+                        libraryStyle = true,
+                        onClick = onOpenEntry,
+                        onLongClick = onLongClickEntry,
+                        onClickContinueViewing = onContinueEntry,
+                        coverBadgeStart = {
+                            DownloadsBadge(count = entry.downloadCount)
+                            UnviewedBadge(count = entry.unviewedCount)
+                        },
+                    )
+                }
+            }
+        }
     }
 }
 

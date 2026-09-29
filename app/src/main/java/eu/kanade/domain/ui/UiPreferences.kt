@@ -40,6 +40,8 @@ class UiPreferences(
 
     fun dismissedLibraryUpdates() = preferenceStore.getStringSet("nyanime_dismissed_library_updates")
 
+    fun viewedLibraryShelfNotices() = preferenceStore.getStringSet("nyanime_viewed_library_shelf_notices")
+
     fun autoAcknowledgeHomeUpdates() = preferenceStore.getBoolean("nyanime_auto_acknowledge_home_updates", true)
 
     fun lastSeenAnimeUpdateNotice() = preferenceStore.getLong("nyanime_last_seen_anime_update_notice")

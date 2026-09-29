@@ -18,6 +18,7 @@ import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.entries.anime.interactor.UpdateAnime
 import eu.kanade.domain.items.episode.interactor.SetSeenStatus
 import eu.kanade.domain.items.episode.model.applyFilters
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.components.SEARCH_DEBOUNCE_MILLIS
 import eu.kanade.presentation.entries.DownloadAction
 import eu.kanade.presentation.library.components.LibraryToolbarTitle
@@ -386,10 +387,12 @@ class AnimeLibraryScreenModel(
      * Get the categories and all its anime from the database.
      */
     private fun getLibraryFlow(): Flow<AnimeLibraryMap> {
+        val viewedNotices = Injekt.get<UiPreferences>().viewedLibraryShelfNotices()
         val shelfStatuses = combine(
             releaseStore.noticeFlow(ReleaseMedium.ANIME),
             airingRepository.effectiveEvents(),
-        ) { notices, events -> animeShelfStatuses(notices, events) }
+            viewedNotices.changes(),
+        ) { notices, events, viewed -> animeShelfStatuses(notices, events, viewed) }
         val animelibAnimesFlow = combine(
             getLibraryAnime.subscribe(),
             getAnimelibItemPreferencesFlow(),

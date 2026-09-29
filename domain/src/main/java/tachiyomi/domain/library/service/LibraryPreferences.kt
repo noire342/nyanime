@@ -22,6 +22,13 @@ class LibraryPreferences(
         LibraryDisplayMode.Serializer::deserialize,
     )
 
+    fun allDisplayMode() = preferenceStore.getObject(
+        "nyanime_all_library_display_mode",
+        LibraryDisplayMode.default,
+        LibraryDisplayMode.Serializer::serialize,
+        LibraryDisplayMode.Serializer::deserialize,
+    )
+
     fun mangaSortingMode() = preferenceStore.getObject(
         "library_sorting_mode",
         MangaLibrarySort.default,

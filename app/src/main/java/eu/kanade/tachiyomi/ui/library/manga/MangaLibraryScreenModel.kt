@@ -372,10 +372,12 @@ class MangaLibraryScreenModel(
      * Get the categories and all its manga from the database.
      */
     private fun getLibraryFlow(): Flow<MangaLibraryMap> {
+        val viewedNotices = uiPreferences.viewedLibraryShelfNotices()
         val shelfStatuses = combine(
             releaseStore.noticeFlow(ReleaseMedium.MANGA),
             chapterScheduleRepository.events(),
-        ) { notices, events -> mangaShelfStatuses(notices, events) }
+            viewedNotices.changes(),
+        ) { notices, events, viewed -> mangaShelfStatuses(notices, events, viewed) }
         val libraryMangasFlow = combine(
             getLibraryManga.subscribe(),
             getLibraryItemPreferencesFlow(),
