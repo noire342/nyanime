@@ -1,6 +1,7 @@
 package eu.kanade.presentation.library.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -90,7 +91,9 @@ fun EntryCompactGridItem(
     coverBadgeStart: @Composable (RowScope.() -> Unit)? = null,
     coverBadgeEnd: @Composable (RowScope.() -> Unit)? = null,
     contentLabels: List<String>? = null,
+    libraryStyle: Boolean = false,
 ) {
+    val modernLibrary = libraryStyle && LocalNyanimeStyle.current
     val poster = rememberAnimePosterSource(coverData)
     val openDetails = if (poster != null) posterOpen(poster, title.orEmpty(), onClick) else onClick
 
@@ -99,6 +102,7 @@ fun EntryCompactGridItem(
         isSelected = isSelected,
         onClick = openDetails,
         onLongClick = onLongClick,
+        modernLibrary = modernLibrary,
     ) {
         EntryGridCover(
             poster = poster,
@@ -109,6 +113,7 @@ fun EntryCompactGridItem(
                         .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha)
                         .posterSource(poster),
                     data = coverData,
+                    shape = if (modernLibrary) RoundedCornerShape(13.dp) else MaterialTheme.shapes.extraSmall,
                     initialPainter = posterSourcePlaceholder(poster),
                     onPainterReady = { poster?.painter = it },
                 )
@@ -204,7 +209,9 @@ fun EntryComfortableGridItem(
     coverBadgeEnd: (@Composable RowScope.() -> Unit)? = null,
     onClickContinueViewing: (() -> Unit)? = null,
     contentLabels: List<String>? = null,
+    libraryStyle: Boolean = false,
 ) {
+    val modernLibrary = libraryStyle && LocalNyanimeStyle.current
     val poster = rememberAnimePosterSource(coverData)
     val openDetails = if (poster != null) posterOpen(poster, title.orEmpty(), onClick) else onClick
 
@@ -213,6 +220,7 @@ fun EntryComfortableGridItem(
         isSelected = isSelected,
         onClick = openDetails,
         onLongClick = onLongClick,
+        modernLibrary = modernLibrary,
     ) {
         Column {
             EntryGridCover(
@@ -224,6 +232,7 @@ fun EntryComfortableGridItem(
                             .alpha(if (isSelected) GRID_SELECTED_COVER_ALPHA else coverAlpha)
                             .posterSource(poster),
                         data = coverData,
+                        shape = if (modernLibrary) RoundedCornerShape(13.dp) else MaterialTheme.shapes.extraSmall,
                         initialPainter = posterSourcePlaceholder(poster),
                         onPainterReady = { poster?.painter = it },
                     )
@@ -327,17 +336,32 @@ private fun GridItemSelectable(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
+    modernLibrary: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    val shape = if (modernLibrary) RoundedCornerShape(16.dp) else MaterialTheme.shapes.small
+    val container = if (modernLibrary) MaterialTheme.colorScheme.surfaceContainerLow else Color.Transparent
     Box(
         modifier = modifier
-            .clip(MaterialTheme.shapes.small)
+            .clip(shape)
+            .background(container)
+            .then(
+                if (modernLibrary) {
+                    Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f), shape)
+                } else {
+                    Modifier
+                },
+            )
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
-            .selectedOutline(isSelected = isSelected, color = MaterialTheme.colorScheme.secondary)
-            .padding(4.dp),
+            .selectedOutline(
+                isSelected = isSelected,
+                color = MaterialTheme.colorScheme.secondary,
+                radius = if (modernLibrary) 16.dp else 0.dp,
+            )
+            .padding(if (modernLibrary) 3.dp else 4.dp),
     ) {
         val contentColor = if (isSelected) {
             MaterialTheme.colorScheme.onSecondary
@@ -356,7 +380,12 @@ private fun GridItemSelectable(
 private fun Modifier.selectedOutline(
     isSelected: Boolean,
     color: Color,
-) = drawBehind { if (isSelected) drawRect(color = color) }
+    radius: Dp,
+) = drawBehind {
+    if (isSelected) {
+        drawRoundRect(color = color, cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius.toPx()))
+    }
+}
 
 /**
  * Layout of list item.
@@ -375,13 +404,27 @@ fun EntryListItem(
     containerHeight: Int = 0,
     modifier: Modifier = Modifier,
     contentLabels: List<String>? = null,
+    libraryStyle: Boolean = false,
 ) {
     val poster = rememberAnimePosterSource(coverData)
     val openDetails = if (poster != null) posterOpen(poster, title.orEmpty(), onClick) else onClick
+    val modernLibrary = libraryStyle && LocalNyanimeStyle.current
+    val shape = RoundedCornerShape(16.dp)
 
     Row(
         modifier = modifier
+            .then(if (modernLibrary) Modifier.padding(horizontal = 12.dp, vertical = 4.dp) else Modifier)
             .nsfwPrivacy(coverData, contentLabels)
+            .then(
+                if (modernLibrary) {
+                    Modifier
+                        .clip(shape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .42f), shape)
+                } else {
+                    Modifier
+                },
+            )
             .selectedBackground(isSelected)
             .height(
                 when (entries) {
@@ -396,7 +439,7 @@ fun EntryListItem(
                 onClick = openDetails,
                 onLongClick = onLongClick,
             )
-            .padding(horizontal = 16.dp, vertical = 3.dp),
+            .padding(horizontal = if (modernLibrary) 8.dp else 16.dp, vertical = if (modernLibrary) 6.dp else 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ItemCover.Book(
@@ -404,6 +447,7 @@ fun EntryListItem(
                 .fillMaxHeight()
                 .alpha(coverAlpha).posterSource(poster),
             data = coverData,
+            shape = if (modernLibrary) RoundedCornerShape(11.dp) else MaterialTheme.shapes.extraSmall,
             initialPainter = posterSourcePlaceholder(poster),
             onPainterReady = { poster?.painter = it },
         )

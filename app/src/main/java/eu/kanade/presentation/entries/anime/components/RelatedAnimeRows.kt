@@ -155,6 +155,7 @@ private fun RelatedAnimeItem(
     when (displayMode) {
         LibraryDisplayMode.ComfortableGrid,
         LibraryDisplayMode.List,
+        LibraryDisplayMode.Shelf,
         -> {
             EntryComfortableGridItem(
                 title = anime.title,

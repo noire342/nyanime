@@ -13,11 +13,17 @@ class LibraryFlagsTest {
 
     @Test
     fun `Check the amount of flags`() {
-        LibraryDisplayMode.values.size shouldBe 4
+        LibraryDisplayMode.values.size shouldBe 5
         MangaLibrarySort.types.size shouldBe 10
         MangaLibrarySort.directions.size shouldBe 2
         AnimeLibrarySort.types.size shouldBe 11
         AnimeLibrarySort.directions.size shouldBe 2
+    }
+
+    @Test
+    fun `Shelf display mode survives preference serialization`() {
+        LibraryDisplayMode.Serializer.serialize(LibraryDisplayMode.Shelf) shouldBe "SHELF"
+        LibraryDisplayMode.Serializer.deserialize("SHELF") shouldBe LibraryDisplayMode.Shelf
     }
 
     @Test

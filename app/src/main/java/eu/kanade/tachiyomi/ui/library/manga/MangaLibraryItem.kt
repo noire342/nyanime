@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.ui.library.manga
 
 import eu.kanade.tachiyomi.source.manga.getNameForMangaInfo
+import eu.kanade.tachiyomi.ui.library.LibraryShelfStatus
 import tachiyomi.domain.library.manga.LibraryManga
 import tachiyomi.domain.source.manga.service.MangaSourceManager
 import uy.kohesive.injekt.Injekt
@@ -12,6 +13,7 @@ class MangaLibraryItem(
     var unreadCount: Long = -1,
     var isLocal: Boolean = false,
     var sourceLanguage: String = "",
+    val shelfStatus: LibraryShelfStatus = LibraryShelfStatus(),
     private val sourceManager: MangaSourceManager = Injekt.get(),
 ) {
     /**

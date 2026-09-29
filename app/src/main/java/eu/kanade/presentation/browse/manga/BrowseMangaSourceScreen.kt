@@ -128,7 +128,7 @@ fun BrowseSourceContent(
                 onMangaLongClick = onMangaLongClick,
             )
         }
-        LibraryDisplayMode.List -> {
+        LibraryDisplayMode.List, LibraryDisplayMode.Shelf -> {
             BrowseMangaSourceList(
                 mangaList = mangaList,
                 entries = entries,

@@ -128,7 +128,7 @@ fun BrowseAnimeSourceContent(
                 onAnimeLongClick = onAnimeLongClick,
             )
         }
-        LibraryDisplayMode.List -> {
+        LibraryDisplayMode.List, LibraryDisplayMode.Shelf -> {
             BrowseAnimeSourceList(
                 animeList = animeList,
                 entries = entries,

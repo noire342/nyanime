@@ -33,6 +33,7 @@ import eu.kanade.domain.ui.model.NavStyle
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.entries.components.LibraryBottomActionMenu
 import eu.kanade.presentation.library.DeleteLibraryEntryDialog
+import eu.kanade.presentation.library.components.LibraryEmptyScreen
 import eu.kanade.presentation.library.components.LibraryToolbar
 import eu.kanade.presentation.library.manga.MangaLibraryContent
 import eu.kanade.presentation.library.manga.MangaLibrarySettingsDialog
@@ -63,7 +64,6 @@ import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
-import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.screens.EmptyScreenAction
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.source.local.entries.manga.isLocal
@@ -201,8 +201,10 @@ data object MangaLibraryTab : Tab {
                 state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
                 state.searchQuery.isNullOrEmpty() && !state.hasActiveFilters && state.isLibraryEmpty -> {
                     val handler = LocalUriHandler.current
-                    EmptyScreen(
+                    LibraryEmptyScreen(
                         stringRes = MR.strings.information_empty_library,
+                        supportingText = context.getString(R.string.library_empty_hint),
+                        isManga = true,
                         modifier = Modifier.padding(contentPadding),
                         actions = persistentListOf(
                             EmptyScreenAction(
@@ -214,6 +216,16 @@ data object MangaLibraryTab : Tab {
                     )
                 }
                 else -> {
+                    val continueReading: (LibraryManga) -> Unit = { item ->
+                        scope.launchIO {
+                            val chapter = screenModel.getNextUnreadChapter(item.manga)
+                            if (chapter != null) {
+                                context.startActivity(ReaderActivity.newIntent(context, chapter.mangaId, chapter.id))
+                            } else {
+                                snackbarHostState.showSnackbar(context.stringResource(MR.strings.no_next_chapter))
+                            }
+                        }
+                    }
                     MangaLibraryContent(
                         categories = state.categories,
                         searchQuery = state.searchQuery,
@@ -224,25 +236,34 @@ data object MangaLibraryTab : Tab {
                         showPageTabs = state.showCategoryTabs || !state.searchQuery.isNullOrEmpty(),
                         onChangeCurrentPage = { screenModel.activeCategoryIndex = it },
                         onMangaClicked = { navigator.push(MangaScreen(it)) },
-                        onContinueReadingClicked = { it: LibraryManga ->
-                            scope.launchIO {
-                                val chapter = screenModel.getNextUnreadChapter(it.manga)
-                                if (chapter != null) {
-                                    context.startActivity(
-                                        ReaderActivity.newIntent(
-                                            context,
-                                            chapter.mangaId,
-                                            chapter.id,
-                                        ),
-                                    )
+                        onContinueReadingClicked = continueReading.takeIf { state.showMangaContinueButton },
+                        onShelfContinueReading = continueReading,
+                        onShelfDownload = { item ->
+                            screenModel.downloadAllUnread(item.manga)
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    context.getString(R.string.library_shelf_download_started),
+                                )
+                            }
+                        },
+                        onShelfMarkRead = screenModel::markRead,
+                        onShelfChangeCategory = screenModel::openChangeCategoryDialog,
+                        onShelfRemove = screenModel::openDeleteMangaDialog,
+                        onOpenSearch = { screenModel.search("") },
+                        onOpenFilter = screenModel::showSettingsDialog,
+                        onOpenUpdates = { navigator.push(MangaUpdatesScreen) },
+                        onOpenRandomEntry = {
+                            scope.launch {
+                                val randomItem = screenModel.getRandomLibraryItemForCurrentCategory()
+                                if (randomItem != null) {
+                                    navigator.push(MangaScreen(randomItem.libraryManga.manga.id))
                                 } else {
                                     snackbarHostState.showSnackbar(
-                                        context.stringResource(MR.strings.no_next_chapter),
+                                        context.stringResource(MR.strings.information_no_entries_found),
                                     )
                                 }
                             }
-                            Unit
-                        }.takeIf { state.showMangaContinueButton },
+                        },
                         onToggleSelection = screenModel::toggleSelection,
                         onToggleRangeSelection = {
                             screenModel.toggleRangeSelection(it)

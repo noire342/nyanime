@@ -78,7 +78,9 @@ AND (s.mode = 'FOLLOW' OR p.favorite = 1
     OR EXISTS(SELECT 1 FROM episodes i WHERE i.anime_id = p._id AND (i.seen = 1 OR i.last_second_seen > 0)));
 
 getNotices:
-SELECT r.* FROM release_notice r JOIN episodes i ON i._id = r.item_id WHERE i.seen = 0 AND r.delivered_at != 1 ORDER BY r.created_at DESC;
+SELECT r.item_id, r.entry_id, r.created_at, r.delivered_at, r.source_at, i.episode_number
+FROM release_notice r JOIN episodes i ON i._id = r.item_id
+WHERE i.seen = 0 ORDER BY r.created_at DESC;
 
 markMetadata:
 UPDATE release_check SET metadata_at = ? WHERE entry_id = ?;

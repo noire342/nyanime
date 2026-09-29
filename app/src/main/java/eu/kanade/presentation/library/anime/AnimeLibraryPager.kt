@@ -17,15 +17,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import eu.kanade.core.preference.PreferenceMutableState
 import eu.kanade.presentation.library.components.GlobalSearchItem
+import eu.kanade.presentation.library.components.LibraryEmptyScreen
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryItem
 import tachiyomi.domain.library.anime.LibraryAnime
 import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.i18n.MR
-import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.util.plus
 
 @Composable
@@ -42,6 +44,13 @@ fun AnimeLibraryPager(
     onClickAnime: (LibraryAnime) -> Unit,
     onLongClickAnime: (LibraryAnime) -> Unit,
     onClickContinueWatching: ((LibraryAnime) -> Unit)?,
+    onShelfContinueWatching: (LibraryAnime) -> Unit,
+    onShelfDownload: (LibraryAnime) -> Unit,
+    onShelfMarkSeen: (LibraryAnime, Boolean) -> Unit,
+    onShelfUpdate: () -> Unit,
+    onShelfChangeCategory: (LibraryAnime) -> Unit,
+    onShelfSelect: (LibraryAnime) -> Unit,
+    onShelfRemove: (LibraryAnime) -> Unit,
 ) {
     BoxWithConstraints {
         val density = LocalDensity.current
@@ -84,6 +93,24 @@ fun AnimeLibraryPager(
                         onClick = onClickAnime,
                         onClickContinueWatching = onClickContinueWatching,
                         onLongClick = onLongClickAnime,
+                        searchQuery = searchQuery,
+                        onGlobalSearchClicked = onGlobalSearchClicked,
+                    )
+                }
+
+                LibraryDisplayMode.Shelf -> {
+                    AnimeLibraryShelf(
+                        items = library,
+                        contentPadding = contentPadding,
+                        selection = selectedAnime,
+                        onClick = onClickAnime,
+                        onContinue = onShelfContinueWatching,
+                        onDownload = onShelfDownload,
+                        onMarkSeen = onShelfMarkSeen,
+                        onUpdate = onShelfUpdate,
+                        onChangeCategory = onShelfChangeCategory,
+                        onSelect = onShelfSelect,
+                        onRemove = onShelfRemove,
                         searchQuery = searchQuery,
                         onGlobalSearchClicked = onGlobalSearchClicked,
                     )
@@ -151,8 +178,16 @@ private fun LibraryPagerEmptyScreen(
             )
         }
 
-        EmptyScreen(
+        LibraryEmptyScreen(
             stringRes = msg,
+            supportingText = LocalContext.current.getString(
+                when {
+                    !searchQuery.isNullOrEmpty() -> R.string.library_empty_search_hint
+                    hasActiveFilters -> R.string.library_empty_filter_hint
+                    else -> R.string.library_empty_category_hint
+                },
+            ),
+            isManga = false,
             modifier = Modifier.weight(1f),
         )
     }

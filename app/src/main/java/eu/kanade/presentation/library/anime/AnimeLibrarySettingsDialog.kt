@@ -229,6 +229,7 @@ private val displayModes = listOf(
     MR.strings.action_display_comfortable_grid to LibraryDisplayMode.ComfortableGrid,
     MR.strings.action_display_cover_only_grid to LibraryDisplayMode.CoverOnlyGrid,
     MR.strings.action_display_list to LibraryDisplayMode.List,
+    MR.strings.action_display_shelf to LibraryDisplayMode.Shelf,
 )
 
 @Composable
@@ -269,7 +270,7 @@ private fun ColumnScope.DisplayPage(
             onChange = columnPreference::set,
             pillColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         )
-    } else {
+    } else if (displayMode != LibraryDisplayMode.Shelf) {
         SliderItem(
             value = columns,
             valueRange = 0..10,

@@ -8,6 +8,17 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 30 settembre 2026 — Libreria Anime e Manga ridisegnata
+
+- Libreria ModernUI più leggibile, con testata compatta, categorie ordinate,
+  progresso immediato e stati vuoti più utili.
+- Le nuove uscite vengono raccolte in cima finché non sono viste o lette.
+- La sezione “Tutti” riunisce Anime e Manga in un'unica raccolta ricercabile.
+- Il passaggio tra “Tutti”, “Anime” e “Manga” mantiene ferma la testata e usa una
+  dissolvenza discreta; filtri, categorie e azioni esistenti restano disponibili.
+- La Home usa un logo vettoriale trasparente coordinato ai temi chiaro e scuro,
+  mentre la testata di “Altro” resta invariata.
+
 ## 29 settembre 2026 — Ripresa intelligente degli episodi
 
 - “Continua a guardare” propone il prossimo episodio quando restano pochi secondi

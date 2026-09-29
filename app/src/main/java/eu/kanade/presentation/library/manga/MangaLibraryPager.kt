@@ -17,15 +17,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import eu.kanade.core.preference.PreferenceMutableState
 import eu.kanade.presentation.library.components.GlobalSearchItem
+import eu.kanade.presentation.library.components.LibraryEmptyScreen
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryItem
 import tachiyomi.domain.library.manga.LibraryManga
 import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.i18n.MR
-import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.util.plus
 
 @Composable
@@ -42,6 +44,13 @@ fun MangaLibraryPager(
     onClickManga: (LibraryManga) -> Unit,
     onLongClickManga: (LibraryManga) -> Unit,
     onClickContinueReading: ((LibraryManga) -> Unit)?,
+    onShelfContinueReading: (LibraryManga) -> Unit,
+    onShelfDownload: (LibraryManga) -> Unit,
+    onShelfMarkRead: (LibraryManga, Boolean) -> Unit,
+    onShelfUpdate: () -> Unit,
+    onShelfChangeCategory: (LibraryManga) -> Unit,
+    onShelfSelect: (LibraryManga) -> Unit,
+    onShelfRemove: (LibraryManga) -> Unit,
 ) {
     BoxWithConstraints {
         val density = LocalDensity.current
@@ -84,6 +93,24 @@ fun MangaLibraryPager(
                         onClick = onClickManga,
                         onLongClick = onLongClickManga,
                         onClickContinueReading = onClickContinueReading,
+                        searchQuery = searchQuery,
+                        onGlobalSearchClicked = onGlobalSearchClicked,
+                    )
+                }
+
+                LibraryDisplayMode.Shelf -> {
+                    MangaLibraryShelf(
+                        items = library,
+                        contentPadding = contentPadding,
+                        selection = selectedManga,
+                        onClick = onClickManga,
+                        onContinue = onShelfContinueReading,
+                        onDownload = onShelfDownload,
+                        onMarkRead = onShelfMarkRead,
+                        onUpdate = onShelfUpdate,
+                        onChangeCategory = onShelfChangeCategory,
+                        onSelect = onShelfSelect,
+                        onRemove = onShelfRemove,
                         searchQuery = searchQuery,
                         onGlobalSearchClicked = onGlobalSearchClicked,
                     )
@@ -151,8 +178,16 @@ private fun LibraryPagerEmptyScreen(
             )
         }
 
-        EmptyScreen(
+        LibraryEmptyScreen(
             stringRes = msg,
+            supportingText = LocalContext.current.getString(
+                when {
+                    !searchQuery.isNullOrEmpty() -> R.string.library_empty_search_hint
+                    hasActiveFilters -> R.string.library_empty_filter_hint
+                    else -> R.string.library_empty_category_hint
+                },
+            ),
+            isManga = true,
             modifier = Modifier.weight(1f),
         )
     }

@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +46,7 @@ import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.motion.ModernMotion
 import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.theme.NyanimeWordmark
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.coil.AnimeImageFetcher
 import eu.kanade.tachiyomi.data.coil.ArtworkRequestPolicy
 import eu.kanade.tachiyomi.data.coil.artworkTimeout
@@ -148,12 +150,26 @@ internal fun SourceHomeWordmarkTransition(value: SourceHomeLoadedLogo?, motion: 
         // Identical bounds for both endpoints: loading never moves the header or its actions.
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
             if (displayed == null) {
-                NyanimeWordmark()
+                NyanimeHomeWordmark()
             } else {
                 SourceHomeBrandImage(displayed)
             }
         }
     }
+}
+
+@Composable
+private fun NyanimeHomeWordmark() {
+    val darkTheme = MaterialTheme.colorScheme.background.luminance() < .5f
+    SubcomposeAsyncImage(
+        model = if (darkTheme) R.raw.nyanime_wordmark_dark else R.raw.nyanime_wordmark_light,
+        contentDescription = "Nyanime",
+        modifier = Modifier.widthIn(max = 148.dp).height(36.dp),
+        contentScale = ContentScale.Fit,
+        alignment = Alignment.CenterStart,
+        loading = { NyanimeWordmark() },
+        error = { NyanimeWordmark() },
+    )
 }
 
 @Composable

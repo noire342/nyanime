@@ -24,9 +24,14 @@ import eu.kanade.presentation.library.components.LibraryToolbarTitle
 import eu.kanade.tachiyomi.data.cache.MangaCoverCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
+import eu.kanade.tachiyomi.data.releases.ChapterScheduleRepository
+import eu.kanade.tachiyomi.data.releases.ReleaseMedium
+import eu.kanade.tachiyomi.data.releases.ReleaseStore
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
+import eu.kanade.tachiyomi.ui.library.LibraryShelfStatus
+import eu.kanade.tachiyomi.ui.library.mangaShelfStatuses
 import eu.kanade.tachiyomi.util.chapter.getNextUnread
 import eu.kanade.tachiyomi.util.removeCovers
 import kotlinx.collections.immutable.ImmutableList
@@ -97,6 +102,8 @@ class MangaLibraryScreenModel(
     private val downloadManager: MangaDownloadManager = Injekt.get(),
     private val downloadCache: MangaDownloadCache = Injekt.get(),
     private val trackerManager: TrackerManager = Injekt.get(),
+    private val releaseStore: ReleaseStore = ReleaseStore(),
+    private val chapterScheduleRepository: ChapterScheduleRepository = ChapterScheduleRepository(),
 ) : StateScreenModel<MangaLibraryScreenModel.State>(State()) {
 
     var activeCategoryIndex: Int by libraryPreferences.lastUsedMangaCategory().asState(
@@ -365,12 +372,17 @@ class MangaLibraryScreenModel(
      * Get the categories and all its manga from the database.
      */
     private fun getLibraryFlow(): Flow<MangaLibraryMap> {
+        val shelfStatuses = combine(
+            releaseStore.noticeFlow(ReleaseMedium.MANGA),
+            chapterScheduleRepository.events(),
+        ) { notices, events -> mangaShelfStatuses(notices, events) }
         val libraryMangasFlow = combine(
             getLibraryManga.subscribe(),
             getLibraryItemPreferencesFlow(),
             downloadCache.changes,
             uiPreferences.showMangaInOtherLanguages().changes(),
-        ) { libraryMangaList, prefs, _, showOtherLanguages ->
+            shelfStatuses,
+        ) { libraryMangaList, prefs, _, showOtherLanguages, statuses ->
             libraryMangaList
                 .filter { libraryManga ->
                     showOtherLanguages ||
@@ -393,6 +405,7 @@ class MangaLibraryScreenModel(
                         } else {
                             ""
                         },
+                        shelfStatus = statuses[libraryManga.id] ?: LibraryShelfStatus(),
                     )
                 }
                 .groupBy { it.libraryManga.category }
@@ -470,6 +483,10 @@ class MangaLibraryScreenModel(
         clearSelection()
     }
 
+    fun downloadAllUnread(manga: Manga) {
+        downloadUnreadChapters(listOf(manga), null)
+    }
+
     /**
      * Queues the amount specified of unread chapters from the list of mangas given.
      *
@@ -510,6 +527,12 @@ class MangaLibraryScreenModel(
             }
         }
         clearSelection()
+    }
+
+    fun markRead(manga: LibraryManga, read: Boolean) {
+        screenModelScope.launchNonCancellable {
+            setReadStatus.await(manga = manga.manga, read = read)
+        }
     }
 
     /**
@@ -617,6 +640,10 @@ class MangaLibraryScreenModel(
         }
     }
 
+    fun selectOnly(manga: LibraryManga) {
+        mutableState.update { it.copy(selection = persistentListOf(manga)) }
+    }
+
     /**
      * Selects all mangas between and including the given manga and the last pressed manga from the
      * same category as the given manga
@@ -686,10 +713,15 @@ class MangaLibraryScreenModel(
     }
 
     fun openChangeCategoryDialog() {
-        screenModelScope.launchIO {
-            // Create a copy of selected manga
-            val mangaList = state.value.selection.map { it.manga }
+        openChangeCategoryDialog(state.value.selection.map { it.manga })
+    }
 
+    fun openChangeCategoryDialog(manga: LibraryManga) {
+        openChangeCategoryDialog(listOf(manga.manga))
+    }
+
+    private fun openChangeCategoryDialog(mangaList: List<Manga>) {
+        screenModelScope.launchIO {
             // Hide the default category because it has a different behavior than the ones from db.
             val categories = state.value.categories.filter { it.id != 0L }
 
@@ -713,6 +745,10 @@ class MangaLibraryScreenModel(
     fun openDeleteMangaDialog() {
         val mangaList = state.value.selection.map { it.manga }
         mutableState.update { it.copy(dialog = Dialog.DeleteManga(mangaList)) }
+    }
+
+    fun openDeleteMangaDialog(manga: LibraryManga) {
+        mutableState.update { it.copy(dialog = Dialog.DeleteManga(listOf(manga.manga))) }
     }
 
     fun closeDialog() {

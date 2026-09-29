@@ -55,6 +55,7 @@ internal fun MangaLibraryList(
                 contentLabels = manga.genre,
                 isSelected = selection.fastAny { it.id == libraryItem.libraryManga.id },
                 title = manga.title,
+                libraryStyle = true,
                 coverData = MangaCover(
                     mangaId = manga.id,
                     sourceId = manga.source,

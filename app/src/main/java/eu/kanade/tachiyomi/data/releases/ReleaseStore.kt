@@ -15,7 +15,13 @@ class ReleaseStore(
     private val anime: AnimeDatabaseHandler = Injekt.get(),
     private val manga: MangaDatabaseHandler = Injekt.get(),
 ) {
-    data class Notice(val itemId: Long, val entryId: Long, val createdAt: Long, val sourceAt: Long = 0)
+    data class Notice(
+        val itemId: Long,
+        val entryId: Long,
+        val createdAt: Long,
+        val sourceAt: Long = 0,
+        val number: Double = -1.0,
+    )
 
     fun subscriptionFlow(medium: ReleaseMedium, id: Long): Flow<ReleaseSubscription?> = when (medium) {
         ReleaseMedium.ANIME -> anime.subscribeToOneOrNull {
@@ -220,13 +226,13 @@ class ReleaseStore(
 
     fun noticeFlow(medium: ReleaseMedium): Flow<List<Notice>> = when (medium) {
         ReleaseMedium.ANIME -> anime.subscribeToList {
-            releaseMonitorQueries.getNotices { item, entry, created, _, sourceAt ->
-                Notice(item, entry, created, sourceAt)
+            releaseMonitorQueries.getNotices { item, entry, created, _, sourceAt, number ->
+                Notice(item, entry, created, sourceAt, number)
             }
         }
         ReleaseMedium.MANGA -> manga.subscribeToList {
-            releaseMonitorQueries.getNotices { item, entry, created, _, sourceAt ->
-                Notice(item, entry, created, sourceAt)
+            releaseMonitorQueries.getNotices { item, entry, created, _, sourceAt, number ->
+                Notice(item, entry, created, sourceAt, number)
             }
         }
     }

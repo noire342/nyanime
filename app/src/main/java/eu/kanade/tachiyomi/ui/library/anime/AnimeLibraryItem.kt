@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.ui.library.anime
 
 import eu.kanade.tachiyomi.source.anime.getNameForAnimeInfo
+import eu.kanade.tachiyomi.ui.library.LibraryShelfStatus
 import tachiyomi.domain.library.anime.LibraryAnime
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import uy.kohesive.injekt.Injekt
@@ -12,6 +13,7 @@ data class AnimeLibraryItem(
     var unseenCount: Long = -1,
     var isLocal: Boolean = false,
     var sourceLanguage: String = "",
+    val shelfStatus: LibraryShelfStatus = LibraryShelfStatus(),
     private val sourceManager: AnimeSourceManager = Injekt.get(),
 ) {
     /**

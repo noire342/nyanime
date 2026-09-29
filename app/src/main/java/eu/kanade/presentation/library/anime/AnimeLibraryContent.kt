@@ -1,11 +1,14 @@
 package eu.kanade.presentation.library.anime
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -14,9 +17,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalLayoutDirection
 import eu.kanade.core.preference.PreferenceMutableState
 import eu.kanade.presentation.library.components.LibraryTabs
+import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -38,6 +43,15 @@ fun AnimeLibraryContent(
     onChangeCurrentPage: (Int) -> Unit,
     onAnimeClicked: (Long) -> Unit,
     onContinueWatchingClicked: ((LibraryAnime) -> Unit)?,
+    onShelfContinueWatching: (LibraryAnime) -> Unit,
+    onShelfDownload: (LibraryAnime) -> Unit,
+    onShelfMarkSeen: (LibraryAnime, Boolean) -> Unit,
+    onShelfChangeCategory: (LibraryAnime) -> Unit,
+    onShelfRemove: (LibraryAnime) -> Unit,
+    onOpenSearch: () -> Unit,
+    onOpenFilter: () -> Unit,
+    onOpenUpdates: () -> Unit,
+    onOpenRandomEntry: () -> Unit,
     onToggleSelection: (LibraryAnime) -> Unit,
     onToggleRangeSelection: (LibraryAnime) -> Unit,
     onRefresh: (Category?) -> Boolean,
@@ -47,12 +61,23 @@ fun AnimeLibraryContent(
     getColumnsForOrientation: (Boolean) -> PreferenceMutableState<Int>,
     getAnimeLibraryForPage: (Int) -> List<AnimeLibraryItem>,
 ) {
+    val modern = LocalNyanimeStyle.current
+    val colors = MaterialTheme.colorScheme
     Column(
-        modifier = Modifier.padding(
-            top = contentPadding.calculateTopPadding(),
-            start = contentPadding.calculateStartPadding(LocalLayoutDirection.current),
-            end = contentPadding.calculateEndPadding(LocalLayoutDirection.current),
-        ),
+        modifier = Modifier
+            .padding(
+                top = contentPadding.calculateTopPadding(),
+                start = contentPadding.calculateStartPadding(LocalLayoutDirection.current),
+                end = contentPadding.calculateEndPadding(LocalLayoutDirection.current),
+            )
+            .fillMaxSize()
+            .then(
+                if (modern) {
+                    Modifier.background(Brush.verticalGradient(listOf(colors.surface, colors.surfaceContainerLowest)))
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         val coercedCurrentPage = remember { currentPage().coerceAtMost(categories.lastIndex) }
         val pagerState = rememberPagerState(coercedCurrentPage) { categories.size }
@@ -60,7 +85,8 @@ fun AnimeLibraryContent(
         val scope = rememberCoroutineScope()
         var isRefreshing by remember(pagerState.currentPage) { mutableStateOf(false) }
 
-        if (showPageTabs && categories.size > 1) {
+        val showModernControls = modern && selection.isEmpty() && searchQuery == null
+        if (showModernControls || (!modern && showPageTabs && categories.size > 1)) {
             LaunchedEffect(categories) {
                 if (categories.size <= pagerState.currentPage) {
                     pagerState.scrollToPage(categories.size - 1)
@@ -70,6 +96,13 @@ fun AnimeLibraryContent(
                 categories = categories,
                 pagerState = pagerState,
                 getNumberOfItemsForCategory = getNumberOfAnimeForCategory,
+                hasActiveFilters = hasActiveFilters,
+                onSearch = onOpenSearch,
+                onFilter = onOpenFilter,
+                onUpdates = onOpenUpdates,
+                onRefreshCategory = { onRefresh(categories[pagerState.currentPage]) },
+                onRefreshLibrary = { onRefresh(null) },
+                onOpenRandomEntry = onOpenRandomEntry,
             ) { scope.launch { pagerState.animateScrollToPage(it) } }
         }
 
@@ -110,6 +143,13 @@ fun AnimeLibraryContent(
                 onClickAnime = onClickAnime,
                 onLongClickAnime = onToggleRangeSelection,
                 onClickContinueWatching = onContinueWatchingClicked,
+                onShelfContinueWatching = onShelfContinueWatching,
+                onShelfDownload = onShelfDownload,
+                onShelfMarkSeen = onShelfMarkSeen,
+                onShelfUpdate = { onRefresh(categories[pagerState.currentPage]) },
+                onShelfChangeCategory = onShelfChangeCategory,
+                onShelfSelect = onToggleSelection,
+                onShelfRemove = onShelfRemove,
             )
         }
 

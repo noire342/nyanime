@@ -28,7 +28,12 @@ import eu.kanade.tachiyomi.data.cache.AnimeCoverCache
 import eu.kanade.tachiyomi.data.discovery.ResumeEpisodeSelector
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
+import eu.kanade.tachiyomi.data.releases.AiringRepository
+import eu.kanade.tachiyomi.data.releases.ReleaseMedium
+import eu.kanade.tachiyomi.data.releases.ReleaseStore
 import eu.kanade.tachiyomi.data.track.TrackerManager
+import eu.kanade.tachiyomi.ui.library.LibraryShelfStatus
+import eu.kanade.tachiyomi.ui.library.animeShelfStatuses
 import eu.kanade.tachiyomi.util.removeBackgrounds
 import eu.kanade.tachiyomi.util.removeCovers
 import kotlinx.collections.immutable.ImmutableList
@@ -100,6 +105,8 @@ class AnimeLibraryScreenModel(
     private val downloadManager: AnimeDownloadManager = Injekt.get(),
     private val downloadCache: AnimeDownloadCache = Injekt.get(),
     private val trackerManager: TrackerManager = Injekt.get(),
+    private val releaseStore: ReleaseStore = ReleaseStore(),
+    private val airingRepository: AiringRepository = AiringRepository(),
 ) : StateScreenModel<AnimeLibraryScreenModel.State>(State()) {
 
     var activeCategoryIndex: Int by libraryPreferences.lastUsedAnimeCategory().asState(
@@ -379,11 +386,16 @@ class AnimeLibraryScreenModel(
      * Get the categories and all its anime from the database.
      */
     private fun getLibraryFlow(): Flow<AnimeLibraryMap> {
+        val shelfStatuses = combine(
+            releaseStore.noticeFlow(ReleaseMedium.ANIME),
+            airingRepository.effectiveEvents(),
+        ) { notices, events -> animeShelfStatuses(notices, events) }
         val animelibAnimesFlow = combine(
             getLibraryAnime.subscribe(),
             getAnimelibItemPreferencesFlow(),
             downloadCache.changes,
-        ) { animelibAnimeList, prefs, _ ->
+            shelfStatuses,
+        ) { animelibAnimeList, prefs, _, statuses ->
             animelibAnimeList
                 .map { animelibAnime ->
                     // Display mode based on user preference: take it from global library setting or category
@@ -401,6 +413,7 @@ class AnimeLibraryScreenModel(
                         } else {
                             ""
                         },
+                        shelfStatus = statuses[animelibAnime.id] ?: LibraryShelfStatus(),
                     )
                 }
                 .groupBy { it.libraryAnime.category }
@@ -481,6 +494,10 @@ class AnimeLibraryScreenModel(
         clearSelection()
     }
 
+    fun downloadAllUnseen(anime: Anime) {
+        downloadUnseenEpisodes(listOf(anime), null)
+    }
+
     /**
      * Queues the amount specified of unseen episodes from the list of animes given.
      *
@@ -521,6 +538,12 @@ class AnimeLibraryScreenModel(
             }
         }
         clearSelection()
+    }
+
+    fun markSeen(anime: LibraryAnime, seen: Boolean) {
+        screenModelScope.launchNonCancellable {
+            setSeenStatus.await(anime = anime.anime, seen = seen)
+        }
     }
 
     /**
@@ -629,6 +652,10 @@ class AnimeLibraryScreenModel(
         }
     }
 
+    fun selectOnly(anime: LibraryAnime) {
+        mutableState.update { it.copy(selection = persistentListOf(anime)) }
+    }
+
     /**
      * Selects all nimes between and including the given anime and the last pressed anime from the
      * same category as the given anime
@@ -698,10 +725,15 @@ class AnimeLibraryScreenModel(
     }
 
     fun openChangeCategoryDialog() {
-        screenModelScope.launchIO {
-            // Create a copy of selected anime
-            val animeList = state.value.selection.map { it.anime }
+        openChangeCategoryDialog(state.value.selection.map { it.anime })
+    }
 
+    fun openChangeCategoryDialog(anime: LibraryAnime) {
+        openChangeCategoryDialog(listOf(anime.anime))
+    }
+
+    private fun openChangeCategoryDialog(animeList: List<Anime>) {
+        screenModelScope.launchIO {
             // Hide the default category because it has a different behavior than the ones from db.
             val categories = state.value.categories.filter { it.id != 0L }
 
@@ -725,6 +757,10 @@ class AnimeLibraryScreenModel(
     fun openDeleteAnimeDialog() {
         val nimeList = state.value.selection.map { it.anime }
         mutableState.update { it.copy(dialog = Dialog.DeleteAnime(nimeList)) }
+    }
+
+    fun openDeleteAnimeDialog(anime: LibraryAnime) {
+        mutableState.update { it.copy(dialog = Dialog.DeleteAnime(listOf(anime.anime))) }
     }
 
     fun closeDialog() {

@@ -74,7 +74,9 @@ AND (s.mode = 'FOLLOW' OR p.favorite = 1
     OR EXISTS(SELECT 1 FROM chapters i WHERE i.manga_id = p._id AND (i.read = 1 OR i.last_page_read > 0)));
 
 getNotices:
-SELECT r.* FROM release_notice r JOIN chapters i ON i._id = r.item_id WHERE i.read = 0 AND r.delivered_at != 1 ORDER BY r.created_at DESC;
+SELECT r.item_id, r.entry_id, r.created_at, r.delivered_at, r.source_at, i.chapter_number
+FROM release_notice r JOIN chapters i ON i._id = r.item_id
+WHERE i.read = 0 ORDER BY r.created_at DESC;
 
 markMetadata:
 UPDATE release_check SET metadata_at = ? WHERE entry_id = ?;

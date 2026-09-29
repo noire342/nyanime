@@ -55,6 +55,7 @@ internal fun AnimeLibraryList(
                 contentLabels = anime.genre,
                 isSelected = selection.fastAny { it.id == libraryItem.libraryAnime.id },
                 title = anime.title,
+                libraryStyle = true,
                 coverData = AnimeCover(
                     animeId = anime.id,
                     sourceId = anime.source,

@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
+import coil3.Image
 import coil3.compose.AsyncImage
 import eu.kanade.presentation.privacy.nsfwPrivacy
 import eu.kanade.presentation.util.rememberResourceBitmapPainter
@@ -32,11 +33,15 @@ enum class ItemCover(val ratio: Float) {
         onClick: (() -> Unit)? = null,
         initialPainter: Painter? = null,
         onPainterReady: (Painter) -> Unit = {},
+        onImageReady: (Image) -> Unit = {},
     ) {
         AsyncImage(
             model = data,
             placeholder = initialPainter ?: ColorPainter(CoverPlaceholderColor),
-            onSuccess = { onPainterReady(it.painter) },
+            onSuccess = {
+                onPainterReady(it.painter)
+                onImageReady(it.result.image)
+            },
             error = initialPainter ?: rememberResourceBitmapPainter(id = R.drawable.cover_error),
             contentDescription = contentDescription,
             modifier = modifier

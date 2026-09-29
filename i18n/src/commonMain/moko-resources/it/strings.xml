@@ -41,6 +41,7 @@
     <string name="action_display">Visualizzazione</string>
     <string name="action_display_grid">Griglia compatta</string>
     <string name="action_display_list">Lista</string>
+    <string name="action_display_shelf">Scaffale</string>
     <string name="action_cancel">Annulla</string>
     <string name="action_sort">Ordina</string>
     <string name="action_install">Installa</string>

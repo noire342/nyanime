@@ -34,6 +34,7 @@ import eu.kanade.presentation.entries.components.LibraryBottomActionMenu
 import eu.kanade.presentation.library.DeleteLibraryEntryDialog
 import eu.kanade.presentation.library.anime.AnimeLibraryContent
 import eu.kanade.presentation.library.anime.AnimeLibrarySettingsDialog
+import eu.kanade.presentation.library.components.LibraryEmptyScreen
 import eu.kanade.presentation.library.components.LibraryToolbar
 import eu.kanade.presentation.more.onboarding.GETTING_STARTED_URL
 import eu.kanade.presentation.privacy.privacyRegion
@@ -63,7 +64,6 @@ import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
-import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.screens.EmptyScreenAction
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.source.local.entries.anime.isLocal
@@ -185,8 +185,10 @@ data object AnimeLibraryTab : Tab {
                 state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
                 state.searchQuery.isNullOrEmpty() && !state.hasActiveFilters && state.isLibraryEmpty -> {
                     val handler = LocalUriHandler.current
-                    EmptyScreen(
+                    LibraryEmptyScreen(
                         stringRes = MR.strings.information_empty_library,
+                        supportingText = context.getString(R.string.library_empty_hint),
+                        isManga = false,
                         modifier = Modifier.padding(contentPadding),
                         actions = persistentListOf(
                             EmptyScreenAction(
@@ -198,6 +200,12 @@ data object AnimeLibraryTab : Tab {
                     )
                 }
                 else -> {
+                    val continueWatching: (LibraryAnime) -> Unit = { item ->
+                        scope.launchIO {
+                            val episode = screenModel.getNextUnseenEpisode(item.anime)
+                            if (episode != null) openEpisode(episode)
+                        }
+                    }
                     AnimeLibraryContent(
                         categories = state.categories,
                         searchQuery = state.searchQuery,
@@ -208,13 +216,34 @@ data object AnimeLibraryTab : Tab {
                         showPageTabs = state.showCategoryTabs || !state.searchQuery.isNullOrEmpty(),
                         onChangeCurrentPage = { screenModel.activeCategoryIndex = it },
                         onAnimeClicked = { navigator.push(AnimeScreen(it)) },
-                        onContinueWatchingClicked = { it: LibraryAnime ->
-                            scope.launchIO {
-                                val episode = screenModel.getNextUnseenEpisode(it.anime)
-                                if (episode != null) openEpisode(episode)
+                        onContinueWatchingClicked = continueWatching.takeIf { state.showAnimeContinueButton },
+                        onShelfContinueWatching = continueWatching,
+                        onShelfDownload = { item ->
+                            screenModel.downloadAllUnseen(item.anime)
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    context.getString(R.string.library_shelf_download_started),
+                                )
                             }
-                            Unit
-                        }.takeIf { state.showAnimeContinueButton },
+                        },
+                        onShelfMarkSeen = screenModel::markSeen,
+                        onShelfChangeCategory = screenModel::openChangeCategoryDialog,
+                        onShelfRemove = screenModel::openDeleteAnimeDialog,
+                        onOpenSearch = { screenModel.search("") },
+                        onOpenFilter = screenModel::showSettingsDialog,
+                        onOpenUpdates = { navigator.push(UpdatesTab) },
+                        onOpenRandomEntry = {
+                            scope.launch {
+                                val randomItem = screenModel.getRandomAnimelibItemForCurrentCategory()
+                                if (randomItem != null) {
+                                    navigator.push(AnimeScreen(randomItem.libraryAnime.anime.id))
+                                } else {
+                                    snackbarHostState.showSnackbar(
+                                        context.stringResource(MR.strings.information_no_entries_found),
+                                    )
+                                }
+                            }
+                        },
                         onToggleSelection = screenModel::toggleSelection,
                         onToggleRangeSelection = {
                             screenModel.toggleRangeSelection(it)
