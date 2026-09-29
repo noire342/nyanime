@@ -4,17 +4,21 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -32,6 +36,7 @@ import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.player.PlayerActivity
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
+import kotlinx.coroutines.launch
 import tachiyomi.presentation.core.util.collectAsState
 
 class ReleaseCalendarScreen(
@@ -59,15 +64,17 @@ fun cafe.adriel.voyager.core.screen.Screen.ReleaseCalendar(
     val navigator = LocalNavigator.currentOrThrow
     val context = LocalContext.current
     var choice by remember { mutableStateOf<ReleaseAgendaItem?>(null) }
+    var choiceTitle by remember { mutableStateOf(false) }
+    var actions by remember { mutableStateOf<ReleaseAgendaItem?>(null) }
     var showIssues by rememberSaveable { mutableStateOf(false) }
-    fun open(item: ReleaseAgendaItem) {
+    fun open(item: ReleaseAgendaItem, title: Boolean = false) {
         when (item.medium) {
-            ReleaseMedium.ANIME -> if (item.itemId == null) {
+            ReleaseMedium.ANIME -> if (title || item.itemId == null) {
                 navigator.push(AnimeScreen(item.entryId))
             } else {
                 context.startActivity(PlayerActivity.newIntent(context, item.entryId, item.itemId))
             }
-            ReleaseMedium.MANGA -> if (item.itemId == null) {
+            ReleaseMedium.MANGA -> if (title || item.itemId == null) {
                 navigator.push(MangaScreen(item.entryId))
             } else {
                 context.startActivity(ReaderActivity.newIntent(context, item.entryId, item.itemId))
@@ -82,6 +89,7 @@ fun cafe.adriel.voyager.core.screen.Screen.ReleaseCalendar(
         },
         model::setMonth, model::setDate, model::refresh,
         onItem = {
+            choiceTitle = false
             if (it.choices.isEmpty()) open(it) else choice = it
         }, showBack = showBack, showMediaFilter = true, medium = state.medium,
         onMedium = if (unified) {
@@ -94,7 +102,30 @@ fun cafe.adriel.voyager.core.screen.Screen.ReleaseCalendar(
         allowAllMedia = unified,
         onStatus = { showIssues = true },
         onSchedule = { navigator.push(AnimeScheduleScreen()) },
+        onLongItem = { actions = it },
+        snackbarHostState = model.snackbarHostState,
     )
+    actions?.let { item ->
+        ReleaseAgendaActionsSheet(
+            item,
+            onDismiss = { actions = null },
+            onTitle = {
+                choiceTitle = true
+                if (item.choices.isEmpty()) open(item, title = true) else choice = item
+            },
+            onContent = {
+                choiceTitle = false
+                val playable = ReleaseAgendaActions.playableOptions(item)
+                if (playable.size == 1) {
+                    open(playable.single())
+                } else if (playable.isNotEmpty()) {
+                    choice = item.copy(choices = playable)
+                }
+            },
+            onUnfollow = { model.unfollow(item) },
+            onRemove = { model.dismiss(item) },
+        )
+    }
     if (showIssues) {
         AiringIssuesSheet(
             state.issues,
@@ -106,9 +137,13 @@ fun cafe.adriel.voyager.core.screen.Screen.ReleaseCalendar(
         )
     }
     choice?.let { item ->
-        ModalBottomSheet(onDismissRequest = { choice = null }) {
+        val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val coroutineScope = rememberCoroutineScope()
+        var opening by remember { mutableStateOf(false) }
+        ModalBottomSheet(onDismissRequest = { choice = null }, sheetState = sheet) {
             Column(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp),
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp).padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(stringResource(R.string.release_choose_source), style = MaterialTheme.typography.titleLarge)
@@ -116,9 +151,20 @@ fun cafe.adriel.voyager.core.screen.Screen.ReleaseCalendar(
                 item.choices.forEach { option ->
                     Surface(
                         onClick = {
-                            choice = null
-                            open(option)
+                            opening = true
+                            coroutineScope.launch {
+                                try {
+                                    sheet.hide()
+                                    if (!sheet.isVisible) {
+                                        choice = null
+                                        open(option, title = choiceTitle)
+                                    }
+                                } finally {
+                                    opening = false
+                                }
+                            }
                         },
+                        enabled = !opening,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,

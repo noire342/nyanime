@@ -8,6 +8,7 @@ import eu.kanade.tachiyomi.data.releases.AiringRepository
 import eu.kanade.tachiyomi.data.releases.ChapterScheduleRepository
 import eu.kanade.tachiyomi.data.releases.ReleaseEligibility
 import eu.kanade.tachiyomi.data.releases.ReleaseMedium
+import eu.kanade.tachiyomi.data.releases.ReleasePreferences
 import eu.kanade.tachiyomi.data.releases.ReleaseStore
 import eu.kanade.tachiyomi.data.track.SourceTrackingHints
 import eu.kanade.tachiyomi.data.track.TrackerManager
@@ -44,13 +45,19 @@ internal class ReleaseAgendaRepository {
         } else {
             manga()
         }
-        return combine(snapshots, Injekt.get<eu.kanade.domain.ui.UiPreferences>().dismissedLibraryUpdates().changes()) {
+        return combine(
+            snapshots,
+            Injekt.get<eu.kanade.domain.ui.UiPreferences>().dismissedLibraryUpdates().changes(),
+            ReleasePreferences().dismissedAgenda.changes(),
+        ) {
                 snapshot,
                 dismissed,
+                agendaDismissed,
             ->
             snapshot.copy(
                 items = snapshot.items.filterNot {
-                    it.dismissalKey in dismissed ||
+                    ReleaseAgendaActions.dismissed(it, agendaDismissed) ||
+                        it.dismissalKey in dismissed ||
                         it.choices.any { choice -> choice.dismissalKey in dismissed }
                 },
             )
@@ -130,6 +137,14 @@ internal class ReleaseAgendaRepository {
                         number = event.episode.toDouble(),
                         sourceLabel = sourceLabel,
                         broadcasts = event.variants,
+                        agendaKeys = setOf(
+                            ReleaseAgendaActions.key(
+                                ReleaseMedium.ANIME,
+                                entry.source,
+                                entry.url,
+                                event.episode.toDouble(),
+                            ),
+                        ),
                     )
                 }
                 for (notice in entryNotices) {
@@ -149,6 +164,15 @@ internal class ReleaseAgendaRepository {
                         dismissalKey = "${item.dateFetch}|anime|${entry.source}|${entry.title}|${item.name}",
                         number = item.episodeNumber,
                         sourceLabel = sourceLabel,
+                        agendaKeys = setOf(
+                            ReleaseAgendaActions.key(
+                                ReleaseMedium.ANIME,
+                                entry.source,
+                                entry.url,
+                                item.episodeNumber,
+                                item.url,
+                            ),
+                        ),
                     )
                 }
             }
@@ -198,6 +222,10 @@ internal class ReleaseAgendaRepository {
                     event.release.releaseAt,
                     app.getString(R.string.release_chapter_planned, event.release.number.toString()),
                     medium = ReleaseMedium.MANGA,
+                    number = event.release.number,
+                    agendaKeys = setOf(
+                        ReleaseAgendaActions.key(ReleaseMedium.MANGA, entry.source, entry.url, event.release.number),
+                    ),
                 )
             }
             for (notice in entryNotices) {
@@ -216,6 +244,24 @@ internal class ReleaseAgendaRepository {
                     item.id,
                     ReleaseMedium.MANGA,
                     dismissalKey = "${item.dateFetch}|manga|${entry.source}|${entry.title}|${item.name}",
+                    number = item.chapterNumber,
+                    agendaKeys = setOf(
+                        ReleaseAgendaActions.key(
+                            ReleaseMedium.MANGA,
+                            entry.source,
+                            entry.url,
+                            null,
+                            item.url,
+                        ),
+                    ),
+                    // Keep available editions separate; an earlier hidden announcement still applies.
+                    plannedAgendaKeys = if (item.chapterNumber.isFinite() && item.chapterNumber > 0) {
+                        setOf(
+                            ReleaseAgendaActions.key(ReleaseMedium.MANGA, entry.source, entry.url, item.chapterNumber),
+                        )
+                    } else {
+                        emptySet()
+                    },
                 )
             }
         }

@@ -18,6 +18,7 @@ internal object ReleaseAgendaMerge {
             work.id to (work.homePresentation?.choices?.map { it.animeId } ?: listOf(work.id))
         }
         val groupOf = members.flatMap { (group, ids) -> ids.map { it to group } }.toMap()
+        val byId = works.associateBy { it.id }
         val grouped = items.groupBy { item ->
             val number = item.number?.takeIf { it.isFinite() && it > 0 }
             if (number == null) item.key else "${groupOf[item.entryId] ?: item.entryId}:$number"
@@ -49,6 +50,14 @@ internal object ReleaseAgendaMerge {
             selected.copy(
                 key = if (number == null) selected.key else "anime-release-$group-$number",
                 choices = choices.takeIf { it.size > 1 }.orEmpty(),
+                relatedEntryIds = ids.toSet(),
+                agendaKeys = if (number != null && number.isFinite() && number > 0) {
+                    ids.mapNotNull { byId[it] }.mapTo(mutableSetOf()) {
+                        ReleaseAgendaActions.key(selected.medium, it.source, it.url, number)
+                    }
+                } else {
+                    options.flatMap { it.agendaKeys }.toSet()
+                },
             )
         }
     }

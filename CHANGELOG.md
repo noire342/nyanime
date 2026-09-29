@@ -8,6 +8,18 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 29 settembre 2026 — Menu delle uscite nell’agenda
+
+- Pressione prolungata su una voce, anche nel calendario: pannello animato con
+  copertina, titolo, data e azioni per scheda, episodio o capitolo.
+- Accesso al contenuto disponibile distinto dalla scheda; per le uscite future
+  il menu spiega che l’episodio o capitolo non è ancora disponibile.
+- “Smetti di seguire” interrompe le uscite del titolo, anche quando riunisce più
+  fonti. “Elimina solo questa voce” nasconde soltanto quell’uscita nell’agenda,
+  mantenendo il seguito, la libreria e i download. Entrambe le azioni sono annullabili.
+- Le voci nascoste restano tali dopo un riavvio, un cambio di orario o il ripristino
+  delle impostazioni da backup; le uscite successive restano visibili.
+
 ## 29 settembre 2026 — Link che aprono i contenuti in Nyanime
 
 - Condivisione delle schede tramite link `nyanime://open/v1`, aperti direttamente

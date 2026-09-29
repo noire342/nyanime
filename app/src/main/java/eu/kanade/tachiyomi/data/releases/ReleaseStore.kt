@@ -44,24 +44,33 @@ class ReleaseStore(
     } ?: ReleaseSubscription()
 
     suspend fun setSubscription(medium: ReleaseMedium, id: Long, value: ReleaseSubscription) {
+        setSubscriptions(medium, mapOf(id to value))
+    }
+
+    /** A merged title changes all its concrete subscriptions in one transaction. */
+    suspend fun setSubscriptions(medium: ReleaseMedium, values: Map<Long, ReleaseSubscription>) {
         when (medium) {
             ReleaseMedium.ANIME -> anime.await(inTransaction = true) {
-                releaseMonitorQueries.setSubscription(
-                    id,
-                    value.mode.name,
-                    value.availability.toDb(),
-                    value.reminder.toDb(),
-                )
-                releaseMonitorQueries.makeDue(id)
+                values.forEach { (id, value) ->
+                    releaseMonitorQueries.setSubscription(
+                        id,
+                        value.mode.name,
+                        value.availability.toDb(),
+                        value.reminder.toDb(),
+                    )
+                    releaseMonitorQueries.makeDue(id)
+                }
             }
             ReleaseMedium.MANGA -> manga.await(inTransaction = true) {
-                releaseMonitorQueries.setSubscription(
-                    id,
-                    value.mode.name,
-                    value.availability.toDb(),
-                    value.reminder.toDb(),
-                )
-                releaseMonitorQueries.makeDue(id)
+                values.forEach { (id, value) ->
+                    releaseMonitorQueries.setSubscription(
+                        id,
+                        value.mode.name,
+                        value.availability.toDb(),
+                        value.reminder.toDb(),
+                    )
+                    releaseMonitorQueries.makeDue(id)
+                }
             }
         }
     }

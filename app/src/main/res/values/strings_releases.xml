@@ -68,4 +68,16 @@
     <string name="release_timeline_end">No more releases are announced for now.</string>
     <string name="release_timeline_end_description">New dates will appear here when available.</string>
     <string name="release_timeline_empty">No releases to show. New content is still checked automatically.</string>
+    <string name="release_entry_actions">Release actions</string>
+    <string name="release_go_title">Go to title</string>
+    <string name="release_go_episode">Go to episode</string>
+    <string name="release_go_chapter">Go to chapter</string>
+    <string name="release_content_not_available">Not available yet. You can open the title.</string>
+    <string name="release_menu_unfollow">Stop following</string>
+    <string name="release_menu_unfollow_description">Stop release checks and reminders for this title.</string>
+    <string name="release_remove_entry">Remove only this entry</string>
+    <string name="release_remove_entry_description">Hide this release from the agenda. Keep following the title.</string>
+    <string name="release_entry_removed">Release removed from the agenda</string>
+    <string name="release_entry_unfollowed">No longer following this title’s releases</string>
+    <string name="release_action_undo">Undo</string>
 </resources>

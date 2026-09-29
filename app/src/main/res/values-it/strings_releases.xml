@@ -68,4 +68,16 @@
     <string name="release_timeline_end">Per ora non ci sono altre uscite annunciate.</string>
     <string name="release_timeline_end_description">Le nuove date compariranno qui quando saranno disponibili.</string>
     <string name="release_timeline_empty">Nessuna uscita da mostrare. Le nuove uscite vengono comunque controllate automaticamente.</string>
+    <string name="release_entry_actions">Azioni per questa uscita</string>
+    <string name="release_go_title">Vai alla scheda</string>
+    <string name="release_go_episode">Vai all’episodio</string>
+    <string name="release_go_chapter">Vai al capitolo</string>
+    <string name="release_content_not_available">Non ancora disponibile. Puoi aprire la scheda.</string>
+    <string name="release_menu_unfollow">Smetti di seguire</string>
+    <string name="release_menu_unfollow_description">Interrompi controlli e promemoria delle uscite di questo titolo.</string>
+    <string name="release_remove_entry">Elimina solo questa voce</string>
+    <string name="release_remove_entry_description">Nascondi questa uscita dall’agenda. Il titolo resta seguito.</string>
+    <string name="release_entry_removed">Voce eliminata dall’agenda</string>
+    <string name="release_entry_unfollowed">Non segui più le uscite di questo titolo</string>
+    <string name="release_action_undo">Annulla</string>
 </resources>

@@ -10,4 +10,5 @@ class ReleasePreferences(store: PreferenceStore = Injekt.get()) {
     val advanceReminders = store.getBoolean("release_advance_reminders_enabled", true)
     val availability = store.getBoolean("release_availability_enabled", true)
     val unifiedAgenda = store.getBoolean("release_unified_agenda", true)
+    val dismissedAgenda = store.getStringSet("release_dismissed_agenda_v1")
 }

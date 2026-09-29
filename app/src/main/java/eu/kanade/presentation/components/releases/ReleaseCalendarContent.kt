@@ -1,7 +1,7 @@
 package eu.kanade.presentation.components.releases
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +30,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,7 +47,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -82,6 +86,9 @@ data class ReleaseAgendaItem(
     val sourceLabel: String = "",
     val choices: List<ReleaseAgendaItem> = emptyList(),
     val broadcasts: List<eu.kanade.tachiyomi.data.releases.ScheduleBroadcast> = emptyList(),
+    val relatedEntryIds: Set<Long> = emptySet(),
+    val agendaKeys: Set<String> = emptySet(),
+    val plannedAgendaKeys: Set<String> = emptySet(),
 ) {
     val date: LocalDate get() = Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault()).toLocalDate()
 }
@@ -107,6 +114,8 @@ fun ReleaseCalendarContent(
     today: LocalDate = LocalDate.now(),
     onStatus: (() -> Unit)? = null,
     onSchedule: (() -> Unit)? = null,
+    onLongItem: (ReleaseAgendaItem) -> Unit = {},
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val navigator = LocalNavigator.currentOrThrow
     val locale = LocalConfiguration.current.locales[0]
@@ -137,7 +146,7 @@ fun ReleaseCalendarContent(
                 }
             },
         )
-    }) { padding ->
+    }, snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             if (showMediaFilter) ReleaseMediaFilters(medium, allowAllMedia, onMedium)
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -236,6 +245,7 @@ fun ReleaseCalendarContent(
                                     motion,
                                     locale,
                                     onItem,
+                                    onLongItem,
                                 )
                             }
                         }
@@ -325,15 +335,23 @@ private fun LazyItemScope.ReleaseCard(
     motion: Boolean,
     locale: Locale,
     onItem: (ReleaseAgendaItem) -> Unit,
+    onLongItem: (ReleaseAgendaItem) -> Unit,
 ) {
     val cue = releaseColor(item.medium)
+    val haptics = LocalHapticFeedback.current
+    val actionsLabel = stringResource(R.string.release_entry_actions)
     val shape = RoundedCornerShape(16.dp)
     Card(
         (if (motion) Modifier.animateItem() else Modifier).fillMaxWidth().padding(
             horizontal = 16.dp,
-        ).clickable {
-            onItem(item)
-        },
+        ).combinedClickable(
+            onClick = { onItem(item) },
+            onLongClickLabel = actionsLabel,
+            onLongClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onLongItem(item)
+            },
+        ),
         shape = shape,
         border = BorderStroke(
             1.dp,
