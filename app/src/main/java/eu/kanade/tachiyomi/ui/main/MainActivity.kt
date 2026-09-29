@@ -82,6 +82,7 @@ import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadCache
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.player.service.HttpServerService
+import eu.kanade.tachiyomi.data.share.ContentLinks
 import eu.kanade.tachiyomi.data.updater.AppUpdateChecker
 import eu.kanade.tachiyomi.data.updater.RELEASE_URL
 import eu.kanade.tachiyomi.extension.anime.api.AnimeExtensionApi
@@ -94,6 +95,7 @@ import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.GlobalMangaSearch
 import eu.kanade.tachiyomi.ui.cast.CastMiniController
 import eu.kanade.tachiyomi.ui.deeplink.DeepLinkScreenType
 import eu.kanade.tachiyomi.ui.deeplink.anime.DeepLinkAnimeScreen
+import eu.kanade.tachiyomi.ui.deeplink.content.SharedContentScreen
 import eu.kanade.tachiyomi.ui.deeplink.manga.DeepLinkMangaScreen
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
@@ -562,18 +564,24 @@ class MainActivity : BaseActivity() {
                 if (!query.isNullOrEmpty()) {
                     navigator.popUntilRoot()
 
-                    val screenType = intent.getStringExtra(INTENT_SEARCH_TYPE).orEmpty()
-                        .ifBlank { "ANIME" }
-                        .let(DeepLinkScreenType::valueOf)
+                    val contentLink = ContentLinks.extract(query)
+                        ?: query.takeIf { it.contains("nyanime://open/", ignoreCase = true) }
+                    if (contentLink != null) {
+                        navigator.push(SharedContentScreen(contentLink))
+                    } else {
+                        val screenType = intent.getStringExtra(INTENT_SEARCH_TYPE).orEmpty()
+                            .ifBlank { "ANIME" }
+                            .let(DeepLinkScreenType::valueOf)
 
-                    when (screenType) {
-                        DeepLinkScreenType.MANGA -> {
-                            navigator.push(GlobalMangaSearchScreen(query))
-                            navigator.push(DeepLinkMangaScreen(query))
-                        }
-                        DeepLinkScreenType.ANIME -> {
-                            navigator.push(GlobalAnimeSearchScreen(query))
-                            navigator.push(DeepLinkAnimeScreen(query))
+                        when (screenType) {
+                            DeepLinkScreenType.MANGA -> {
+                                navigator.push(GlobalMangaSearchScreen(query))
+                                navigator.push(DeepLinkMangaScreen(query))
+                            }
+                            DeepLinkScreenType.ANIME -> {
+                                navigator.push(GlobalAnimeSearchScreen(query))
+                                navigator.push(DeepLinkAnimeScreen(query))
+                            }
                         }
                     }
                 }
@@ -598,8 +606,15 @@ class MainActivity : BaseActivity() {
                 null
             }
             Intent.ACTION_VIEW -> {
+                // Versioned content links always resolve through an installed extension.
+                if (intent.scheme.equals("nyanime", ignoreCase = true) &&
+                    intent.data?.host.equals("open", ignoreCase = true)
+                ) {
+                    navigator.popUntilRoot()
+                    navigator.push(SharedContentScreen(intent.data.toString()))
+                }
                 // Handling opening of backup files
-                if (BackupFileFormat.acceptsPath(intent.data?.path)) {
+                else if (BackupFileFormat.acceptsPath(intent.data?.path)) {
                     navigator.popUntilRoot()
                     navigator.push(RestoreBackupScreen(intent.data.toString()))
                 }

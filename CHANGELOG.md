@@ -8,6 +8,19 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 29 settembre 2026 — Link che aprono i contenuti in Nyanime
+
+- Condivisione delle schede tramite link `nyanime://open/v1`, aperti direttamente
+  nell’app tramite l’estensione installata sul telefono del destinatario.
+- Un unico pannello per schede, episodi e capitoli: scelta tra titolo, inizio
+  dell’episodio/capitolo, minuto del player o pagina del lettore.
+- Azione di condivisione anche selezionando un singolo episodio o capitolo;
+  link alla pagina distinto dalla condivisione dell’immagine nel lettore.
+- Apertura del riferimento preciso, senza cercare un titolo simile; errori
+  espliciti per estensione assente, link non valido e contenuto non disponibile.
+- I link non includono URL di streaming, intestazioni, cookie, ID del database
+  locale o dati delle stanze. Le normali azioni WebView/browser restano disponibili.
+
 ## 29 settembre 2026 — Notifiche delle uscite più leggibili
 
 - Nome del titolo sulla prima riga compatta; nome completo a capo nei dettagli

@@ -165,6 +165,18 @@
         </activity>
 
         <activity
+            android:name=".ui.deeplink.content.ContentLinkActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="nyanime" android:host="open" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".crash.CrashActivity"
             android:exported="false"
             android:process=":error_handler" />

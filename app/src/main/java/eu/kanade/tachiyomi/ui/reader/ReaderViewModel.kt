@@ -60,6 +60,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
 import logcat.LogPriority
+import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.preference.toggle
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.launchNonCancellable
@@ -78,6 +79,7 @@ import tachiyomi.domain.items.chapter.model.ChapterUpdate
 import tachiyomi.domain.items.chapter.service.getChapterSort
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.source.manga.service.MangaSourceManager
+import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.source.local.entries.manga.isLocal
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -133,6 +135,7 @@ class ReaderViewModel @JvmOverloads constructor(
      * The visible page index of the currently loaded chapter. Used to restore from process kill.
      */
     private var chapterPageIndex = savedState.get<Int>("page_index") ?: -1
+    private var sharedPage: Int? = null
         set(value) {
             savedState["page_index"] = value
             field = value
@@ -278,7 +281,7 @@ class ReaderViewModel @JvmOverloads constructor(
      * Initializes this presenter with the given [mangaId] and [initialChapterId]. This method will
      * fetch the manga from the database and initialize the initial chapter.
      */
-    suspend fun init(mangaId: Long, initialChapterId: Long): Result<Boolean> {
+    suspend fun init(mangaId: Long, initialChapterId: Long, startPage: Int? = null): Result<Boolean> {
         if (!needsInit()) return Result.success(true)
         return withIOContext {
             try {
@@ -286,7 +289,10 @@ class ReaderViewModel @JvmOverloads constructor(
                 if (manga != null) {
                     sourceManager.isInitialized.first { it }
                     mutableState.update { it.copy(manga = manga) }
-                    if (chapterId == -1L) chapterId = initialChapterId
+                    if (chapterId == -1L) {
+                        chapterId = initialChapterId
+                        sharedPage = startPage
+                    }
 
                     val context = Injekt.get<Application>()
                     val source = sourceManager.getOrStub(manga.source)
@@ -316,6 +322,15 @@ class ReaderViewModel @JvmOverloads constructor(
         chapter: ReaderChapter,
     ): ViewerChapters {
         loader.loadChapter(chapter)
+        sharedPage?.let { page ->
+            val index = page - 1
+            require(chapter.pages?.any { it.index == index } == true) {
+                Injekt.get<Application>().stringResource(AYMR.strings.content_open_page_missing)
+            }
+            chapterPageIndex = index
+            chapter.requestedPage = index
+            sharedPage = null
+        }
 
         manga?.let { title ->
             ReadingTogetherManager.existing()

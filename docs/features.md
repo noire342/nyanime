@@ -324,3 +324,15 @@ separate. Un render sul PC non dimostra fluidità o stabilità sul dispositivo.
 
 Consulta le [guide tecniche](README.md) per protocollo delle stanze, vincoli Cast,
 misure Anime4K, contratti delle estensioni e procedure di verifica.
+
+## Condivisione dei contenuti
+
+Il comando Condividi nelle schede genera un link che apre Nyanime. Lo stesso
+pannello è disponibile selezionando un episodio o capitolo, da Altro nel player
+e dal menu del lettore. Permette di scegliere scheda, inizio del contenuto,
+minuto attuale o pagina attuale; la pressione prolungata su una pagina offre
+anche il collegamento a quella pagina, distinto dal salvataggio dell’immagine.
+
+Il destinatario deve avere la stessa estensione installata e abilitata.
+L’app risolve il riferimento preciso del contenuto tramite i contratti generici
+delle estensioni, senza indovinare un’alternativa. [Dettagli](content-sharing.md).

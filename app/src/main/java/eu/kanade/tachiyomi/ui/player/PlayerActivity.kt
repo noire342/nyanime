@@ -63,6 +63,7 @@ import aniyomi.core.common.torrent.TorrentServerApi
 import aniyomi.core.common.torrent.TorrentServerUtils
 import com.hippo.unifile.UniFile
 import eu.kanade.domain.items.episode.model.toSEpisode
+import eu.kanade.presentation.share.ContentShareDialog
 import eu.kanade.presentation.theme.TachiyomiTheme
 import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.animesource.model.ChapterType
@@ -79,6 +80,8 @@ import eu.kanade.tachiyomi.data.download.anime.ultra.UltraFiles
 import eu.kanade.tachiyomi.data.download.anime.ultra.UltraPlaybackGuard
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
+import eu.kanade.tachiyomi.data.share.ContentLink
+import eu.kanade.tachiyomi.data.share.SharedMedium
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
 import eu.kanade.tachiyomi.databinding.PlayerLayoutBinding
 import eu.kanade.tachiyomi.network.NetworkPreferences
@@ -234,6 +237,41 @@ class PlayerActivity : BaseActivity() {
         }
     }
 
+    private var sharedStart: Pair<Long, Long>? = null
+
+    private fun readSharedStart(intent: Intent): Pair<Long, Long>? {
+        if (!intent.hasExtra(SHARED_START)) return null
+        val episode = intent.getLongExtra("episodeId", -1)
+        val position = intent.getLongExtra(SHARED_START, -1)
+        return if (episode >= 0 && position in 0..eu.kanade.tachiyomi.data.share.ContentLinks.MAX_POSITION_MS) {
+            episode to position
+        } else {
+            null
+        }
+    }
+
+    fun shareCurrentContent() {
+        val anime = viewModel.currentAnime.value ?: return
+        val episode = viewModel.currentEpisode.value ?: return
+        if (viewModel.currentSource.value !is AnimeHttpSource) return
+        ContentShareDialog.show(
+            this,
+            ContentLink(
+                medium = SharedMedium.ANIME,
+                sourceId = anime.source,
+                sourceName = viewModel.currentSource.value?.name,
+                entryUrl = anime.url,
+                title = anime.title,
+                itemUrl = episode.url,
+                itemTitle = episode.name,
+                positionMs = (viewModel.pos.value.toDouble() * 1000).toLong().coerceIn(
+                    0,
+                    eu.kanade.tachiyomi.data.share.ContentLinks.MAX_POSITION_MS,
+                ),
+            ),
+        )
+    }
+
     companion object {
         fun newIntent(
             context: Context,
@@ -242,10 +280,12 @@ class PlayerActivity : BaseActivity() {
             hostList: List<Hoster>? = null,
             hostIndex: Int? = null,
             vidIndex: Int? = null,
+            startPositionMs: Long? = null,
         ): Intent {
             return Intent(context, PlayerActivity::class.java).apply {
                 putExtra("animeId", animeId)
                 putExtra("episodeId", episodeId)
+                startPositionMs?.let { putExtra(SHARED_START, it) }
                 hostIndex?.let { putExtra("hostIndex", it) }
                 vidIndex?.let { putExtra("vidIndex", it) }
                 hostList?.let { putExtra("hostList", it.serialize()) }
@@ -253,6 +293,8 @@ class PlayerActivity : BaseActivity() {
             }
         }
 
+        private const val SHARED_START = "nyanime.shared.start_ms"
+        private const val SHARED_EPISODE = "nyanime.shared.episode_id"
         internal const val MPV_DIR = "mpv"
         private const val MPV_FONTS_DIR = "fonts"
         private const val MPV_SCRIPTS_DIR = "scripts"
@@ -263,6 +305,7 @@ class PlayerActivity : BaseActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         fileLoadedJob?.cancel()
+        sharedStart = readSharedStart(intent)
 
         val animeId = intent.extras?.getLong("animeId") ?: -1
         val episodeId = intent.extras?.getLong("episodeId") ?: -1
@@ -317,6 +360,15 @@ class PlayerActivity : BaseActivity() {
         enableEdgeToEdge()
         registerSecureActivity(this)
         super.onCreate(savedInstanceState)
+        sharedStart = if (savedInstanceState == null) {
+            readSharedStart(intent)
+        } else {
+            if (savedInstanceState.containsKey(SHARED_START)) {
+                savedInstanceState.getLong(SHARED_EPISODE) to savedInstanceState.getLong(SHARED_START)
+            } else {
+                null
+            }
+        }
         UltraPlaybackGuard.enterPlayer()
         setContentView(binding.root)
         privacyDisplayController?.registerView(binding.player, PrivacyArea.VIDEO)
@@ -1744,6 +1796,10 @@ class PlayerActivity : BaseActivity() {
         if (!isChangingConfigurations) {
             viewModel.onSaveInstanceStateNonConfigurationChange()
         }
+        sharedStart?.let { (episode, position) ->
+            outState.putLong(SHARED_EPISODE, episode)
+            outState.putLong(SHARED_START, position)
+        }
         super.onSaveInstanceState(outState)
     }
 
@@ -1852,7 +1908,8 @@ class PlayerActivity : BaseActivity() {
         if (viewModel.isLoadingEpisode.value) {
             viewModel.currentEpisode.value?.let { episode ->
                 val preservePos = playerPreferences.preserveWatchingPosition().get()
-                val resumePosition = castController.takePhoneResume(episode.id ?: -1) ?: position
+                val resumePosition = sharedStart?.takeIf { it.first == episode.id }?.second
+                    ?: castController.takePhoneResume(episode.id ?: -1) ?: position
                     ?: if (episode.seen && !preservePos) {
                         0L
                     } else {
@@ -2115,6 +2172,10 @@ class PlayerActivity : BaseActivity() {
         if (castController.state.value.active || castController.state.value.connecting) {
             player.paused = true
             return
+        }
+        if (sharedStart?.first == viewModel.currentEpisode.value?.id) {
+            sharedStart = null
+            intent.removeExtra(SHARED_START)
         }
         viewModel.remoteProgressOwned = false
         mediaSession?.isActive = true

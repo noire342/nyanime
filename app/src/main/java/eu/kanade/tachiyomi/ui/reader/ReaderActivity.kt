@@ -54,6 +54,7 @@ import eu.kanade.presentation.reader.ReaderPageActionsDialog
 import eu.kanade.presentation.reader.ReadingModeSelectDialog
 import eu.kanade.presentation.reader.appbars.ReaderAppBars
 import eu.kanade.presentation.reader.settings.ReaderSettingsDialog
+import eu.kanade.presentation.share.ContentShareDialog
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.common.Constants
 import eu.kanade.tachiyomi.data.coil.TachiyomiImageDecoder
@@ -62,6 +63,8 @@ import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.reading.ReadingBookmark
 import eu.kanade.tachiyomi.data.reading.ReadingPosition
 import eu.kanade.tachiyomi.data.reading.ReadingTogetherManager
+import eu.kanade.tachiyomi.data.share.ContentLink
+import eu.kanade.tachiyomi.data.share.SharedMedium
 import eu.kanade.tachiyomi.databinding.ReaderActivityBinding
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
@@ -114,12 +117,24 @@ import java.io.ByteArrayOutputStream
 class ReaderActivity : BaseActivity() {
 
     companion object {
-        fun newIntent(context: Context, mangaId: Long?, chapterId: Long?): Intent {
+        private const val SHARED_PAGE = "nyanime.shared.page"
+
+        fun newIntent(context: Context, mangaId: Long?, chapterId: Long?, startPage: Int? = null): Intent {
             return Intent(context, ReaderActivity::class.java).apply {
                 putExtra("manga", mangaId)
                 putExtra("chapter", chapterId)
+                startPage?.let { putExtra(SHARED_PAGE, it) }
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.hasExtra(SHARED_PAGE)) {
+            // singleTask retains the old reader ViewModel. A shared target needs a fresh title/chapter loader.
+            finish()
+            startActivity(Intent(intent))
         }
     }
 
@@ -196,7 +211,12 @@ class ReaderActivity : BaseActivity() {
             )
 
             lifecycleScope.launchNonCancellable {
-                val initResult = viewModel.init(manga, chapter)
+                val initResult = viewModel.init(
+                    manga,
+                    chapter,
+                    intent.getIntExtra(SHARED_PAGE, -1).takeIf { it >= 1 },
+                )
+                if (initResult.getOrDefault(false)) intent.removeExtra(SHARED_PAGE)
                 if (!initResult.getOrDefault(false)) {
                     val exception = initResult.exceptionOrNull() ?: IllegalStateException(
                         "Unknown err",
@@ -496,7 +516,7 @@ class ReaderActivity : BaseActivity() {
             }
 
             val onDismissRequest = viewModel::closeDialog
-            when (state.dialog) {
+            when (val dialog = state.dialog) {
                 is ReaderViewModel.Dialog.Loading -> {
                     AlertDialog(
                         onDismissRequest = {},
@@ -547,6 +567,9 @@ class ReaderActivity : BaseActivity() {
                         onDismissRequest = onDismissRequest,
                         onSetAsCover = viewModel::setAsCover,
                         onShare = viewModel::shareImage,
+                        onSharePageLink = { sharePageLink(dialog.page) }.takeIf {
+                            viewModel.getSource() is eu.kanade.tachiyomi.source.online.HttpSource
+                        },
                         onSave = viewModel::saveImage,
                     )
                 }
@@ -649,10 +672,30 @@ class ReaderActivity : BaseActivity() {
     }
 
     private fun shareChapter() {
-        assistUrl?.let {
-            val intent = it.toUri().toShareIntent(this, type = "text/plain")
-            startActivity(Intent.createChooser(intent, stringResource(MR.strings.action_share)))
-        }
+        val chapter = viewModel.state.value.viewerChapters?.currChapter ?: return
+        shareReaderContent(chapter, viewModel.state.value.currentPage)
+    }
+
+    private fun sharePageLink(page: ReaderPage) {
+        shareReaderContent(page.chapter, page.index + 1)
+    }
+
+    private fun shareReaderContent(chapter: ReaderChapter, page: Int) {
+        val manga = viewModel.manga ?: return
+        if (viewModel.getSource() !is eu.kanade.tachiyomi.source.online.HttpSource) return
+        ContentShareDialog.show(
+            this,
+            ContentLink(
+                medium = SharedMedium.MANGA,
+                sourceId = manga.source,
+                sourceName = viewModel.getSource()?.name,
+                entryUrl = manga.url,
+                title = manga.title,
+                itemUrl = chapter.chapter.url,
+                itemTitle = chapter.chapter.name,
+                page = page.coerceAtLeast(1),
+            ),
+        )
     }
 
     private fun showReadingModeToast(mode: Int) {

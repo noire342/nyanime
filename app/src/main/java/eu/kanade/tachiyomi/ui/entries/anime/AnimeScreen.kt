@@ -1,7 +1,6 @@
 package eu.kanade.tachiyomi.ui.entries.anime
 
 import android.content.Context
-import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -43,6 +42,7 @@ import eu.kanade.presentation.entries.components.SetIntervalDialog
 import eu.kanade.presentation.more.settings.screen.player.PlayerSettingsGesturesScreen.SkipIntroLengthDialog
 import eu.kanade.presentation.motion.PosterAnimeLoadingScreen
 import eu.kanade.presentation.motion.PosterDetailsScreen
+import eu.kanade.presentation.share.ContentShareDialog
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.formatEpisodeNumber
@@ -50,6 +50,8 @@ import eu.kanade.presentation.util.isTabletUi
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
+import eu.kanade.tachiyomi.data.share.ContentLink
+import eu.kanade.tachiyomi.data.share.SharedMedium
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.source.anime.isLocalOrStub
@@ -70,7 +72,6 @@ import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.setting.SettingsScreen
 import eu.kanade.tachiyomi.ui.webview.WebViewScreen
 import eu.kanade.tachiyomi.util.system.copyToClipboard
-import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.launch
 import logcat.LogPriority
@@ -506,19 +507,18 @@ class AnimeScreen(
     }
 
     private fun shareAnime(context: Context, anime_: Anime?, source_: AnimeSource?) {
-        try {
-            getAnimeUrl(anime_, source_)?.let { url ->
-                val intent = url.toUri().toShareIntent(context, type = "text/plain")
-                context.startActivity(
-                    Intent.createChooser(
-                        intent,
-                        context.stringResource(MR.strings.action_share),
-                    ),
-                )
-            }
-        } catch (e: Exception) {
-            context.toast(e.message)
-        }
+        val entry = anime_ ?: return
+        if (source_ == null) return
+        ContentShareDialog.show(
+            context,
+            ContentLink(
+                medium = SharedMedium.ANIME,
+                sourceId = entry.source,
+                sourceName = source_.name,
+                entryUrl = entry.url,
+                title = entry.title,
+            ),
+        )
     }
 
     /**

@@ -1,7 +1,6 @@
 package eu.kanade.tachiyomi.ui.entries.manga
 
 import android.content.Context
-import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -38,10 +37,13 @@ import eu.kanade.presentation.entries.manga.DuplicateMangaDialog
 import eu.kanade.presentation.entries.manga.MangaScreen
 import eu.kanade.presentation.entries.manga.components.MangaCoverDialog
 import eu.kanade.presentation.entries.manga.components.ScanlatorFilterDialog
+import eu.kanade.presentation.share.ContentShareDialog
 import eu.kanade.presentation.theme.LegacyMangaTheme
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.isTabletUi
+import eu.kanade.tachiyomi.data.share.ContentLink
+import eu.kanade.tachiyomi.data.share.SharedMedium
 import eu.kanade.tachiyomi.source.MangaSource
 import eu.kanade.tachiyomi.source.manga.isLocalOrStub
 import eu.kanade.tachiyomi.source.online.HttpSource
@@ -60,7 +62,6 @@ import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.ui.setting.SettingsScreen
 import eu.kanade.tachiyomi.ui.webview.WebViewScreen
 import eu.kanade.tachiyomi.util.system.copyToClipboard
-import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.launch
 import logcat.LogPriority
@@ -375,19 +376,18 @@ class MangaScreen(
     }
 
     private fun shareManga(context: Context, manga_: Manga?, source_: MangaSource?) {
-        try {
-            getMangaUrl(manga_, source_)?.let { url ->
-                val intent = url.toUri().toShareIntent(context, type = "text/plain")
-                context.startActivity(
-                    Intent.createChooser(
-                        intent,
-                        context.stringResource(MR.strings.action_share),
-                    ),
-                )
-            }
-        } catch (e: Exception) {
-            context.toast(e.message)
-        }
+        val entry = manga_ ?: return
+        if (source_ == null) return
+        ContentShareDialog.show(
+            context,
+            ContentLink(
+                medium = SharedMedium.MANGA,
+                sourceId = entry.source,
+                sourceName = source_.name,
+                entryUrl = entry.url,
+                title = entry.title,
+            ),
+        )
     }
 
     /**

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Input
 import androidx.compose.material.icons.outlined.NewLabel
 import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.RemoveDone
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -84,6 +85,7 @@ fun EntryBottomActionMenu(
     onDeleteClicked: (() -> Unit)? = null,
     onExternalClicked: (() -> Unit)? = null,
     onInternalClicked: (() -> Unit)? = null,
+    onShareClicked: (() -> Unit)? = null,
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -103,9 +105,9 @@ fun EntryBottomActionMenu(
             val haptic = LocalHapticFeedback.current
             val confirm =
                 remember {
-                    mutableStateListOf(false, false, false, false, false, false, false, false, false, false, false)
+                    mutableStateListOf(*Array(12) { false })
                 }
-            val confirmRange = 0..<11
+            val confirmRange = 0..<12
             var resetJob: Job? = remember { null }
             val onLongClickItem: (Int) -> Unit = { toConfirmIndex ->
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -125,6 +127,15 @@ fun EntryBottomActionMenu(
                     )
                     .padding(horizontal = 8.dp, vertical = 12.dp),
             ) {
+                if (onShareClicked != null) {
+                    Button(
+                        title = stringResource(MR.strings.action_share),
+                        icon = Icons.Outlined.Share,
+                        toConfirm = confirm[11],
+                        onLongClick = { onLongClickItem(11) },
+                        onClick = onShareClicked,
+                    )
+                }
                 if (onBookmarkClicked != null) {
                     val bookmark = if (isManga) MR.strings.action_bookmark else AYMR.strings.action_bookmark_episode
                     Button(

@@ -725,4 +725,28 @@
     <string name="privacy_display_waiting_area">Waiting for a selected area.</string>
     <string name="privacy_display_suspended">Temporarily suspended. %s</string>
     <string name="privacy_display_failed">Protection is unavailable in this session. The app continues normally.</string>
+
+    <!-- Nyanime content sharing -->
+    <string name="content_share_title">Share with Nyanime</string>
+    <string name="content_share_entry">Title details</string>
+    <string name="content_share_episode">Episode from the beginning</string>
+    <string name="content_share_chapter">Chapter from the beginning</string>
+    <string name="content_share_time">From %1$s</string>
+    <string name="content_share_page">Page %1$d</string>
+    <string name="content_share_help">Choose where to start. The other person needs Nyanime and the same extension.</string>
+    <string name="content_share_send">Share link</string>
+    <string name="content_share_copy">Copy link</string>
+    <string name="content_link_copied">Nyanime link copied</string>
+    <string name="content_share_unavailable">This content cannot be shared right now.</string>
+    <string name="content_share_page_link">Share link to this page</string>
+    <string name="content_open_title">Open in Nyanime</string>
+    <string name="content_open_loading">Opening the shared content…</string>
+    <string name="content_open_invalid">This Nyanime link is invalid or requires a newer version of the app.</string>
+    <string name="content_open_source_missing">The extension needed for this link is not installed or enabled. Install it from Browse, then try again.</string>
+    <string name="content_open_item_missing">The shared episode or chapter is no longer available in this extension. You can still open the title details.</string>
+    <string name="content_open_network">The extension could not open this content. Check your connection and try again.</string>
+    <string name="content_open_retry">Try again</string>
+    <string name="content_open_session_active">A room or Cast session is active. You can open the title details without changing the session. End the session before opening this episode or chapter.</string>
+    <string name="content_open_page_missing">The shared page is not available in this chapter.</string>
+    <string name="content_open_busy">End the room or Cast session before opening this episode or chapter.</string>
 </resources>

@@ -64,8 +64,11 @@ import eu.kanade.presentation.entries.manga.components.MangaChapterListItem
 import eu.kanade.presentation.entries.manga.components.MangaInfoBox
 import eu.kanade.presentation.privacy.contentPrivacyRegion
 import eu.kanade.presentation.privacy.nsfwPrivacy
+import eu.kanade.presentation.share.ContentShareDialog
 import eu.kanade.presentation.util.formatChapterNumber
 import eu.kanade.tachiyomi.data.download.manga.model.MangaDownload
+import eu.kanade.tachiyomi.data.share.ContentLink
+import eu.kanade.tachiyomi.data.share.SharedMedium
 import eu.kanade.tachiyomi.data.track.MangaAnimeContinuity
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.manga.getNameForMangaInfo
@@ -351,6 +354,9 @@ private fun MangaScreenSmallImpl(
                 chapters.filter { it.selected }
             }
             SharedMangaBottomActionMenu(
+                manga = state.manga,
+                canShare = onShareClicked != null,
+                sourceName = state.source.name,
                 selected = selectedChapters,
                 onMultiBookmarkClicked = onMultiBookmarkClicked,
                 onMultiMarkAsReadClicked = onMultiMarkAsReadClicked,
@@ -614,6 +620,9 @@ fun MangaScreenLargeImpl(
                     chapters.filter { it.selected }
                 }
                 SharedMangaBottomActionMenu(
+                    manga = state.manga,
+                    canShare = onShareClicked != null,
+                    sourceName = state.source.name,
                     selected = selectedChapters,
                     onMultiBookmarkClicked = onMultiBookmarkClicked,
                     onMultiMarkAsReadClicked = onMultiMarkAsReadClicked,
@@ -759,6 +768,9 @@ fun MangaScreenLargeImpl(
 
 @Composable
 private fun SharedMangaBottomActionMenu(
+    manga: Manga,
+    canShare: Boolean,
+    sourceName: String,
     selected: List<ChapterList.Item>,
     onMultiBookmarkClicked: (List<Chapter>, bookmarked: Boolean) -> Unit,
     onMultiMarkAsReadClicked: (List<Chapter>, markAsRead: Boolean) -> Unit,
@@ -768,8 +780,24 @@ private fun SharedMangaBottomActionMenu(
     fillFraction: Float,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     EntryBottomActionMenu(
         visible = selected.isNotEmpty(),
+        onShareClicked = {
+            val item = selected.single().chapter
+            ContentShareDialog.show(
+                context,
+                ContentLink(
+                    medium = SharedMedium.MANGA,
+                    sourceId = manga.source,
+                    sourceName = sourceName,
+                    entryUrl = manga.url,
+                    title = manga.title,
+                    itemUrl = item.url,
+                    itemTitle = item.name,
+                ),
+            )
+        }.takeIf { canShare && selected.size == 1 },
         modifier = modifier.fillMaxWidth(fillFraction),
         onBookmarkClicked = {
             onMultiBookmarkClicked.invoke(selected.fastMap { it.chapter }, true)

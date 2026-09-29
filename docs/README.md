@@ -8,6 +8,7 @@ I documenti tecnici in inglese conservano i nomi delle API e dei componenti.
 
 | Guida | Contenuto |
 | --- | --- |
+| [Condivisione in Nyanime](content-sharing.md) | Schede, episodi con minutaggio e capitoli con pagina, senza logica specifica delle fonti. |
 | [Primi passi e FAQ](getting-started.md) | Installazione, aggiornamenti, estensioni, preferenze e problemi comuni. |
 | [Aiuto](support.md) | Archiviazione, migrazione, tracker e risoluzione dei problemi. |
 | [Privacy](privacy.md) | Dati locali, connessioni esterne e controlli disponibili. |

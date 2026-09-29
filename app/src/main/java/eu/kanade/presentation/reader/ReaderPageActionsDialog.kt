@@ -1,10 +1,12 @@
 package eu.kanade.presentation.reader
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Photo
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Share
@@ -21,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.components.AdaptiveSheet
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.ActionButton
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
@@ -31,47 +34,59 @@ fun ReaderPageActionsDialog(
     onSetAsCover: () -> Unit,
     onShare: (Boolean) -> Unit,
     onSave: () -> Unit,
+    onSharePageLink: (() -> Unit)? = null,
 ) {
     var showSetCoverDialog by remember { mutableStateOf(false) }
 
     AdaptiveSheet(onDismissRequest = onDismissRequest) {
-        Row(
-            modifier = Modifier.padding(vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
-        ) {
-            ActionButton(
-                modifier = Modifier.weight(1f),
-                title = stringResource(MR.strings.set_as_cover),
-                icon = Icons.Outlined.Photo,
-                onClick = { showSetCoverDialog = true },
-            )
-            ActionButton(
-                modifier = Modifier.weight(1f),
-                title = stringResource(MR.strings.action_copy_to_clipboard),
-                icon = Icons.Outlined.ContentCopy,
-                onClick = {
-                    onShare(true)
+        Column {
+            Row(
+                modifier = Modifier.padding(vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.small),
+            ) {
+                ActionButton(
+                    modifier = Modifier.weight(1f),
+                    title = stringResource(MR.strings.set_as_cover),
+                    icon = Icons.Outlined.Photo,
+                    onClick = { showSetCoverDialog = true },
+                )
+                ActionButton(
+                    modifier = Modifier.weight(1f),
+                    title = stringResource(MR.strings.action_copy_to_clipboard),
+                    icon = Icons.Outlined.ContentCopy,
+                    onClick = {
+                        onShare(true)
+                        onDismissRequest()
+                    },
+                )
+                ActionButton(
+                    modifier = Modifier.weight(1f),
+                    title = stringResource(MR.strings.action_share),
+                    icon = Icons.Outlined.Share,
+                    onClick = {
+                        onShare(false)
+                        onDismissRequest()
+                    },
+                )
+                ActionButton(
+                    modifier = Modifier.weight(1f),
+                    title = stringResource(MR.strings.action_save),
+                    icon = Icons.Outlined.Save,
+                    onClick = {
+                        onSave()
+                        onDismissRequest()
+                    },
+                )
+            }
+            if (onSharePageLink != null) {
+                TextButton(onClick = {
                     onDismissRequest()
-                },
-            )
-            ActionButton(
-                modifier = Modifier.weight(1f),
-                title = stringResource(MR.strings.action_share),
-                icon = Icons.Outlined.Share,
-                onClick = {
-                    onShare(false)
-                    onDismissRequest()
-                },
-            )
-            ActionButton(
-                modifier = Modifier.weight(1f),
-                title = stringResource(MR.strings.action_save),
-                icon = Icons.Outlined.Save,
-                onClick = {
-                    onSave()
-                    onDismissRequest()
-                },
-            )
+                    onSharePageLink()
+                }) {
+                    androidx.compose.material3.Icon(Icons.Outlined.Link, contentDescription = null)
+                    Text(stringResource(AYMR.strings.content_share_page_link), Modifier.padding(start = 8.dp))
+                }
+            }
         }
     }
 

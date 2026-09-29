@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -91,6 +92,7 @@ fun MoreSheet(
     timerAtEpisodeEnd: Boolean,
     onOpenSleepTimer: () -> Unit,
     onOpenWatchTogether: () -> Unit,
+    onShareContent: (() -> Unit)?,
     onDismissRequest: () -> Unit,
     onEnterFiltersPanel: () -> Unit,
     customButtons: ImmutableList<CustomButton>,
@@ -137,6 +139,12 @@ fun MoreSheet(
                         text = stringResource(AYMR.strings.player_sheets_filters_title),
                         modifier = Modifier.padding(start = 8.dp),
                     )
+                }
+            }
+            if (onShareContent != null) {
+                OutlinedButton(onClick = onShareContent, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Outlined.Share, contentDescription = null)
+                    Text(stringResource(AYMR.strings.content_share_title), Modifier.padding(start = 8.dp))
                 }
             }
             SleepTimerEntry(remainingTime, onOpenSleepTimer, timerAtEpisodeEnd)

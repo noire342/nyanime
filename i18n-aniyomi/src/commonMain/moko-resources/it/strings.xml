@@ -634,4 +634,28 @@
     <string name="privacy_display_waiting_area">In attesa di un’area selezionata.</string>
     <string name="privacy_display_suspended">Temporaneamente sospesa. %s</string>
     <string name="privacy_display_failed">Protezione non disponibile in questa sessione. L’app continua normalmente.</string>
+
+    <!-- Nyanime content sharing -->
+    <string name="content_share_title">Condividi con Nyanime</string>
+    <string name="content_share_entry">Scheda del titolo</string>
+    <string name="content_share_episode">Episodio dall’inizio</string>
+    <string name="content_share_chapter">Capitolo dall’inizio</string>
+    <string name="content_share_time">Dal minuto %1$s</string>
+    <string name="content_share_page">Pagina %1$d</string>
+    <string name="content_share_help">Scegli da dove partire. L’altra persona deve avere Nyanime e la stessa estensione.</string>
+    <string name="content_share_send">Condividi link</string>
+    <string name="content_share_copy">Copia link</string>
+    <string name="content_link_copied">Link Nyanime copiato</string>
+    <string name="content_share_unavailable">Questo contenuto non può essere condiviso al momento.</string>
+    <string name="content_share_page_link">Condividi link a questa pagina</string>
+    <string name="content_open_title">Apri in Nyanime</string>
+    <string name="content_open_loading">Apertura del contenuto condiviso…</string>
+    <string name="content_open_invalid">Questo link Nyanime non è valido oppure richiede una versione più recente dell’app.</string>
+    <string name="content_open_source_missing">L’estensione necessaria per questo link non è installata o abilitata. Installala da Sfoglia, poi riprova.</string>
+    <string name="content_open_item_missing">L’episodio o il capitolo condiviso non è più disponibile in questa estensione. Puoi comunque aprire la scheda del titolo.</string>
+    <string name="content_open_network">L’estensione non è riuscita ad aprire questo contenuto. Controlla la connessione e riprova.</string>
+    <string name="content_open_retry">Riprova</string>
+    <string name="content_open_session_active">È attiva una stanza o una sessione Cast. Puoi aprire la scheda senza cambiare la sessione. Termina la sessione prima di aprire questo episodio o capitolo.</string>
+    <string name="content_open_page_missing">La pagina condivisa non è disponibile in questo capitolo.</string>
+    <string name="content_open_busy">Termina la stanza o il Cast prima di aprire questo episodio o capitolo.</string>
 </resources>

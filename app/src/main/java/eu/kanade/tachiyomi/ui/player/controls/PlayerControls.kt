@@ -794,6 +794,10 @@ fun PlayerControls(
             onExtendSleepTimer = viewModel::extendTimer,
             onOpenSleepTimer = { viewModel.showSheet(Sheets.SleepTimer) },
             onOpenWatchTogether = { viewModel.showSheet(Sheets.WatchTogether) },
+            onShareContent = {
+                viewModel.showSheet(Sheets.None)
+                playbackActivity.shareCurrentContent()
+            }.takeIf { currentSource is eu.kanade.tachiyomi.animesource.online.AnimeHttpSource },
             reduceMotion = reduceMotion,
             buttons = customButtons.getButtons().toImmutableList(),
             onSelectAnime4KCustom = onSelectAnime4KCustom,

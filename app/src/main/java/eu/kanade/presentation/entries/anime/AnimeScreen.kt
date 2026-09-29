@@ -78,11 +78,14 @@ import eu.kanade.presentation.entries.components.ItemHeader
 import eu.kanade.presentation.entries.components.MissingItemCountListItem
 import eu.kanade.presentation.privacy.contentPrivacyRegion
 import eu.kanade.presentation.privacy.nsfwPrivacy
+import eu.kanade.presentation.share.ContentShareDialog
 import eu.kanade.presentation.util.formatEpisodeNumber
 import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
 import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
+import eu.kanade.tachiyomi.data.share.ContentLink
+import eu.kanade.tachiyomi.data.share.SharedMedium
 import eu.kanade.tachiyomi.data.track.AnimeMangaContinuity
 import eu.kanade.tachiyomi.source.anime.getNameForAnimeInfo
 import eu.kanade.tachiyomi.ui.browse.anime.extension.details.AnimeSourcePreferencesScreen
@@ -434,6 +437,9 @@ private fun AnimeScreenSmallImpl(
                     episodes.filter { it.selected }
                 }
                 SharedAnimeBottomActionMenu(
+                    anime = state.anime,
+                    canShare = onShareClicked != null,
+                    sourceName = state.source.name,
                     selected = selectedEpisodes,
                     onEpisodeClicked = onEpisodeClicked,
                     onMultiBookmarkClicked = onMultiBookmarkClicked,
@@ -816,6 +822,9 @@ fun AnimeScreenLargeImpl(
                         episodes.filter { it.selected }
                     }
                     SharedAnimeBottomActionMenu(
+                        anime = state.anime,
+                        canShare = onShareClicked != null,
+                        sourceName = state.source.name,
                         selected = selectedEpisodes,
                         onEpisodeClicked = onEpisodeClicked,
                         onMultiBookmarkClicked = onMultiBookmarkClicked,
@@ -1048,6 +1057,9 @@ fun AnimeScreenLargeImpl(
 
 @Composable
 private fun SharedAnimeBottomActionMenu(
+    anime: Anime,
+    canShare: Boolean,
+    sourceName: String,
     selected: List<EpisodeList.Item>,
     onEpisodeClicked: (Episode, Boolean) -> Unit,
     onMultiBookmarkClicked: (List<Episode>, bookmarked: Boolean) -> Unit,
@@ -1060,8 +1072,24 @@ private fun SharedAnimeBottomActionMenu(
     alwaysUseExternalPlayer: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     EntryBottomActionMenu(
         visible = selected.isNotEmpty(),
+        onShareClicked = {
+            val item = selected.single().episode
+            ContentShareDialog.show(
+                context,
+                ContentLink(
+                    medium = SharedMedium.ANIME,
+                    sourceId = anime.source,
+                    sourceName = sourceName,
+                    entryUrl = anime.url,
+                    title = anime.title,
+                    itemUrl = item.url,
+                    itemTitle = item.name,
+                ),
+            )
+        }.takeIf { canShare && selected.size == 1 },
         modifier = modifier.fillMaxWidth(fillFraction),
         onBookmarkClicked = {
             onMultiBookmarkClicked.invoke(selected.fastMap { it.episode }, true)
