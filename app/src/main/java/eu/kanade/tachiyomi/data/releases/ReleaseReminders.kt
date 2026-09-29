@@ -27,10 +27,6 @@ import tachiyomi.domain.entries.anime.repository.AnimeRepository
 import tachiyomi.domain.items.episode.repository.EpisodeRepository
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
-import java.text.DateFormat
-import java.time.Instant
-import java.time.ZoneId
-import java.util.Date
 
 /** One alarm for the nearest reminder, not an alarm per title or a network polling timer. */
 object ReleaseReminders {
@@ -119,29 +115,18 @@ object ReleaseReminders {
         }
         if (!seen) {
             val hidden = Injekt.get<SecurityPreferences>().hideNotificationContent().get()
-            val advance = reminder.kind == ReleaseReminderKind.ADVANCE
-            val description = if (hidden) {
-                context.getString(
-                    if (advance) R.string.release_advance_private else R.string.release_reminder_description,
-                )
-            } else if (advance) {
-                val format = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-                val zone = ZoneId.systemDefault()
-                val tomorrow = Instant.ofEpochMilli(now).atZone(zone).toLocalDate().plusDays(1)
-                val date = Instant.ofEpochMilli(event.airingAt).atZone(zone).toLocalDate()
-                context.getString(
-                    if (date == tomorrow) R.string.release_advance_notification else R.string.release_advance_upcoming,
-                    eu.kanade.presentation.components.releases.scheduleBroadcastLabel(context, event),
-                    format.format(Date(event.airingAt)),
-                )
-            } else {
-                eu.kanade.presentation.components.releases.scheduleBroadcastLabel(context, event)
-            }
+            val text = ReleaseNotificationCopy.from(context).reminder(
+                anime.title,
+                event,
+                now,
+                if (event.variants.isEmpty()) ScheduleAirType.RAW else AnimeSchedulePreferences().type,
+                hidden,
+            )
             val notification = NotificationCompat.Builder(context, CHANNEL)
                 .setSmallIcon(R.drawable.ic_ani)
-                .setContentTitle(if (hidden) context.getString(R.string.release_title) else anime.title)
-                .setContentText(description)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(description))
+                .setContentTitle(text.headline)
+                .setContentText(text.summary)
+                .setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(text.headline).bigText(text.details))
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
                 .setContentIntent(
                     NotificationReceiver.openEpisodePendingActivity(context, anime, Notifications.ID_NEW_EPISODES),

@@ -13,9 +13,6 @@
     <string name="release_reminder_follow_description">Avvisi all’orario annunciato e, se attivo nelle impostazioni, anche 24 ore prima. La disponibilità nella fonte può essere diversa.</string>
     <string name="release_advance_reminder">Avvisami un giorno prima</string>
     <string name="release_advance_description">Con i promemoria di trasmissione attivi, ricevi anche un avviso 24 ore prima. Funziona anche senza AnimeSchedule.</string>
-    <string name="release_advance_notification">Domani · %1$s · %2$s</string>
-    <string name="release_advance_upcoming">In arrivo · %1$s · %2$s</string>
-    <string name="release_advance_private">Un episodio seguito è in arrivo.</string>
     <string name="release_advance_active">Avviso del giorno prima attivo.</string>
     <string name="release_advance_inactive">Avviso del giorno prima disattivato.</string>
     <string name="release_test_reminder">Prova un promemoria</string>

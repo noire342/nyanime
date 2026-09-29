@@ -99,7 +99,10 @@ object ReleaseNotifications {
                         if (items.isNotEmpty()) {
                             AnimeLibraryUpdateNotifier(
                                 context,
-                            ).showUpdateNotifications(listOf(anime to items.toTypedArray()))
+                            ).showUpdateNotifications(
+                                listOf(anime to items.toTypedArray()),
+                                notices.associate { it.itemId to it.sourceAt },
+                            )
                         }
                     }
                     ReleaseMedium.MANGA -> {
@@ -112,7 +115,10 @@ object ReleaseNotifications {
                         if (items.isNotEmpty()) {
                             MangaLibraryUpdateNotifier(
                                 context,
-                            ).showUpdateNotifications(listOf(manga to items.toTypedArray()))
+                            ).showUpdateNotifications(
+                                listOf(manga to items.toTypedArray()),
+                                notices.associate { it.itemId to it.sourceAt },
+                            )
                         }
                     }
                 }

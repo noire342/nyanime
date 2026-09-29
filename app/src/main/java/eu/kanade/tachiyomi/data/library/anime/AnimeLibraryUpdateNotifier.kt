@@ -23,6 +23,9 @@ import eu.kanade.tachiyomi.data.library.LibraryUpdateLoad
 import eu.kanade.tachiyomi.data.notification.NotificationHandler
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
+import eu.kanade.tachiyomi.data.releases.ReleaseMedium
+import eu.kanade.tachiyomi.data.releases.ReleaseNotificationCopy
+import eu.kanade.tachiyomi.data.releases.ReleaseNotificationText
 import eu.kanade.tachiyomi.source.UnmeteredSource
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.util.lang.chop
@@ -194,15 +197,22 @@ class AnimeLibraryUpdateNotifier(
      *
      * @param updates a list of anime with new updates.
      */
-    suspend fun showUpdateNotifications(updates: List<Pair<Anime, Array<Episode>>>) {
+    suspend fun showUpdateNotifications(
+        updates: List<Pair<Anime, Array<Episode>>>,
+        publicationDates: Map<Long, Long> = emptyMap(),
+    ) {
+        val single = updates.singleOrNull()?.takeUnless { securityPreferences.hideNotificationContent().get() }
+            ?.let { (anime, episodes) -> newEpisodesText(anime, episodes, publicationDates) }
         // Parent group notification
         context.notify(
             Notifications.ID_NEW_EPISODES,
             Notifications.CHANNEL_NEW_CHAPTERS_EPISODES,
         ) {
             setContentTitle(context.stringResource(AYMR.strings.notification_new_episodes))
-            if (updates.size == 1 && !securityPreferences.hideNotificationContent().get()) {
-                setContentText(updates.first().first.title.chop(NOTIF_TITLE_MAX_LEN))
+            if (single != null) {
+                setContentTitle(single.headline)
+                setContentText(single.summary)
+                setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(single.headline).bigText(single.details))
             } else {
                 setContentText(
                     context.resources.getQuantityString(
@@ -253,20 +263,23 @@ class AnimeLibraryUpdateNotifier(
                 androidx.core.app.NotificationManagerCompat.from(context).notify(
                     "release-anime",
                     anime.id.hashCode(),
-                    createNewEpisodesNotification(anime, episodes),
+                    createNewEpisodesNotification(anime, episodes, publicationDates),
                 )
             }
         }
     }
 
-    private suspend fun createNewEpisodesNotification(anime: Anime, episodes: Array<Episode>): Notification {
+    private suspend fun createNewEpisodesNotification(
+        anime: Anime,
+        episodes: Array<Episode>,
+        publicationDates: Map<Long, Long>,
+    ): Notification {
         val icon = kotlinx.coroutines.withTimeoutOrNull(500) { getAnimeIcon(anime) }
         return context.notificationBuilder(Notifications.CHANNEL_NEW_CHAPTERS_EPISODES) {
-            setContentTitle(anime.title)
-
-            val description = getNewEpisodesDescription(episodes)
-            setContentText(description)
-            setStyle(NotificationCompat.BigTextStyle().bigText(description))
+            val text = newEpisodesText(anime, episodes, publicationDates)
+            setContentTitle(text.headline)
+            setContentText(text.summary)
+            setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(text.headline).bigText(text.details))
 
             setSmallIcon(R.drawable.ic_ani)
 
@@ -404,6 +417,20 @@ class AnimeLibraryUpdateNotifier(
             }
         }
     }
+
+    private fun newEpisodesText(
+        anime: Anime,
+        episodes: Array<Episode>,
+        publicationDates: Map<Long, Long>,
+    ): ReleaseNotificationText = ReleaseNotificationCopy.from(context).available(
+        ReleaseMedium.ANIME,
+        anime.title,
+        getNewEpisodesDescription(episodes),
+        episodes.size,
+        episodes.map { publicationDates[it.id] ?: 0 },
+        episodes.maxOf { it.dateFetch },
+        System.currentTimeMillis(),
+    )
 
     /**
      * Returns an intent to open the main activity.

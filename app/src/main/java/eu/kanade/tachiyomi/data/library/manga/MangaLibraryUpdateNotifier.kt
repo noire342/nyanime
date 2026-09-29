@@ -23,6 +23,9 @@ import eu.kanade.tachiyomi.data.library.LibraryUpdateLoad
 import eu.kanade.tachiyomi.data.notification.NotificationHandler
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
+import eu.kanade.tachiyomi.data.releases.ReleaseMedium
+import eu.kanade.tachiyomi.data.releases.ReleaseNotificationCopy
+import eu.kanade.tachiyomi.data.releases.ReleaseNotificationText
 import eu.kanade.tachiyomi.source.UnmeteredSource
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.util.lang.chop
@@ -176,15 +179,22 @@ class MangaLibraryUpdateNotifier(
      *
      * @param updates a list of manga with new updates.
      */
-    suspend fun showUpdateNotifications(updates: List<Pair<Manga, Array<Chapter>>>) {
+    suspend fun showUpdateNotifications(
+        updates: List<Pair<Manga, Array<Chapter>>>,
+        publicationDates: Map<Long, Long> = emptyMap(),
+    ) {
+        val single = updates.singleOrNull()?.takeUnless { securityPreferences.hideNotificationContent().get() }
+            ?.let { (manga, chapters) -> newChaptersText(manga, chapters, publicationDates) }
         // Parent group notification
         context.notify(
             Notifications.ID_NEW_CHAPTERS,
             Notifications.CHANNEL_NEW_CHAPTERS_EPISODES,
         ) {
             setContentTitle(context.stringResource(MR.strings.notification_new_chapters))
-            if (updates.size == 1 && !securityPreferences.hideNotificationContent().get()) {
-                setContentText(updates.first().first.title.chop(NOTIF_TITLE_MAX_LEN))
+            if (single != null) {
+                setContentTitle(single.headline)
+                setContentText(single.summary)
+                setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(single.headline).bigText(single.details))
             } else {
                 setContentText(
                     context.resources.getQuantityString(
@@ -235,20 +245,23 @@ class MangaLibraryUpdateNotifier(
                 androidx.core.app.NotificationManagerCompat.from(context).notify(
                     "release-manga",
                     manga.id.hashCode(),
-                    createNewChaptersNotification(manga, chapters),
+                    createNewChaptersNotification(manga, chapters, publicationDates),
                 )
             }
         }
     }
 
-    private suspend fun createNewChaptersNotification(manga: Manga, chapters: Array<Chapter>): Notification {
+    private suspend fun createNewChaptersNotification(
+        manga: Manga,
+        chapters: Array<Chapter>,
+        publicationDates: Map<Long, Long>,
+    ): Notification {
         val icon = kotlinx.coroutines.withTimeoutOrNull(500) { getMangaIcon(manga) }
         return context.notificationBuilder(Notifications.CHANNEL_NEW_CHAPTERS_EPISODES) {
-            setContentTitle(manga.title)
-
-            val description = getNewChaptersDescription(chapters)
-            setContentText(description)
-            setStyle(NotificationCompat.BigTextStyle().bigText(description))
+            val text = newChaptersText(manga, chapters, publicationDates)
+            setContentTitle(text.headline)
+            setContentText(text.summary)
+            setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(text.headline).bigText(text.details))
 
             setSmallIcon(R.drawable.ic_ani)
 
@@ -390,6 +403,20 @@ class MangaLibraryUpdateNotifier(
             }
         }
     }
+
+    private fun newChaptersText(
+        manga: Manga,
+        chapters: Array<Chapter>,
+        publicationDates: Map<Long, Long>,
+    ): ReleaseNotificationText = ReleaseNotificationCopy.from(context).available(
+        ReleaseMedium.MANGA,
+        manga.title,
+        getNewChaptersDescription(chapters),
+        chapters.size,
+        chapters.map { publicationDates[it.id] ?: 0 },
+        chapters.maxOf { it.dateFetch },
+        System.currentTimeMillis(),
+    )
 
     /**
      * Returns an intent to open the main activity.

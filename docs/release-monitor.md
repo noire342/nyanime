@@ -105,6 +105,16 @@ creata soltanto per chiedere il permesso mancante. Riavvio, aggiornamento dell'a
 cambio orario/fuso e concessione del permesso per gli allarmi riprogrammano gli avvisi.
 **Stato del monitoraggio** permette di provare separatamente il canale dei nuovi
 contenuti e quello dei promemoria.
+
+Le notifiche iniziano con una frase esplicita, per esempio **Domani esce un nuovo
+episodio di «Titolo»**. La riga breve mostra numero e ora; la vista espansa separa
+data completa, tipo di trasmissione, piattaforme e disponibilità nella fonte.
+Gli avvisi dei contenuti già trovati usano **Oggi esce…** soltanto con una data di
+pubblicazione effettivamente fornita per tutti gli elementi. Senza questa prova,
+oppure con un recupero storico, mostrano **È disponibile…**. L’ora di rilevamento
+è distinta dall’ora di pubblicazione; una data senza ora non diventa mezzanotte.
+Titoli lunghi conservati nella vista espansa, plurali per più episodi/capitoli e
+preferenze di riservatezza applicate anche ai nuovi testi.
 Date non più annunciate vengono rimosse soltanto dopo una risposta completa e
 valida, con numero e ora aggiornati insieme. Errori e pagine incomplete conservano
 l'ultima verifica riuscita. Gli orari seguono il fuso del dispositivo.

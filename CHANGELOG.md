@@ -8,6 +8,18 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 29 settembre 2026 — Notifiche delle uscite più leggibili
+
+- Titoli espliciti: “Domani esce un nuovo episodio di…” e “Oggi esce un nuovo
+  episodio/capitolo di…”, con plurali per le uscite multiple.
+- Numero e ora in una riga breve; notifica espansa con data completa, trasmissione,
+  piattaforme e dettagli disponibili. Orari nel fuso e nel formato scelto sul telefono.
+- Avvisi di disponibilità distinti dagli annunci: una data di rilevamento o un
+  recupero storico non diventano una pubblicazione di oggi. Orario di rilevamento
+  indicato come tale, senza inventare l’ora di uscita dei capitoli.
+- Struttura coerente anche per gli avvisi della libreria; azioni, canali, impostazioni
+  di privacy e ricevute di consegna mantenuti.
+
 ## 29 settembre 2026 — Protezione laterale integrata
 
 - Compatibilità rilevata dall’hardware e dalle API, senza vincolo sul firmware esatto.
