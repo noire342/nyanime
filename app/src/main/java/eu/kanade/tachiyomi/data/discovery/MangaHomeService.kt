@@ -65,7 +65,7 @@ class MangaHomeService(
 
     suspend fun resolveAlternatives(item: MangaHomeItem): MangaHomeItem = withContext(Dispatchers.IO) {
         configureIndex()
-        val identified = enrichIdentity(item)
+        val identified = enrichIdentity(item, timeoutMillis = 15_000)
         val ids = identified.presentation?.catalogIds.orEmpty()
         if (ids.isEmpty()) return@withContext withAlternatives(identified)
         val existing = withAlternatives(identified)
@@ -76,7 +76,7 @@ class MangaHomeService(
                     identityRequests.withPermit {
                         val source = manager.get(home.id) as? MangaCatalogIdResolver ?: return@withPermit
                         try {
-                            val remote = withTimeoutOrNull(15_000) {
+                            val remote = withTimeoutOrNull(20_000) {
                                 ids.entries.sortedBy {
                                     if (it.key ==
                                         "anilist"
@@ -118,14 +118,14 @@ class MangaHomeService(
         withAlternatives(identified)
     }
 
-    suspend fun enrichIdentity(item: MangaHomeItem): MangaHomeItem {
+    suspend fun enrichIdentity(item: MangaHomeItem, timeoutMillis: Long = 6_000): MangaHomeItem {
         configureIndex()
         val cached = withAlternatives(item)
         if (cached.presentation?.catalogIds?.isNotEmpty() == true) return remember(cached)
         val sourceRevision = registry.current().homes.firstOrNull { it.id == item.manga.source }?.revision.orEmpty()
         val key = "$sourceRevision:${item.manga.source}:${item.manga.url}"
         val ids = identityCache[key] ?: identityRequests.withPermit {
-            identityCache[key] ?: withTimeoutOrNull(6_000) {
+            identityCache[key] ?: withTimeoutOrNull(timeoutMillis) {
                 val source = manager.get(item.manga.source) ?: return@withTimeoutOrNull emptyMap()
                 val details = MangaSourceUpdateGate.await(
                     source,

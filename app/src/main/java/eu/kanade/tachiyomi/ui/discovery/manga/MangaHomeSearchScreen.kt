@@ -163,7 +163,7 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
                 null
             }
             loading = false
-            if (pages.size > 1) {
+            if (pages.isNotEmpty()) {
                 val enriched = coroutineScope {
                     pages.map { sourcePage ->
                         async {
@@ -186,10 +186,13 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
                     }.awaitAll()
                 }
                 val identityMerged = MangaHomeMerge.merge(enriched, preferredSource)
-                items = MangaHomeMerge.merge(
-                    listOf(MangaHomePage(previousItems, false), identityMerged),
+                items = service.mergeKnown(
+                    MangaHomeMerge.merge(
+                        listOf(MangaHomePage(previousItems, false), identityMerged),
+                        preferredSource,
+                    ),
                     preferredSource,
-                ).items.distinctBy(MangaHomeItem::key)
+                ).items
             }
         }
 
