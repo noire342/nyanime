@@ -41,6 +41,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 - Settimane future non ancora pubblicate trattate come dati assenti e conservate
   nella cache; restano disponibili le date lontane del catalogo abituale. La verifica
   del token e della settimana corrente continua a riconoscere i guasti del servizio.
+- Coda di verifica corretta quando contiene sia titoli già associati sia associazioni
+  da recuperare: l’ordinamento conserva la priorità senza bloccare il lavoro.
 - Trasmissione preferita per promemoria e controlli mirati delle disponibilità;
   orario annunciato distinto dal contenuto effettivamente trovato nell’estensione.
 - Widget “Le tue uscite” basato sulla stessa agenda locale anime e manga, con

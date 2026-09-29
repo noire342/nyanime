@@ -43,4 +43,40 @@ class AiringRefreshQueueTest {
         assertTrue(AiringRefreshQueue.hasColdBacklog(pending + failed, batch.map { it.entryId }.toSet()))
         assertFalse(AiringRefreshQueue.hasColdBacklog(listOf(failed, fresh), emptySet()))
     }
+
+    @Test fun mixedPendingMappingsAndVerifiedSchedulesKeepStableRecoveryPriority() {
+        val candidates = listOf(
+            AiringRefreshQueue.Candidate(
+                11,
+                AiringCache(now, now - ReleasePolicy.HOUR, "AVAILABLE"),
+                true,
+                scheduleDue = true,
+            ),
+            AiringRefreshQueue.Candidate(
+                42,
+                AiringCache(now, now, "AVAILABLE"),
+                true,
+                scheduleDue = true,
+                scheduleCold = true,
+            ),
+            AiringRefreshQueue.Candidate(
+                12,
+                AiringCache(now, now - 2 * ReleasePolicy.HOUR, "AVAILABLE"),
+                true,
+                scheduleDue = true,
+            ),
+            AiringRefreshQueue.Candidate(
+                41,
+                AiringCache(now, now, "AVAILABLE"),
+                true,
+                scheduleDue = true,
+                scheduleCold = true,
+            ),
+        )
+        for (order in listOf(candidates, candidates.reversed())) {
+            val batch = AiringRefreshQueue.batch(order, now)
+            assertEquals(listOf(41L, 42L, 12L, 11L), batch.map { it.entryId })
+            assertFalse(AiringRefreshQueue.hasColdBacklog(order, batch.map { it.entryId }.toSet()))
+        }
+    }
 }

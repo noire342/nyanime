@@ -14,7 +14,7 @@ internal object AiringRefreshQueue {
 
     fun batch(candidates: List<Candidate>, now: Long): List<Candidate> = candidates
         .filter { it.scheduleDue || AiringRefreshPolicy.shouldRefresh(it.cache, now, it.hasUpcoming) }
-        .sortedWith(compareBy<Candidate> { if (it.scheduleCold) 0 else it.cache.attemptedAt }.thenBy { it.entryId })
+        .sortedWith(compareBy<Candidate> { if (it.scheduleCold) 0L else it.cache.attemptedAt }.thenBy { it.entryId })
         .take(BATCH_SIZE)
 
     fun hasColdBacklog(candidates: List<Candidate>, processed: Set<Long>): Boolean = candidates.any {
