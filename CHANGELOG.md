@@ -8,6 +8,11 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 29 settembre 2026 — Manga in altre lingue visibili inizialmente
+
+- “Mostra manga in altre lingue” è ora attivo di default per chi non ha ancora
+  salvato una scelta. Le preferenze già impostate rimangono rispettate.
+
 ## 29 settembre 2026 — Splash coerente con il tema scelto
 
 - Su Android 12 e successivi, splash e sfondo iniziale rispettano la modalità

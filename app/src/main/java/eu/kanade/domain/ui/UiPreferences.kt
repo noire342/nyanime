@@ -30,7 +30,7 @@ class UiPreferences(
 
     fun homeCategoryOrder() = preferenceStore.getString("nyanime_home_category_order", "[]")
 
-    fun showMangaInOtherLanguages() = preferenceStore.getBoolean("nyanime_manga_home_other_languages", false)
+    fun showMangaInOtherLanguages() = preferenceStore.getBoolean("nyanime_manga_home_other_languages", true)
 
     fun preferredMangaHomeSource() = preferenceStore.getLong("nyanime_manga_home_preferred_source", 0L)
 
