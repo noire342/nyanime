@@ -8,6 +8,17 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 29 settembre 2026 — Manga unificati e cambio fonte
+
+- Riconoscimento delle fonti alternative tramite ID pubblici, condiviso tra
+  Home, ricerca e scheda manga anche quando i titoli compaiono in sezioni diverse.
+- Cambio fonte in un pannello compatto, con scelta della fonte predefinita;
+  apertura diretta e collegamenti ai capitoli conservati per ciascuna estensione.
+- Recupero progressivo delle identità senza limite ai primi otto risultati,
+  mantenendo posizione delle schede e scorrimento durante gli aggiornamenti.
+- Identità discordanti restano separate; cambiare fonte non migra automaticamente
+  libreria, download o progresso. Dati e logica dei siti restano nelle estensioni.
+
 ## 29 settembre 2026 — Menu delle uscite nell’agenda
 
 - Pressione prolungata su una voce, anche nel calendario: pannello animato con

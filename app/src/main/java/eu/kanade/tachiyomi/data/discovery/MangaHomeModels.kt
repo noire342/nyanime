@@ -57,9 +57,18 @@ data class MangaHomeItem(
     val manga: Manga,
     val presentation: MangaHomePresentation? = null,
     val sourceTitle: String = manga.title,
-    val alternateSources: List<Manga> = emptyList(),
+    val sourceVariants: List<MangaHomeVariant> = emptyList(),
+    val stableKey: String? = null,
 ) {
-    val key: String get() = manga.source.toString() + ":" + manga.url + ":" + presentation?.id.orEmpty()
+    val key: String get() = stableKey ?: (manga.source.toString() + ":" + manga.url + ":" + presentation?.id.orEmpty())
+    val alternateSources: List<Manga> get() = sourceVariants.map { it.manga }
+    fun variant() = MangaHomeVariant(manga, presentation, sourceTitle)
 }
+
+data class MangaHomeVariant(
+    val manga: Manga,
+    val presentation: MangaHomePresentation?,
+    val sourceTitle: String,
+)
 
 data class MangaHomePage(val items: List<MangaHomeItem>, val hasNextPage: Boolean)

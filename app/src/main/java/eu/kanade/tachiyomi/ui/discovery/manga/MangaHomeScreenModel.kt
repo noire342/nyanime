@@ -82,6 +82,28 @@ class MangaHomeScreenModel(
 
     init {
         screenModelScope.launch {
+            combine(service.identityChanges, uiPreferences.preferredMangaHomeSource().changes()) { _, preferred ->
+                preferred
+            }
+                .collect { preferred ->
+                    mutableState.update { current ->
+                        if (!current.mixed) {
+                            current
+                        } else {
+                            current.copy(
+                                rows = current.rows.mapValues { (_, row) ->
+                                    row.copy(
+                                        page = row.page?.let {
+                                            service.mergeKnown(it, preferred.takeIf { id -> id != 0L })
+                                        },
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+        }
+        screenModelScope.launch {
             combine(
                 registry.observe(),
                 base.downloadedOnly().changes(),
@@ -175,7 +197,6 @@ class MangaHomeScreenModel(
 
     fun preferSource(id: Long) {
         uiPreferences.preferredMangaHomeSource().set(id)
-        if (state.value.mixed) refresh()
     }
 
     fun refresh() {
@@ -263,7 +284,13 @@ class MangaHomeScreenModel(
                 rows = current.rows +
                     (
                         request.sectionId to MangaHomeRowState(
-                            merged.copy(items = (previous + merged.items).distinctBy(MangaHomeItem::key)),
+                            service.mergeKnown(
+                                merged.copy(items = previous + merged.items),
+                                uiPreferences.preferredMangaHomeSource().get().takeIf {
+                                    it !=
+                                        0L
+                                },
+                            ),
                             request.page,
                             false,
                             error,
@@ -271,13 +298,13 @@ class MangaHomeScreenModel(
                         ),
             )
         }
-        if (pages.size < 2 || version != generation) return
+        if (version != generation) return
         val enriched = coroutineScope {
             pages.map { page ->
                 async {
                     page.copy(
-                        items = page.items.mapIndexed { index, item ->
-                            if (index >= 8 || item.presentation?.catalogIds?.isNotEmpty() == true) {
+                        items = page.items.map { item ->
+                            if (item.presentation?.catalogIds?.isNotEmpty() == true) {
                                 item
                             } else {
                                 try {
@@ -309,7 +336,13 @@ class MangaHomeScreenModel(
                 rows = current.rows +
                     (
                         request.sectionId to MangaHomeRowState(
-                            richer.copy(items = (before + richer.items).distinctBy(MangaHomeItem::key)),
+                            service.mergeKnown(
+                                richer.copy(items = before + richer.items),
+                                uiPreferences.preferredMangaHomeSource().get().takeIf {
+                                    it !=
+                                        0L
+                                },
+                            ),
                             request.page,
                             false,
                         )

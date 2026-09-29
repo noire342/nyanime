@@ -88,6 +88,13 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
         var selectedGenre by rememberSaveable { mutableStateOf(initialGenre) }
         var page by rememberSaveable { mutableIntStateOf(1) }
         var items by remember { mutableStateOf<List<MangaHomeItem>>(emptyList()) }
+        val identityRevision by service.identityChanges.collectAsState()
+        val preferred by uiPreferences.preferredMangaHomeSource().changes().collectAsState(
+            initial = uiPreferences.preferredMangaHomeSource().get(),
+        )
+        LaunchedEffect(identityRevision, preferred) {
+            items = service.mergeKnown(MangaHomePage(items, false), preferred.takeIf { it != 0L }).items
+        }
         var hasMore by remember { mutableStateOf(false) }
         var loading by remember { mutableStateOf(false) }
         var error by remember { mutableStateOf<String?>(null) }
@@ -140,7 +147,11 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
                     val available = eligible.mapNotNull { (home, _) -> pagesBySource[home.key] }
                     if (available.isNotEmpty()) {
                         val merged = MangaHomeMerge.merge(available, preferredSource)
-                        items = (previousItems + merged.items).distinctBy(MangaHomeItem::key)
+                        items =
+                            service.mergeKnown(
+                                merged.copy(items = previousItems + merged.items),
+                                preferredSource,
+                            ).items
                         hasMore = merged.hasNextPage
                     }
                 }
@@ -157,8 +168,8 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
                     pages.map { sourcePage ->
                         async {
                             sourcePage.copy(
-                                items = sourcePage.items.mapIndexed { index, item ->
-                                    if (index >= 8 || item.presentation?.catalogIds?.isNotEmpty() == true) {
+                                items = sourcePage.items.map { item ->
+                                    if (item.presentation?.catalogIds?.isNotEmpty() == true) {
                                         item
                                     } else {
                                         try {
@@ -261,7 +272,6 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
                         item { Text(error ?: "Nessun manga trovato.") }
                     }
                     items(items, key = { it.key }) { item ->
-                        var menu by remember(item.key) { mutableStateOf(false) }
                         Surface(
                             shape = RoundedCornerShape(14.dp),
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -289,24 +299,9 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
                                         maxLines = 3,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    val variants = listOf(item.manga) + item.alternateSources
-                                    val sourceName = homes.firstOrNull {
-                                        it.id == item.manga.source
-                                    }?.sourceName.orEmpty()
-                                    TextButton(onClick = { menu = true }, enabled = variants.size > 1) {
-                                        Text(if (variants.size > 1) "${variants.size} fonti · scegli" else sourceName)
-                                    }
-                                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                                        variants.forEach { manga: Manga ->
-                                            val source = homes.firstOrNull {
-                                                it.id == manga.source
-                                            }?.sourceName.orEmpty()
-                                            DropdownMenuItem(text = { Text(source) }, onClick = {
-                                                menu = false
-                                                navigator.push(MangaScreen(manga.id, fromSource = true))
-                                            })
-                                        }
-                                    }
+                                    eu.kanade.presentation.discovery.manga.MangaSourceAction(item, onOpen = { manga ->
+                                        navigator.push(MangaScreen(manga.id, fromSource = true))
+                                    })
                                 }
                             }
                         }

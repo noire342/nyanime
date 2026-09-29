@@ -44,12 +44,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastAll
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastMap
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.relativeDateTimeText
+import eu.kanade.presentation.discovery.manga.MangaSourceAction
 import eu.kanade.presentation.entries.DownloadAction
 import eu.kanade.presentation.entries.EntryScreenItem
 import eu.kanade.presentation.entries.components.EntryBottomActionMenu
@@ -66,6 +68,7 @@ import eu.kanade.presentation.privacy.contentPrivacyRegion
 import eu.kanade.presentation.privacy.nsfwPrivacy
 import eu.kanade.presentation.share.ContentShareDialog
 import eu.kanade.presentation.util.formatChapterNumber
+import eu.kanade.tachiyomi.data.discovery.MangaHomeItem
 import eu.kanade.tachiyomi.data.download.manga.model.MangaDownload
 import eu.kanade.tachiyomi.data.share.ContentLink
 import eu.kanade.tachiyomi.data.share.SharedMedium
@@ -434,6 +437,11 @@ private fun MangaScreenSmallImpl(
                         key = EntryScreenItem.ACTION_ROW,
                         contentType = EntryScreenItem.ACTION_ROW,
                     ) {
+                        MangaSourceAction(
+                            MangaHomeItem(state.manga),
+                            Modifier.padding(horizontal = 16.dp),
+                            discover = true,
+                        )
                         MangaActionRow(
                             entryId = state.manga.id,
                             automaticFollowed =
@@ -691,6 +699,7 @@ fun MangaScreenLargeImpl(
                             onCoverClick = onCoverClicked,
                             doSearch = onSearch,
                         )
+                        MangaSourceAction(MangaHomeItem(state.manga), discover = true)
                         MangaActionRow(
                             entryId = state.manga.id,
                             automaticFollowed =

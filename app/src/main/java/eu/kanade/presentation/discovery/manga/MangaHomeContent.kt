@@ -294,6 +294,7 @@ fun MangaHomeContent(
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     )
                                                 }
+                                                MangaSourceAction(featuredItem, onOpen = onManga)
                                                 Spacer(Modifier.weight(1f))
                                                 Button(onClick = {
                                                     featuredItem.presentation?.chapters?.firstOrNull()?.let {
@@ -683,34 +684,7 @@ private fun MangaSourceSelector(
     onManga: (Manga) -> Unit,
     onPreferredSource: (Long) -> Unit,
 ) {
-    if (item.alternateSources.isEmpty()) return
-    var expanded by remember(item.key) { mutableStateOf(false) }
-    Box {
-        AssistChip(
-            onClick = { expanded = true },
-            label = { Text("${item.alternateSources.size + 1} fonti · scegli") },
-        )
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            (listOf(item.manga) + item.alternateSources).forEach { manga ->
-                val source = state.homes.firstOrNull { it.id == manga.source }?.sourceName
-                    ?: "Fonte ${manga.source}"
-                DropdownMenuItem(
-                    text = { Text("Apri da $source") },
-                    onClick = {
-                        expanded = false
-                        onManga(manga)
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text("Preferisci $source") },
-                    onClick = {
-                        expanded = false
-                        onPreferredSource(manga.source)
-                    },
-                )
-            }
-        }
-    }
+    MangaSourceAction(item, onOpen = onManga)
 }
 
 @Composable
