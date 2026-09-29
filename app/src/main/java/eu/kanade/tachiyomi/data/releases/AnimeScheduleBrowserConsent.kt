@@ -28,7 +28,7 @@ internal class AnimeScheduleBrowserConsent(
             response.headers.values("Set-Cookie").firstNotNullOfOrNull { header ->
                 Cookie.parse(origin, header)?.takeIf {
                     it.name == COOKIE_NAME && it.domain == origin.host && it.path == "/" && it.value.isNotEmpty()
-                }?.toString()
+                }?.let { header }
             }
         }
     }

@@ -38,7 +38,10 @@ class AnimeScheduleBrowserConsentTest {
                 MockResponse.Builder().code(204)
                     .addHeader("Set-Cookie", "as_consent_v3=site-generated; Path=/; Secure; SameSite=Lax").build(),
             )
-            assertTrue(runBlocking { api.necessaryCookie() }!!.startsWith("as_consent_v3=site-generated;"))
+            assertEquals(
+                "as_consent_v3=site-generated; Path=/; Secure; SameSite=Lax",
+                runBlocking { api.necessaryCookie() },
+            )
             val request = server.takeRequest()
             assertEquals("/api/v3/consent", request.target)
             assertEquals("POST", request.method)

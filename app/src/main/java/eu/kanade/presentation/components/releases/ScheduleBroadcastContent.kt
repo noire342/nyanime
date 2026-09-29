@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -17,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -32,8 +29,9 @@ import eu.kanade.tachiyomi.data.releases.AnimeScheduleRepository
 import eu.kanade.tachiyomi.data.releases.ReleasePolicy
 import eu.kanade.tachiyomi.data.releases.ScheduleAirType
 import eu.kanade.tachiyomi.data.releases.ScheduleBroadcast
+import eu.kanade.tachiyomi.data.releases.ScheduleParser
+import eu.kanade.tachiyomi.data.releases.ScheduleSnapshot
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -97,50 +95,66 @@ internal fun scheduleBroadcastLabel(context: Context, event: AiringEvent): Strin
     }
 }
 
+private data class SchedulePresentation(val snapshot: ScheduleSnapshot, val events: List<AiringEvent>)
+
+/** One local projection for the title header and its detailed schedule, including channel changes. */
+@Composable private fun rememberSchedulePresentation(animeId: Long): SchedulePresentation? {
+    val preferences = remember { AnimeSchedulePreferences() }
+    val flow = remember(animeId) {
+        val repository = AnimeScheduleRepository()
+        combine(
+            AiringRepository().events(),
+            repository.records(),
+            preferences.enabled.changes(),
+            preferences.connected.changes(),
+            preferences.preferredType.changes(),
+        ) { base, records, enabled, connected, type ->
+            if (!enabled || !connected) {
+                null
+            } else {
+                val now = System.currentTimeMillis()
+                val record = repository.validRecords(records.filter { it.entryId == animeId }).firstOrNull {
+                    it.verifiedAt > 0 && now - it.verifiedAt <= 2 * ReleasePolicy.DAY
+                }
+                record?.snapshot?.let { snapshot ->
+                    val preferred = ScheduleAirType.entries.firstOrNull { it.name == type } ?: ScheduleAirType.SUB
+                    val events = ScheduleParser.overlay(
+                        base.filter { it.entryId == animeId },
+                        listOf(record),
+                        preferred,
+                        now,
+                    ).filter { it.airingAt > now }
+                    SchedulePresentation(snapshot, events)
+                }
+            }
+        }
+    }
+    val presentation by flow.collectAsState(initial = null)
+    return presentation
+}
+
+@Composable internal fun rememberScheduleNextAiringAt(animeId: Long, fallback: Long?): Long? {
+    val presentation = rememberSchedulePresentation(animeId) ?: return fallback
+    return presentation.events.firstOrNull()?.airingAt
+}
+
 /** Cached display only; refreshes belong to the worker, never to composition or the player. */
 @Composable internal fun ScheduleEpisodeCard(
     animeId: Long,
     modifier: Modifier = Modifier,
     fallback: @Composable () -> Unit,
 ) {
-    val preferences = remember { AnimeSchedulePreferences() }
-    val flow = remember(animeId) {
-        combine(AnimeScheduleRepository().records(), preferences.enabled.changes(), preferences.connected.changes()) {
-                records,
-                enabled,
-                connected,
-            ->
-            AnimeScheduleRepository().validRecords(records.filter { it.entryId == animeId }).firstOrNull {
-                it.verifiedAt > 0 &&
-                    System.currentTimeMillis() - it.verifiedAt <= 2 * ReleasePolicy.DAY
-            }?.snapshot.takeIf {
-                enabled &&
-                    connected
-            }
-        }
-    }
-    val snapshot by flow.collectAsState(initial = null)
-    val eventsFlow =
-        remember(animeId) {
-            AiringRepository().effectiveEvents().map {
-                it.filter { event ->
-                    event.entryId ==
-                        animeId &&
-                        event.airingAt > System.currentTimeMillis()
-                }
-            }
-        }
-    val events by eventsFlow.collectAsState(initial = emptyList())
+    val presentation = rememberSchedulePresentation(animeId)
     val context = LocalContext.current
     val navigator = LocalNavigator.currentOrThrow
-    val details = snapshot
-    if (details == null) {
+    if (presentation == null) {
         fallback()
         return
     }
+    val details = presentation.snapshot
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        val next = events.firstOrNull { it.variants.isNotEmpty() }
-        if (next != null) {
+        val next = presentation.events.firstOrNull()
+        if (next != null && next.variants.isNotEmpty()) {
             eu.kanade.presentation.entries.anime.components.NextEpisodeAiringListItem(
                 scheduleBroadcastLabel(context, next),
                 next.airingAt,

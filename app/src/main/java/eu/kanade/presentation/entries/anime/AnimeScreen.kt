@@ -60,6 +60,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.domain.entries.anime.model.episodesFiltered
 import eu.kanade.domain.entries.anime.model.seasonsFiltered
 import eu.kanade.presentation.components.relativeDateTimeText
+import eu.kanade.presentation.components.releases.rememberScheduleNextAiringAt
 import eu.kanade.presentation.entries.DownloadAction
 import eu.kanade.presentation.entries.EntryScreenItem
 import eu.kanade.presentation.entries.anime.components.AnimeActionRow
@@ -506,12 +507,15 @@ private fun AnimeScreenSmallImpl(
                             appBarPadding = topPadding,
                             anime = state.anime,
                             sourceName = remember { state.source.getNameForAnimeInfo() },
-                            nextAiringAtMillis = if (
-                                showNextEpisodeAirTime &&
-                                state.airingTime > 0L &&
-                                state.anime.status.toInt() != SAnime.COMPLETED
-                            ) {
-                                state.nextAiringEpisode.second * 1000L
+                            nextAiringAtMillis = if (showNextEpisodeAirTime) {
+                                rememberScheduleNextAiringAt(
+                                    state.anime.id,
+                                    if (state.airingTime > 0L && state.anime.status.toInt() != SAnime.COMPLETED) {
+                                        state.nextAiringEpisode.second * 1000L
+                                    } else {
+                                        null
+                                    },
+                                )
                             } else {
                                 null
                             },
@@ -878,12 +882,15 @@ fun AnimeScreenLargeImpl(
                                 appBarPadding = contentPadding.calculateTopPadding(),
                                 anime = state.anime,
                                 sourceName = remember { state.source.getNameForAnimeInfo() },
-                                nextAiringAtMillis = if (
-                                    showNextEpisodeAirTime &&
-                                    state.airingTime > 0L &&
-                                    state.anime.status.toInt() != SAnime.COMPLETED
-                                ) {
-                                    state.nextAiringEpisode.second * 1000L
+                                nextAiringAtMillis = if (showNextEpisodeAirTime) {
+                                    rememberScheduleNextAiringAt(
+                                        state.anime.id,
+                                        if (state.airingTime > 0L && state.anime.status.toInt() != SAnime.COMPLETED) {
+                                            state.nextAiringEpisode.second * 1000L
+                                        } else {
+                                            null
+                                        },
+                                    )
                                 } else {
                                     null
                                 },

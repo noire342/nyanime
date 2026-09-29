@@ -24,6 +24,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   configurato prima dell’accesso; scelte già salvate sul sito conservate.
 - Orari RAW, SUB inglese e DUB inglese distinti, première, rinvii, date eccezionali
   e piattaforme integrate nell’agenda esistente e nelle schede anime.
+- Conto alla rovescia della scheda e dettaglio degli orari coordinati con la
+  trasmissione preferita; un rinvio senza data non conserva un vecchio conto alla rovescia.
 - Associazione tramite ID di catalogo verificati, cache condivisa degli orari e rispetto
   dei limiti del servizio. Il catalogo abituale rimane disponibile senza configurazione.
 - Trasmissione preferita per promemoria e controlli mirati delle disponibilità;
