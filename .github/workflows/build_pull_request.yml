@@ -43,13 +43,13 @@ jobs:
         uses: gradle/actions/setup-gradle@94baf225fe0a508e581a564467443d0e2379123b # v4.3.0
 
       - name: Check code format
-        run: ./gradlew spotlessCheck
+        run: bash scripts/ci_gradle.sh spotlessCheck
 
       - name: Build app
-        run: ./gradlew assembleRelease
+        run: bash scripts/ci_gradle.sh assembleRelease
 
       - name: Run unit tests
-        run: ./gradlew testReleaseUnitTest
+        run: bash scripts/ci_gradle.sh testReleaseUnitTest
 
       - name: Upload APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

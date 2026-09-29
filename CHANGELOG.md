@@ -8,6 +8,14 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 29 settembre 2026 — Memoria della compilazione GitHub
+
+- Profilo CI condiviso per preview e pull request: compilatore Kotlin nello stesso
+  processo Gradle, memoria riservata aumentata e compilazione dei moduli senza
+  parallelismo. Corretto il percorso che esauriva la memoria prima dei test.
+- Rapporti dei test e diagnostica di compilazione conservati in caso di fallimento,
+  senza allegare dump di memoria del processo.
+
 ## 29 settembre 2026 — Agenda futura e verifica degli orari
 
 - Verifiche degli orari in una coda indipendente dagli aggiornamenti degli
