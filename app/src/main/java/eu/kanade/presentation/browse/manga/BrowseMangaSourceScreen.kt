@@ -118,6 +118,14 @@ fun BrowseSourceContent(
         return
     }
 
+    if (mangaList.itemCount == 0 && mangaList.loadState.refresh is LoadState.NotLoading) {
+        EmptyScreen(
+            modifier = Modifier.padding(contentPadding),
+            message = stringResource(MR.strings.no_results_found),
+        )
+        return
+    }
+
     when (displayMode) {
         LibraryDisplayMode.ComfortableGrid -> {
             BrowseMangaSourceComfortableGrid(

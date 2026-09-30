@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -45,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -178,6 +181,8 @@ class SourceHomeListScreen(
                             Modifier.fillMaxWidth(),
                             placeholder = { Text("Titolo, parola chiave…") },
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { model.search(query, immediate = true) }),
                             shape = RoundedCornerShape(24.dp),
                             leadingIcon = { Icon(Icons.Outlined.Search, null) },
                             trailingIcon = {
@@ -208,6 +213,14 @@ class SourceHomeListScreen(
                                 }
                             }
                         }
+                        eu.kanade.presentation.search.SearchAssistanceBar(
+                            state.assistance,
+                            onSuggestion = {
+                                query = it
+                                model.search(it, immediate = true)
+                            },
+                            onExact = model::searchExactly,
+                        )
                         SourceHomeActiveFilters(state.filters) {
                             model.applyFilters(state.filters - it)
                         }

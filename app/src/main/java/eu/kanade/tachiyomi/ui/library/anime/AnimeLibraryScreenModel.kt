@@ -123,6 +123,9 @@ class AnimeLibraryScreenModel(
                 getTrackingFilterFlow(),
                 downloadCache.changes,
             ) { searchQuery, library, tracks, trackingFilter, _ ->
+                if (!searchQuery.isNullOrBlank()) {
+                    Injekt.get<eu.kanade.tachiyomi.data.search.SmartTitleSearch>().prepareLibrary()
+                }
                 library
                     .applyFilters(tracks, trackingFilter)
                     .applySort(tracks, trackingFilter.keys)

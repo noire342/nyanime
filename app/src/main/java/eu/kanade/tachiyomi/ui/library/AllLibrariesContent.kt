@@ -116,14 +116,22 @@ internal fun LibrariesTab.AllLibrariesContent() {
     val displayMode by displayPreference.collectAsState()
     val viewedNotices = remember { Injekt.get<UiPreferences>().viewedLibraryShelfNotices() }
 
-    val animeItems = remember(animeState.library, query) {
+    var aliasesReady by remember { mutableStateOf(false) }
+    LaunchedEffect(query) {
+        if (query != null && !aliasesReady) {
+            Injekt.get<eu.kanade.tachiyomi.data.search.SmartTitleSearch>().prepareLibrary()
+            aliasesReady = true
+        }
+    }
+
+    val animeItems = remember(animeState.library, query, aliasesReady) {
         animeState.library.values
             .flatten()
             .distinctBy { it.libraryAnime.id }
             .filter { query.isNullOrBlank() || it.matches(query.orEmpty()) }
             .map(UnifiedLibraryEntry::Anime)
     }
-    val mangaItems = remember(mangaState.library, query) {
+    val mangaItems = remember(mangaState.library, query, aliasesReady) {
         mangaState.library.values
             .flatten()
             .distinctBy { it.libraryManga.id }

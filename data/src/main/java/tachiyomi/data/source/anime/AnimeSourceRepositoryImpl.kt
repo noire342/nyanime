@@ -56,8 +56,9 @@ class AnimeSourceRepositoryImpl(
         sourceId: Long,
         query: String,
         filterList: AnimeFilterList,
+        session: tachiyomi.domain.search.SearchSession?,
     ): AnimeSourcePagingSourceType {
-        return AnimeSourceSearchPagingSource(sourceManager.getOrStub(sourceId), query, filterList)
+        return AnimeSourceSearchPagingSource(sourceManager.getOrStub(sourceId), query, filterList, session)
     }
 
     override fun getPopularAnime(sourceId: Long): AnimeSourcePagingSourceType {

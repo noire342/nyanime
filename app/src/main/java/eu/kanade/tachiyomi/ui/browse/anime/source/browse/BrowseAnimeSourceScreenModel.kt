@@ -27,6 +27,8 @@ import eu.kanade.tachiyomi.util.removeBackgrounds
 import eu.kanade.tachiyomi.util.removeCovers
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
@@ -49,6 +51,9 @@ import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.anime.model.toAnimeUpdate
 import tachiyomi.domain.items.episode.interactor.SetAnimeDefaultEpisodeFlags
 import tachiyomi.domain.library.service.LibraryPreferences
+import tachiyomi.domain.search.SearchAssistance
+import tachiyomi.domain.search.SearchMedium
+import tachiyomi.domain.search.TitleSearch
 import tachiyomi.domain.source.anime.interactor.GetRemoteAnime
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import uy.kohesive.injekt.Injekt
@@ -75,6 +80,10 @@ class BrowseAnimeSourceScreenModel(
     private val addTracks: AddAnimeTracks = Injekt.get(),
     private val getIncognitoState: GetAnimeIncognitoState = Injekt.get(),
 ) : StateScreenModel<BrowseAnimeSourceScreenModel.State>(State(Listing.valueOf(listingQuery))) {
+
+    private val titleSearch: TitleSearch = Injekt.get()
+    private var assistanceJob: Job? = null
+    private var searchDebounce: Job? = null
 
     var displayMode by sourcePreferences.sourceDisplayMode().asState(screenModelScope)
 
@@ -109,8 +118,20 @@ class BrowseAnimeSourceScreenModel(
     val animePagerFlowFlow = state.map { it.listing }
         .distinctUntilChanged()
         .map { listing ->
+            assistanceJob?.cancel()
+            val session = (listing as? Listing.Search)?.query?.takeIf { it.isNotBlank() }?.let {
+                titleSearch.session(it, SearchMedium.VIDEO, listing.exact, sourceId)
+            }
+            mutableState.update { it.copy(assistance = session?.assistance?.value ?: SearchAssistance()) }
+            if (session != null) {
+                assistanceJob = ioCoroutineScope.launch {
+                    session.assistance.collect { assistance ->
+                        mutableState.update { if (it.listing == listing) it.copy(assistance = assistance) else it }
+                    }
+                }
+            }
             Pager(PagingConfig(pageSize = 25)) {
-                getRemoteAnime.subscribe(sourceId, listing.query ?: "", listing.filters)
+                getRemoteAnime.subscribe(sourceId, listing.query ?: "", listing.filters, session)
             }.flow.map { pagingData ->
                 pagingData.map {
                     networkToLocalAnime.await(it.toDomainAnime(sourceId))
@@ -161,6 +182,7 @@ class BrowseAnimeSourceScreenModel(
     }
 
     fun search(query: String? = null, filters: AnimeFilterList? = null) {
+        searchDebounce?.cancel()
         val input = state.value.listing as? Listing.Search
             ?: Listing.Search(query = null, filters = source.getFilterList())
 
@@ -168,6 +190,7 @@ class BrowseAnimeSourceScreenModel(
             it.copy(
                 listing = input.copy(
                     query = query ?: input.query,
+                    exact = false,
                     filters = filters ?: input.filters,
                 ),
                 toolbarQuery = query ?: input.query,
@@ -317,6 +340,21 @@ class BrowseAnimeSourceScreenModel(
 
     fun setToolbarQuery(query: String?) {
         mutableState.update { it.copy(toolbarQuery = query) }
+        searchDebounce?.cancel()
+        if (query != null) {
+            searchDebounce = screenModelScope.launch {
+                delay(350)
+                search(query)
+            }
+        }
+    }
+
+    fun searchExactly() {
+        searchDebounce?.cancel()
+        mutableState.update { current ->
+            val listing = current.listing as? Listing.Search ?: return@update current
+            current.copy(listing = listing.copy(exact = !listing.exact))
+        }
     }
 
     sealed class Listing(open val query: String?, open val filters: AnimeFilterList) {
@@ -328,7 +366,11 @@ class BrowseAnimeSourceScreenModel(
             query = GetRemoteAnime.QUERY_LATEST,
             filters = AnimeFilterList(),
         )
-        data class Search(override val query: String?, override val filters: AnimeFilterList) : Listing(
+        data class Search(
+            override val query: String?,
+            override val filters: AnimeFilterList,
+            val exact: Boolean = false,
+        ) : Listing(
             query = query,
             filters = filters,
         )
@@ -360,6 +402,7 @@ class BrowseAnimeSourceScreenModel(
         val listing: Listing,
         val filters: AnimeFilterList = AnimeFilterList(),
         val toolbarQuery: String? = null,
+        val assistance: SearchAssistance = SearchAssistance(),
         val dialog: Dialog? = null,
     ) {
         val isUserQuery get() = listing is Listing.Search && !listing.query.isNullOrEmpty()

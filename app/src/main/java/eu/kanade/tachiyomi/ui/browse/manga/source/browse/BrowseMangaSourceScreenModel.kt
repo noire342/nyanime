@@ -26,6 +26,8 @@ import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.util.removeCovers
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
@@ -48,6 +50,9 @@ import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.entries.manga.model.toMangaUpdate
 import tachiyomi.domain.items.chapter.interactor.SetMangaDefaultChapterFlags
 import tachiyomi.domain.library.service.LibraryPreferences
+import tachiyomi.domain.search.SearchAssistance
+import tachiyomi.domain.search.SearchMedium
+import tachiyomi.domain.search.TitleSearch
 import tachiyomi.domain.source.manga.interactor.GetRemoteManga
 import tachiyomi.domain.source.manga.service.MangaSourceManager
 import uy.kohesive.injekt.Injekt
@@ -74,6 +79,10 @@ class BrowseMangaSourceScreenModel(
     private val getIncognitoState: GetMangaIncognitoState = Injekt.get(),
     initialSelections: Map<String, String> = emptyMap(),
 ) : StateScreenModel<BrowseMangaSourceScreenModel.State>(State(Listing.valueOf(listingQuery))) {
+
+    private val titleSearch: TitleSearch = Injekt.get()
+    private var assistanceJob: Job? = null
+    private var searchDebounce: Job? = null
 
     var displayMode by sourcePreferences.sourceDisplayMode().asState(screenModelScope)
 
@@ -127,8 +136,20 @@ class BrowseMangaSourceScreenModel(
     val mangaPagerFlowFlow = state.map { it.listing }
         .distinctUntilChanged()
         .map { listing ->
+            assistanceJob?.cancel()
+            val session = (listing as? Listing.Search)?.query?.takeIf { it.isNotBlank() }?.let {
+                titleSearch.session(it, SearchMedium.MANGA, listing.exact, sourceId)
+            }
+            mutableState.update { it.copy(assistance = session?.assistance?.value ?: SearchAssistance()) }
+            if (session != null) {
+                assistanceJob = ioCoroutineScope.launch {
+                    session.assistance.collect { assistance ->
+                        mutableState.update { if (it.listing == listing) it.copy(assistance = assistance) else it }
+                    }
+                }
+            }
             Pager(PagingConfig(pageSize = 25)) {
-                getRemoteManga.subscribe(sourceId, listing.query ?: "", listing.filters)
+                getRemoteManga.subscribe(sourceId, listing.query ?: "", listing.filters, session)
             }.flow.map { pagingData ->
                 pagingData.map {
                     networkToLocalManga.await(it.toDomainManga(sourceId))
@@ -183,6 +204,7 @@ class BrowseMangaSourceScreenModel(
     }
 
     fun search(query: String? = null, filters: FilterList? = null) {
+        searchDebounce?.cancel()
         if (source !is CatalogueSource) return
 
         val input = state.value.listing as? Listing.Search
@@ -192,6 +214,7 @@ class BrowseMangaSourceScreenModel(
             it.copy(
                 listing = input.copy(
                     query = query ?: input.query,
+                    exact = false,
                     filters = filters ?: input.filters,
                 ),
                 toolbarQuery = query ?: input.query,
@@ -344,12 +367,31 @@ class BrowseMangaSourceScreenModel(
 
     fun setToolbarQuery(query: String?) {
         mutableState.update { it.copy(toolbarQuery = query) }
+        searchDebounce?.cancel()
+        if (query != null) {
+            searchDebounce = screenModelScope.launch {
+                delay(350)
+                search(query)
+            }
+        }
+    }
+
+    fun searchExactly() {
+        searchDebounce?.cancel()
+        mutableState.update { current ->
+            val listing = current.listing as? Listing.Search ?: return@update current
+            current.copy(listing = listing.copy(exact = !listing.exact))
+        }
     }
 
     sealed class Listing(open val query: String?, open val filters: FilterList) {
         data object Popular : Listing(query = GetRemoteManga.QUERY_POPULAR, filters = FilterList())
         data object Latest : Listing(query = GetRemoteManga.QUERY_LATEST, filters = FilterList())
-        data class Search(override val query: String?, override val filters: FilterList) : Listing(
+        data class Search(
+            override val query: String?,
+            override val filters: FilterList,
+            val exact: Boolean = false,
+        ) : Listing(
             query = query,
             filters = filters,
         )
@@ -381,6 +423,7 @@ class BrowseMangaSourceScreenModel(
         val listing: Listing,
         val filters: FilterList = FilterList(),
         val toolbarQuery: String? = null,
+        val assistance: SearchAssistance = SearchAssistance(),
         val dialog: Dialog? = null,
     ) {
         val isUserQuery get() = listing is Listing.Search && !listing.query.isNullOrEmpty()

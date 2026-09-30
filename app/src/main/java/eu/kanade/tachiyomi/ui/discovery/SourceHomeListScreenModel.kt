@@ -3,24 +3,43 @@ package eu.kanade.tachiyomi.ui.discovery
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.tachiyomi.data.discovery.ExtensionHomeServices
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import tachiyomi.data.discovery.mergeHomeCards
 import tachiyomi.domain.discovery.SourceHomeGroupAccess
 import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.entries.anime.model.Anime
+import tachiyomi.domain.search.ExtensionSearchAdapter
+import tachiyomi.domain.search.SearchAssistance
+import tachiyomi.domain.search.SearchMedium
+import tachiyomi.domain.search.SearchPage
+import tachiyomi.domain.search.SearchSession
+import tachiyomi.domain.search.TitleSearch
+import tachiyomi.domain.search.runtimeSearchTitle
+import tachiyomi.domain.search.searchAliases
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.io.IOException
 
 class SourceHomeListScreenModel(
     homeKey: String,
     sectionId: String,
-    services: ExtensionHomeServices = Injekt.get(),
+    private val services: ExtensionHomeServices = Injekt.get(),
     private var date: String? = null,
 ) : StateScreenModel<SourceHomeListScreenModel.State>(State()) {
+    private val titleSearch: TitleSearch = Injekt.get()
+    private var searchSession: SearchSession? = null
+    private var assistanceJob: Job? = null
+    private var exact = false
     private val repository = services.merged
     private val accessFlow = services.observeGroup(homeKey)
     private var job: Job? = null
@@ -50,12 +69,18 @@ class SourceHomeListScreenModel(
         }
     }
 
-    fun search(query: String) {
-        if (query.trim() == state.value.query) return
+    fun search(query: String, immediate: Boolean = false) {
+        if (query.trim() == state.value.query && !immediate) return
+        exact = false
         job?.cancel()
-        mutableState.value = State(access = state.value.access, query = query.trim(), filters = state.value.filters)
+        mutableState.update { it.copy(query = query.trim(), hasNext = true, error = null) }
         nextPage = 1
-        load(reset = true, debounce = true)
+        load(reset = true, debounce = !immediate)
+    }
+
+    fun searchExactly() {
+        exact = !exact
+        load(reset = true)
     }
 
     fun applyFilters(values: Map<String, List<String>>) {
@@ -103,7 +128,14 @@ class SourceHomeListScreenModel(
         val previous = if (reset) emptyList() else current.items
         mutableState.update { it.copy(loading = true, error = null) }
         job = screenModelScope.launch {
-            if (debounce) delay(400)
+            if (debounce) delay(350)
+            if (current.query.isNotBlank()) {
+                loadSearch(current, page, previous, reset)
+                return@launch
+            }
+            assistanceJob?.cancel()
+            searchSession = null
+            mutableState.update { it.copy(assistance = SearchAssistance()) }
             repository.observe(
                 current.access,
                 SourceHomeRequest(sectionId, page, current.query, date, current.filters, browse = true),
@@ -129,9 +161,91 @@ class SourceHomeListScreenModel(
         }
     }
 
+    private suspend fun loadSearch(current: State, page: Int, previous: List<Anime>, reset: Boolean) {
+        if (reset || searchSession == null) {
+            assistanceJob?.cancel()
+            searchSession = titleSearch.session(current.query, SearchMedium.VIDEO, exact)
+            val session = requireNotNull(searchSession)
+            mutableState.update { it.copy(assistance = session.assistance.value) }
+            assistanceJob = screenModelScope.launch {
+                session.assistance.collect { value ->
+                    mutableState.update { if (searchSession === session) it.copy(assistance = value) else it }
+                }
+            }
+        }
+        val session = requireNotNull(searchSession)
+        val eligible = current.access.providers.filter { provider ->
+            provider.source?.let { source ->
+                source.search != null &&
+                    current.filters.all { (name, values) ->
+                        source.browseFilters.any { it.name == name && it.accepts(values) }
+                    }
+            } == true
+        }
+        val responses = withContext(Dispatchers.IO) {
+            coroutineScope {
+                eligible.map { provider ->
+                    async {
+                        try {
+                            val result = session.search(homeAdapter(provider, current, reset), page)
+                            Result.success(result)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Exception) {
+                            Result.failure(failure)
+                        }
+                    }
+                }.awaitAll()
+            }
+        }
+        val successful = responses.mapNotNull { it.getOrNull() }
+        mutableState.update { state ->
+            state.copy(
+                items = if (successful.isNotEmpty()) {
+                    mergeHomeCards(previous + successful.flatMap { it.items })
+                } else {
+                    if (reset) emptyList() else state.items
+                },
+                loading = false,
+                hasNext = successful.any { it.hasNextPage },
+                stale = false,
+                error = responses.firstNotNullOfOrNull { it.exceptionOrNull()?.message },
+            )
+        }
+        if (successful.isNotEmpty()) nextPage = page + 1
+    }
+
+    private fun homeAdapter(
+        provider: tachiyomi.domain.discovery.SourceHomeAccess,
+        current: State,
+        reset: Boolean,
+    ) = object : ExtensionSearchAdapter<Anime> {
+        private val home = requireNotNull(provider.source)
+        override val key = home.key
+        override fun identity(item: Anime) = item.source.toString() + ":" + item.url
+        override fun title(item: Anime) = runtimeSearchTitle(
+            item.source,
+            item.url,
+            item.title,
+            SearchMedium.VIDEO,
+            searchAliases(item.memo),
+        )
+        override suspend fun fetch(page: Int, query: String): SearchPage<Anime> {
+            val value = services.forHome(home.key).repository.observe(
+                provider,
+                SourceHomeRequest(sectionId, page, query, date, current.filters, browse = true),
+                refresh = reset && current.items.isNotEmpty(),
+            ).first { !it.loading }
+            if (value.error != null) throw IOException(value.error)
+            val data = value.data ?: throw IOException("Missing search response")
+            return SearchPage(data.items, data.hasNextPage)
+        }
+    }
+
     data class State(
         val access: SourceHomeGroupAccess = SourceHomeGroupAccess(loading = true),
         val query: String = "",
+        val assistance: SearchAssistance = SearchAssistance(),
         val filters: Map<String, List<String>> = emptyMap(),
         val title: String? = null,
         val items: List<Anime> = emptyList(),

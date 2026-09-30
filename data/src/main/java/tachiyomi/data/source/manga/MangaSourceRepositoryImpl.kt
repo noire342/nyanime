@@ -72,9 +72,10 @@ class MangaSourceRepositoryImpl(
         sourceId: Long,
         query: String,
         filterList: FilterList,
+        session: tachiyomi.domain.search.SearchSession?,
     ): SourcePagingSourceType {
         val source = sourceManager.get(sourceId) as CatalogueSource
-        return SourceSearchPagingSource(source, query, filterList)
+        return SourceSearchPagingSource(source, query, filterList, session)
     }
 
     override fun getPopularManga(sourceId: Long): SourcePagingSourceType {

@@ -33,24 +33,29 @@ fun GlobalMangaSearchScreen(
     onClickSource: (CatalogueSource) -> Unit,
     onClickItem: (Manga) -> Unit,
     onLongClickItem: (Manga) -> Unit,
+    onExact: () -> Unit = {},
+    onSuggestion: (String) -> Unit = onSearch,
     onRetrySource: ((CatalogueSource) -> Unit)? = null,
 ) {
     Scaffold(
         modifier = Modifier.privacyRegion(PrivacyArea.SEARCH),
         topBar = { scrollBehavior ->
-            GlobalMangaSearchToolbar(
-                searchQuery = state.searchQuery,
-                progress = state.progress,
-                total = state.total,
-                navigateUp = navigateUp,
-                onChangeSearchQuery = onChangeSearchQuery,
-                onSearch = onSearch,
-                sourceFilter = state.sourceFilter,
-                onChangeSearchFilter = onChangeSearchFilter,
-                onlyShowHasResults = state.onlyShowHasResults,
-                onToggleResults = onToggleResults,
-                scrollBehavior = scrollBehavior,
-            )
+            androidx.compose.foundation.layout.Column {
+                GlobalMangaSearchToolbar(
+                    searchQuery = state.searchQuery,
+                    progress = state.progress,
+                    total = state.total,
+                    navigateUp = navigateUp,
+                    onChangeSearchQuery = onChangeSearchQuery,
+                    onSearch = onSearch,
+                    sourceFilter = state.sourceFilter,
+                    onChangeSearchFilter = onChangeSearchFilter,
+                    onlyShowHasResults = state.onlyShowHasResults,
+                    onToggleResults = onToggleResults,
+                    scrollBehavior = scrollBehavior,
+                )
+                eu.kanade.presentation.search.SearchAssistanceBar(state.assistance, onSuggestion, onExact)
+            }
         },
     ) { paddingValues ->
         GlobalSearchContent(

@@ -8,11 +8,16 @@ class GetRemoteAnime(
     private val repository: AnimeSourceRepository,
 ) {
 
-    fun subscribe(sourceId: Long, query: String, filterList: AnimeFilterList): AnimeSourcePagingSourceType {
+    fun subscribe(
+        sourceId: Long,
+        query: String,
+        filterList: AnimeFilterList,
+        session: tachiyomi.domain.search.SearchSession? = null,
+    ): AnimeSourcePagingSourceType {
         return when (query) {
             QUERY_POPULAR -> repository.getPopularAnime(sourceId)
             QUERY_LATEST -> repository.getLatestAnime(sourceId)
-            else -> repository.searchAnime(sourceId, query, filterList)
+            else -> repository.searchAnime(sourceId, query, filterList, session)
         }
     }
 

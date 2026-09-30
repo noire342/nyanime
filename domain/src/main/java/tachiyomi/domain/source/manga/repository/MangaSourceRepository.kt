@@ -19,7 +19,12 @@ interface MangaSourceRepository {
 
     fun getMangaSourcesWithNonLibraryManga(): Flow<List<MangaSourceWithCount>>
 
-    fun searchManga(sourceId: Long, query: String, filterList: FilterList): SourcePagingSourceType
+    fun searchManga(
+        sourceId: Long,
+        query: String,
+        filterList: FilterList,
+        session: tachiyomi.domain.search.SearchSession? = null,
+    ): SourcePagingSourceType
 
     fun getPopularManga(sourceId: Long): SourcePagingSourceType
 

@@ -33,24 +33,29 @@ fun GlobalAnimeSearchScreen(
     onClickSource: (AnimeSource) -> Unit,
     onClickItem: (Anime) -> Unit,
     onLongClickItem: (Anime) -> Unit,
+    onExact: () -> Unit = {},
+    onSuggestion: (String) -> Unit = onSearch,
     onRetrySource: ((AnimeSource) -> Unit)? = null,
 ) {
     Scaffold(
         modifier = Modifier.privacyRegion(PrivacyArea.SEARCH),
         topBar = { scrollBehavior ->
-            GlobalAnimeSearchToolbar(
-                searchQuery = state.searchQuery,
-                progress = state.progress,
-                total = state.total,
-                navigateUp = navigateUp,
-                onChangeSearchQuery = onChangeSearchQuery,
-                onSearch = onSearch,
-                sourceFilter = state.sourceFilter,
-                onChangeSearchFilter = onChangeSearchFilter,
-                onlyShowHasResults = state.onlyShowHasResults,
-                onToggleResults = onToggleResults,
-                scrollBehavior = scrollBehavior,
-            )
+            androidx.compose.foundation.layout.Column {
+                GlobalAnimeSearchToolbar(
+                    searchQuery = state.searchQuery,
+                    progress = state.progress,
+                    total = state.total,
+                    navigateUp = navigateUp,
+                    onChangeSearchQuery = onChangeSearchQuery,
+                    onSearch = onSearch,
+                    sourceFilter = state.sourceFilter,
+                    onChangeSearchFilter = onChangeSearchFilter,
+                    onlyShowHasResults = state.onlyShowHasResults,
+                    onToggleResults = onToggleResults,
+                    scrollBehavior = scrollBehavior,
+                )
+                eu.kanade.presentation.search.SearchAssistanceBar(state.assistance, onSuggestion, onExact)
+            }
         },
     ) { paddingValues ->
         GlobalSearchContent(

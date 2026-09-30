@@ -155,6 +155,12 @@ data class BrowseAnimeSourceScreen(
                         onSearch = screenModel::search,
                     )
 
+                    eu.kanade.presentation.search.SearchAssistanceBar(
+                        state.assistance,
+                        onSuggestion = { screenModel.search(it) },
+                        onExact = screenModel::searchExactly,
+                    )
+
                     Row(
                         modifier = Modifier
                             .horizontalScroll(rememberScrollState())

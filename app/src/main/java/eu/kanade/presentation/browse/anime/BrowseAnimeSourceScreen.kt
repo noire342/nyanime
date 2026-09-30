@@ -118,6 +118,14 @@ fun BrowseAnimeSourceContent(
         return
     }
 
+    if (animeList.itemCount == 0 && animeList.loadState.refresh is LoadState.NotLoading) {
+        EmptyScreen(
+            modifier = Modifier.padding(contentPadding),
+            message = stringResource(MR.strings.no_results_found),
+        )
+        return
+    }
+
     when (displayMode) {
         LibraryDisplayMode.ComfortableGrid -> {
             BrowseAnimeSourceComfortableGrid(

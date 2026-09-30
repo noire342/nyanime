@@ -8,11 +8,16 @@ class GetRemoteManga(
     private val repository: MangaSourceRepository,
 ) {
 
-    fun subscribe(sourceId: Long, query: String, filterList: FilterList): SourcePagingSourceType {
+    fun subscribe(
+        sourceId: Long,
+        query: String,
+        filterList: FilterList,
+        session: tachiyomi.domain.search.SearchSession? = null,
+    ): SourcePagingSourceType {
         return when (query) {
             QUERY_POPULAR -> repository.getPopularManga(sourceId)
             QUERY_LATEST -> repository.getLatestManga(sourceId)
-            else -> repository.searchManga(sourceId, query, filterList)
+            else -> repository.searchManga(sourceId, query, filterList, session)
         }
     }
 

@@ -1,8 +1,10 @@
 package eu.kanade.tachiyomi.ui.library.anime
 
+import eu.kanade.tachiyomi.data.search.SmartTitleSearch
 import eu.kanade.tachiyomi.source.anime.getNameForAnimeInfo
 import eu.kanade.tachiyomi.ui.library.LibraryShelfStatus
 import tachiyomi.domain.library.anime.LibraryAnime
+import tachiyomi.domain.search.LibraryTitleSearch
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -29,6 +31,22 @@ data class AnimeLibraryItem(
             return libraryAnime.id == id
         }
         return libraryAnime.anime.title.contains(constraint, true) ||
+            tachiyomi.domain.search.LibraryTitleSearch.matches(
+                constraint,
+                libraryAnime.anime.title,
+                Injekt.get<eu.kanade.domain.source.service.SourcePreferences>().tolerantSearch().get(),
+            ) ||
+            (
+                tachiyomi.domain.search.searchAliases(libraryAnime.anime.memo) +
+                    Injekt.get<SmartTitleSearch>().aliases(libraryAnime.anime.source, libraryAnime.anime.title)
+                )
+                .any { alias ->
+                    LibraryTitleSearch.matches(
+                        constraint,
+                        alias,
+                        Injekt.get<eu.kanade.domain.source.service.SourcePreferences>().tolerantSearch().get(),
+                    )
+                } ||
             (libraryAnime.anime.author?.contains(constraint, true) ?: false) ||
             (libraryAnime.anime.artist?.contains(constraint, true) ?: false) ||
             (libraryAnime.anime.description?.contains(constraint, true) ?: false) ||

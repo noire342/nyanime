@@ -16,7 +16,12 @@ interface AnimeSourceRepository {
 
     fun getAnimeSourcesWithFavoriteCount(): Flow<List<Pair<AnimeSource, Long>>>
 
-    fun searchAnime(sourceId: Long, query: String, filterList: AnimeFilterList): AnimeSourcePagingSourceType
+    fun searchAnime(
+        sourceId: Long,
+        query: String,
+        filterList: AnimeFilterList,
+        session: tachiyomi.domain.search.SearchSession? = null,
+    ): AnimeSourcePagingSourceType
 
     fun getPopularAnime(sourceId: Long): AnimeSourcePagingSourceType
 

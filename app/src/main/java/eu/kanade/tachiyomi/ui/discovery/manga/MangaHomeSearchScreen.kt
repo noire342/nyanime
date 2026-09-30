@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Search
@@ -42,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -61,15 +64,22 @@ import eu.kanade.tachiyomi.data.discovery.MangaHomeService
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import tachiyomi.domain.discovery.SourceHomeListing
 import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.search.ExtensionSearchAdapter
+import tachiyomi.domain.search.SearchMedium
+import tachiyomi.domain.search.SearchPage
+import tachiyomi.domain.search.TitleSearch
+import tachiyomi.domain.search.runtimeSearchTitle
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -83,6 +93,9 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
         val listing by registry.observe().collectAsState(initial = SourceHomeListing())
         val navigator = LocalNavigator.currentOrThrow
         val context = LocalContext.current
+        val titleSearch = remember { Injekt.get<TitleSearch>() }
+        var exact by remember { mutableStateOf(false) }
+        var submitted by remember { mutableIntStateOf(0) }
         var query by rememberSaveable { mutableStateOf("") }
         var selectedSource by rememberSaveable { mutableStateOf<String?>(null) }
         var selectedGenre by rememberSaveable { mutableStateOf(initialGenre) }
@@ -109,14 +122,18 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
         }
         val revision = eligible.joinToString("|") { it.first.key + ":" + it.first.revision }
 
-        LaunchedEffect(query, selectedSource, selectedGenre, page, revision) {
+        val session = remember(query, selectedSource, selectedGenre, revision, exact, submitted) {
+            titleSearch.session(query, SearchMedium.MANGA, exact)
+        }
+        val assistance by session.assistance.collectAsState()
+
+        LaunchedEffect(query, selectedSource, selectedGenre, page, revision, exact, submitted) {
             loading = true
             error = null
             if (page == 1) {
-                items = emptyList()
                 hasMore = false
             }
-            if (query.isNotBlank()) delay(320)
+            if (query.isNotBlank() && submitted == 0) delay(350)
             val previousItems = if (page > 1) items else emptyList()
             val pagesBySource = mutableMapOf<String, MangaHomePage>()
             val failures = mutableListOf<Throwable>()
@@ -127,10 +144,24 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
                     launch {
                         val result = try {
                             Result.success(
-                                service.fetch(
-                                    home.key,
-                                    SourceHomeRequest(section?.id ?: SourceHomeRequest.SEARCH, page, query),
-                                ),
+                                if (query.isBlank()) {
+                                    service.fetch(
+                                        home.key,
+                                        SourceHomeRequest(section?.id ?: SourceHomeRequest.SEARCH, page, query),
+                                    )
+                                } else {
+                                    withContext(Dispatchers.IO) {
+                                        val result = session.search(
+                                            mangaHomeAdapter(
+                                                service,
+                                                home.key,
+                                                section?.id ?: SourceHomeRequest.SEARCH,
+                                            ),
+                                            page,
+                                        )
+                                        MangaHomePage(result.items, result.hasNextPage)
+                                    }
+                                },
                             )
                         } catch (cancelled: CancellationException) {
                             throw cancelled
@@ -163,6 +194,7 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
                 null
             }
             loading = false
+            if (pages.isEmpty() && page == 1) items = emptyList()
             if (pages.isNotEmpty()) {
                 val enriched = coroutineScope {
                     pages.map { sourcePage ->
@@ -216,12 +248,33 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
                     value = query,
                     onValueChange = {
                         query = it
+                        exact = false
+                        submitted = 0
                         page = 1
                     },
                     leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                     placeholder = { Text("Titolo o parola chiave") },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        submitted++
+                        page = 1
+                    }),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                )
+                eu.kanade.presentation.search.SearchAssistanceBar(
+                    assistance,
+                    onSuggestion = {
+                        query = it
+                        exact = false
+                        submitted++
+                        page = 1
+                    },
+                    onExact = {
+                        exact = !exact
+                        submitted++
+                        page = 1
+                    },
                 )
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
@@ -317,3 +370,19 @@ class MangaHomeSearchScreen(private val initialGenre: String? = null) : Screen()
         }
     }
 }
+
+private fun mangaHomeAdapter(service: MangaHomeService, homeKey: String, section: String) =
+    object : ExtensionSearchAdapter<MangaHomeItem> {
+        override val key = homeKey
+        override fun identity(item: MangaHomeItem) = item.manga.source.toString() + ":" + item.manga.url
+        override fun title(item: MangaHomeItem) = runtimeSearchTitle(
+            item.manga.source,
+            item.manga.url,
+            item.sourceTitle,
+            SearchMedium.MANGA,
+        )
+        override suspend fun fetch(page: Int, query: String): SearchPage<MangaHomeItem> {
+            val result = service.fetch(homeKey, SourceHomeRequest(section, page, query))
+            return SearchPage(result.items, result.hasNextPage)
+        }
+    }

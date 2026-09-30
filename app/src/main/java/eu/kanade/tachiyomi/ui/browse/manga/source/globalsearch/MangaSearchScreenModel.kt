@@ -11,10 +11,13 @@ import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.util.ioCoroutineScope
 import eu.kanade.tachiyomi.extension.manga.MangaExtensionManager
 import eu.kanade.tachiyomi.source.CatalogueSource
+import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.ui.browse.SourceSearchRunner
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toPersistentMap
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
@@ -23,6 +26,13 @@ import tachiyomi.core.common.preference.toggle
 import tachiyomi.domain.entries.manga.interactor.GetManga
 import tachiyomi.domain.entries.manga.interactor.NetworkToLocalManga
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.search.ExtensionSearchAdapter
+import tachiyomi.domain.search.SearchAssistance
+import tachiyomi.domain.search.SearchMedium
+import tachiyomi.domain.search.SearchPage
+import tachiyomi.domain.search.SearchSession
+import tachiyomi.domain.search.TitleSearch
+import tachiyomi.domain.search.searchTitle
 import tachiyomi.domain.source.manga.service.MangaSourceManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -37,6 +47,12 @@ abstract class MangaSearchScreenModel(
     private val preferences: SourcePreferences = Injekt.get(),
     private val uiPreferences: UiPreferences = Injekt.get(),
 ) : StateScreenModel<MangaSearchScreenModel.State>(initialState) {
+
+    private val titleSearch: TitleSearch = Injekt.get()
+    private var searchSession: SearchSession? = null
+    private var assistanceJob: Job? = null
+    private var debounceJob: Job? = null
+    private var exactSearch = false
 
     private val searches = SourceSearchRunner<CatalogueSource>(ioCoroutineScope)
 
@@ -113,7 +129,28 @@ abstract class MangaSearchScreenModel(
     }
 
     fun updateSearchQuery(query: String?) {
-        mutableState.update { it.copy(searchQuery = query) }
+        if (query == state.value.searchQuery) return
+        searches.reset()
+        assistanceJob?.cancel()
+        debounceJob?.cancel()
+        exactSearch = false
+        lastQuery = null
+        mutableState.update { it.copy(searchQuery = query, assistance = SearchAssistance()) }
+        debounceJob = screenModelScope.launch {
+            delay(350)
+            search()
+        }
+    }
+
+    fun searchExactly() {
+        exactSearch = !exactSearch
+        lastQuery = null
+        search()
+    }
+
+    fun chooseSuggestion(query: String) {
+        updateSearchQuery(query)
+        search()
     }
 
     fun setSourceFilter(filter: MangaSourceFilter) {
@@ -126,6 +163,7 @@ abstract class MangaSearchScreenModel(
     }
 
     fun search() {
+        debounceJob?.cancel()
         val query = state.value.searchQuery
         val sourceFilter = state.value.sourceFilter
 
@@ -143,6 +181,17 @@ abstract class MangaSearchScreenModel(
         this.lastSourceFilter = sourceFilter
 
         searches.reset()
+        if (!sameQuery || searchSession == null) {
+            assistanceJob?.cancel()
+            val session = titleSearch.session(query, SearchMedium.MANGA, exactSearch)
+            searchSession = session
+            mutableState.update { it.copy(assistance = session.assistance.value) }
+            assistanceJob = screenModelScope.launch {
+                session.assistance.collect { value ->
+                    mutableState.update { if (searchSession === session) it.copy(assistance = value) else it }
+                }
+            }
+        }
         val sources = getSelectedSources()
 
         // Reuse previous results if possible
@@ -172,9 +221,22 @@ abstract class MangaSearchScreenModel(
     }
 
     private fun fetch(source: CatalogueSource, query: String) {
+        val session = requireNotNull(searchSession)
         searches.submit(source, fetch = {
-            val page = source.getSearchManga(1, query, source.getFilterList())
-            page.mangas.map { networkToLocalManga.await(it.toDomainManga(source.id)) }
+            val filters = source.getFilterList()
+            val page = session.search(
+                object : ExtensionSearchAdapter<SManga> {
+                    override val key = source.id.toString()
+                    override fun identity(item: SManga) = item.url
+                    override fun title(item: SManga) = item.searchTitle(source.id)
+                    override suspend fun fetch(page: Int, query: String): SearchPage<SManga> {
+                        val response = source.getSearchManga(page, query, filters)
+                        return SearchPage(response.mangas, response.hasNextPage)
+                    }
+                },
+                1,
+            )
+            page.items.map { networkToLocalManga.await(it.toDomainManga(source.id)) }
         }) { result ->
             updateItem(source, result.fold({ MangaSearchItemResult.Success(it) }, { MangaSearchItemResult.Error(it) }))
         }
@@ -202,6 +264,7 @@ abstract class MangaSearchScreenModel(
     data class State(
         val fromSourceId: Long? = null,
         val searchQuery: String? = null,
+        val assistance: SearchAssistance = SearchAssistance(),
         val sourceFilter: MangaSourceFilter = MangaSourceFilter.PinnedOnly,
         val onlyShowHasResults: Boolean = false,
         val items: PersistentMap<CatalogueSource, MangaSearchItemResult> = persistentMapOf(),

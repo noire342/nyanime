@@ -1,8 +1,10 @@
 package eu.kanade.tachiyomi.ui.library.manga
 
+import eu.kanade.tachiyomi.data.search.SmartTitleSearch
 import eu.kanade.tachiyomi.source.manga.getNameForMangaInfo
 import eu.kanade.tachiyomi.ui.library.LibraryShelfStatus
 import tachiyomi.domain.library.manga.LibraryManga
+import tachiyomi.domain.search.LibraryTitleSearch
 import tachiyomi.domain.source.manga.service.MangaSourceManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -29,6 +31,19 @@ class MangaLibraryItem(
             return libraryManga.id == id
         }
         return libraryManga.manga.title.contains(constraint, true) ||
+            tachiyomi.domain.search.LibraryTitleSearch.matches(
+                constraint,
+                libraryManga.manga.title,
+                Injekt.get<eu.kanade.domain.source.service.SourcePreferences>().tolerantSearch().get(),
+            ) ||
+            Injekt.get<SmartTitleSearch>().aliases(libraryManga.manga.source, libraryManga.manga.title)
+                .any { alias ->
+                    LibraryTitleSearch.matches(
+                        constraint,
+                        alias,
+                        Injekt.get<eu.kanade.domain.source.service.SourcePreferences>().tolerantSearch().get(),
+                    )
+                } ||
             (libraryManga.manga.author?.contains(constraint, true) ?: false) ||
             (libraryManga.manga.artist?.contains(constraint, true) ?: false) ||
             (libraryManga.manga.description?.contains(constraint, true) ?: false) ||

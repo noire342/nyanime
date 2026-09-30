@@ -9,11 +9,14 @@ import eu.kanade.domain.entries.anime.model.toDomainAnime
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.presentation.util.ioCoroutineScope
 import eu.kanade.tachiyomi.animesource.AnimeSource
+import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.extension.anime.AnimeExtensionManager
 import eu.kanade.tachiyomi.ui.browse.SourceSearchRunner
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toPersistentMap
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
@@ -22,6 +25,13 @@ import tachiyomi.core.common.preference.toggle
 import tachiyomi.domain.entries.anime.interactor.GetAnime
 import tachiyomi.domain.entries.anime.interactor.NetworkToLocalAnime
 import tachiyomi.domain.entries.anime.model.Anime
+import tachiyomi.domain.search.ExtensionSearchAdapter
+import tachiyomi.domain.search.SearchAssistance
+import tachiyomi.domain.search.SearchMedium
+import tachiyomi.domain.search.SearchPage
+import tachiyomi.domain.search.SearchSession
+import tachiyomi.domain.search.TitleSearch
+import tachiyomi.domain.search.searchTitle
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -35,6 +45,12 @@ abstract class AnimeSearchScreenModel(
     private val getAnime: GetAnime = Injekt.get(),
     private val preferences: SourcePreferences = Injekt.get(),
 ) : StateScreenModel<AnimeSearchScreenModel.State>(initialState) {
+
+    private val titleSearch: TitleSearch = Injekt.get()
+    private var searchSession: SearchSession? = null
+    private var assistanceJob: Job? = null
+    private var debounceJob: Job? = null
+    private var exactSearch = false
 
     private val searches = SourceSearchRunner<AnimeSource>(ioCoroutineScope)
 
@@ -100,7 +116,28 @@ abstract class AnimeSearchScreenModel(
     }
 
     fun updateSearchQuery(query: String?) {
-        mutableState.update { it.copy(searchQuery = query) }
+        if (query == state.value.searchQuery) return
+        searches.reset()
+        assistanceJob?.cancel()
+        debounceJob?.cancel()
+        exactSearch = false
+        lastQuery = null
+        mutableState.update { it.copy(searchQuery = query, assistance = SearchAssistance()) }
+        debounceJob = screenModelScope.launch {
+            delay(350)
+            search()
+        }
+    }
+
+    fun searchExactly() {
+        exactSearch = !exactSearch
+        lastQuery = null
+        search()
+    }
+
+    fun chooseSuggestion(query: String) {
+        updateSearchQuery(query)
+        search()
     }
 
     fun setSourceFilter(filter: AnimeSourceFilter) {
@@ -113,6 +150,7 @@ abstract class AnimeSearchScreenModel(
     }
 
     fun search() {
+        debounceJob?.cancel()
         val query = state.value.searchQuery
         val sourceFilter = state.value.sourceFilter
 
@@ -130,6 +168,17 @@ abstract class AnimeSearchScreenModel(
         this.lastSourceFilter = sourceFilter
 
         searches.reset()
+        if (!sameQuery || searchSession == null) {
+            assistanceJob?.cancel()
+            val session = titleSearch.session(query, SearchMedium.VIDEO, exactSearch)
+            searchSession = session
+            mutableState.update { it.copy(assistance = session.assistance.value) }
+            assistanceJob = screenModelScope.launch {
+                session.assistance.collect { value ->
+                    mutableState.update { if (searchSession === session) it.copy(assistance = value) else it }
+                }
+            }
+        }
         val sources = getSelectedSources()
 
         // Reuse previous results if possible
@@ -160,9 +209,22 @@ abstract class AnimeSearchScreenModel(
     }
 
     private fun fetch(source: AnimeSource, query: String) {
+        val session = requireNotNull(searchSession)
         searches.submit(source, fetch = {
-            val page = source.getSearchAnime(1, query, source.getFilterList())
-            page.animes.map { networkToLocalAnime.await(it.toDomainAnime(source.id)) }
+            val filters = source.getFilterList()
+            val page = session.search(
+                object : ExtensionSearchAdapter<SAnime> {
+                    override val key = source.id.toString()
+                    override fun identity(item: SAnime) = item.url
+                    override fun title(item: SAnime) = item.searchTitle(source.id)
+                    override suspend fun fetch(page: Int, query: String): SearchPage<SAnime> {
+                        val response = source.getSearchAnime(page, query, filters)
+                        return SearchPage(response.animes, response.hasNextPage)
+                    }
+                },
+                1,
+            )
+            page.items.map { networkToLocalAnime.await(it.toDomainAnime(source.id)) }
         }) { result ->
             updateItem(source, result.fold({ AnimeSearchItemResult.Success(it) }, { AnimeSearchItemResult.Error(it) }))
         }
@@ -190,6 +252,7 @@ abstract class AnimeSearchScreenModel(
     data class State(
         val fromSourceId: Long? = null,
         val searchQuery: String? = null,
+        val assistance: SearchAssistance = SearchAssistance(),
         val sourceFilter: AnimeSourceFilter = AnimeSourceFilter.PinnedOnly,
         val onlyShowHasResults: Boolean = false,
         val items: PersistentMap<AnimeSource, AnimeSearchItemResult> = persistentMapOf(),
