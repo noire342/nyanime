@@ -20,7 +20,7 @@ data class SearchTitle(
     val names get() = (listOf(title) + aliases).filter { it.length in 1..256 }.distinct().take(16)
 }
 
-data class TitleMatch(val item: SearchTitle, val score: Int)
+data class TitleMatch(val item: SearchTitle, val score: Int, val numericFallback: Boolean = false)
 
 interface TitleMatcher {
     fun score(query: String, title: String): Int
@@ -42,19 +42,15 @@ object TitleNormalizer {
     fun preservesNumbers(query: List<String>, candidate: List<String>) =
         query.isEmpty() || (candidate.size >= query.size && query.indices.all { query[it] == candidate[it] })
 
-    /** Only a separate, trailing 1 can mean a first season omitted from the title. */
-    fun firstSeasonBase(value: String): String? {
+    /** A separate trailing number can be a season/part, but never overrides a matching numbered name. */
+    fun trailingNumberBase(value: String): String? {
         val tokens = words(value).split(' ')
-        if (tokens.size < 2 || tokens.last() != "1") return null
+        if (tokens.size < 2 || !tokens.last().all(Char::isDigit)) return null
         val base = tokens.dropLast(1).let {
-            if (it.lastOrNull() in listOf("season", "stagione")) it.dropLast(1) else it
+            if (it.lastOrNull() in listOf("season", "stagione", "part", "parte")) it.dropLast(1) else it
         }.joinToString(" ")
         return base.takeIf { it.length >= 3 && it.any(Char::isLetter) }
     }
-
-    fun compatibleNumbers(query: String, candidate: List<String>): Boolean =
-        preservesNumbers(numericParts(query), candidate) ||
-            firstSeasonBase(query)?.let { numericParts(it) == candidate } == true
 
     /** Accent folding is secondary and Latin-only: Japanese voicing marks retain their meaning. */
     fun folded(value: String): String = words(value).map { character ->
@@ -73,7 +69,7 @@ class LexicalTitleMatcher : TitleMatcher {
         val numbers: List<String>,
         val tokens: List<String>,
         val folded: String,
-        val firstSeasonBase: String?,
+        val numberlessBase: String?,
     )
     private data class DistanceKey(val first: String, val second: String, val limit: Int)
 
@@ -83,15 +79,16 @@ class LexicalTitleMatcher : TitleMatcher {
     }
 
     private fun prepare(value: String): NormalizedTitle = synchronized(normalized) {
-        normalized.getOrPut(value) {
-            val words = TitleNormalizer.words(value)
+        val key = value.take(256)
+        normalized.getOrPut(key) {
+            val words = TitleNormalizer.words(key)
             NormalizedTitle(
                 words,
                 words.replace(" ", ""),
                 TitleNormalizer.numericParts(words),
                 words.split(' '),
                 TitleNormalizer.folded(words),
-                TitleNormalizer.firstSeasonBase(words),
+                TitleNormalizer.trailingNumberBase(words),
             )
         }
     }
@@ -111,10 +108,10 @@ class LexicalTitleMatcher : TitleMatcher {
         }
         if (wanted.words.isBlank() || actual.words.isBlank()) return 0
         if (!TitleNormalizer.preservesNumbers(wanted.numbers, actual.numbers)) {
-            val base = wanted.firstSeasonBase?.let(::prepare) ?: return 0
+            val base = wanted.numberlessBase?.let(::prepare) ?: return 0
             if (actual.numbers != base.numbers) return 0
-            // Exact numbered names still outrank this possible first-season interpretation.
-            return score(base, actual, distances).takeIf { it >= 85 }?.minus(5) ?: 0
+            val penalty = if (wanted.tokens.last() == "1") 5 else 12
+            return score(base, actual, distances).takeIf { it >= 85 }?.minus(penalty) ?: 0
         }
         val editionPenalty = if (wanted.numbers != actual.numbers) 12 else 0
         if (wanted.words == actual.words) return 100
@@ -158,14 +155,14 @@ class LexicalTitleMatcher : TitleMatcher {
 
     override fun rank(query: String, candidates: Collection<SearchTitle>): List<TitleMatch> {
         val wanted = prepare(query)
-        val firstSeasonNumbers = wanted.firstSeasonBase?.let(::prepare)?.numbers
+        val baseNumbers = wanted.numberlessBase?.let(::prepare)?.numbers
         val distances = mutableMapOf<DistanceKey, Int>()
         return candidates.distinctBy { it.key }
             .map { item ->
                 val canonical = prepare(item.title)
                 val consistent = canonical.numbers.isEmpty() ||
                     TitleNormalizer.preservesNumbers(wanted.numbers, canonical.numbers) ||
-                    canonical.numbers == firstSeasonNumbers
+                    canonical.numbers == baseNumbers
                 val best = if (consistent) {
                     item.names.maxOfOrNull { name ->
                         val alias = prepare(name)
@@ -177,10 +174,18 @@ class LexicalTitleMatcher : TitleMatcher {
                 } else {
                     0
                 }
-                TitleMatch(item, best)
+                val numericFallback = wanted.numbers.isNotEmpty() &&
+                    item.names.none {
+                        TitleNormalizer.preservesNumbers(wanted.numbers, prepare(it).numbers)
+                    }
+                TitleMatch(item, best, numericFallback)
             }
             .filter { it.score >= 75 }
-            .sortedWith(compareByDescending<TitleMatch> { it.score }.thenBy { it.item.title })
+            .sortedWith(
+                compareBy<TitleMatch> {
+                    it.numericFallback
+                }.thenByDescending { it.score }.thenBy { it.item.title },
+            )
     }
 
     companion object {

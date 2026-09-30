@@ -65,7 +65,12 @@ class SearchSession(
     private val cursors = mutableMapOf<String, MutableList<Cursor<*>>>()
     private val displayed = mutableMapOf<String, MutableSet<String>>()
     private val extraRequests = mutableMapOf<String, SearchRequestBudget>()
-    private data class RecoveredQuery(val query: String, val expected: List<String>, val canPage: Boolean)
+    private data class RecoveredQuery(
+        val query: String,
+        val expected: List<String>,
+        val canPage: Boolean,
+        val interpretation: String,
+    )
     private val recoveredQueries = java.util.concurrent.ConcurrentHashMap<String, RecoveredQuery>()
 
     suspend fun suggestions(): List<SearchTitle> = candidateLock.withLock {
@@ -73,16 +78,16 @@ class SearchSession(
         if (!canAssist()) return@withLock emptyList()
         mutableAssistance.update { it.copy(loading = true) }
         try {
-            val found = matcher.rank(query, provider.candidates(query, medium, online)).take(5).map { it.item }
+            val found = matcher.rank(query, provider.candidates(query, medium, online)).take(30).map { it.item }
             candidateSnapshot = found
-            mutableAssistance.update { it.copy(suggestions = found, loading = false, resolved = true) }
+            mutableAssistance.update { it.copy(suggestions = titleOptions(found), loading = false, resolved = true) }
             found
         } catch (failure: SearchCandidateFailure) {
-            val found = matcher.rank(query, failure.local).take(5).map { it.item }
+            val found = matcher.rank(query, failure.local).take(30).map { it.item }
             candidateSnapshot = found
             mutableAssistance.update {
                 it.copy(
-                    suggestions = found,
+                    suggestions = titleOptions(found),
                     loading = false,
                     unavailable = true,
                     resolved = true,
@@ -125,7 +130,9 @@ class SearchSession(
             }
             if (recovered != null) {
                 remember(recovered.items.map(adapter::title))
-                merged += recovered.items.filter { pertinent(adapter.title(it), previousRecovery.expected) }
+                merged += recovered.items.filter {
+                    pertinent(adapter.title(it), previousRecovery.expected, previousRecovery.interpretation)
+                }
                 branches += Cursor(previousRecovery.query, 2, recovered.hasNextPage && previousRecovery.canPage)
             }
         } else if (canAssist() &&
@@ -134,13 +141,13 @@ class SearchSession(
             val candidates = suggestions()
             val ranked = matcher.rank(query, candidates)
             val first = ranked.firstOrNull()
-            val interpretation = first?.item?.let { item ->
-                val numbers = TitleNormalizer.numericParts(item.title)
-                TitleNormalizer.firstSeasonBase(query)?.takeIf {
-                    !TitleNormalizer.preservesNumbers(TitleNormalizer.numericParts(query), numbers) &&
-                        numbers == TitleNormalizer.numericParts(it)
-                }
-            } ?: query
+            val interpretation = if (first?.numericFallback ==
+                true
+            ) {
+                TitleNormalizer.trailingNumberBase(query) ?: query
+            } else {
+                query
+            }
             // Retrieve the best grounded spelling even when alternatives are plausible.
             // All suggestions stay visible; this never selects or links a work for the user.
             val corrected = if (first != null) {
@@ -193,13 +200,13 @@ class SearchSession(
                 } else {
                     listOfNotNull(query, corrected)
                 }
-                val matches = recovered.items.filter { pertinent(adapter.title(it), expected) }
+                val matches = recovered.items.filter { pertinent(adapter.title(it), expected, interpretation) }
                 merged += matches
                 // An anchor is a single bounded probe, never a crawl of a broad catalog.
                 branches += Cursor(variant, 2, recovered.hasNextPage && matches.isNotEmpty() && namedVariant)
                 if (matches.isNotEmpty()) {
                     mutableAssistance.update { it.copy(correctedQuery = corrected ?: variant) }
-                    recoveredQueries[adapter.key] = RecoveredQuery(variant, expected, namedVariant)
+                    recoveredQueries[adapter.key] = RecoveredQuery(variant, expected, namedVariant, interpretation)
                     break
                 }
             }
@@ -208,9 +215,11 @@ class SearchSession(
         val unique = merged.distinctBy(adapter::identity)
         synchronized(displayed) { displayed[adapter.key] = unique.mapTo(mutableSetOf(), adapter::identity) }
         val ordered = if (canAssist()) {
-            unique.sortedByDescending {
-                matcher.rank(query, listOf(adapter.title(it))).firstOrNull()?.score ?: 0
-            }
+            unique.map { it to matcher.rank(query, listOf(adapter.title(it))).firstOrNull() }
+                .sortedWith(
+                    compareBy<Pair<T, TitleMatch?>> { it.second?.numericFallback ?: true }
+                        .thenByDescending { it.second?.score ?: 0 },
+                ).map { it.first }
         } else {
             unique
         }
@@ -236,9 +245,9 @@ class SearchSession(
             val filtered = if (branch.query == query) {
                 result.items
             } else {
-                val expected = recoveredQueries[adapter.key]?.takeIf { it.query == branch.query }?.expected
-                    ?: listOf(branch.query)
-                result.items.filter { pertinent(adapter.title(it), expected) }
+                val recovery = recoveredQueries[adapter.key]?.takeIf { it.query == branch.query }
+                val expected = recovery?.expected ?: listOf(branch.query)
+                result.items.filter { pertinent(adapter.title(it), expected, recovery?.interpretation ?: query) }
             }
             synchronized(displayed) {
                 val seen = displayed.getOrPut(adapter.key) { mutableSetOf() }
@@ -269,12 +278,16 @@ class SearchSession(
         return grounded.filter { it.length >= 4 && it.any(Char::isLetter) }.maxByOrNull { it.length }
     }
 
-    private fun pertinent(item: SearchTitle, expected: List<String>): Boolean {
+    // One chip per distinct search text. Candidate identities and aliases remain separate.
+    private fun titleOptions(items: List<SearchTitle>) = items.distinctBy { TitleNormalizer.words(it.title) }.take(5)
+
+    private fun pertinent(item: SearchTitle, expected: List<String>, interpretation: String): Boolean {
+        val wanted = TitleNormalizer.numericParts(interpretation)
         val numbers = TitleNormalizer.numericParts(item.title)
-        if (numbers.isNotEmpty() && !TitleNormalizer.compatibleNumbers(query, numbers)) {
+        if (numbers.isNotEmpty() && !TitleNormalizer.preservesNumbers(wanted, numbers)) {
             return false
         }
-        if (item.names.none { TitleNormalizer.compatibleNumbers(query, TitleNormalizer.numericParts(it)) }) return false
+        if (item.names.none { TitleNormalizer.preservesNumbers(wanted, TitleNormalizer.numericParts(it)) }) return false
         return expected.any { matcher.rank(it, listOf(item)).any { match -> match.score >= 75 } }
     }
 

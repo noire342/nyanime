@@ -9,6 +9,8 @@ descrizioni o temi. Non richiede un aggiornamento delle estensioni.
 
 Home, Sfoglia e singole fonti condividono lo stesso motore. Sotto il campo di
 ricerca compaiono suggerimenti di titolo: toccarne uno avvia una nuova ricerca.
+Lo stesso testo compare una sola volta nei suggerimenti, anche quando è noto
+a più cataloghi o fonti; le identità dei candidati rimangono distinte nel motore.
 Un suggerimento di catalogo non garantisce la disponibilità nell'estensione;
 solo i risultati ottenuti dall'estensione possono essere aperti.
 
@@ -38,21 +40,26 @@ Il modulo [`core/smart-search`](../core/smart-search) separa:
 
 `LexicalTitleMatcher` mantiene i nomi originali. Confronta forme Unicode
 normalizzate, parole separate, forme compatte e una forma secondaria senza
-accenti latini. Numeri ed edizioni non vengono eliminati: cercare un nome numerato
+accenti latini. Numeri ed edizioni hanno precedenza: cercare un nome numerato
 può proporre anche le sue parti successive, senza aggiungere automaticamente
 un numero di stagione alla query. Un numero diverso resta incompatibile.
 Un alias senza numero non rende una parte numerata equivalente al titolo base.
 I titoli corti richiedono più prudenza. La distanza di modifica considera anche
 lettere invertite e refusi in un prefisso seguito da un sottotitolo.
 
-Un `1` separato alla fine, anche dopo «season» o «stagione», può indicare la
-prima stagione il cui numero non compare nel titolo. Il nome con quel numero
-ha precedenza; in sua assenza si può recuperare il titolo base, purché il nome
-completo sia una corrispondenza forte. Gli altri numeri rimangono invariati:
-`Synthetic Protocol 47 1` può recuperare `Synthetic Protocol 47`, ma non
-`Synthetic Protocol 48` o la sua seconda stagione. Un numero attaccato a una
-parola o nel mezzo del nome non viene eliminato. È un'interpretazione della
-query mostrata all'utente, non una prova di equivalenza tra opere.
+Un numero separato alla fine, anche dopo «season», «stagione», «part» o «parte»,
+può indicare una stagione o parte richiesta. Un candidato con quel numero
+ha precedenza anche su una somiglianza testuale più forte del titolo base.
+Se non esiste un candidato numerato plausibile, si può recuperare il titolo
+base riconosciuto, purché il nome completo sia una corrispondenza forte.
+Il `1` è favorito come possibile prima stagione non numerata. Un numero inesistente
+non blocca quindi la ricerca; il testo digitato resta visibile e la nota indica
+la variante usata. Gli altri numeri rimangono invariati: `Synthetic Protocol 47 56`
+può recuperare `Synthetic Protocol 47`, ma non `Synthetic Protocol 48`.
+Un numero attaccato a una parola o nel mezzo del nome non viene eliminato.
+L'interpretazione scelta rimane la stessa durante aggiornamento e paginazione:
+un candidato numerato riconosciuto non si trasforma nel titolo base.
+È un recupero di ricerca, non una prova di equivalenza tra opere.
 
 `SymSpellTitleIndex` usa SymSpellKt per recuperare candidati dal dizionario
 costruito durante l'uso. I candidati vengono verificati contro nomi completi:
@@ -123,7 +130,7 @@ Il motore restituisce uno stato esplicito quando l'aiuto non è disponibile.
 ## Verifiche e manutenzione
 
 I test versionati usano esclusivamente nomi sintetici. Coprono normalizzazione,
-refusi e alias, edizioni numerate, prima stagione implicita, ambiguità con
+refusi e alias, edizioni numerate, numeri finali non riconosciuti, prima stagione implicita, ambiguità con
 recupero esplicito e alternative visibili, originali falliti, budget condivisi,
 paginazione interrotta, deduplicazione, offline e cache danneggiata.
 I parser dei cataloghi e la compatibilità dei metadati hanno test dedicati.
@@ -138,9 +145,9 @@ senza rete. Misura ricerca più valutazione con obiettivo p95 inferiore a 100 ms
 registra anche la variazione della memoria del processo, che include runtime e
 allocazioni temporanee e non equivale alla sola dimensione dell'indice.
 La prova del 1 ottobre 2026 su Galaxy Z Flip6 (Android 16) ha ottenuto
-**p95 15,66 ms** su 100 campioni misurati dopo 20 di riscaldamento, includendo
+**p95 16,74 ms** su 100 campioni misurati dopo 20 di riscaldamento, includendo
 query parziali senza numero e refusi su titoli numerati. La variazione misurata
-è 37.248 KiB di heap Java e 85.956 KiB di PSS del processo di prova, comprensivo
+è 37.248 KiB di heap Java e 87.932 KiB di PSS del processo di prova, comprensivo
 del corpus e del runtime: non è la memoria incrementale della sola app.
 Questa misura riguarda il motore locale, non latenza di rete o tempo di apertura
 delle estensioni. Le prove con contenuti reali restano locali, fuori dal repository.

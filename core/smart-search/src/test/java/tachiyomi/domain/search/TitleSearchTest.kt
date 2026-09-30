@@ -258,7 +258,7 @@ class TitleSearchTest {
         }
         session.search(adapter, 1).items shouldBe listOf(zero)
         session.assistance.value.correctedQuery shouldBe zero
-        session.assistance.value.suggestions.map { it.title } shouldBe listOf(zero)
+        session.assistance.value.suggestions.first().title shouldBe zero
     }
 
     @Test
@@ -277,8 +277,8 @@ class TitleSearchTest {
             session.assistance.value.correctedQuery shouldBe base
             session.query shouldBe query
         }
-        matcher.score("Solar Gate 0", "Solar Gate") shouldBe 0
-        matcher.score("Solar Gate 2", "Solar Gate") shouldBe 0
+        matcher.rank("Solar Gate 0", listOf(title("Solar Gate"))).single().numericFallback shouldBe true
+        matcher.rank("Solar Gate 2", listOf(title("Solar Gate"))).single().numericFallback shouldBe true
         matcher.score("Solar1 Gate", "Solar Gate") shouldBe 0
         matcher.score("Synthetic Protocol 48 1", "Synthetic Protocol 47") shouldBe 0
         val index = SymSpellTitleIndex()
@@ -297,6 +297,68 @@ class TitleSearchTest {
         }
         session.search(adapter, 1).items shouldBe listOf("Solar;Gate 1")
         adapter.calls shouldBe listOf(1 to "slar gate 1", 1 to "Solar;Gate 1")
+    }
+
+    @Test
+    fun `unmatched trailing numbers recover a known base and preserve numbers inside its name`() = runTest {
+        for ((query, name) in listOf(
+            "slar gate 56" to "Solar;Gate",
+            "slar gate season 56" to "Solar;Gate",
+            "synthetc protocol 47 56" to "Synthetic Protocol 47",
+        )) {
+            val titles = listOf(title(name), title("Solar;Gate 0"), title("Synthetic Protocol 48"))
+            val index = SymSpellTitleIndex()
+            index.add(titles)
+            val session = SearchSession(
+                query,
+                SearchMedium.VIDEO,
+                Provider(index.candidates(query, SearchMedium.VIDEO)),
+                matcher,
+            )
+            val adapter = Adapter { _, variant ->
+                SearchPage(
+                    if (variant ==
+                        name
+                    ) {
+                        listOf(name)
+                    } else {
+                        emptyList()
+                    },
+                    false,
+                )
+            }
+            session.search(adapter, 1).items shouldBe listOf(name)
+            session.assistance.value.correctedQuery shouldBe name
+            adapter.calls shouldBe listOf(1 to query, 1 to name)
+        }
+    }
+
+    @Test
+    fun `a matched numbered candidate stays strict across refresh and pagination`() = runTest {
+        val name = "Solar;Gate 0"
+        val session = SearchSession(
+            "slar gate 0",
+            SearchMedium.VIDEO,
+            Provider(listOf(title("Solar;Gate"), title(name))),
+            matcher,
+        )
+        val adapter = Adapter { page, variant ->
+            SearchPage(
+                if (variant == name) listOf("Solar;Gate", name, "Solar;Gate 2", "$name Bonus") else emptyList(),
+                page == 1 && variant == name,
+            )
+        }
+        session.search(adapter, 1).items shouldBe listOf(name, "$name Bonus")
+        session.search(adapter, 2).items shouldBe emptyList()
+        session.search(adapter, 1).items shouldBe listOf(name, "$name Bonus")
+    }
+
+    @Test
+    fun `identical suggestion text has one chip without collapsing source results`() = runTest {
+        val titles = listOf(title("Solar Gate", "one"), title("Solar Gate", "two"), title("Solar Gaze"))
+        val session = SearchSession("solar gte", SearchMedium.VIDEO, Provider(titles), matcher)
+        session.suggestions().size shouldBe 3
+        session.assistance.value.suggestions.map { it.title } shouldBe listOf("Solar Gate", "Solar Gaze")
     }
 
     @Test

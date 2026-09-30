@@ -13,9 +13,10 @@ tracking, player o corrispondenze di identità tra fonti.
 
 Le sessioni conservano la query originale e possono recuperare i risultati del
 candidato meglio valutato, mantenendo visibili le alternative. Numeri del nome
-e delle parti restano distinti; solo un `1` finale separato può indicare una
-prima stagione senza numero nel titolo. Il confronto completo e i vincoli
-numerici si applicano anche ai recuperi e alle pagine successive.
+e delle parti hanno precedenza; un numero finale separato senza candidati
+numerati plausibili può recuperare il titolo base riconosciuto. Il `1` può
+indicare una prima stagione senza numero nel titolo. Il confronto completo,
+i vincoli numerici e l'interpretazione scelta valgono anche nelle pagine successive.
 
 ## Dipendenza e licenza
 

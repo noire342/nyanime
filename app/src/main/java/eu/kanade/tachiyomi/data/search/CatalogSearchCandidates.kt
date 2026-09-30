@@ -33,7 +33,7 @@ class CatalogSearchCandidates(private val client: OkHttpClient, private val json
     suspend fun fetch(query: String, medium: SearchMedium, budget: SearchRequestBudget): List<SearchTitle> {
         val found = mutableListOf<SearchTitle>()
         var failure: Exception? = null
-        val base = TitleNormalizer.firstSeasonBase(query)
+        val base = TitleNormalizer.trailingNumberBase(query)
         val queries = listOf(query, base ?: TitleNormalizer.words(query)).distinct().take(2)
         for (variant in queries) {
             if (!budget.take()) return found

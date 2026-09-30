@@ -40,12 +40,12 @@ class SymSpellTitleIndex(private val capacity: Int = 5_000) {
     fun candidates(query: String, medium: SearchMedium): List<SearchTitle> {
         val words = TitleNormalizer.words(query).split(' ').filter { it.isNotBlank() }
         val numbers = TitleNormalizer.numericParts(query)
-        val firstSeasonNumbers = TitleNormalizer.firstSeasonBase(query)?.let(TitleNormalizer::numericParts)
+        val baseNumbers = TitleNormalizer.trailingNumberBase(query)?.let(TitleNormalizer::numericParts)
         val eligible = if (numbers.isEmpty()) {
             null
         } else {
             editions.entries.filter {
-                TitleNormalizer.preservesNumbers(numbers, it.key) || it.key == firstSeasonNumbers
+                TitleNormalizer.preservesNumbers(numbers, it.key) || it.key == baseNumbers
             }
                 .flatMapTo(mutableSetOf()) { it.value }
         }
@@ -74,7 +74,7 @@ class SymSpellTitleIndex(private val capacity: Int = 5_000) {
                         numbers.isEmpty() ||
                             item.names.any { name ->
                                 val actual = TitleNormalizer.numericParts(name)
-                                TitleNormalizer.preservesNumbers(numbers, actual) || actual == firstSeasonNumbers
+                                TitleNormalizer.preservesNumbers(numbers, actual) || actual == baseNumbers
                             }
                         )
             }.take(600).toList()
