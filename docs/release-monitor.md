@@ -84,19 +84,24 @@ non mediante gli ID numerici di un altro database.
 
 ## Promemoria e limiti verificabili
 
-Un solo allarme locale punta al prossimo avviso: 24 ore prima oppure all'orario
-della trasmissione. **Avvisami un giorno prima**, in Impostazioni > Libreria,
-è attivo inizialmente e si può disattivare separatamente; richiede i promemoria di
-trasmissione attivi. Funziona con le date AniList anche senza AnimeSchedule.
-Il promemoria anticipato e quello della trasmissione hanno ricevute distinte,
+Un solo allarme locale punta al prossimo avviso. **Orari dei promemoria**, in
+Impostazioni > Libreria, permette di combinare 24 ore prima, le 09:00/15:00/20:00
+del giorno precedente e del giorno stesso, un'ora o 10/5/2 minuti prima e
+l'orario della trasmissione. Gli orari fissi seguono il fuso del telefono; nel
+giorno dell'uscita vengono usati solo se precedono la trasmissione. Le due scelte
+precedenti, 24 ore prima e all'uscita, conservano i loro valori dopo l'aggiornamento.
+Funziona con le date AniList anche senza AnimeSchedule, con il monitoraggio e
+i promemoria attivi. Le nuove opzioni sono disattivate inizialmente.
+Le scelte coincidenti producono un solo avviso. I diversi momenti hanno ricevute
 persistenti e condivise tra edizioni con lo stesso ID di catalogo verificato.
 Visto in una di queste edizioni, esclusioni per titolo e incognito impediscono
 l'avviso. Le ricevute sono dati di consegna locali, non cronologia da importare
 su un altro telefono. Nessuna richiesta di rete è necessaria alla scadenza.
 
 L'autorizzazione Android per gli allarmi puntuali è facoltativa; senza di essa il
-promemoria può ritardare. Gli avvisi anticipati possono recuperare un ritardo di
-sei ore, quelli all'orario annunciato di due ore: oltre questa finestra non vengono
+promemoria può ritardare. L'avviso delle 24 ore recupera fino a sei ore; gli orari
+fissi e l'uscita fino a due ore, gli avvisi vicini all'uscita hanno finestre più
+brevi e vengono sempre saltati dopo l'uscita. Oltre queste finestre non vengono
 inviati, per evitare raffiche dopo periodi offline. Un avviso saltato non viene
 registrato come consegnato; una data successivamente rinviata può essere riprogrammata.
 I permessi e il canale bloccati non consumano la ricevuta. Alla riapertura o al

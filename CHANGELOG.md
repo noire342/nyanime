@@ -8,6 +8,16 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 30 settembre 2026 — Orari personalizzati per i promemoria
+
+- I promemoria delle trasmissioni anime possono essere combinati: 24 ore prima o alle 09:00,
+  15:00 e 20:00 del giorno precedente; il giorno stesso agli stessi orari,
+  un’ora, 10, 5 o 2 minuti prima, oppure all’orario annunciato.
+- Gli orari fissi seguono il fuso del telefono. Gli avvisi che arriverebbero dopo
+  l’uscita o troppo tardi vengono saltati; scelte coincidenti non duplicano la notifica.
+- Le preferenze già esistenti per 24 ore prima e all’uscita restano attive dopo
+  l’aggiornamento. Le notifiche di contenuti disponibili nella fonte restano separate.
+
 ## 30 settembre 2026 — Backup più semplici
 
 - Un backup completo si avvia con un tocco da Altro o da Dati e archiviazione,

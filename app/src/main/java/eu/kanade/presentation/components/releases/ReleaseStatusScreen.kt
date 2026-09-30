@@ -48,7 +48,6 @@ class ReleaseStatusScreen : Screen() {
         val navigator = LocalNavigator.currentOrThrow
         var state by remember { mutableStateOf(ReleaseStatusSnapshot()) }
         val preferences = remember { ReleasePreferences() }
-        val advance by preferences.advanceReminders.changes().collectAsState(preferences.advanceReminders.get())
         val reminders by preferences.reminders.changes().collectAsState(preferences.reminders.get())
         var canRemind by remember { mutableStateOf(ReleaseNotifications.canPost(context, ReleaseReminders.CHANNEL)) }
         var exact by remember { mutableStateOf(ReleaseReminders.exactAllowed(context)) }
@@ -135,18 +134,21 @@ class ReleaseStatusScreen : Screen() {
                             )
                             Text(stringResource(R.string.release_reminder_description))
                             Text(
-                                stringResource(
-                                    if (advance &&
-                                        reminders
-                                    ) {
-                                        R.string.release_advance_active
-                                    } else {
-                                        R.string.release_advance_inactive
-                                    },
-                                ),
+                                if (reminders) {
+                                    context.resources.getQuantityString(
+                                        R.plurals.release_reminder_times_count,
+                                        preferences.selectedReminders().size,
+                                        preferences.selectedReminders().size,
+                                    )
+                                } else {
+                                    stringResource(R.string.release_reminder_times_disabled)
+                                },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            TextButton(onClick = { navigator.push(ReleaseReminderSettingsScreen()) }) {
+                                Text(stringResource(R.string.release_reminder_times))
+                            }
                             if (!canRemind) Text(stringResource(R.string.release_notification_blocked))
                             TextButton(onClick = {
                                 ReleaseStatus.showTestNotification(context, ReleaseReminders.CHANNEL)

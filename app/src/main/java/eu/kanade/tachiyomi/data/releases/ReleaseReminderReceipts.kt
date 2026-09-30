@@ -11,7 +11,10 @@ class ReleaseReminderReceipts(private val db: AnimeDatabaseHandler = Injekt.get(
     }.toSet()
 
     suspend fun record(reminder: ReleaseReminder, now: Long) = db.await(inTransaction = true) {
-        reminder.keys.forEach { reminderReceiptQueries.recordReceipt(it, reminder.kind.name, now) }
+        reminder.keys.forEach {
+            reminderReceiptQueries.recordReceipt(it, reminder.kind.name, now)
+            reminderReceiptQueries.recordReceipt(it, reminder.timeReceipt, now)
+        }
         reminderReceiptQueries.pruneReceipts(now - 365 * ReleasePolicy.DAY)
     }
 }

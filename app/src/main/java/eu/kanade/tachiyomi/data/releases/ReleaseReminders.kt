@@ -32,6 +32,21 @@ import uy.kohesive.injekt.api.get
 object ReleaseReminders {
     const val CHANNEL = "release-reminders"
     private val mutex = Mutex()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** Saving a choice must finish rescheduling even when the settings screen is closed. */
+    fun reschedule(context: Context) {
+        val application = context.applicationContext
+        scope.launch {
+            try {
+                schedule(application)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // The durable preference is picked up by the existing foreground/periodic pass.
+            }
+        }
+    }
 
     fun exactAllowed(context: Context): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
         context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
@@ -56,7 +71,7 @@ object ReleaseReminders {
         val events = eligibleEvents()
         val now = System.currentTimeMillis()
         val receipts = ReleaseReminderReceipts()
-        val reminders = ReleaseReminderPlan.pending(events, receipts.delivered(), preferences.advanceReminders.get())
+        val reminders = ReleaseReminderPlan.pending(events, receipts.delivered(), preferences.selectedReminders())
         for (reminder in reminders) {
             if (reminder.at <= now) deliverDue(context, reminder, receipts, now)
         }

@@ -265,15 +265,11 @@ object SettingsLibraryScreen : SearchableSettings {
                         true
                     },
                 ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = eu.kanade.tachiyomi.data.releases.ReleasePreferences().advanceReminders,
-                    title = context.getString(eu.kanade.tachiyomi.R.string.release_advance_reminder),
-                    subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_advance_description),
-                    onValueChanged = {
-                        ContextCompat.getMainExecutor(context).execute {
-                            scope.launch { eu.kanade.tachiyomi.data.releases.ReleaseReminders.schedule(context) }
-                        }
-                        true
+                Preference.PreferenceItem.TextPreference(
+                    title = context.getString(eu.kanade.tachiyomi.R.string.release_reminder_times),
+                    subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_reminder_times_settings_summary),
+                    onClick = {
+                        navigator.push(eu.kanade.presentation.components.releases.ReleaseReminderSettingsScreen())
                     },
                 ),
                 Preference.PreferenceItem.TextPreference(

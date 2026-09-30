@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.time.ZoneId
 import java.time.ZonedDateTime
 
 class ReleaseReminderPlanTest {
@@ -14,8 +15,9 @@ class ReleaseReminderPlanTest {
     private fun plan(
         vararg events: AiringEvent,
         delivered: Set<Pair<String, String>> = emptySet(),
-        advance: Boolean = true,
-    ) = ReleaseReminderPlan.pending(events.toList(), delivered, advance)
+        selected: Set<ReleaseReminderKind> = setOf(ReleaseReminderKind.ADVANCE, ReleaseReminderKind.AIRING),
+        zone: ZoneId = ZoneId.of("Europe/Rome"),
+    ) = ReleaseReminderPlan.pending(events.toList(), delivered, selected, zone)
 
     @Test fun fallbackAloneSchedulesThePreviousDayAndTheBroadcast() {
         val reminders = plan(event())
@@ -24,7 +26,10 @@ class ReleaseReminderPlanTest {
     }
 
     @Test fun disablingAdvanceKeepsTheBroadcastReminder() {
-        assertEquals(ReleaseReminderKind.AIRING, plan(event(), advance = false).single().kind)
+        assertEquals(
+            ReleaseReminderKind.AIRING,
+            plan(event(), selected = setOf(ReleaseReminderKind.AIRING)).single().kind,
+        )
     }
 
     @Test fun duplicateEditionsNotifyOnceAndWatchingEitherCanSuppressTheGroup() {
@@ -106,6 +111,72 @@ class ReleaseReminderPlanTest {
         val airing = ZonedDateTime.parse("2026-10-25T12:00:00+01:00[Europe/Rome]").toInstant().toEpochMilli()
         val reminder = plan(event(time = airing)).first()
         assertEquals(24 * ReleasePolicy.HOUR, airing - reminder.at)
+    }
+
+    @Test fun localDaypartsAndOffsetsUseTheirOwnInstantsAcrossDaylightSaving() {
+        val zone = ZoneId.of("Europe/Rome")
+        val airing = ZonedDateTime.parse("2026-10-25T21:47:00+01:00[Europe/Rome]").toInstant().toEpochMilli()
+        val selected = ReleaseReminderKind.entries.toSet()
+        val reminders = plan(event(time = airing), selected = selected, zone = zone).associateBy { it.kind }
+        fun local(kind: ReleaseReminderKind) =
+            ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(reminders.getValue(kind).at), zone)
+        assertEquals(9, local(ReleaseReminderKind.DAY_BEFORE_MORNING).hour)
+        assertEquals(24, local(ReleaseReminderKind.DAY_BEFORE_MORNING).dayOfMonth)
+        assertEquals(15, local(ReleaseReminderKind.DAY_BEFORE_AFTERNOON).hour)
+        assertEquals(20, local(ReleaseReminderKind.DAY_BEFORE_EVENING).hour)
+        assertEquals(9, local(ReleaseReminderKind.SAME_DAY_MORNING).hour)
+        assertEquals(25, local(ReleaseReminderKind.SAME_DAY_MORNING).dayOfMonth)
+        assertEquals(15, local(ReleaseReminderKind.SAME_DAY_AFTERNOON).hour)
+        assertEquals(20, local(ReleaseReminderKind.SAME_DAY_EVENING).hour)
+        assertEquals(ReleasePolicy.HOUR, airing - reminders.getValue(ReleaseReminderKind.HOUR_BEFORE).at)
+        assertEquals(10 * ReleasePolicy.MINUTE, airing - reminders.getValue(ReleaseReminderKind.TEN_MINUTES_BEFORE).at)
+        assertEquals(5 * ReleasePolicy.MINUTE, airing - reminders.getValue(ReleaseReminderKind.FIVE_MINUTES_BEFORE).at)
+        assertEquals(2 * ReleasePolicy.MINUTE, airing - reminders.getValue(ReleaseReminderKind.TWO_MINUTES_BEFORE).at)
+        assertEquals(reminders.values.map { it.at }.toSet().size, reminders.size)
+    }
+
+    @Test fun fixedSameDayMomentsAfterTheReleaseAreNotScheduled() {
+        val airing = ZonedDateTime.parse("2026-11-01T14:00:00+01:00[Europe/Rome]").toInstant().toEpochMilli()
+        val selected = setOf(
+            ReleaseReminderKind.SAME_DAY_MORNING,
+            ReleaseReminderKind.SAME_DAY_AFTERNOON,
+            ReleaseReminderKind.SAME_DAY_EVENING,
+        )
+        assertEquals(
+            listOf(ReleaseReminderKind.SAME_DAY_MORNING),
+            plan(event(time = airing), selected = selected).map { it.kind },
+        )
+        val nine = ZonedDateTime.parse("2026-11-01T09:00:00+01:00[Europe/Rome]").toInstant().toEpochMilli()
+        assertTrue(
+            plan(event(time = nine), selected = setOf(ReleaseReminderKind.SAME_DAY_MORNING)).isEmpty(),
+        )
+    }
+
+    @Test fun equivalentChoicesAndPreferenceChangesNeverDeliverTwiceAtTheSameInstant() {
+        val airing = ZonedDateTime.parse("2026-11-01T20:00:00+01:00[Europe/Rome]").toInstant().toEpochMilli()
+        val selected = setOf(ReleaseReminderKind.ADVANCE, ReleaseReminderKind.DAY_BEFORE_EVENING)
+        val reminders = plan(event(time = airing), selected = selected)
+        assertEquals(1, reminders.size)
+        assertEquals(ReleaseReminderKind.ADVANCE, reminders.single().kind)
+        val receipt = reminders.single().keys.map { it to reminders.single().timeReceipt }.toSet()
+        assertTrue(plan(event(time = airing), delivered = receipt, selected = selected).isEmpty())
+        assertTrue(
+            plan(event(time = airing), delivered = receipt, selected = setOf(ReleaseReminderKind.DAY_BEFORE_EVENING))
+                .isEmpty(),
+        )
+    }
+
+    @Test fun shortCountdownNeverArrivesAfterAirTimeOrFarBehindSchedule() {
+        val ten = plan(event(), selected = setOf(ReleaseReminderKind.TEN_MINUTES_BEFORE)).single()
+        val two = plan(event(), selected = setOf(ReleaseReminderKind.TWO_MINUTES_BEFORE)).single()
+        assertFalse(ten.expired(ten.at + 4 * ReleasePolicy.MINUTE))
+        assertTrue(ten.expired(ten.at + 6 * ReleasePolicy.MINUTE))
+        assertFalse(two.expired(two.at + ReleasePolicy.MINUTE))
+        assertTrue(two.expired(at))
+    }
+
+    @Test fun choosingNoMomentsSchedulesNoReminder() {
+        assertTrue(plan(event(), selected = emptySet()).isEmpty())
     }
 
     @Test fun malformedOrUnknownDatesCannotScheduleAnAlarm() {
