@@ -88,6 +88,8 @@ AniSkip o associazioni di opere. Le Home conservano il loro merge per ID verific
 I budget restano consumati anche se un tentativo viene interrotto. La concorrenza
 di ricerca delle fonti resta quella esistente. Cambiare query cancella le attività
 precedenti e le risposte obsolete non aggiornano la schermata corrente.
+Anche nella ricerca della Home anime i risultati ricevuti compaiono mentre
+altre fonti stanno rispondendo, senza attendere il completamento dell'intero gruppo.
 
 Un aggiornamento della stessa ricerca riutilizza la variante già verificata
 nella fonte, senza ripetere la scoperta della correzione. Gli alias condivisi

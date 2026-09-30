@@ -6,8 +6,7 @@ import eu.kanade.tachiyomi.data.discovery.ExtensionHomeServices
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -184,9 +183,10 @@ class SourceHomeListScreenModel(
         }
         val responses = withContext(Dispatchers.IO) {
             coroutineScope {
-                eligible.map { provider ->
-                    async {
-                        try {
+                val completed = Channel<Result<SearchPage<Anime>>>(eligible.size.coerceAtLeast(1))
+                eligible.forEach { provider ->
+                    launch {
+                        val result = try {
                             val result = session.search(homeAdapter(provider, current, reset), page)
                             Result.success(result)
                         } catch (cancelled: CancellationException) {
@@ -194,12 +194,40 @@ class SourceHomeListScreenModel(
                         } catch (failure: Exception) {
                             Result.failure(failure)
                         }
+                        completed.send(result)
                     }
-                }.awaitAll()
+                }
+                val received = mutableListOf<Result<SearchPage<Anime>>>()
+                repeat(eligible.size) {
+                    received += completed.receive()
+                    val available = received.mapNotNull { it.getOrNull() }
+                    if (available.any { it.items.isNotEmpty() }) {
+                        // A slow source must not hold back its peers. Keep received rows in place.
+                        mutableState.update { state ->
+                            if (searchSession === session &&
+                                state.query == current.query &&
+                                state.filters == current.filters &&
+                                state.access == current.access
+                            ) {
+                                state.copy(items = mergeHomeCards(previous + available.flatMap { it.items }))
+                            } else {
+                                state
+                            }
+                        }
+                    }
+                }
+                received
             }
         }
         val successful = responses.mapNotNull { it.getOrNull() }
         mutableState.update { state ->
+            if (searchSession !== session ||
+                state.query != current.query ||
+                state.filters != current.filters ||
+                state.access != current.access
+            ) {
+                return@update state
+            }
             state.copy(
                 items = if (successful.isNotEmpty()) {
                     mergeHomeCards(previous + successful.flatMap { it.items })

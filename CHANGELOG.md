@@ -12,7 +12,7 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 
 - Home, Sfoglia, singole fonti e libreria riconoscono punteggiatura diversa,
   parole unite, refusi e alias, mantenendo il testo originale e i filtri.
-- Suggerimenti di titolo distinti dai risultati disponibili, recuperi limitati
+- Suggerimenti di titolo distinti dai risultati disponibili, risultati progressivi e recuperi limitati
   e comando per alternare ricerca esatta e intelligente.
 - Recupero automatico del candidato plausibile anche con alternative visibili;
   numeri del nome e delle parti conservati, con riconoscimento della prima
