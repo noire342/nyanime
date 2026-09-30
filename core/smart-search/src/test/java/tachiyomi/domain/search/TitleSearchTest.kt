@@ -205,6 +205,115 @@ class TitleSearchTest {
     }
 
     @Test
+    fun `numberless aliases do not create false ambiguity with the base work`() = runTest {
+        val base = title("Solar;Gate")
+        val side = title("Solar;Gate 0: Synthetic Side Story", aliases = listOf("Solar;Gate: Synthetic Side Story"))
+        val ranked = matcher.rank("slar gate", listOf(base, side))
+        ranked.first().item shouldBe base
+        (ranked.first().score - ranked.last().score >= 6) shouldBe true
+        val session = SearchSession("slar gate", SearchMedium.VIDEO, Provider(listOf(base, side)), matcher)
+        val adapter = Adapter { _, query ->
+            SearchPage(if (query == "Solar;Gate") listOf("Solar;Gate") else emptyList(), false)
+        }
+        session.search(adapter, 1).items shouldBe listOf("Solar;Gate")
+        session.assistance.value.correctedQuery shouldBe "Solar;Gate"
+    }
+
+    @Test
+    fun `shared aliases do not prove different canonical works are the same`() = runTest {
+        val titles = listOf(
+            title("Solar Gate", aliases = listOf("Golden Portal")),
+            title("Lunar Gate", aliases = listOf("Golden Portal")),
+        )
+        val session = SearchSession("golden portl", SearchMedium.VIDEO, Provider(titles), matcher)
+        val adapter = Adapter { _, variant ->
+            SearchPage(if (variant == "Golden Portal") listOf("Solar Gate", "Lunar Gate") else emptyList(), false)
+        }
+        session.search(adapter, 1).items.toSet() shouldBe setOf("Solar Gate", "Lunar Gate")
+        session.assistance.value.correctedQuery shouldBe "Golden Portal"
+        session.assistance.value.suggestions.toSet() shouldBe titles.toSet()
+        adapter.calls shouldBe listOf(1 to "golden portl", 1 to "Golden Portal")
+    }
+
+    @Test
+    fun `plausible alternatives recover results while keeping every suggestion visible`() = runTest {
+        val titles = listOf(title("Solar Gate"), title("Solar Gaze"))
+        val session = SearchSession("solar gte", SearchMedium.VIDEO, Provider(titles), matcher)
+        val adapter = Adapter { _, variant ->
+            SearchPage(if (variant == "Solar Gate") listOf("Solar Gate") else emptyList(), false)
+        }
+        session.search(adapter, 1).items shouldBe listOf("Solar Gate")
+        session.query shouldBe "solar gte"
+        session.assistance.value.suggestions.size shouldBe 2
+        session.assistance.value.correctedQuery shouldBe "Solar Gate"
+    }
+
+    @Test
+    fun `zero numbered work is recovered without accepting the unnumbered or another season`() = runTest {
+        val zero = "Solar;Gate 0: Synthetic Continuation"
+        val titles = listOf(title("Solar;Gate"), title(zero), title("Solar;Gate 2"))
+        val session = SearchSession("slar gate 0", SearchMedium.VIDEO, Provider(titles), matcher)
+        val adapter = Adapter { _, variant ->
+            SearchPage(if (variant == zero) listOf("Solar;Gate", zero, "Solar;Gate 2") else emptyList(), false)
+        }
+        session.search(adapter, 1).items shouldBe listOf(zero)
+        session.assistance.value.correctedQuery shouldBe zero
+        session.assistance.value.suggestions.map { it.title } shouldBe listOf(zero)
+    }
+
+    @Test
+    fun `trailing first season can retrieve the base title without discarding other numbers`() = runTest {
+        for ((query, base) in listOf(
+            "slar gate 1" to "Solar;Gate",
+            "slar gate season 1" to "Solar;Gate",
+            "slar gate stagione 1" to "Solar;Gate",
+            "synthetc protocol 47 1" to "Synthetic Protocol 47",
+        )) {
+            val session = SearchSession(query, SearchMedium.VIDEO, Provider(listOf(title(base))), matcher)
+            val adapter = Adapter { _, variant ->
+                SearchPage(if (variant == base) listOf(base, "Synthetic Protocol 48") else emptyList(), false)
+            }
+            session.search(adapter, 1).items shouldBe listOf(base)
+            session.assistance.value.correctedQuery shouldBe base
+            session.query shouldBe query
+        }
+        matcher.score("Solar Gate 0", "Solar Gate") shouldBe 0
+        matcher.score("Solar Gate 2", "Solar Gate") shouldBe 0
+        matcher.score("Solar1 Gate", "Solar Gate") shouldBe 0
+        matcher.score("Synthetic Protocol 48 1", "Synthetic Protocol 47") shouldBe 0
+        val index = SymSpellTitleIndex()
+        index.add(listOf(title("Solar;Gate"), title("Solar;Gate 1"), title("Solar;Gate 2")))
+        val ranked = matcher.rank("solar gate 1", index.candidates("solar gate 1", SearchMedium.VIDEO))
+        ranked.first().item.title shouldBe "Solar;Gate 1"
+        ranked.map { it.item.title } shouldBe listOf("Solar;Gate 1", "Solar;Gate")
+    }
+
+    @Test
+    fun `an actual first number in a name takes priority over the unnumbered interpretation`() = runTest {
+        val titles = listOf(title("Solar;Gate"), title("Solar;Gate 1"))
+        val session = SearchSession("slar gate 1", SearchMedium.VIDEO, Provider(titles), matcher)
+        val adapter = Adapter { _, variant ->
+            SearchPage(if (variant in listOf("Solar;Gate", "Solar;Gate 1")) listOf(variant) else emptyList(), false)
+        }
+        session.search(adapter, 1).items shouldBe listOf("Solar;Gate 1")
+        adapter.calls shouldBe listOf(1 to "slar gate 1", 1 to "Solar;Gate 1")
+    }
+
+    @Test
+    fun `anchors use the original intent rather than an unrelated subtitle word`() = runTest {
+        val full = "Aerial;Gate - A Chronicle Beyond Borders"
+        for (query in listOf("aeril gate", "aerilgate")) {
+            val session = SearchSession(query, SearchMedium.VIDEO, Provider(listOf(title(full))), matcher)
+            val adapter = Adapter { _, variant ->
+                SearchPage(if (variant == "aerial") listOf("Aerial;Gate (Translated)") else emptyList(), true)
+            }
+            session.search(adapter, 1).items shouldBe listOf("Aerial;Gate (Translated)")
+            adapter.calls shouldBe listOf(1 to query, 1 to full, 1 to "aerial")
+            session.search(adapter, 2).items shouldBe emptyList()
+        }
+    }
+
+    @Test
     fun `refresh reuses verified source spelling without exhausting discovery retries`() = runTest {
         val provider = Provider(listOf(title("Solar Gate", aliases = listOf("Golden Portal"))))
         val session = SearchSession("golden portl", SearchMedium.VIDEO, provider, matcher)

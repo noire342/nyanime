@@ -33,7 +33,8 @@ class CatalogSearchCandidates(private val client: OkHttpClient, private val json
     suspend fun fetch(query: String, medium: SearchMedium, budget: SearchRequestBudget): List<SearchTitle> {
         val found = mutableListOf<SearchTitle>()
         var failure: Exception? = null
-        val queries = listOf(query, TitleNormalizer.words(query)).distinct().take(2)
+        val base = TitleNormalizer.firstSeasonBase(query)
+        val queries = listOf(query, base ?: TitleNormalizer.words(query)).distinct().take(2)
         for (variant in queries) {
             if (!budget.take()) return found
             try {
@@ -47,7 +48,7 @@ class CatalogSearchCandidates(private val client: OkHttpClient, private val json
             }
         }
         try {
-            if (budget.take()) found += anilist(query, medium)
+            if (budget.take()) found += anilist(base ?: query, medium)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {

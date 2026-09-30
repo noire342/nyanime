@@ -14,8 +14,12 @@ solo i risultati ottenuti dall'estensione possono essere aperti.
 
 Quando una correzione recupera risultati, una nota indica il testo utilizzato.
 «Ricerca esatta» disattiva l'aiuto per quella query; «Usa ricerca intelligente»
-lo riattiva. Il testo digitato resta visibile. Candidati ambigui vengono proposti
-senza selezionare automaticamente un'opera. Filtri e categorie restano applicati.
+lo riattiva. Il testo digitato resta visibile. Il candidato plausibile meglio
+valutato viene usato anche per recuperare risultati, lasciando visibili le altre
+alternative: non occorre toccare un suggerimento per avviare il recupero.
+Questo non seleziona un'opera né modifica associazioni o tracking.
+Filtri e categorie restano applicati. Se la fonte non restituisce alcun titolo
+pertinente, l'app non trasforma i suggerimenti di catalogo in risultati fittizi.
 
 In **Impostazioni → Sfoglia → Ricerca intelligente** puoi disabilitare la
 tolleranza, disabilitare soltanto i suggerimenti online o cancellare la cache.
@@ -36,8 +40,19 @@ Il modulo [`core/smart-search`](../core/smart-search) separa:
 normalizzate, parole separate, forme compatte e una forma secondaria senza
 accenti latini. Numeri ed edizioni non vengono eliminati: cercare un nome numerato
 può proporre anche le sue parti successive, senza aggiungere automaticamente
-un numero di stagione alla query. Un numero diverso resta incompatibile. I titoli corti richiedono
-più prudenza. La distanza di modifica considera anche lettere invertite.
+un numero di stagione alla query. Un numero diverso resta incompatibile.
+Un alias senza numero non rende una parte numerata equivalente al titolo base.
+I titoli corti richiedono più prudenza. La distanza di modifica considera anche
+lettere invertite e refusi in un prefisso seguito da un sottotitolo.
+
+Un `1` separato alla fine, anche dopo «season» o «stagione», può indicare la
+prima stagione il cui numero non compare nel titolo. Il nome con quel numero
+ha precedenza; in sua assenza si può recuperare il titolo base, purché il nome
+completo sia una corrispondenza forte. Gli altri numeri rimangono invariati:
+`Synthetic Protocol 47 1` può recuperare `Synthetic Protocol 47`, ma non
+`Synthetic Protocol 48` o la sua seconda stagione. Un numero attaccato a una
+parola o nel mezzo del nome non viene eliminato. È un'interpretazione della
+query mostrata all'utente, non una prova di equivalenza tra opere.
 
 `SymSpellTitleIndex` usa SymSpellKt per recuperare candidati dal dizionario
 costruito durante l'uso. I candidati vengono verificati contro nomi completi:
@@ -75,7 +90,8 @@ di ricerca delle fonti resta quella esistente. Cambiare query cancella le attivi
 precedenti e le risposte obsolete non aggiornano la schermata corrente.
 
 Un aggiornamento della stessa ricerca riutilizza la variante già verificata
-  nella fonte, senza ripetere la scoperta della correzione.
+nella fonte, senza ripetere la scoperta della correzione. Gli alias condivisi
+possono recuperare più risultati, mantenendone distinte le identità.
 
 Ogni variante di query ha il proprio cursore. I tentativi su una sola parola
 significativa si fermano alla prima pagina: non aprono una scansione ampia.
@@ -105,7 +121,8 @@ Il motore restituisce uno stato esplicito quando l'aiuto non è disponibile.
 ## Verifiche e manutenzione
 
 I test versionati usano esclusivamente nomi sintetici. Coprono normalizzazione,
-refusi e alias, edizioni numerate, ambiguità, originali falliti, budget condivisi,
+refusi e alias, edizioni numerate, prima stagione implicita, ambiguità con
+recupero esplicito e alternative visibili, originali falliti, budget condivisi,
 paginazione interrotta, deduplicazione, offline e cache danneggiata.
 I parser dei cataloghi e la compatibilità dei metadati hanno test dedicati.
 
@@ -118,10 +135,10 @@ Il benchmark Android `TitleSearchBenchmark` costruisce 5.000 titoli sintetici
 senza rete. Misura ricerca più valutazione con obiettivo p95 inferiore a 100 ms;
 registra anche la variazione della memoria del processo, che include runtime e
 allocazioni temporanee e non equivale alla sola dimensione dell'indice.
-La prova del 30 settembre 2026 su Galaxy Z Flip6 (Android 16) ha ottenuto
-**p95 12,93 ms** su 100 campioni misurati dopo 20 di riscaldamento, includendo
+La prova del 1 ottobre 2026 su Galaxy Z Flip6 (Android 16) ha ottenuto
+**p95 15,66 ms** su 100 campioni misurati dopo 20 di riscaldamento, includendo
 query parziali senza numero e refusi su titoli numerati. La variazione misurata
-è 37.248 KiB di heap Java e 87.938 KiB di PSS del processo di prova, comprensivo
+è 37.248 KiB di heap Java e 85.956 KiB di PSS del processo di prova, comprensivo
 del corpus e del runtime: non è la memoria incrementale della sola app.
 Questa misura riguarda il motore locale, non latenza di rete o tempo di apertura
 delle estensioni. Le prove con contenuti reali restano locali, fuori dal repository.
@@ -133,8 +150,9 @@ delle estensioni. Le prove con contenuti reali restano locali, fuori dal reposit
 ```
 
 I layout devono essere verificati su dispositivo reale, anche con caratteri grandi.
-`SearchAssistanceBar` riserva spazio ai suggerimenti, mantiene i risultati durante
-i recuperi e usa `ModernMotion` per la comparsa delle informazioni. Non modifica
+`SearchAssistanceBar` riserva spazio al messaggio e ai suggerimenti anche prima
+della loro comparsa, adattandolo alla dimensione dei caratteri. Mantiene i risultati
+durante i recuperi e usa `ModernMotion` per la comparsa delle informazioni. Non modifica
 gli effetti di navigazione o il ciclo di vita del player.
 
 ## Licenza della dipendenza

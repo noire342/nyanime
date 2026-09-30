@@ -11,6 +11,12 @@ La libreria filtra localmente tramite `LibraryTitleSearch`; i provider HTTP e
 la persistenza Android sono nell'app. Non aggiungere qui regole per siti,
 tracking, player o corrispondenze di identità tra fonti.
 
+Le sessioni conservano la query originale e possono recuperare i risultati del
+candidato meglio valutato, mantenendo visibili le alternative. Numeri del nome
+e delle parti restano distinti; solo un `1` finale separato può indicare una
+prima stagione senza numero nel titolo. Il confronto completo e i vincoli
+numerici si applicano anche ai recuperi e alle pagine successive.
+
 ## Dipendenza e licenza
 
 SymSpellKt 3.4.0 è una dipendenza Gradle con licenza MIT, senza modifiche.

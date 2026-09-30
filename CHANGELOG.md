@@ -14,6 +14,9 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   parole unite, refusi e alias, mantenendo il testo originale e i filtri.
 - Suggerimenti di titolo distinti dai risultati disponibili, recuperi limitati
   e comando per alternare ricerca esatta e intelligente.
+- Recupero automatico del candidato plausibile anche con alternative visibili;
+  numeri del nome e delle parti conservati, con riconoscimento della prima
+  stagione quando il titolo base non la numera.
 - Aiuto online facoltativo dei cataloghi, cache locale cancellabile e nessuna
   nuova memorizzazione persistente in incognito. La libreria resta tutta locale.
 - Nessun aggiornamento obbligatorio delle estensioni e nessuna modifica automatica

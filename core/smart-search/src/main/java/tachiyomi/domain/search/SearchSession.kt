@@ -125,42 +125,37 @@ class SearchSession(
             }
             if (recovered != null) {
                 remember(recovered.items.map(adapter::title))
-                merged += recovered.items.filter { item ->
-                    adapter.title(item).names.any { name ->
-                        previousRecovery.expected.any {
-                            matcher.score(it, name) >=
-                                75
-                        }
-                    }
-                }
+                merged += recovered.items.filter { pertinent(adapter.title(it), previousRecovery.expected) }
                 branches += Cursor(previousRecovery.query, 2, recovered.hasNextPage && previousRecovery.canPage)
             }
         } else if (canAssist() &&
-            original.items.none { item -> adapter.title(item).names.any { matcher.score(query, it) >= 92 } }
+            original.items.none { matcher.rank(query, listOf(adapter.title(it))).any { it.score >= 92 } }
         ) {
             val candidates = suggestions()
             val ranked = matcher.rank(query, candidates)
             val first = ranked.firstOrNull()
-            val runnerUp = ranked.firstOrNull { candidate ->
-                candidate.item.names.none { name ->
-                    first?.item?.names?.any { TitleNormalizer.compact(it) == TitleNormalizer.compact(name) } == true
+            val interpretation = first?.item?.let { item ->
+                val numbers = TitleNormalizer.numericParts(item.title)
+                TitleNormalizer.firstSeasonBase(query)?.takeIf {
+                    !TitleNormalizer.preservesNumbers(TitleNormalizer.numericParts(query), numbers) &&
+                        numbers == TitleNormalizer.numericParts(it)
                 }
-            }
-            val confident =
-                first != null && first.score >= 85 && (runnerUp == null || first.score - runnerUp.score >= 6)
-            val corrected = if (confident) {
+            } ?: query
+            // Retrieve the best grounded spelling even when alternatives are plausible.
+            // All suggestions stay visible; this never selects or links a work for the user.
+            val corrected = if (first != null) {
                 requireNotNull(first).item.names
                     .filter { name ->
-                        TitleNormalizer.numericParts(name) == TitleNormalizer.numericParts(query) &&
+                        TitleNormalizer.numericParts(name) == TitleNormalizer.numericParts(interpretation) &&
                             (
                                 LexicalTitleMatcher.editDistance(
-                                    TitleNormalizer.compact(query),
+                                    TitleNormalizer.compact(interpretation),
                                     TitleNormalizer.compact(name),
                                     2,
                                 ) <= 2 ||
-                                    matcher.score(query, name) >= 85
+                                    matcher.score(interpretation, name) >= 85
                                 )
-                    }.maxByOrNull { matcher.score(query, it) }
+                    }.maxByOrNull { matcher.score(interpretation, it) }
             } else {
                 null
             }
@@ -168,13 +163,11 @@ class SearchSession(
                 corrected?.let(::add)
                 if (corrected != null &&
                     first != null &&
-                    TitleNormalizer.numericParts(first.item.title) == TitleNormalizer.numericParts(query)
+                    TitleNormalizer.numericParts(first.item.title) == TitleNormalizer.numericParts(interpretation)
                 ) {
                     add(first.item.title)
                 }
-                val anchor = TitleNormalizer.words(corrected ?: query).split(' ')
-                    .filter { it.length >= 4 && it.any(Char::isLetter) }.maxByOrNull { it.length }
-                if (anchor != null) add(anchor)
+                recoveryAnchor(corrected ?: first?.item?.title)?.let(::add)
             }.distinctBy { it.trim().lowercase() }.filter { it != query }.take(2)
             for (variant in attempts) {
                 val budget = synchronized(extraRequests) {
@@ -192,16 +185,20 @@ class SearchSession(
                 }
                 remember(recovered.items.map(adapter::title))
                 val namedVariant = corrected != null && variant in listOf(corrected, first?.item?.title)
-                val expected = if (namedVariant) listOfNotNull(corrected, variant) else listOf(corrected ?: query)
-                val pertinent = recovered.items.filter {
-                    val item = adapter.title(it)
-                    item.names.any { name -> expected.any { matcher.score(it, name) >= 75 } }
+                val expected = if (namedVariant) {
+                    listOfNotNull(corrected, variant, first?.item?.title) +
+                        ranked.filter { candidate ->
+                            candidate.item.names.any { TitleNormalizer.compact(it) == TitleNormalizer.compact(variant) }
+                        }.map { it.item.title }
+                } else {
+                    listOfNotNull(query, corrected)
                 }
-                merged += pertinent
+                val matches = recovered.items.filter { pertinent(adapter.title(it), expected) }
+                merged += matches
                 // An anchor is a single bounded probe, never a crawl of a broad catalog.
-                branches += Cursor(variant, 2, recovered.hasNextPage && pertinent.isNotEmpty() && namedVariant)
-                if (pertinent.isNotEmpty()) {
-                    mutableAssistance.update { it.copy(correctedQuery = variant) }
+                branches += Cursor(variant, 2, recovered.hasNextPage && matches.isNotEmpty() && namedVariant)
+                if (matches.isNotEmpty()) {
+                    mutableAssistance.update { it.copy(correctedQuery = corrected ?: variant) }
                     recoveredQueries[adapter.key] = RecoveredQuery(variant, expected, namedVariant)
                     break
                 }
@@ -212,7 +209,7 @@ class SearchSession(
         synchronized(displayed) { displayed[adapter.key] = unique.mapTo(mutableSetOf(), adapter::identity) }
         val ordered = if (canAssist()) {
             unique.sortedByDescending {
-                adapter.title(it).names.maxOfOrNull { name -> matcher.score(query, name) } ?: 0
+                matcher.rank(query, listOf(adapter.title(it))).firstOrNull()?.score ?: 0
             }
         } else {
             unique
@@ -239,11 +236,9 @@ class SearchSession(
             val filtered = if (branch.query == query) {
                 result.items
             } else {
-                result.items.filter {
-                    adapter.title(it).names.any { name ->
-                        matcher.score(branch.query, name) >= 75
-                    }
-                }
+                val expected = recoveredQueries[adapter.key]?.takeIf { it.query == branch.query }?.expected
+                    ?: listOf(branch.query)
+                result.items.filter { pertinent(adapter.title(it), expected) }
             }
             synchronized(displayed) {
                 val seen = displayed.getOrPut(adapter.key) { mutableSetOf() }
@@ -251,6 +246,36 @@ class SearchSession(
             }
         }
         return SearchPage(items, branches.any { it.more })
+    }
+
+    private fun recoveryAnchor(corrected: String?): String? {
+        val wanted = TitleNormalizer.words(query).split(' ')
+        val recognized = TitleNormalizer.words(corrected ?: query).split(' ')
+        val compact = TitleNormalizer.compact(query)
+        val joinedPrefix = recognized.indices.firstOrNull { index ->
+            LexicalTitleMatcher.editDistance(compact, recognized.take(index + 1).joinToString(""), 2) <= 2
+        }?.let { recognized.take(it + 1) }
+        val grounded = joinedPrefix ?: wanted.map { token ->
+            val limit = if (token.length < 4) {
+                0
+            } else if (token.length < 8) {
+                1
+            } else {
+                2
+            }
+            recognized.minByOrNull { LexicalTitleMatcher.editDistance(token, it, limit) }
+                ?.takeIf { LexicalTitleMatcher.editDistance(token, it, limit) <= limit } ?: token
+        }
+        return grounded.filter { it.length >= 4 && it.any(Char::isLetter) }.maxByOrNull { it.length }
+    }
+
+    private fun pertinent(item: SearchTitle, expected: List<String>): Boolean {
+        val numbers = TitleNormalizer.numericParts(item.title)
+        if (numbers.isNotEmpty() && !TitleNormalizer.compatibleNumbers(query, numbers)) {
+            return false
+        }
+        if (item.names.none { TitleNormalizer.compatibleNumbers(query, TitleNormalizer.numericParts(it)) }) return false
+        return expected.any { matcher.rank(it, listOf(item)).any { match -> match.score >= 75 } }
     }
 
     private suspend fun remember(items: List<SearchTitle>) {
