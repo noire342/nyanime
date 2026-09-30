@@ -61,12 +61,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.watch.WatchRecovery
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
 import eu.kanade.tachiyomi.data.watch.preparationCaption
 import eu.kanade.tachiyomi.data.watch.recovery
 import eu.kanade.tachiyomi.data.watch.showPreparationFeedback
 import eu.kanade.tachiyomi.ui.watch.WatchParticipantStrip
+import eu.kanade.tachiyomi.ui.watch.rememberRoomText
 import kotlin.math.PI
 import kotlin.math.floor
 import kotlin.math.sin
@@ -87,6 +89,7 @@ fun WatchPlaybackButton(
     onRetry: () -> Unit = {},
     showParticipants: Boolean = true,
 ) {
+    val text = rememberRoomText()
     val seconds = room.resumeSeconds?.takeIf { it > 0 }
     val preparing = room.showPreparationFeedback || loading
     val glyph = when {
@@ -99,12 +102,18 @@ fun WatchPlaybackButton(
     val details = room.recovery == WatchRecovery.Details
     val busy = glyph != PlaybackGlyph.Play && glyph != PlaybackGlyph.Pause || details
     val caption = when {
-        glyph == PlaybackGlyph.Countdown -> "Si parte insieme tra…"
-        else -> room.preparationCaption(loading)
+        glyph == PlaybackGlyph.Countdown -> text(R.string.room_starting)
+        else -> room.preparationCaption(text, loading)
     }
     val action = when (glyph) {
-        PlaybackGlyph.Retry -> "Riprova"
-        else -> if (room.wantsPlayback && !room.localHold) "Metti in pausa per tutti" else "Riproduci per tutti"
+        PlaybackGlyph.Retry -> text(R.string.room_retry)
+        else -> if (room.wantsPlayback &&
+            !room.localHold
+        ) {
+            text(R.string.room_pause_action)
+        } else {
+            text(R.string.room_play_action)
+        }
     }
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -134,7 +143,7 @@ fun WatchPlaybackButton(
                 )
                 .semantics(mergeDescendants = true) {
                     stateDescription = when {
-                        glyph == PlaybackGlyph.Countdown -> "Si parte insieme tra $seconds"
+                        glyph == PlaybackGlyph.Countdown -> text(R.string.room_start_seconds, seconds ?: 1)
                         busy -> caption
                         else -> action
                     }

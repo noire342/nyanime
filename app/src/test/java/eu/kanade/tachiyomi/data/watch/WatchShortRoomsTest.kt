@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.data.watch
 
+import eu.kanade.tachiyomi.data.watch.testRoomText
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -38,8 +39,13 @@ class WatchShortRoomsTest {
         val invite = WatchInvite.create(owner.publicKey, System.currentTimeMillis()).encode()
         var granted = ""
         val host =
-            WatchShortRooms(this, { _, _ -> error("Host must not join") }, network::open) { testScheduler.currentTime }
-        val guest = WatchShortRooms(this, { room, _ -> granted = room }, network::open) { testScheduler.currentTime }
+            WatchShortRooms(this, testRoomText, { _, _ ->
+                error("Host must not join")
+            }, network::open) { testScheduler.currentTime }
+        val guest =
+            WatchShortRooms(this, testRoomText, { room, _ ->
+                granted = room
+            }, network::open) { testScheduler.currentTime }
         host.host(invite, "Host")
         val code = host.state.value.code
         assertTrue(code.matches(Regex("[0-9]{8}")))

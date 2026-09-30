@@ -14,17 +14,19 @@ import eu.kanade.presentation.motion.posterSourcePlaceholder
 import eu.kanade.presentation.motion.rememberPosterSource
 import eu.kanade.presentation.privacy.nsfwPrivacy
 import eu.kanade.presentation.theme.LocalNyanimeStyle
+import eu.kanade.tachiyomi.R
 import tachiyomi.domain.discovery.homeItemKey
 import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
 import kotlin.math.absoluteValue
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 /** The extension supplies every title, image and synopsis; there is no catalogue resolution here. */
 @Composable
 fun SourceFeaturedCarousel(
     items: List<Anime>,
     refreshKey: Int = 0,
-    title: String = "In evidenza",
+    title: String = androidStringResource(R.string.home_featured),
     onBrowse: (() -> Unit)? = null,
     onSources: ((Anime) -> Unit)? = null,
     onClick: (Anime) -> Unit,
@@ -52,10 +54,10 @@ fun SourceFeaturedCarousel(
             ) {
                 CinematicHero(
                     title = anime.title,
-                    eyebrow = "$title · ${index + 1} di ${items.size}",
+                    eyebrow = androidStringResource(R.string.home_featured_position, title, index + 1, items.size),
                     metadata = (presentation?.badges.orEmpty() + presentation?.details.orEmpty()).joinToString(" · "),
                     description = anime.description,
-                    actionLabel = "Apri episodi",
+                    actionLabel = androidStringResource(R.string.home_open_episodes),
                     onOpen = openDetails,
                     onSources = onSources?.takeIf { presentation?.choices.orEmpty().size > 1 }?.let { action ->
                         { action(anime) }

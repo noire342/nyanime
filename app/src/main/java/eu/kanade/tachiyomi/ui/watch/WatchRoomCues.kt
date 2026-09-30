@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.google.zxing.common.BitMatrix
 import eu.kanade.presentation.discovery.ArtworkPlaceholder
 import eu.kanade.presentation.theme.LocalNyanimeStyle
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.watch.WatchQr
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
 import eu.kanade.tachiyomi.ui.player.controls.components.NextEpisodeCard
@@ -38,18 +39,19 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun WatchQrDialog(link: String, onDismiss: () -> Unit) {
+    val text = rememberRoomText()
     val matrix by produceState<BitMatrix?>(null, link) {
         value = withContext(Dispatchers.Default) { runCatching { WatchQr.encode(link) }.getOrNull() }
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Invita con il QR") },
+        title = { Text(text(R.string.room_qr_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Il tuo amico può inquadrarlo con la fotocamera e aprire l'invito in Nyanime.")
+                Text(text(R.string.room_qr_hint))
                 Canvas(
                     Modifier.fillMaxWidth().aspectRatio(1f).background(Color.White)
-                        .semantics { contentDescription = "QR dell'invito alla stanza" },
+                        .semantics { contentDescription = text(R.string.room_qr_description) },
                 ) {
                     matrix?.let { qr ->
                         val cell = size.width / qr.width
@@ -60,10 +62,10 @@ fun WatchQrDialog(link: String, onDismiss: () -> Unit) {
                         }
                     }
                 }
-                Text("Puoi sempre condividere o copiare il codice.", style = MaterialTheme.typography.bodySmall)
+                Text(text(R.string.room_qr_fallback), style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Chiudi") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(text(R.string.room_close_dialog)) } },
     )
 }
 
@@ -78,13 +80,14 @@ fun WatchRoomCues(
     reduceMotion: Boolean = false,
     artwork: @Composable () -> Unit = { ArtworkPlaceholder(Modifier.sizeIn(minWidth = 64.dp, minHeight = 88.dp)) },
 ) {
+    val text = rememberRoomText()
     val controls = room.host || room.sharedControls
     Column(modifier.widthIn(max = 440.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         room.skip?.let { skip ->
             if (LocalNyanimeStyle.current) {
                 PlayerSkipCue(
-                    label = if (controls) "Salta per tutti" else skip.label,
-                    detail = skip.label + (room.skipSeconds?.let { " · tra $it s" } ?: ""),
+                    label = if (controls) text(R.string.room_skip_all) else skip.label,
+                    detail = room.skipSeconds?.let { text(R.string.room_skip_countdown, skip.label, it) } ?: skip.label,
                     onSkip = onSkip,
                     onCancel = onCancelSkip,
                     showActions = controls,
@@ -93,17 +96,14 @@ fun WatchRoomCues(
                 Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            skip.label +
-                                (
-                                    room.skipSeconds?.let {
-                                        " tra " + it + " s"
-                                    } ?: ""
-                                    ),
+                            room.skipSeconds?.let { text(R.string.room_skip_countdown, skip.label, it) } ?: skip.label,
                             style = MaterialTheme.typography.titleMedium,
                         )
                         if (controls) {
-                            Button(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Salta per tutti") }
-                            TextButton(onClick = onCancelSkip) { Text("Annulla il salto") }
+                            Button(onClick = onSkip, modifier = Modifier.fillMaxWidth()) {
+                                Text(text(R.string.room_skip_all))
+                            }
+                            TextButton(onClick = onCancelSkip) { Text(text(R.string.room_cancel_skip)) }
                         }
                     }
                 }
@@ -116,7 +116,7 @@ fun WatchRoomCues(
                 secondsRemaining = room.nextSeconds ?: 10,
                 onPlayNow = onNext,
                 onCancel = onCancelNext,
-                statusText = if (room.nextSeconds == null) "Preparazione insieme…" else null,
+                statusText = if (room.nextSeconds == null) text(R.string.room_prepare_together) else null,
                 showActions = controls,
                 playEnabled = next.deadline != null,
                 reduceMotion = reduceMotion,

@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.motion.modernMotionEnabled
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.cast.CastController
 import eu.kanade.tachiyomi.data.watch.WatchOpeningState
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
@@ -76,6 +77,7 @@ internal fun WatchMiniBar(
     modifier: Modifier = Modifier,
     includeNavigationInsets: Boolean = false,
 ) {
+    val text = rememberRoomText()
     val colors = MaterialTheme.colorScheme
     Surface(
         modifier.fillMaxWidth(),
@@ -93,7 +95,13 @@ internal fun WatchMiniBar(
                 Modifier.weight(1f).clickable(
                     enabled = !opening.loading,
                     role = Role.Button,
-                    onClickLabel = if (room.media != null) "Torna al video" else "Apri la stanza",
+                    onClickLabel = if (room.media !=
+                        null
+                    ) {
+                        text(R.string.room_return_video)
+                    } else {
+                        text(R.string.room_open_room)
+                    },
                     onClick = onOpenPlayer,
                 ).padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -102,17 +110,17 @@ internal fun WatchMiniBar(
                 Icon(Icons.Default.PlayArrow, null, Modifier.size(32.dp), colors.primary)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(
-                        room.media?.title ?: "Guardiamo insieme",
+                        room.media?.title ?: text(R.string.room_watch_invitation),
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         when {
-                            opening.loading -> "Apriamo il video…"
-                            opening.error != null -> "Video non aperto · Tocca per riprovare"
-                            room.media != null -> "Torna al video · " + room.media.episode
-                            else -> "Scegli un episodio per la stanza"
+                            opening.loading -> text(R.string.room_opening_video)
+                            opening.error != null -> text(R.string.room_video_retry)
+                            room.media != null -> text(R.string.room_return_episode, room.media.episode)
+                            else -> text(R.string.room_choose_episode)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
@@ -125,7 +133,7 @@ internal fun WatchMiniBar(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
                         Icons.Default.Groups,
-                        "Apri la stanza: ${room.members.size} partecipanti",
+                        text(R.string.room_open_participants, room.members.size),
                         Modifier.size(22.dp),
                     )
                     Text(room.members.size.toString(), style = MaterialTheme.typography.labelSmall)

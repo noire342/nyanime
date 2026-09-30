@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
 import eu.kanade.domain.entries.anime.model.toDomainAnime
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.ui.player.PlayerActivity
@@ -46,6 +47,7 @@ private class WatchResolveFailure(val problem: WatchProblem, message: String) : 
  */
 class WatchTogetherManager private constructor(private val application: Application) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val text = RoomText.from(application)
     private val roomArchive = WatchRoomArchive(application)
     private val mutableRecoverable = MutableStateFlow(roomArchive.load() != null)
     val recoverable = mutableRecoverable.asStateFlow()
@@ -71,7 +73,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
             preferences.edit().putString("name", value.trim().take(32)).apply()
         }
 
-    val shortRooms = WatchShortRooms(scope, ::joinResolvedInvite)
+    val shortRooms = WatchShortRooms(scope, text, ::joinResolvedInvite)
     private fun joinResolvedInvite(invite: String, name: String) {
         playback.forgetDetached()
         controller.join(invite, name)
@@ -79,6 +81,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
 
     val controller = WatchRoomController(
         scope,
+        text,
         object : WatchPlayer {
             override fun sample(): WatchPlayback = currentPlayback()
             override fun pause(paused: Boolean) {
@@ -111,6 +114,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
 
     val reading = eu.kanade.tachiyomi.data.reading.ReadingRoomController(
         scope,
+        text,
         SystemClock::elapsedRealtime,
         roomArchive::update,
         controller::sendReading,
@@ -225,12 +229,12 @@ class WatchTogetherManager private constructor(private val application: Applicat
                 }
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 mutablePreparation.value =
-                    WatchOpeningState(error = "La fonte non ha risposto in tempo.", problem = WatchProblem.SourceError)
+                    WatchOpeningState(error = text(R.string.room_prepare_timeout), problem = WatchProblem.SourceError)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 mutablePreparation.value = WatchOpeningState(
-                    error = e.message ?: "Impossibile preparare il prossimo episodio.",
+                    error = e.message ?: text(R.string.room_next_prepare_failed),
                     problem = (e as? WatchResolveFailure)?.problem ?: WatchProblem.SourceError,
                 )
             }
@@ -348,7 +352,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
                 ) {
                     mutableOpening.value =
                         WatchOpeningState(
-                            error = "La fonte non ha risposto in tempo. Riprova.",
+                            error = text(R.string.room_source_timeout),
                             problem = WatchProblem.SourceError,
                         )
                 }
@@ -360,7 +364,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
                 mutableOpening.value = WatchOpeningState(
                     error =
                     (e as? IllegalArgumentException)?.message
-                        ?: "Non riesco a caricare l'episodio dalla tua fonte. Riprova.",
+                        ?: text(R.string.room_episode_load_failed),
                     problem = (e as? WatchResolveFailure)?.problem ?: WatchProblem.SourceError,
                 )
             }
@@ -374,15 +378,15 @@ class WatchTogetherManager private constructor(private val application: Applicat
             val source = sourceManager.get(media.sourceId)
                 ?: throw WatchResolveFailure(
                     WatchProblem.MissingSource,
-                    "Serve la stessa estensione del tuo amico, installata e attendibile.",
+                    text(R.string.room_extension_required),
                 )
             require(media.animeUrl.isNotBlank() && media.episodeUrl.isNotBlank()) {
-                "Questo contenuto non ha un riferimento condivisibile. L'host deve scegliere un titolo da un'estensione."
+                text(R.string.room_reference_missing)
             }
             require(
                 source is AnimeHttpSource && WatchCatalogReference.isAllowed(media.animeUrl, source.baseUrl),
             ) {
-                "Il riferimento al titolo non è compatibile con la tua estensione. Aggiornala e riprova."
+                text(R.string.room_title_reference_error)
             }
             val entry = SAnime.create().apply {
                 url = media.animeUrl
@@ -407,7 +411,7 @@ class WatchTogetherManager private constructor(private val application: Applicat
                             WatchMedia.normalize(it.name) == WatchMedia.normalize(media.episode)
                     }
             }
-            requireNotNull(episode) { "Episodio non disponibile nella tua estensione. Aggiornala e riprova." }
+            requireNotNull(episode) { text(R.string.room_episode_missing) }
             val local = media.copy(sourceId = source.id, animeUrl = anime.url, episodeUrl = episode.url)
             WatchSelection(media, local.key, anime.id, episode.id)
         }

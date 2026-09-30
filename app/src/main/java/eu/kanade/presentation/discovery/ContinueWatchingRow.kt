@@ -12,20 +12,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import eu.kanade.domain.base.BasePreferences
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.discovery.LocalHomeItem
 import eu.kanade.tachiyomi.data.discovery.ResumeVisibility
 import kotlinx.coroutines.launch
 import tachiyomi.domain.discovery.SectionState
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 @Composable
 fun ContinueWatchingRow(
     state: SectionState<List<LocalHomeItem>>,
     onOpen: (Long) -> Unit,
-    emptyMessage: String = "I titoli che guardi compariranno qui.",
+    emptyMessage: String = androidStringResource(R.string.home_resume_empty),
     onPlay: (LocalHomeItem) -> Unit,
 ) {
+    val hiddenMessage = androidStringResource(R.string.home_hidden_message)
+    val undoLabel = androidStringResource(R.string.room_cancel)
     val visibility = remember { Injekt.get<ResumeVisibility>() }
     val base = remember { Injekt.get<BasePreferences>() }
     val hidden by visibility.hidden.changes().collectAsState(initial = visibility.hidden.get())
@@ -41,7 +45,7 @@ fun ContinueWatchingRow(
                 visibility.hide(item.anime.id)
                 scope.launch {
                     snackbar.currentSnackbarData?.dismiss()
-                    if (snackbar.showSnackbar("Titolo nascosto. Cronologia conservata.", "Annulla") ==
+                    if (snackbar.showSnackbar(hiddenMessage, undoLabel) ==
                         SnackbarResult.ActionPerformed
                     ) {
                         visibility.restore(item.anime.id)
@@ -52,7 +56,9 @@ fun ContinueWatchingRow(
         )
         SnackbarHost(snackbar)
         if (!incognito && hidden.isNotEmpty()) {
-            TextButton(onClick = { visibility.restoreAll() }) { Text("Ripristina tutti i titoli nascosti") }
+            TextButton(onClick = {
+                visibility.restoreAll()
+            }) { Text(androidStringResource(R.string.home_restore_hidden)) }
         }
     }
 }

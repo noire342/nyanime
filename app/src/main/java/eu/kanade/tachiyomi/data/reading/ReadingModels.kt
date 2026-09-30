@@ -1,5 +1,7 @@
 package eu.kanade.tachiyomi.data.reading
 
+import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.watch.RoomText
 import eu.kanade.tachiyomi.data.watch.watchHash
 import eu.kanade.tachiyomi.data.watch.watchHex
 import eu.kanade.tachiyomi.data.watch.watchJson
@@ -75,6 +77,7 @@ data class ReadingEnvelope(
     val strokes: List<ReadingStroke> = emptyList(),
     val acknowledgement: Long = 0,
     val error: String = "",
+    val errorCode: String = "",
     val edits: List<ReadingEdit> = emptyList(),
     val digest: String = "",
 ) {
@@ -95,6 +98,7 @@ data class ReadingEnvelope(
         edits.all { it.valid() && it.page.pageKey == page?.pageKey } &&
         (digest.isEmpty() || digest.matches(Regex("[0-9a-f]{64}"))) &&
         error.length <= 240 &&
+        errorCode.length <= 32 &&
         watchJson.encodeToString(this).toByteArray().size <= 22000 &&
         when (kind) {
             ReadingKind.Presence -> peer != null
@@ -132,15 +136,15 @@ data class ReadingRoomState(
     val notice: String = "",
 ) {
     val others: Map<String, ReadingPeer> get() = members.filterKeys { it != localId }
-    val status: String get() = when {
+    fun status(text: RoomText): String = when {
         !active -> notice
-        relayCount == 0 -> "Riconnessione… puoi continuare a leggere"
-        !connected && members.isEmpty() -> "In attesa della stanza…"
-        !supported -> "Per leggere insieme, aggiornate Nyanime su entrambi i telefoni"
-        !connected -> "In attesa della stanza…"
-        pending.isNotEmpty() -> "${pending.size} schizzi in attesa"
-        others.isEmpty() -> "Invita qualcuno a leggere con te"
-        else -> "${members.size} lettori · ognuno al proprio ritmo"
+        relayCount == 0 -> text(R.string.room_reading_reconnecting)
+        !connected && members.isEmpty() -> text(R.string.room_reading_waiting)
+        !supported -> text(R.string.room_reading_update_required)
+        !connected -> text(R.string.room_reading_waiting)
+        pending.isNotEmpty() -> text(R.string.room_pending_sketches, pending.size)
+        others.isEmpty() -> text(R.string.room_invite_reader)
+        else -> text(R.string.room_reader_count, members.size)
     }
 
     fun strokes(page: ReadingPosition): List<ReadingStroke> {

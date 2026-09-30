@@ -72,6 +72,7 @@ import eu.kanade.presentation.motion.rememberPosterSource
 import eu.kanade.presentation.privacy.nsfwPrivacy
 import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.theme.LocalNyanimeStyle
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.discovery.LocalHomeItem
 import eu.kanade.tachiyomi.ui.privacy.PrivacyArea
 import tachiyomi.domain.discovery.CatalogAnime
@@ -84,6 +85,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 fun CatalogFeed.displayTitle(): String = when (this) {
     CatalogFeed.TRENDING -> "In tendenza"
@@ -139,9 +141,13 @@ fun SectionHeader(title: String, more: (() -> Unit)? = null) {
         )
         if (more != null) {
             TextButton(onClick = more) {
-                Text("Vedi tutti", maxLines = 1)
+                Text(androidStringResource(R.string.home_see_all), maxLines = 1)
                 Spacer(Modifier.width(4.dp))
-                Icon(Icons.AutoMirrored.Filled.ArrowForward, "Mostra tutti: $title", Modifier.size(18.dp))
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForward,
+                    androidStringResource(R.string.home_show_section, title),
+                    Modifier.size(18.dp),
+                )
             }
         }
     }
@@ -158,9 +164,18 @@ fun LoadNotice(
     if (loading && showLoadingIndicator) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
     if (stale || error != null) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-            if (stale) Text("Dati salvati · aggiornamento non disponibile", style = MaterialTheme.typography.labelSmall)
+            if (stale) {
+                Text(
+                    androidStringResource(R.string.home_saved_offline),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
             error?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            if (retry != null && !loading) TextButton(onClick = retry) { Text("Riprova") }
+            if (retry != null &&
+                !loading
+            ) {
+                TextButton(onClick = retry) { Text(androidStringResource(R.string.room_retry)) }
+            }
         }
     }
 }
@@ -207,7 +222,7 @@ fun PosterCard(
                 interactionSource = interaction,
                 indication = null,
                 role = Role.Button,
-                onClickLabel = "Apri $title",
+                onClickLabel = androidStringResource(R.string.home_open_named_title, title),
                 onClick = openDetails,
             ).padding(bottom = 8.dp),
     ) {
@@ -252,7 +267,7 @@ fun PosterCard(
                 }, modifier = Modifier.align(Alignment.TopEnd).posterForeground(poster)) {
                     Icon(
                         Icons.Outlined.Info,
-                        "Informazioni su $title",
+                        androidStringResource(R.string.home_title_information, title),
                         Modifier.background(Color.Black.copy(alpha = 0.72f), CircleShape).padding(3.dp),
                         tint = Color.White,
                     )
@@ -313,7 +328,12 @@ fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit)
             val openDetails = posterOpen(poster, anime.title) { onClick(anime) }
             CinematicHero(
                 title = anime.title,
-                eyebrow = "In evidenza · ${index + 1} di ${pager.pageCount}",
+                eyebrow = androidStringResource(
+                    R.string.home_featured_position,
+                    androidStringResource(R.string.home_featured),
+                    index + 1,
+                    pager.pageCount,
+                ),
                 metadata = listOfNotNull(
                     anime.score?.let {
                         "★ $it/100"
@@ -321,7 +341,7 @@ fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit)
                     anime.genres.joinToString(" · "),
                 ).joinToString(" · "),
                 description = anime.synopsis,
-                actionLabel = "Scopri il titolo",
+                actionLabel = androidStringResource(R.string.home_discover_title),
                 onOpen = openDetails,
                 poster = poster,
             ) {
@@ -344,7 +364,7 @@ fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit)
 fun LocalAnimeRow(
     state: SectionState<List<LocalHomeItem>>,
     onOpen: (LocalHomeItem) -> Unit,
-    emptyMessage: String = "Gli anime che segui compariranno qui.",
+    emptyMessage: String = androidStringResource(R.string.home_library_empty),
     onHide: ((LocalHomeItem) -> Unit)? = null,
     onPlay: (LocalHomeItem) -> Unit,
 ) {
@@ -376,7 +396,11 @@ fun LocalAnimeRow(
                     Column(Modifier.width(cardWidth).nsfwPrivacy(item.anime)) {
                         Box(
                             Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(14.dp))
-                                .clickable(role = Role.Button, onClickLabel = "Apri scheda", onClick = openDetails)
+                                .clickable(
+                                    role = Role.Button,
+                                    onClickLabel = androidStringResource(R.string.home_open_title_details),
+                                    onClick = openDetails,
+                                )
                                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                         ) {
                             SourceHomeArtwork(
@@ -401,7 +425,17 @@ fun LocalAnimeRow(
                             ) {
                                 Icon(
                                     Icons.Filled.PlayArrow,
-                                    (if (item.progress > 0) "Riprendi " else "Guarda ") + item.anime.title,
+                                    androidStringResource(
+                                        R.string.home_play_named_title,
+                                        if (item.progress >
+                                            0
+                                        ) {
+                                            androidStringResource(R.string.home_resume_action)
+                                        } else {
+                                            androidStringResource(R.string.home_watch_action)
+                                        },
+                                        item.anime.title,
+                                    ),
                                     Modifier.size(32.dp),
                                 )
                             }
@@ -422,13 +456,13 @@ fun LocalAnimeRow(
                             Column(
                                 Modifier.weight(1f).clickable(
                                     role = Role.Button,
-                                    onClickLabel = "Apri scheda",
+                                    onClickLabel = androidStringResource(R.string.home_open_title_details),
                                     onClick = openDetails,
                                 ),
                             ) {
                                 if (item.finale != null) {
                                     Text(
-                                        "PROSSIMO EPISODIO",
+                                        androidStringResource(R.string.home_next_episode),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary,
                                     )
@@ -458,18 +492,21 @@ fun LocalAnimeRow(
                                             ),
                                         )
                                     }) {
-                                        Text("Riprendi il finale")
+                                        Text(androidStringResource(R.string.home_resume_ending))
                                     }
                                 }
                             }
                             IconButton(onClick = openDetails, modifier = Modifier.size(48.dp)) {
-                                Icon(Icons.Outlined.Info, "Scheda di ${item.anime.title}")
+                                Icon(
+                                    Icons.Outlined.Info,
+                                    androidStringResource(R.string.home_named_details, item.anime.title),
+                                )
                             }
                             if (onHide != null) {
                                 IconButton(onClick = { onHide(item) }, modifier = Modifier.size(48.dp)) {
                                     Icon(
                                         Icons.Outlined.VisibilityOff,
-                                        "Nascondi ${item.anime.title} da Continua a guardare",
+                                        androidStringResource(R.string.home_hide_resume, item.anime.title),
                                     )
                                 }
                             }

@@ -8,6 +8,15 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 30 settembre 2026 — Traduzioni inglesi più complete
+
+- Stanze, inviti, QR, lettura condivisa e schizzi seguono la lingua dell’app,
+  inclusi messaggi di connessione, comandi nel player e notifica della stanza.
+- Tradotti anche i testi e i filtri della Home, le opzioni della sigla e dei comandi del player,
+  il download degli aggiornamenti nell’app e la visibilità dei manga in altre lingue.
+- L’italiano rimane disponibile; codici d’invito e riferimenti delle estensioni
+  conservano il formato esistente.
+
 ## 30 settembre 2026 — Collegamenti condivisi apribili dall’app
 
 - Schede, episodi con minutaggio e capitoli con pagina vengono condivisi con link

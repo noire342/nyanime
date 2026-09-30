@@ -25,6 +25,7 @@ import eu.kanade.presentation.more.settings.screen.appearance.AppLanguageScreen
 import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.theme.LocalDarkTheme
 import eu.kanade.presentation.theme.ThemeModeCards
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableMap
@@ -37,6 +38,7 @@ import tachiyomi.presentation.core.util.collectAsState
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.time.LocalDate
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 object SettingsAppearanceScreen : SearchableSettings {
 
@@ -134,8 +136,8 @@ object SettingsAppearanceScreen : SearchableSettings {
                 ),
                 Preference.PreferenceItem.SwitchPreference(
                     preference = uiPreferences.showMangaInOtherLanguages(),
-                    title = "Mostra manga in altre lingue",
-                    subtitle = "Vale per Home, ricerca, fonti, Libreria e novità. I manga nascosti restano salvati.",
+                    title = androidStringResource(R.string.nyanime_other_languages),
+                    subtitle = androidStringResource(R.string.nyanime_other_languages_hint),
                 ),
                 Preference.PreferenceItem.ListPreference(
                     preference = uiPreferences.tabletUiMode(),

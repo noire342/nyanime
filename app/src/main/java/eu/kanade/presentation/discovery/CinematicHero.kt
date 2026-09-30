@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.motion.PosterSource
 import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.motion.posterForeground
+import eu.kanade.tachiyomi.R
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 /** Artwork and actions stay owned by the existing catalogue/source integration. */
 @Composable
@@ -188,7 +190,7 @@ private fun HeroPrimaryAction(label: String, onOpen: () -> Unit, modifier: Modif
 private fun HeroSecondaryActions(onSources: (() -> Unit)?, onInformation: () -> Unit) {
     if (onSources != null) {
         IconButton(onClick = onSources, modifier = Modifier.background(Color.White.copy(alpha = 0.16f), CircleShape)) {
-            Icon(Icons.Outlined.SwapHoriz, "Scegli la fonte", tint = Color.White)
+            Icon(Icons.Outlined.SwapHoriz, androidStringResource(R.string.home_choose_source), tint = Color.White)
         }
     }
     IconButton(onClick = onInformation, modifier = Modifier.background(Color.White.copy(alpha = 0.16f), CircleShape)) {
@@ -233,7 +235,7 @@ internal fun CarouselPosition(page: Int, count: Int, onBrowse: (() -> Unit)? = n
         }
         if (onBrowse != null) {
             TextButton(onClick = onBrowse) {
-                Text("Vedi tutti", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(androidStringResource(R.string.home_see_all), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.size(8.dp))
                 Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(16.dp))
             }

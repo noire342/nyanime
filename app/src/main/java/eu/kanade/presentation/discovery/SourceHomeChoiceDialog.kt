@@ -26,9 +26,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import eu.kanade.tachiyomi.R
 import tachiyomi.domain.discovery.SourceHomeGroup
 import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 @Composable
 fun SourceHomeChoiceDialog(
@@ -42,7 +44,7 @@ fun SourceHomeChoiceDialog(
     var rememberSource by remember(anime.id) { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Scegli la fonte") },
+        title = { Text(androidStringResource(R.string.home_choose_source)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
@@ -94,10 +96,13 @@ fun SourceHomeChoiceDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Checkbox(checked = rememberSource, onCheckedChange = null)
-                    Text("Ricorda per questo titolo", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        androidStringResource(R.string.home_remember_title),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Chiudi") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(androidStringResource(R.string.room_close_dialog)) } },
     )
 }

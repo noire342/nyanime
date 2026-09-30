@@ -5,6 +5,7 @@ import com.google.zxing.DecodeHintType
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import com.google.zxing.qrcode.QRCodeReader
+import eu.kanade.tachiyomi.data.watch.testRoomText
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -120,7 +121,7 @@ class WatchCoordinationTest {
         val code = "01234567"
         val link = WatchShortRooms.link(code)
         assertEquals(code, WatchInvite.codeFromLink(link, 1_800_000_000_000L))
-        val shared = WatchShortRooms.shareText(code)
+        val shared = WatchShortRooms.shareText(code, testRoomText)
         assertTrue(shared.contains("Codice stanza: $code"))
         assertTrue(shared.contains(link))
         assertFalse(shared.contains("NY1."))

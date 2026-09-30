@@ -31,6 +31,7 @@ import eu.kanade.presentation.more.settings.widget.TextPreferenceWidget
 import eu.kanade.presentation.util.LocalBackPress
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.BuildConfig
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.updater.AppUpdateChecker
 import eu.kanade.tachiyomi.data.updater.RELEASE_URL
 import eu.kanade.tachiyomi.ui.more.NewUpdateScreen
@@ -59,6 +60,7 @@ import uy.kohesive.injekt.api.get
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 object AboutScreen : Screen() {
 
@@ -105,9 +107,8 @@ object AboutScreen : Screen() {
                 if (updaterEnabled) {
                     item {
                         SwitchPreferenceWidget(
-                            title = "Scarica e installa nell'app",
-                            subtitle = "Mostra avanzamento e pulsante Installa. " +
-                                "Android chiederà conferma.",
+                            title = androidStringResource(R.string.update_in_app),
+                            subtitle = androidStringResource(R.string.update_in_app_hint),
                             checked = inAppUpdates,
                             onCheckedChanged = uiPreferences.inAppUpdateInstallation()::set,
                         )

@@ -37,6 +37,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import eu.kanade.tachiyomi.data.watch.WatchActivity
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
+import eu.kanade.tachiyomi.ui.watch.rememberRoomText
 import tachiyomi.presentation.core.components.material.padding
 
 @Composable
@@ -49,6 +50,7 @@ fun TopLeftPlayerControls(
     activity: WatchActivity? = null,
     reduceMotion: Boolean = false,
 ) {
+    val text = rememberRoomText()
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
@@ -72,7 +74,7 @@ fun TopLeftPlayerControls(
                 style = MaterialTheme.typography.bodyLarge,
             )
             Crossfade(
-                targetState = (activity?.label ?: mediaTitle) to (activity != null),
+                targetState = (activity?.label(text) ?: mediaTitle) to (activity != null),
                 animationSpec = tween(if (reduceMotion) 0 else 180),
                 label = "episodeOrSharedAction",
             ) { (label, sharedAction) ->

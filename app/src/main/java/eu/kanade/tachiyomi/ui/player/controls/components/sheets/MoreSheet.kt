@@ -58,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.player.components.PlayerSheet
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.player.Anime4KMode
 import eu.kanade.tachiyomi.ui.player.Anime4KProfile
 import eu.kanade.tachiyomi.ui.player.Decoder
@@ -77,6 +78,7 @@ import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import androidx.compose.ui.res.stringResource as androidStringResource
 import tachiyomi.presentation.core.util.collectAsState as collectPreferenceAsState
 
 @Composable
@@ -149,29 +151,29 @@ fun MoreSheet(
             }
             SleepTimerEntry(remainingTime, onOpenSleepTimer, timerAtEpisodeEnd)
             eu.kanade.presentation.privacy.PlayerPrivacyEntry()
-            Text("Salto della sigla", style = MaterialTheme.typography.titleMedium)
+            Text(androidStringResource(R.string.player_intro_skip), style = MaterialTheme.typography.titleMedium)
             ShortcutPreference(
-                "Salta automaticamente (predefinito)",
+                androidStringResource(R.string.player_auto_skip_default),
                 globalAutoSkip,
                 playerPreferences.autoSkipIntro()::set,
             )
             if (anime != null) {
-                Text("Per questo anime", style = MaterialTheme.typography.bodyMedium)
+                Text(androidStringResource(R.string.player_for_this_anime), style = MaterialTheme.typography.bodyMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = animeAutoSkip == null,
                         onClick = { playerPreferences.setAutoSkipIntroOverride(anime, null) },
-                        label = { Text("Usa impostazione generale") },
+                        label = { Text(androidStringResource(R.string.player_use_global)) },
                     )
                     FilterChip(
                         selected = animeAutoSkip == true,
                         onClick = { playerPreferences.setAutoSkipIntroOverride(anime, true) },
-                        label = { Text("Salta") },
+                        label = { Text(androidStringResource(R.string.player_skip)) },
                     )
                     FilterChip(
                         selected = animeAutoSkip == false,
                         onClick = { playerPreferences.setAutoSkipIntroOverride(anime, false) },
-                        label = { Text("Non saltare") },
+                        label = { Text(androidStringResource(R.string.player_do_not_skip)) },
                     )
                 }
             }
@@ -183,32 +185,35 @@ fun MoreSheet(
                 if (qualityAvailable) {
                     OutlinedButton(onClick = onOpenQuality) {
                         Icon(Icons.Default.HighQuality, null)
-                        Text("Qualità video", Modifier.padding(start = 8.dp))
+                        Text(androidStringResource(R.string.player_video_quality), Modifier.padding(start = 8.dp))
                     }
                 }
                 OutlinedButton(onClick = onOpenScreenshot) {
                     Icon(Icons.Default.PhotoCamera, null)
-                    Text("Fotogramma", Modifier.padding(start = 8.dp))
+                    Text(androidStringResource(R.string.player_frame), Modifier.padding(start = 8.dp))
                 }
             }
             TextButton(onClick = { customizeControls = !customizeControls }) {
-                Text("Personalizza comandi")
+                Text(androidStringResource(R.string.player_customize_controls))
                 Icon(if (customizeControls) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null)
             }
             if (customizeControls) {
                 ShortcutPreference(
-                    "Mostra il tasto audio",
+                    androidStringResource(R.string.player_show_audio),
                     showAudioShortcut,
                     playerPreferences.showAudioShortcut()::set,
                 )
                 ShortcutPreference(
-                    "Mostra il tasto HQ",
+                    androidStringResource(R.string.player_show_quality),
                     showQualityShortcut,
                     playerPreferences.showQualityShortcut()::set,
                 )
             }
             TextButton(onClick = onOpenWatchTogether, modifier = Modifier.fillMaxWidth()) {
-                Text("Guarda insieme", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    androidStringResource(R.string.player_watch_together),
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
 
             Text(stringResource(AYMR.strings.player_hwdec_mode))

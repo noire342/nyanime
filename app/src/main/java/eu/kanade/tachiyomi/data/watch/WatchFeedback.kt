@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.data.watch
 
+import eu.kanade.tachiyomi.R
 import kotlinx.serialization.Serializable
 
 /** Optional host-authenticated presentation metadata; never an executable playback command. */
@@ -22,11 +23,11 @@ data class WatchActivity(
         value.isFinite() &&
         value in 0.0..86_400.0
 
-    val label: String get() = when (command) {
-        "pause" -> "$name ha messo in pausa"
-        "play" -> "$name ha premuto Play"
-        "seek" -> "$name è andato a ${watchPositionLabel(value)}"
-        "speed" -> "$name ha cambiato la velocità"
+    fun label(text: RoomText): String = when (command) {
+        "pause" -> text(R.string.room_actor_pause, name)
+        "play" -> text(R.string.room_actor_play, name)
+        "seek" -> text(R.string.room_actor_seek, name, watchPositionLabel(value))
+        "speed" -> text(R.string.room_actor_speed, name)
         else -> ""
     }
 }
@@ -60,28 +61,28 @@ val WatchRoomState.waitingFor: WatchMember? get() = members.firstOrNull {
     it.id != localMemberId && (!it.ready || it.buffering || it.problem != WatchProblem.None)
 }.takeIf { waitForEveryone || phase == WatchPhase.Buffering }
 
-fun WatchRoomState.preparationCaption(localLoading: Boolean = false): String = when {
-    commandFailed && recovery == WatchRecovery.Details -> "La stanza è in pausa"
-    commandFailed -> "Conferma non ricevuta. Tocca per riprovare"
-    recovery == WatchRecovery.Connection -> "Connessione interrotta. Tocca per riprovare"
-    phase == WatchPhase.Reconnecting || relayCount == 0 -> "Ritroviamo il collegamento…"
-    localHold -> "In pausa su questo telefono"
-    localLoading -> "Il tuo video sta caricando…"
+fun WatchRoomState.preparationCaption(text: RoomText, localLoading: Boolean = false): String = when {
+    commandFailed && recovery == WatchRecovery.Details -> text(R.string.room_paused)
+    commandFailed -> text(R.string.room_no_confirmation)
+    recovery == WatchRecovery.Connection -> text(R.string.room_connection_retry)
+    phase == WatchPhase.Reconnecting || relayCount == 0 -> text(R.string.room_reconnecting)
+    localHold -> text(R.string.room_local_pause)
+    localLoading -> text(R.string.room_local_loading)
     waitingFor != null -> {
         val friend = waitingFor!!
         when (friend.problem) {
-            WatchProblem.Connection -> "Aspettiamo ${friend.name}: si sta ricollegando"
+            WatchProblem.Connection -> text(R.string.room_wait_friend_reconnecting, friend.name)
             WatchProblem.MissingSource, WatchProblem.SourceError, WatchProblem.DifferentEdition ->
-                "${friend.name} deve controllare il video"
-            WatchProblem.LocalPause -> "${friend.name} è in pausa"
-            else -> "Aspettiamo ${friend.name}…"
+                text(R.string.room_friend_check_video, friend.name)
+            WatchProblem.LocalPause -> text(R.string.room_friend_paused, friend.name)
+            else -> text(R.string.room_wait_for_friend, friend.name)
         }
     }
     phase == WatchPhase.DifferentVideo -> if (recovery == WatchRecovery.Details) {
-        "Controlliamo l'episodio"
+        text(R.string.room_check_episode)
     } else {
-        "Prepariamo l'episodio della stanza…"
+        text(R.string.room_prepare_room_episode)
     }
-    preparingPlayback && members.size <= 1 -> "In attesa del tuo amico…"
-    else -> "Ci siamo quasi…"
+    preparingPlayback && members.size <= 1 -> text(R.string.room_waiting_friend)
+    else -> text(R.string.room_almost_ready)
 }

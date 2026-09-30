@@ -76,6 +76,8 @@ import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.player.components.PlayerSheet
 import eu.kanade.presentation.theme.TachiyomiTheme
+import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.watch.RoomText
 import eu.kanade.tachiyomi.data.watch.WatchInvite
 import eu.kanade.tachiyomi.data.watch.WatchOpeningState
 import eu.kanade.tachiyomi.data.watch.WatchPhase
@@ -85,6 +87,7 @@ import eu.kanade.tachiyomi.data.watch.WatchShortRooms
 import eu.kanade.tachiyomi.data.watch.WatchShortState
 import eu.kanade.tachiyomi.data.watch.WatchTogetherManager
 import eu.kanade.tachiyomi.data.watch.description
+import eu.kanade.tachiyomi.data.watch.roomMessage
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
 
 class WatchTogetherActivity : BaseActivity() {
@@ -95,7 +98,7 @@ class WatchTogetherActivity : BaseActivity() {
         if (intent.action != Intent.ACTION_VIEW) return
         val parsed = runCatching { WatchInvite.codeFromLink(intent.dataString.orEmpty(), System.currentTimeMillis()) }
         incomingCode = parsed.getOrDefault("")
-        inviteError = parsed.exceptionOrNull()?.message
+        inviteError = parsed.exceptionOrNull()?.roomMessage(RoomText.from(this))
         // Keep invitation secrets out of saved activity state and subsequent launches.
         intent.data = null
     }
@@ -114,12 +117,15 @@ class WatchTogetherActivity : BaseActivity() {
         WatchTogetherManager.get(this).present(this)
         setContent {
             TachiyomiTheme {
+                val text = rememberRoomText()
                 Scaffold(
                     topBar = {
                         TopAppBar(
-                            title = { Text("La nostra stanza") },
+                            title = { Text(text(R.string.room_title)) },
                             navigationIcon = {
-                                IconButton(onClick = ::finish) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Indietro") }
+                                IconButton(onClick = ::finish) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, text(R.string.room_back))
+                                }
                             },
                         )
                     },
@@ -158,9 +164,10 @@ fun WatchTogetherSheet(onDismiss: () -> Unit) {
 
 @Composable
 fun WatchTogetherButton() {
+    val text = rememberRoomText()
     val context = LocalContext.current
     IconButton(onClick = { context.startActivity(Intent(context, WatchTogetherActivity::class.java)) }) {
-        Icon(Icons.Default.Group, "Guarda insieme")
+        Icon(Icons.Default.Group, text(R.string.room_watch))
     }
 }
 
@@ -171,6 +178,7 @@ fun WatchTogetherPanel(
     inviteError: String? = null,
     onInviteConsumed: () -> Unit = {},
 ) {
+    val text = rememberRoomText()
     val context = LocalContext.current
     val manager = remember { WatchTogetherManager.get(context) }
     val room by manager.controller.state.collectAsState()
@@ -247,7 +255,7 @@ fun WatchTogetherPanel(
         onCopy = {
             context.getSystemService(
                 ClipboardManager::class.java,
-            ).setPrimaryClip(ClipData.newPlainText("Codice stanza", short.code))
+            ).setPrimaryClip(ClipData.newPlainText(text(R.string.room_code), short.code))
             copied = true
         },
         copied = copied,
@@ -255,9 +263,9 @@ fun WatchTogetherPanel(
             if (short.code.isNotBlank() && short.relayCount > 0 && room.relayCount > 0) {
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, WatchShortRooms.shareText(short.code))
+                    putExtra(Intent.EXTRA_TEXT, WatchShortRooms.shareText(short.code, text))
                 }
-                context.startActivity(Intent.createChooser(intent, "Invita un amico"))
+                context.startActivity(Intent.createChooser(intent, text(R.string.room_invite_friend)))
             }
         },
         onTogglePlayback = {
@@ -326,6 +334,7 @@ fun WatchTogetherContent(
     onResumeRoom: () -> Boolean = { false },
     onDiscardRoom: () -> Unit = {},
 ) {
+    val text = rememberRoomText()
     var joining by rememberSaveable { mutableStateOf(false) }
     var editingName by rememberSaveable { mutableStateOf(false) }
     var code by remember { mutableStateOf("") }
@@ -352,9 +361,13 @@ fun WatchTogetherContent(
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Default.Group, null, Modifier.size(30.dp), tint = colors.onPrimary) }
             Column(Modifier.weight(1f)) {
-                Text("Guarda insieme", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text(
-                    if (room.active) "La tua stanza" else "Video e manga, con chi vuoi.",
+                    text(R.string.room_watch),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    if (room.active) text(R.string.room_your_room) else text(R.string.room_intro),
                     color = colors.onSurfaceVariant,
                 )
             }
@@ -362,16 +375,16 @@ fun WatchTogetherContent(
         if (inviteError != null) Text(inviteError, color = colors.error)
         if (room.active && saveFailed) {
             Text(
-                "Le annotazioni non sono ancora salvate per il rientro. Riproveremo automaticamente.",
+                text(R.string.room_save_pending),
                 color = colors.error,
             )
         }
         if (room.active && incomingCode.isNotBlank() && incomingCode != room.invite && incomingCode != short.code) {
             Card {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Hai ricevuto un altro invito", style = MaterialTheme.typography.titleMedium)
-                    Text("Per entrare, lascerai questa stanza.", color = colors.onSurfaceVariant)
-                    Button(onClick = { onJoin(incomingCode) }) { Text("Cambia stanza") }
+                    Text(text(R.string.room_another_invite), style = MaterialTheme.typography.titleMedium)
+                    Text(text(R.string.room_switch_hint), color = colors.onSurfaceVariant)
+                    Button(onClick = { onJoin(incomingCode) }) { Text(text(R.string.room_switch)) }
                 }
             }
         }
@@ -383,7 +396,7 @@ fun WatchTogetherContent(
                 ) {
                     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            "In attesa di conferma",
+                            text(R.string.room_confirmation),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                         )
@@ -395,13 +408,13 @@ fun WatchTogetherContent(
                         LinearProgressIndicator(Modifier.fillMaxWidth())
                         Text(
                             if (short.relayCount > 0) {
-                                "Richiesta inviata. Il tuo amico deve accettare."
+                                text(R.string.room_request_sent)
                             } else {
                                 short.message
                             },
                             color = colors.onSurfaceVariant,
                         )
-                        TextButton(onClick = onCancelShort) { Text("Annulla") }
+                        TextButton(onClick = onCancelShort) { Text(text(R.string.room_cancel)) }
                     }
                 }
             }
@@ -409,17 +422,17 @@ fun WatchTogetherContent(
                 Card(shape = RoundedCornerShape(22.dp)) {
                     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            "Riprendi la tua stanza",
+                            text(R.string.room_resume_room),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                         )
-                        Text("La sessione precedente è ancora disponibile.", color = colors.onSurfaceVariant)
+                        Text(text(R.string.room_previous_session), color = colors.onSurfaceVariant)
                         Button(onClick = { resumeError = !onResumeRoom() }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Rientra")
+                            Text(text(R.string.room_rejoin))
                         }
-                        TextButton(onClick = onDiscardRoom) { Text("Elimina sessione") }
+                        TextButton(onClick = onDiscardRoom) { Text(text(R.string.room_discard_session)) }
                         if (resumeError) {
-                            Text("Impossibile rientrare. Puoi creare una nuova stanza.", color = colors.error)
+                            Text(text(R.string.room_rejoin_failed), color = colors.error)
                         }
                     }
                 }
@@ -443,15 +456,15 @@ fun WatchTogetherContent(
                 ) {
                     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text(
-                            if (joining) "Entra in una stanza" else "Crea una stanza",
+                            if (joining) text(R.string.room_join_title) else text(R.string.room_create_title),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
                             if (joining) {
-                                "Inserisci il codice ricevuto."
+                                text(R.string.room_enter_code)
                             } else {
-                                "Ricevi un codice da condividere con i tuoi amici."
+                                text(R.string.room_create_hint)
                             },
                             color = colors.onSurfaceVariant,
                         )
@@ -464,7 +477,17 @@ fun WatchTogetherContent(
                                 value = code,
                                 onValueChange = { code = WatchShortRooms.normalizeInput(it) },
                                 modifier = Modifier.fillMaxWidth(),
-                                label = { Text(if (code.length > 8) "Invito ricevuto" else "Codice a 8 cifre") },
+                                label = {
+                                    Text(
+                                        if (code.length >
+                                            8
+                                        ) {
+                                            text(R.string.room_received_invite)
+                                        } else {
+                                            text(R.string.room_eight_digit_code)
+                                        },
+                                    )
+                                },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = if (code.length > 8) KeyboardType.Text else KeyboardType.Number,
@@ -479,21 +502,21 @@ fun WatchTogetherContent(
                             enabled = !joining || canJoin,
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                             shape = RoundedCornerShape(14.dp),
-                        ) { Text(if (joining) "Chiedi di entrare" else "Crea stanza") }
+                        ) { Text(if (joining) text(R.string.room_request_join) else text(R.string.room_create)) }
                         TextButton(onClick = { joining = !joining }, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (joining) "Crea una stanza invece" else "Ho già un codice")
+                            Text(if (joining) text(R.string.room_create_instead) else text(R.string.room_have_code))
                         }
                     }
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Nome: ${name.ifBlank { "Spettatore" }}",
+                        text(R.string.room_name_label, name.ifBlank { text(R.string.room_viewer) }),
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.onSurfaceVariant,
                     )
                     TextButton(onClick = { editingName = !editingName }) {
-                        Text(if (editingName) "Fine" else "Modifica")
+                        Text(if (editingName) text(R.string.room_done) else text(R.string.room_edit))
                     }
                 }
                 AnimatedVisibility(
@@ -505,7 +528,7 @@ fun WatchTogetherContent(
                         value = name,
                         onValueChange = onName,
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Il tuo nome") },
+                        label = { Text(text(R.string.room_your_name)) },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                     )
@@ -520,7 +543,11 @@ fun WatchTogetherContent(
                 ) {
                     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Invita un amico", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text(R.string.room_invite_friend),
+                                Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
                             TextButton(onClick = onQr, enabled = invitationsReady) { Text("QR") }
                         }
                         SelectionContainer {
@@ -533,7 +560,7 @@ fun WatchTogetherContent(
                         }
                         Text(
                             when {
-                                invitationsReady -> "Codice temporaneo · approvi tu chi entra"
+                                invitationsReady -> text(R.string.room_temporary_code)
                                 room.relayCount == 0 -> room.message
                                 else -> short.message
                             },
@@ -550,11 +577,11 @@ fun WatchTogetherContent(
                                     null,
                                     Modifier.size(18.dp),
                                 )
-                                Text(if (copied) " Copiato" else " Copia")
+                                Text(if (copied) text(R.string.room_copied) else text(R.string.room_copy))
                             }
                             Button(onClick = onShare, enabled = invitationsReady, modifier = Modifier.weight(1f)) {
                                 Icon(Icons.Default.Share, null, Modifier.size(18.dp))
-                                Text(" Condividi")
+                                Text(text(R.string.room_share))
                             }
                         }
                     }
@@ -564,22 +591,24 @@ fun WatchTogetherContent(
                 Card(shape = RoundedCornerShape(22.dp)) {
                     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            "Vuole entrare",
+                            text(R.string.room_join_requests),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                         )
                         short.requests.forEach { request ->
                             Text("${request.name} · ${request.id.takeLast(6)}")
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Button(onClick = { onApproveShort(request.id) }) { Text("Accetta") }
-                                OutlinedButton(onClick = { onRejectShort(request.id) }) { Text("Rifiuta") }
+                                Button(onClick = { onApproveShort(request.id) }) { Text(text(R.string.room_accept)) }
+                                OutlinedButton(onClick = {
+                                    onRejectShort(request.id)
+                                }) { Text(text(R.string.room_reject)) }
                             }
                         }
                     }
                 }
             }
             OutlinedButton(onClick = onRead, modifier = Modifier.fillMaxWidth()) {
-                Text("Leggi insieme")
+                Text(text(R.string.room_read))
             }
             Card(
                 colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh),
@@ -587,7 +616,8 @@ fun WatchTogetherContent(
             ) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        room.media?.title ?: if (room.host) "Scegli cosa guardare" else "Il tuo amico sta scegliendo…",
+                        room.media?.title
+                            ?: if (room.host) text(R.string.room_choose_watch) else text(R.string.room_friend_choosing),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
@@ -600,9 +630,11 @@ fun WatchTogetherContent(
                     }
                     Text(
                         opening.error ?: when {
-                            opening.loading -> "Apro l'episodio dalla tua estensione…"
-                            room.preparingPlayback -> room.playbackPreparationMessage
-                            room.host && room.relayCount > 0 && short.relayCount == 0 -> "Preparo gli inviti…"
+                            opening.loading -> text(R.string.room_opening_episode)
+                            room.preparingPlayback -> room.playbackPreparationMessage(text)
+                            room.host && room.relayCount > 0 && short.relayCount == 0 -> text(
+                                R.string.room_preparing_invites,
+                            )
                             else -> room.message
                         },
                         color = if (opening.error != null) colors.error else colors.onSurfaceVariant,
@@ -617,21 +649,31 @@ fun WatchTogetherContent(
                                 onResync
                             },
                         ) {
-                            Text(if (opening.problem == WatchProblem.MissingSource) "Apri estensioni" else "Riprova")
+                            Text(
+                                if (opening.problem ==
+                                    WatchProblem.MissingSource
+                                ) {
+                                    text(R.string.room_open_extensions)
+                                } else {
+                                    text(R.string.room_retry)
+                                },
+                            )
                         }
                     }
                     if (room.host &&
                         room.media == null
                     ) {
-                        Button(onClick = onChooseVideo) { Text("Scegli un video") }
+                        Button(onClick = onChooseVideo) { Text(text(R.string.room_choose_video)) }
                     }
                     if (room.media != null && onOpenPlayer != null) {
-                        OutlinedButton(onClick = onOpenPlayer, enabled = !opening.loading) { Text("Apri il player") }
+                        OutlinedButton(onClick = onOpenPlayer, enabled = !opening.loading) {
+                            Text(text(R.string.room_open_player))
+                        }
                     }
                 }
             }
             if (room.members.isNotEmpty()) {
-                Text("Nella stanza · " + room.members.size + "/8", style = MaterialTheme.typography.titleSmall)
+                Text(text(R.string.room_member_count, room.members.size), style = MaterialTheme.typography.titleSmall)
                 room.members.forEachIndexed { index, member ->
                     val participant: @Composable (Modifier) -> Unit = { nameModifier ->
                         Text(member.name + if (index == 0) " · Host" else "", nameModifier)
@@ -639,22 +681,25 @@ fun WatchTogetherContent(
                     val status: @Composable () -> Unit = {
                         Text(
                             if (member.problem != WatchProblem.None) {
-                                member.problem.description()
+                                member.problem.description(text)
                             } else if (member.buffering) {
-                                "Caricamento"
+                                text(R.string.room_loading)
                             } else if (room.prebuffering && member.ready) {
                                 member.bufferedAheadSeconds?.let {
-                                    "Precaricati ${it.coerceAtMost(15)}/15 s"
-                                } ?: "Precaricamento in corso"
+                                    text(R.string.room_buffered, it.coerceAtMost(15))
+                                } ?: text(R.string.room_prebuffering)
                             } else if (member.reading) {
-                                "Sta leggendo"
+                                text(R.string.room_reading)
                             } else if (member.ready && member.positionSeconds != null) {
                                 val seconds = member.positionSeconds.toInt().coerceAtLeast(0)
-                                "Sta guardando · ${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+                                text(
+                                    R.string.room_watch_position,
+                                    "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}",
+                                )
                             } else if (member.ready) {
-                                "Pronto"
+                                text(R.string.room_ready)
                             } else {
-                                "In attesa"
+                                text(R.string.room_waiting)
                             },
                             style = MaterialTheme.typography.labelMedium,
                             color = if (member.ready && !member.buffering) colors.primary else colors.onSurfaceVariant,
@@ -675,7 +720,7 @@ fun WatchTogetherContent(
             }
             WatchRoomCues(room, onSkip, onCancelSkip, onNext, onCancelNext)
             if (preparation.error != null) {
-                Text("Prossimo episodio: " + preparation.error, color = colors.error)
+                Text(text(R.string.room_next_error, preparation.error), color = colors.error)
                 TextButton(
                     onClick = if (preparation.problem ==
                         WatchProblem.MissingSource
@@ -689,9 +734,9 @@ fun WatchTogetherContent(
                         if (preparation.problem ==
                             WatchProblem.MissingSource
                         ) {
-                            "Apri estensioni"
+                            text(R.string.room_open_extensions)
                         } else {
-                            "Riprova preparazione"
+                            text(R.string.room_retry_preparation)
                         },
                     )
                 }
@@ -720,51 +765,49 @@ fun WatchTogetherContent(
                     )
                     Text(
                         when {
-                            !room.sharedControls && !room.host -> " Torna alla visione"
-                            room.wantsPlayback && !room.localHold -> " Pausa per tutti"
-                            else -> " Riprendi insieme"
+                            !room.sharedControls && !room.host -> text(R.string.room_return_watch)
+                            room.wantsPlayback && !room.localHold -> text(R.string.room_pause_all)
+                            else -> text(R.string.room_resume_together)
                         },
                     )
                 }
             }
             TextButton(onClick = {
                 options = !options
-            }) { Text(if (options) "Nascondi opzioni" else "Opzioni della stanza") }
+            }) { Text(if (options) text(R.string.room_hide_options) else text(R.string.room_options)) }
             AnimatedVisibility(options, enter = fadeIn(tween(motionDuration)), exit = fadeOut(tween(motionDuration))) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (room.host) {
-                        WatchOption("Tutti possono usare i comandi", room.sharedControls, onSharedControls)
-                        WatchOption("Metti tutti in pausa se uno carica", room.waitForEveryone, onWaitForEveryone)
-                        WatchOption("Precarica prima di partire", room.prebufferOnStart, onPrebufferOnStart)
+                        WatchOption(text(R.string.room_shared_controls), room.sharedControls, onSharedControls)
+                        WatchOption(text(R.string.room_wait_for_everyone), room.waitForEveryone, onWaitForEveryone)
+                        WatchOption(text(R.string.room_prebuffer), room.prebufferOnStart, onPrebufferOnStart)
                         if (room.prebufferOnStart) {
                             Text(
-                                "Fino a 15 secondi di video per persona, caricati in parallelo. " +
-                                    "Se la fonte non mostra il progresso, attesa breve; massimo 15 secondi se carica lentamente.",
+                                text(R.string.room_prebuffer_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.onSurfaceVariant,
                             )
                         }
                         if (!room.waitForEveryone) {
                             Text(
-                                "Se l'amico carica, il tuo video prosegue fino a 5 secondi; poi vi fermate insieme.",
+                                text(R.string.room_buffer_grace_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.onSurfaceVariant,
                             )
                         }
                     }
                     Text(
-                        "Connessioni attive: " +
-                            room.relayCount +
-                            (room.latencyMs?.let { " · Ritardo " + it + " ms" } ?: ""),
+                        text(R.string.room_connections, room.relayCount) +
+                            (room.latencyMs?.let { text(R.string.room_latency, it) } ?: ""),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.onSurfaceVariant,
                     )
-                    TextButton(onClick = onResync) { Text("Riallinea adesso") }
+                    TextButton(onClick = onResync) { Text(text(R.string.room_resync)) }
                 }
             }
             HorizontalDivider()
             TextButton(onClick = onLeave, modifier = Modifier.fillMaxWidth()) {
-                Text(if (room.host) "Chiudi la stanza" else "Lascia la stanza", color = colors.error)
+                Text(if (room.host) text(R.string.room_close) else text(R.string.room_leave), color = colors.error)
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -785,21 +828,22 @@ private fun WatchOption(label: String, checked: Boolean, onChange: (Boolean) -> 
 
 @Composable
 fun WatchRoomChip(room: WatchRoomState, onClick: () -> Unit) {
+    val text = rememberRoomText()
     if (room.active) {
         AssistChip(
             onClick = onClick,
             label = {
                 Text(
                     when {
-                        room.resumeSeconds != null -> "Ripartenza tra ${room.resumeSeconds}"
-                        room.preparingPlayback -> "Guarda insieme · Preparazione…"
-                        room.phase == WatchPhase.Playing -> "Insieme · " + room.members.size
+                        room.resumeSeconds != null -> text(R.string.room_resume_countdown, room.resumeSeconds)
+                        room.preparingPlayback -> text(R.string.room_chip_preparing)
+                        room.phase == WatchPhase.Playing -> text(R.string.room_together_count, room.members.size)
                         room.phase in listOf(
                             WatchPhase.Connecting,
                             WatchPhase.Reconnecting,
-                        ) -> "Guarda insieme · Connessione…"
-                        room.phase == WatchPhase.Buffering -> "Guarda insieme · Caricamento…"
-                        else -> "Guarda insieme · In pausa"
+                        ) -> text(R.string.room_chip_connecting)
+                        room.phase == WatchPhase.Buffering -> text(R.string.room_chip_loading)
+                        else -> text(R.string.room_chip_paused)
                     },
                 )
             },

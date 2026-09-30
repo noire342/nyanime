@@ -28,6 +28,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.common.Constants
 import eu.kanade.tachiyomi.ui.more.DownloadQueueState
 import eu.kanade.tachiyomi.ui.more.ReadyAppUpdateSurface
+import eu.kanade.tachiyomi.ui.watch.rememberRoomText
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.ScrollbarLazyColumn
@@ -55,6 +56,7 @@ fun MoreScreen(
     onClickSettings: () -> Unit,
     onClickAbout: () -> Unit,
 ) {
+    val text = rememberRoomText()
     val uriHandler = LocalUriHandler.current
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -74,8 +76,8 @@ fun MoreScreen(
             }
             item {
                 TextPreferenceWidget(
-                    title = "Guarda e leggi insieme",
-                    subtitle = "Una stanza per video, manga e schizzi condivisi",
+                    title = text(R.string.room_more_title),
+                    subtitle = text(R.string.room_more_hint),
                     icon = Icons.Outlined.PeopleOutline,
                     onPreferenceClick = {
                         context.startActivity(

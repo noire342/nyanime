@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.data.watch
 
+import eu.kanade.tachiyomi.R
 import kotlinx.serialization.Serializable
 import java.text.Normalizer
 import java.util.Locale
@@ -162,16 +163,16 @@ data class WatchRoomState(
         wantsPlayback &&
         phase != WatchPhase.Playing &&
         resumeSeconds == null
-    val playbackPreparationMessage: String get() = when {
-        pendingPlaybackPaused == false -> "Richiesta di riproduzione inviata…"
+    fun playbackPreparationMessage(text: RoomText): String = when {
+        pendingPlaybackPaused == false -> text(R.string.room_request_play_sent)
         phase in listOf(
             WatchPhase.Connecting,
             WatchPhase.Reconnecting,
             WatchPhase.Buffering,
             WatchPhase.DifferentVideo,
         ) ->
-            message.ifBlank { "Preparazione della riproduzione…" }
-        else -> "Verifica che tutti siano pronti…"
+            message.ifBlank { text(R.string.room_prepare_playback) }
+        else -> text(R.string.room_checking_ready)
     }
 }
 

@@ -77,6 +77,7 @@ import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.privacy.nsfwPrivacy
 import eu.kanade.presentation.privacy.privacyRegion
 import eu.kanade.presentation.util.formatChapterNumber
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.discovery.MangaGenreLabels
 import eu.kanade.tachiyomi.data.discovery.MangaHomeChapter
@@ -87,6 +88,7 @@ import tachiyomi.domain.discovery.SourceHomeSection
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.history.manga.model.MangaHistoryWithRelations
 import tachiyomi.domain.updates.manga.model.MangaUpdatesWithRelations
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 @Composable
 fun MangaHomeContent(
@@ -138,12 +140,12 @@ fun MangaHomeContent(
     if (genresOpen) {
         ModalBottomSheet(onDismissRequest = { genresOpen = false }) {
             Column(Modifier.imePadding().padding(horizontal = 20.dp)) {
-                Text("Tutti i generi", style = MaterialTheme.typography.headlineSmall)
+                Text(androidStringResource(R.string.home_all_genres), style = MaterialTheme.typography.headlineSmall)
                 OutlinedTextField(
                     value = genreQuery,
                     onValueChange = { genreQuery = it },
                     modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                    placeholder = { Text("Cerca un genere") },
+                    placeholder = { Text(androidStringResource(R.string.home_search_genre)) },
                     singleLine = true,
                     leadingIcon = { Icon(Icons.Outlined.Search, null) },
                 )
@@ -196,7 +198,7 @@ fun MangaHomeContent(
                             }
                             if (categories.size > 8) {
                                 item {
-                                    HomeGenreChip("Tutti i generi") { genresOpen = true }
+                                    HomeGenreChip(androidStringResource(R.string.home_all_genres)) { genresOpen = true }
                                 }
                             }
                             items(categories, key = { MangaGenreLabels.key(it) }) { category ->
@@ -279,9 +281,9 @@ fun MangaHomeContent(
                                                         if (featuredItem.presentation?.chapters?.isNotEmpty() ==
                                                             true
                                                         ) {
-                                                            "Leggi ora"
+                                                            androidStringResource(R.string.home_manga_read)
                                                         } else {
-                                                            "Apri manga"
+                                                            androidStringResource(R.string.home_open_manga)
                                                         },
                                                     )
                                                     Spacer(Modifier.width(6.dp))
@@ -332,7 +334,7 @@ fun MangaHomeContent(
                             modifier = Modifier.privacyRegion(PrivacyArea.RESUME),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            SectionTitle("Continua a leggere")
+                            SectionTitle(androidStringResource(R.string.home_continue_reading))
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 20.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -383,8 +385,10 @@ fun MangaHomeContent(
                                 Modifier.fillMaxWidth().padding(end = 20.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                SectionTitle("Le tue novità", Modifier.weight(1f))
-                                TextButton(onClick = onUpdates) { Text("Vedi tutte") }
+                                SectionTitle(androidStringResource(R.string.home_your_updates), Modifier.weight(1f))
+                                TextButton(onClick = onUpdates) {
+                                    Text(androidStringResource(R.string.home_see_all_updates))
+                                }
                             }
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 20.dp),
@@ -417,7 +421,7 @@ fun MangaHomeContent(
                                                     color = MaterialTheme.colorScheme.primary,
                                                 )
                                                 Text(
-                                                    "Leggi ora  →",
+                                                    androidStringResource(R.string.home_manga_read_arrow),
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
@@ -432,7 +436,7 @@ fun MangaHomeContent(
                 if (state.offline) {
                     item("offline") {
                         Text(
-                            "Modalità Solo scaricati: apri la biblioteca per leggere i capitoli sul dispositivo.",
+                            androidStringResource(R.string.home_downloaded_manga_hint),
                             Modifier.padding(20.dp),
                         )
                     }
@@ -472,14 +476,19 @@ fun MangaHomeContent(
                             item("error:" + section.id) {
                                 Column(Modifier.padding(horizontal = 20.dp)) {
                                     Text(row.error, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    OutlinedButton(onClick = { onRetry(section.id) }) { Text("Riprova") }
+                                    OutlinedButton(onClick = {
+                                        onRetry(section.id)
+                                    }) { Text(androidStringResource(R.string.room_retry)) }
                                 }
                             }
                         }
                         val entries = row?.page?.items.orEmpty()
                         if (entries.isEmpty() && row?.page != null && row.error == null) {
                             item("empty:" + section.id) {
-                                Text("Nessun contenuto in questa sezione.", Modifier.padding(horizontal = 20.dp))
+                                Text(
+                                    androidStringResource(R.string.home_section_empty),
+                                    Modifier.padding(horizontal = 20.dp),
+                                )
                             }
                         }
                         if (rail) {
@@ -565,7 +574,15 @@ fun MangaHomeContent(
                                     enabled = !row.loading,
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
-                                    Text(if (row.loading) "Caricamento…" else "Mostra altri")
+                                    Text(
+                                        if (row.loading) {
+                                            androidStringResource(
+                                                R.string.home_loading,
+                                            )
+                                        } else {
+                                            androidStringResource(R.string.home_more)
+                                        },
+                                    )
                                 }
                             }
                         }
@@ -653,7 +670,7 @@ private fun MangaUpdateCard(
                     TextButton(
                         onClick = onManga,
                         contentPadding = PaddingValues(horizontal = 0.dp),
-                    ) { Text("Apri manga") }
+                    ) { Text(androidStringResource(R.string.home_open_manga)) }
                 }
             }
         }
@@ -745,7 +762,7 @@ private fun Artwork(data: Any, title: String, modifier: Modifier = Modifier) {
                 failed = false
                 retry++
             }, modifier = Modifier.align(Alignment.Center)) {
-                Icon(Icons.Outlined.Refresh, contentDescription = "Ricarica copertina")
+                Icon(Icons.Outlined.Refresh, contentDescription = androidStringResource(R.string.home_reload_cover))
             }
         }
     }

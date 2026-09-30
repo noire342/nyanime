@@ -20,7 +20,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import eu.kanade.tachiyomi.R
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 /** Compact cards retain their complete extension metadata in an accessible information sheet. */
 @Composable
@@ -69,7 +71,7 @@ internal fun TitleInformationSheet(
                 },
                 enabled = !opening,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Apri scheda completa") }
+            ) { Text(androidStringResource(R.string.home_open_details)) }
         }
     }
 }

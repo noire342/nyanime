@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.data.watch
 
+import eu.kanade.tachiyomi.data.watch.testRoomText
 import kotlinx.serialization.encodeToString
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -30,8 +31,8 @@ class WatchFeedbackTest {
 
     @Test
     fun waitingCaptionDistinguishesLocalLoadingAndTheActualFriend() {
-        assertEquals("Aspettiamo Marco…", waiting.preparationCaption())
-        assertEquals("Il tuo video sta caricando…", waiting.preparationCaption(localLoading = true))
+        assertEquals("Aspettiamo Marco…", waiting.preparationCaption(testRoomText))
+        assertEquals("Il tuo video sta caricando…", waiting.preparationCaption(testRoomText, localLoading = true))
         assertEquals("Marco", waiting.copy(waitForEveryone = false).waitingFor?.name)
         assertEquals(null, waiting.copy(waitForEveryone = false, phase = WatchPhase.Playing).waitingFor)
         assertEquals(WatchRecovery.None, waiting.copy(waitingSeconds = 14).recovery)
@@ -57,7 +58,7 @@ class WatchFeedbackTest {
         val message = WatchMessage(type = WatchMessageType.Timeline, sequence = 1, at = 1000, activity = activity)
         assertTrue(message.valid())
         assertEquals(activity, watchJson.decodeFromString<WatchMessage>(watchJson.encodeToString(message)).activity)
-        assertEquals("Marco è andato a 1:01:01", activity.label)
+        assertEquals("Marco è andato a 1:01:01", activity.label(testRoomText))
         assertFalse(activity.copy(value = Double.NaN).valid())
         assertFalse(activity.copy(command = "unknown").valid())
         assertFalse(activity.copy(name = "x".repeat(33)).valid())

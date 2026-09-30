@@ -6,6 +6,7 @@ import eu.kanade.domain.entries.manga.model.toDomainManga
 import eu.kanade.domain.entries.manga.model.toSManga
 import eu.kanade.domain.items.chapter.interactor.SyncChaptersWithSource
 import eu.kanade.domain.source.manga.interactor.GetMangaIncognitoState
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.releases.ReleaseMedium
 import eu.kanade.tachiyomi.data.releases.ReleaseUpdateGate
 import eu.kanade.tachiyomi.data.watch.WatchCatalogReference
@@ -62,6 +63,7 @@ class ReadingTogetherManager private constructor(context: Context) {
     val watch = WatchTogetherManager.get(context)
     val controller get() = watch.reading
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val text = eu.kanade.tachiyomi.data.watch.RoomText.from(context)
     private val preferences = context.getSharedPreferences("reading_together", Context.MODE_PRIVATE)
     private val savedReturn = runCatching {
         eu.kanade.tachiyomi.data.watch.watchJson.decodeFromString<ReadingBookmark>(
@@ -224,7 +226,7 @@ class ReadingTogetherManager private constructor(context: Context) {
             } catch (e: CancellationException) {
                 if (e is kotlinx.coroutines.TimeoutCancellationException) {
                     fail(
-                        "La fonte non risponde. Il tuo punto è al sicuro: riprova.",
+                        text(R.string.room_reading_source_error),
                     )
                 } else {
                     throw e
@@ -232,7 +234,7 @@ class ReadingTogetherManager private constructor(context: Context) {
             } catch (e: Exception) {
                 fail(
                     (e as? IllegalArgumentException)?.message
-                        ?: "Non riesco ad aprire questa pagina. Riprova dalla stanza.",
+                        ?: text(R.string.room_page_open_failed),
                 )
             } finally {
                 mutableTools.value = tools.value.copy(opening = false)
@@ -283,19 +285,19 @@ class ReadingTogetherManager private constructor(context: Context) {
 
     private suspend fun resolveCatalog(position: ReadingPosition): ReadingBookmark = withContext(Dispatchers.IO) {
         require(!Injekt.get<GetMangaIncognitoState>().await(position.source)) {
-            "Disattiva la modalità incognito per condividere questa lettura."
+            text(R.string.room_incognito_reading)
         }
         val sources = Injekt.get<MangaSourceManager>()
         sources.isInitialized.first { it }
         val source = sources.get(position.source) as? HttpSource
             ?: throw IllegalArgumentException(
-                "Per raggiungere questa pagina serve la stessa estensione, installata e attendibile.",
+                text(R.string.room_reading_extension_required),
             )
         require(
             WatchCatalogReference.isAllowed(position.manga, source.baseUrl) &&
                 WatchCatalogReference.isAllowed(position.chapter, source.baseUrl),
         ) {
-            "Il riferimento non è compatibile con la tua estensione. Aggiornatela su entrambi i telefoni."
+            text(R.string.room_reading_reference_error)
         }
         val manga = Injekt.get<NetworkToLocalManga>().await(
             SManga.create().apply {
@@ -319,7 +321,7 @@ class ReadingTogetherManager private constructor(context: Context) {
             chapter = chapters.await(manga.id).singleOrNull { it.url == position.chapter }
         }
         requireNotNull(chapter) {
-            "Questo capitolo non è disponibile nella stessa edizione. Aprilo dalla tua libreria: non sceglierò un capitolo diverso."
+            text(R.string.room_chapter_edition_error)
         }
         ReadingBookmark(manga.id, chapter.id, position)
     }

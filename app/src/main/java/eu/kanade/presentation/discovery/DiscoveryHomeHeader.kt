@@ -63,7 +63,9 @@ import eu.kanade.presentation.motion.posterForeground
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.theme.NyanimeWordmark
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
+import eu.kanade.tachiyomi.R
 import tachiyomi.domain.discovery.SourceHomeGroup
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 @Composable
 fun DiscoveryHomeHeader(
@@ -103,7 +105,9 @@ fun DiscoveryHomeHeader(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (onBack != null) {
-                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Indietro") }
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, androidStringResource(R.string.home_back))
+                        }
                     }
                     SourceHomeWordmark(
                         logo,
@@ -144,14 +148,17 @@ private fun HomeHeaderActions(
             ) { visible ->
                 if (visible) {
                     IconButton(onClick = { onUpdates?.invoke() }) {
-                        Icon(Icons.Outlined.Adjust, contentDescription = "Vai alle tue novità")
+                        Icon(Icons.Outlined.Adjust, contentDescription = androidStringResource(R.string.home_updates))
                     }
                 }
             }
         }
         eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
         Box(Modifier.width(if (compactSearch) 48.dp else 96.dp).height(48.dp), contentAlignment = Alignment.Center) {
-            val description = "Cerca " + (homes.firstOrNull { it.id == selectedHome }?.title ?: "anime")
+            val description = androidStringResource(
+                R.string.home_search_category,
+                homes.firstOrNull { it.id == selectedHome }?.title ?: androidStringResource(R.string.home_anime),
+            )
             if (compactSearch) {
                 IconButton(onClick = { onSearch?.invoke() }, enabled = onSearch != null) {
                     Icon(Icons.Outlined.Search, contentDescription = description)
@@ -173,7 +180,11 @@ private fun HomeHeaderActions(
                         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                     ) {
                         Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Text("Cerca", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                        Text(
+                            androidStringResource(R.string.home_search),
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                        )
                     }
                 }
             }
@@ -253,7 +264,10 @@ private fun HomeContentSwitch(
                                                         onPrioritizeCategory(category)
                                                     }
                                                 },
-                                                onLongClickLabel = "Sposta ${category.title} all'inizio",
+                                                onLongClickLabel = androidStringResource(
+                                                    R.string.home_prioritize,
+                                                    category.title,
+                                                ),
                                             )
                                             .semantics {
                                                 role = Role.Tab

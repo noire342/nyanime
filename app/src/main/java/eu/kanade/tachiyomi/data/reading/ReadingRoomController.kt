@@ -1,5 +1,7 @@
 package eu.kanade.tachiyomi.data.reading
 
+import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.watch.RoomText
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
 import eu.kanade.tachiyomi.data.watch.watchHex
 import eu.kanade.tachiyomi.data.watch.watchRandom
@@ -13,6 +15,7 @@ import kotlinx.coroutines.launch
 /** A reading channel in the existing room, with no player reference and no second transport. */
 class ReadingRoomController(
     private val scope: CoroutineScope,
+    private val text: RoomText,
     private val now: () -> Long,
     private val onDocumentChanged: (List<ReadingEdit>) -> Unit = {},
     private val send: (ReadingEnvelope, String) -> Unit,
@@ -20,7 +23,7 @@ class ReadingRoomController(
     private val mutableState = MutableStateFlow(ReadingRoomState())
     val state = mutableState.asStateFlow()
     private var ticker: Job? = null
-    private var local = ReadingPeer("Lettore")
+    private var local = ReadingPeer(text(R.string.room_reader))
     private var lastRoster = 0L
     private var operation = 0L
     private var revision = 0L
@@ -214,7 +217,7 @@ class ReadingRoomController(
         }
         if (!crdt.apply(edit)) {
             mutableState.value =
-                state.value.copy(notice = "Questa stanza ha raggiunto il limite delle annotazioni temporanee.")
+                state.value.copy(notice = text(R.string.room_annotation_limit))
             return false
         }
         updateCrdtBoard(edit.page)
@@ -237,7 +240,7 @@ class ReadingRoomController(
         if (state.value.pending.size >= 16) {
             mutableState.value =
                 state.value.copy(
-                    notice = "Ci sono schizzi in attesa. Aspetta la riconnessione prima di aggiungerne altri.",
+                    notice = text(R.string.room_pending_sketches_hint),
                 )
             return false
         }
@@ -308,7 +311,14 @@ class ReadingRoomController(
                         head.page?.pageKey == page.pageKey &&
                         envelope.acknowledgement >= head.operation
                     ) {
-                        mutableState.value = state.value.copy(pending = pending.drop(1), notice = envelope.error)
+                        mutableState.value = state.value.copy(
+                            pending = pending.drop(1),
+                            notice = if (envelope.errorCode == "page_sketch_limit") {
+                                text(R.string.room_page_sketch_limit)
+                            } else {
+                                envelope.error
+                            },
+                        )
                         state.value.pending.firstOrNull()?.let { send(it, "") }
                     }
                 }
@@ -464,7 +474,7 @@ class ReadingRoomController(
             value.stroke != null -> {
                 if (value.stroke.author != sender) return
                 if (strokes.size >= 12) {
-                    error = "Questa pagina ha già 12 schizzi. Cancella qualcosa prima di continuare."
+                    error = text(R.string.room_page_sketch_limit)
                 } else if (strokes.none { it.id == value.stroke.id }) {
                     strokes.add(value.stroke)
                 }
@@ -508,6 +518,7 @@ class ReadingRoomController(
                 strokes = board.strokes,
                 acknowledgement = ack,
                 error = error,
+                errorCode = if (error.isNotBlank()) "page_sketch_limit" else "",
             ),
             target,
         )

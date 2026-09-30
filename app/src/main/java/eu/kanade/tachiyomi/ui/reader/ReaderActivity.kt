@@ -738,7 +738,7 @@ class ReaderActivity : BaseActivity() {
      * this case the activity is closed and a toast is shown to the user.
      */
     private fun setInitialChapterError(error: Throwable) {
-        readingTogether.fail(error.message ?: "Impossibile aprire il capitolo. Il tuo punto è conservato nella stanza.")
+        readingTogether.fail(error.message ?: getString(R.string.room_chapter_open_failed))
         logcat(LogPriority.ERROR, error)
         finish()
         toast(error.message)
@@ -829,7 +829,7 @@ class ReaderActivity : BaseActivity() {
                 readingTogether.arrived(bookmark)
             }
         } else {
-            readingTogether.fail("Hai cambiato capitolo durante l'apertura. Riprova dalla stanza.")
+            readingTogether.fail(getString(R.string.room_chapter_changed))
         }
     }
 

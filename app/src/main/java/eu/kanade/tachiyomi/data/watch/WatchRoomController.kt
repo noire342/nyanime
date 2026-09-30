@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.data.watch
 
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.reading.ReadingEnvelope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -17,6 +18,7 @@ import kotlin.math.roundToLong
  */
 class WatchRoomController(
     private val scope: CoroutineScope,
+    private val text: RoomText,
     private val player: WatchPlayer,
     private val now: () -> Long,
     private val wallMillis: () -> Long = System::currentTimeMillis,
@@ -140,7 +142,7 @@ class WatchRoomController(
             val room = makeInvite(identity)
             val network = transportFactory(room, identity)
             reset()
-            name = displayName.trim().take(32).ifBlank { "Spettatore" }
+            name = displayName.trim().take(32).ifBlank { text(R.string.room_viewer) }
             invite = room
             transport = network
             originalSpeed = sample.speed.takeIf { it.isFinite() }?.coerceIn(0.25, 3.0) ?: 1.0
@@ -154,7 +156,7 @@ class WatchRoomController(
                 host = host,
                 invite = room.encode(),
                 media = if (host) sample.media else null,
-                message = "Connessione alla stanza…",
+                message = text(R.string.room_connection_start),
                 localMemberId = network.publicKey,
                 readingSupported = host,
                 readingVersion = if (host) 2 else 0,
@@ -189,7 +191,7 @@ class WatchRoomController(
             transport = null
             mutableState.value = WatchRoomState(
                 phase = WatchPhase.Failed,
-                message = (e as? IllegalArgumentException)?.message ?: "Impossibile aprire la stanza. Riprova.",
+                message = (e as? IllegalArgumentException)?.roomMessage(text) ?: text(R.string.room_open_failed),
             )
         }
     }
@@ -341,7 +343,7 @@ class WatchRoomController(
         if (!active || readingMode) return false
         if (!value.isFinite()) return true
         if (!state.value.host && !state.value.sharedControls) {
-            mutableState.value = state.value.copy(message = "I comandi sono gestiti da chi ha creato la stanza.")
+            mutableState.value = state.value.copy(message = text(R.string.room_host_controls))
             return true
         }
         if (action == "play" && state.value.localHold) return true
@@ -408,7 +410,7 @@ class WatchRoomController(
             "play" -> if (!state.value.localHold) {
                 desiredPaused = false
                 mutableState.value =
-                    state.value.copy(playRequested = true, message = "Preparazione della riproduzione…")
+                    state.value.copy(playRequested = true, message = text(R.string.room_prepare_playback))
                 pausedBy = ""
             }
             "skip" -> {
@@ -452,7 +454,7 @@ class WatchRoomController(
                     ++activitySequence,
                     now(),
                     actorId,
-                    actor.ifBlank { "Spettatore" }.take(32),
+                    actor.ifBlank { text(R.string.room_viewer) }.take(32),
                     request.command,
                     media.key,
                     if (request.command == "speed") request.speed else request.position,
@@ -551,7 +553,7 @@ class WatchRoomController(
             return
         }
         if (incoming.coordinationVersion != 2) {
-            stop(WatchPhase.Failed, "Per guardare insieme aggiornate Nyanime su entrambi i telefoni.")
+            stop(WatchPhase.Failed, text(R.string.room_update_required))
             return
         }
         if (incoming.sequence <= (departed[sender] ?: 0L)) return
@@ -598,7 +600,7 @@ class WatchRoomController(
             }
             WatchMessageType.Timeline -> if (isOwner) {
                 if (incoming.peers.size >= 8 && transport?.publicKey !in incoming.peers) {
-                    stop(WatchPhase.Failed, "La stanza è piena: possono partecipare fino a 8 persone.")
+                    stop(WatchPhase.Failed, text(R.string.room_room_full))
                     return
                 }
                 val alreadyConnected = timeline != null
@@ -693,9 +695,9 @@ class WatchRoomController(
                 stop(
                     WatchPhase.Closed,
                     if (readingMode) {
-                        "Chi ha creato la stanza l'ha chiusa. Puoi continuare a leggere."
+                        text(R.string.room_host_closed_reading)
                     } else {
-                        "Chi ha creato la stanza l'ha chiusa. Il video è in pausa."
+                        text(R.string.room_host_closed_video)
                     },
                 )
             }
@@ -705,7 +707,7 @@ class WatchRoomController(
     private fun tick() {
         if (wallMillis() >= (invite?.expires ?: 0)) {
             send(message(if (state.value.host) WatchMessageType.Closed else WatchMessageType.Leave))
-            stop(WatchPhase.Closed, "La stanza è scaduta. Puoi crearne una nuova.")
+            stop(WatchPhase.Closed, text(R.string.room_expired_room))
             return
         }
         val time = now()
@@ -723,14 +725,14 @@ class WatchRoomController(
         }
         val sample = player.sample()
         if (sample.media?.valid() == false) {
-            stop(WatchPhase.Failed, "Questo contenuto non può essere condiviso nella stanza.")
+            stop(WatchPhase.Failed, text(R.string.room_content_unshareable))
             return
         }
         // Expiry also runs when no relay is connected; a spinner must not conceal a lost command.
         pendingCommand?.takeIf { time - pendingSince > 8000 }?.let {
             failedCommand = it
             pendingCommand = null
-            closedMessage = "Comando non confermato. Controlla la connessione e riprova."
+            closedMessage = text(R.string.room_command_unconfirmed)
             mutableState.value = state.value.copy(pendingPlaybackPaused = null, commandFailed = true)
         }
         if (state.value.relayCount == 0) {
@@ -763,9 +765,9 @@ class WatchRoomController(
     private fun connectionMessage(time: Long): String {
         val connecting = time - started < 12_000
         return when (transport?.relayFailure()) {
-            WatchRelayFailure.Rejected -> "I relay non accettano i messaggi della stanza."
-            WatchRelayFailure.RateLimited -> "Relay occupati. Riprovo tra poco…"
-            else -> if (connecting) "Connessione alla stanza…" else "Connessione assente. Riprovo automaticamente…"
+            WatchRelayFailure.Rejected -> text(R.string.room_relay_rejected)
+            WatchRelayFailure.RateLimited -> text(R.string.room_relay_busy)
+            else -> if (connecting) text(R.string.room_connection_start) else text(R.string.room_connection_lost)
         }
     }
 
@@ -1019,34 +1021,43 @@ class WatchRoomController(
             else -> WatchPhase.Playing
         }
         val statusText = when {
-            state.value.localHold -> "In pausa su questo telefono. Tocca Riprendi quando vuoi tornare."
+            state.value.localHold -> text(R.string.room_local_pause_hint)
             nextCue != null && nextBlocking != null ->
                 nextBlocking.name +
                     ": " +
                     if (nextBlocking.problem == WatchProblem.Connection) {
-                        nextBlocking.problem.description()
+                        nextBlocking.problem.description(text)
                     } else if (nextBlocking.nextProblem != WatchProblem.None) {
-                        nextBlocking.nextProblem.description()
+                        nextBlocking.nextProblem.description(text)
                     } else if (!nextBlocking.canAdvance) {
-                        "non è pronto per il prossimo episodio"
+                        text(R.string.room_next_not_ready)
                     } else {
-                        "preparazione del prossimo episodio"
+                        text(R.string.room_next_preparing)
                     }
-            nextCue != null -> "Il prossimo episodio è pronto per tutti."
-            sample.ended -> "Episodio terminato."
+            nextCue != null -> text(R.string.room_next_ready)
+            sample.ended -> text(R.string.room_episode_ended)
             waiting && blocking != null ->
                 blocking.name +
                     ": " +
-                    if (blocking.problem != WatchProblem.None) blocking.problem.description() else "in attesa"
+                    if (blocking.problem !=
+                        WatchProblem.None
+                    ) {
+                        blocking.problem.description(text)
+                    } else {
+                        text(R.string.room_waiting_short)
+                    }
             prebuffering && prebufferingMember != null ->
-                "${prebufferingMember.name} precarica · " +
-                    (prebufferingMember.bufferedAheadSeconds?.let { "$it/15 s" } ?: "in preparazione")
-            buffering -> problem.description()
-            countdown != null -> "Si riparte insieme tra " + countdown
-            paused && !desiredPaused -> "Verifica che tutti siano pronti…"
-            paused && pausedBy.isNotBlank() -> pausedBy + " ha messo in pausa."
-            paused -> "Tutti pronti. Puoi avviare la riproduzione."
-            else -> "State guardando insieme."
+                text(
+                    R.string.room_member_prebuffering,
+                    prebufferingMember.name,
+                    prebufferingMember.bufferedAheadSeconds?.let { "$it/15 s" } ?: text(R.string.room_preparing_short),
+                )
+            buffering -> problem.description(text)
+            countdown != null -> text(R.string.room_resume_seconds, countdown)
+            paused && !desiredPaused -> text(R.string.room_checking_ready)
+            paused && pausedBy.isNotBlank() -> text(R.string.room_paused_by, pausedBy)
+            paused -> text(R.string.room_all_ready)
+            else -> text(R.string.room_watching_together)
         }
         mutableState.value = state.value.copy(
             phase = phase, media = media, playRequested = !desiredPaused,
@@ -1064,7 +1075,7 @@ class WatchRoomController(
                     peer.bufferedAheadSeconds,
                 )
             },
-            message = if (peers.isEmpty() && media == null) "Condividi il codice con il tuo amico." else statusText,
+            message = if (peers.isEmpty() && media == null) text(R.string.room_share_code_hint) else statusText,
             resumeSeconds = countdown, skip = skipCue,
             skipSeconds = remainingSeconds(skipCue?.deadline, time),
             upcoming = upcoming, next = nextCue, nextSeconds = remainingSeconds(nextCue?.deadline, time),
@@ -1196,18 +1207,18 @@ class WatchRoomController(
                 },
                 latencyMs = clock.latency,
                 message = when {
-                    stale -> "Aspetto chi ha creato la stanza. Il video resta in pausa."
-                    remote == null -> "Aspetto il tuo amico. La sua stanza deve essere aperta."
-                    remote.media == null -> "Il tuo amico sta scegliendo cosa guardare."
+                    stale -> text(R.string.room_waiting_host)
+                    remote == null -> text(R.string.room_waiting_friend_room)
+                    remote.media == null -> text(R.string.room_friend_choosing_video)
                     !same &&
                         sample.ready &&
                         localMedia?.key == remote.media.key &&
                         localMedia.duration > 0 &&
                         remote.media.duration > 0 ->
-                        "Le durate differiscono molto. Controlla la versione nelle qualità del player."
-                    !same -> "Preparazione dell'episodio scelto dal tuo amico…"
-                    state.value.localHold -> "In pausa su questo telefono. Tocca Riprendi quando vuoi tornare."
-                    else -> "Preparazione della sincronizzazione…"
+                        text(R.string.room_duration_mismatch)
+                    !same -> text(R.string.room_prepare_friend_episode)
+                    state.value.localHold -> text(R.string.room_local_pause_hint)
+                    else -> text(R.string.room_prepare_sync)
                 },
             )
             return
@@ -1258,13 +1269,13 @@ class WatchRoomController(
                 closedMessage.isNotEmpty() -> closedMessage
                 remote.buffering || sample.buffering -> {
                     val blocked = remote.peers.values.firstOrNull { !it.ready || it.buffering }
-                    blocked?.let { it.name + ": " + it.problem.description() } ?: "Preparazione del video"
+                    blocked?.let { it.name + ": " + it.problem.description(text) } ?: text(R.string.room_prepare_video)
                 }
-                remote.prebuffering -> "Precaricamento iniziale dei video…"
-                state.value.resumeSeconds != null -> "Si riparte insieme tra " + state.value.resumeSeconds
-                shouldPause && remote.pausedBy.isNotBlank() -> remote.pausedBy + " ha messo in pausa."
-                shouldPause -> "La stanza è in pausa."
-                else -> "State guardando insieme."
+                remote.prebuffering -> text(R.string.room_initial_prebuffer)
+                state.value.resumeSeconds != null -> text(R.string.room_resume_seconds, state.value.resumeSeconds!!)
+                shouldPause && remote.pausedBy.isNotBlank() -> text(R.string.room_paused_by, remote.pausedBy)
+                shouldPause -> text(R.string.room_paused_sentence)
+                else -> text(R.string.room_watching_together)
             },
         )
     }

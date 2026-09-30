@@ -18,8 +18,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import eu.kanade.tachiyomi.R
 import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 @Composable
 fun SourceHomeRankingCard(
@@ -64,7 +66,7 @@ fun SourceHomeRankingCard(
                 style = MaterialTheme.typography.labelSmall,
             )
             if (onSources != null && presentation?.choices.orEmpty().size > 1) {
-                TextButton(onClick = onSources) { Text("Fonti") }
+                TextButton(onClick = onSources) { Text(androidStringResource(R.string.home_sources)) }
             }
         }
     }

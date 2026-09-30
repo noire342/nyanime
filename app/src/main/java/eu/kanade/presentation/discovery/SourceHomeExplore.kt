@@ -53,8 +53,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.motion.ModernMotion
 import eu.kanade.presentation.motion.modernMotionEnabled
+import eu.kanade.tachiyomi.R
 import tachiyomi.domain.discovery.SourceHomeFilter
 import tachiyomi.domain.discovery.SourceHomeGroup
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 @Composable
 fun SourceHomeExploreBar(
@@ -67,12 +69,12 @@ fun SourceHomeExploreBar(
     if (genresOpen) {
         ModalBottomSheet(onDismissRequest = { genresOpen = false }) {
             Column(Modifier.imePadding().padding(horizontal = 20.dp)) {
-                Text("Tutti i generi", style = MaterialTheme.typography.headlineSmall)
+                Text(androidStringResource(R.string.home_all_genres), style = MaterialTheme.typography.headlineSmall)
                 OutlinedTextField(
                     value = genreQuery,
                     onValueChange = { genreQuery = it },
                     modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                    placeholder = { Text("Cerca un genere") },
+                    placeholder = { Text(androidStringResource(R.string.home_search_genre)) },
                     singleLine = true,
                     leadingIcon = { Icon(Icons.Outlined.Search, null) },
                 )
@@ -103,7 +105,7 @@ fun SourceHomeExploreBar(
         }
         if (categories.size > 8) {
             item {
-                HomeGenreChip("Tutti i generi") { genresOpen = true }
+                HomeGenreChip(androidStringResource(R.string.home_all_genres)) { genresOpen = true }
             }
         }
         items(categories, key = { it.id }) { category ->
@@ -116,7 +118,7 @@ fun SourceHomeExploreBar(
 fun HomeExploreAction(onClick: () -> Unit) {
     AssistChip(
         onClick = onClick,
-        label = { Text("Esplora e filtra") },
+        label = { Text(androidStringResource(R.string.home_explore)) },
         leadingIcon = { Icon(Icons.Outlined.Tune, null) },
     )
 }
@@ -154,13 +156,13 @@ fun SourceHomeActiveFilters(
                 onClick = { onRemove(name) },
                 label = {
                     Text(
-                        "$name: ${selection.joinToString().ifBlank { "Tutti" }}",
+                        "$name: ${selection.joinToString().ifBlank { androidStringResource(R.string.home_all) }}",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.fillParentMaxWidth(.72f),
                     )
                 },
-                trailingIcon = { Icon(Icons.Outlined.Close, "Rimuovi filtro $name") },
+                trailingIcon = { Icon(Icons.Outlined.Close, androidStringResource(R.string.home_remove_filter, name)) },
             )
         }
     }
@@ -195,14 +197,14 @@ fun SourceHomeFilterContent(
     Column(Modifier.imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Trova la prossima storia", style = MaterialTheme.typography.titleLarge)
+                Text(androidStringResource(R.string.home_next_story), style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Combina i filtri e scegli cosa guardare",
+                    androidStringResource(R.string.home_filter_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            TextButton(onClick = { draft = emptyMap() }) { Text("Azzera") }
+            TextButton(onClick = { draft = emptyMap() }) { Text(androidStringResource(R.string.home_reset)) }
         }
         LazyColumn(
             Modifier.weight(1f, fill = false),
@@ -222,7 +224,7 @@ fun SourceHomeFilterContent(
                             Column(Modifier.weight(1f)) {
                                 Text(filter.name, style = MaterialTheme.typography.titleSmall)
                                 Text(
-                                    selected.joinToString().ifBlank { "Tutti" },
+                                    selected.joinToString().ifBlank { androidStringResource(R.string.home_all) },
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                     style = MaterialTheme.typography.bodySmall,
@@ -231,7 +233,14 @@ fun SourceHomeFilterContent(
                             }
                             Icon(
                                 if (open) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                                if (open) "Chiudi ${filter.name}" else "Scegli ${filter.name}",
+                                if (open) {
+                                    androidStringResource(
+                                        R.string.home_close_filter,
+                                        filter.name,
+                                    )
+                                } else {
+                                    androidStringResource(R.string.home_choose_filter, filter.name)
+                                },
                             )
                         }
                         AnimatedVisibility(
@@ -265,7 +274,7 @@ fun SourceHomeFilterContent(
             },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp).heightIn(min = 52.dp),
         ) {
-            Text("Mostra risultati")
+            Text(androidStringResource(R.string.home_results))
         }
     }
 }
@@ -293,12 +302,12 @@ private fun SourceHomeFilterOptions(
                     { search = it },
                     Modifier.fillMaxWidth(),
                     singleLine = true,
-                    placeholder = { Text("Cerca nelle opzioni") },
+                    placeholder = { Text(androidStringResource(R.string.home_search_options)) },
                     leadingIcon = { Icon(Icons.Outlined.Search, null) },
                 )
             }
             if (filter.kind == SourceHomeFilter.Kind.MULTIPLE) {
-                TextButton(onClick = { onSelect(emptyList()) }) { Text("Nessuna limitazione") }
+                TextButton(onClick = { onSelect(emptyList()) }) { Text(androidStringResource(R.string.home_unlimited)) }
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 filter.options.filter { it.contains(search, ignoreCase = true) }.forEach { option ->

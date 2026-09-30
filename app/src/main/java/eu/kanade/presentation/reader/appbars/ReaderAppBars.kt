@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarActions
 import eu.kanade.presentation.reader.components.ChapterNavigator
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import eu.kanade.tachiyomi.ui.reader.viewer.Viewer
@@ -32,6 +33,7 @@ import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
+import androidx.compose.ui.res.stringResource as androidStringResource
 
 private val animationSpec = tween<IntOffset>(200)
 
@@ -107,7 +109,7 @@ fun ReaderAppBars(
                             .apply {
                                 add(
                                     AppBar.Action(
-                                        title = "Leggi insieme",
+                                        title = androidStringResource(R.string.room_read),
                                         icon = Icons.Outlined.Group,
                                         onClick = onReadingTogether,
                                     ),

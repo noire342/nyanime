@@ -65,6 +65,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.reading.ReadingEdit
 import eu.kanade.tachiyomi.data.reading.ReadingEditKind
 import eu.kanade.tachiyomi.data.reading.ReadingPosition
@@ -75,6 +76,7 @@ import eu.kanade.tachiyomi.data.watch.WatchInvite
 import eu.kanade.tachiyomi.data.watch.WatchShortRooms
 import eu.kanade.tachiyomi.ui.watch.WatchQrDialog
 import eu.kanade.tachiyomi.ui.watch.WatchTogetherPanel
+import eu.kanade.tachiyomi.ui.watch.rememberRoomText
 
 val readingInkColors = listOf(0xFFFFC857, 0xFF4DDDC7, 0xFF76AEFF, 0xFFFF766E, 0xFFFFFFFF).map { it.toInt() }
 
@@ -110,6 +112,7 @@ fun ReadingRoomPanel(
     onPlaceNote: () -> Unit = {},
     onVideo: (() -> Unit)? = null,
 ) {
+    val text = rememberRoomText()
     val activity = LocalContext.current as? Activity
     val room by manager.controller.state.collectAsState()
     val tools by manager.tools.collectAsState()
@@ -130,14 +133,14 @@ fun ReadingRoomPanel(
     if (addingNote) {
         AlertDialog(
             onDismissRequest = { addingNote = false },
-            title = { Text("Una nota sulla pagina") },
+            title = { Text(text(R.string.room_note_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Scrivi la nota, poi tocca il punto del manga dove vuoi lasciarla.")
+                    Text(text(R.string.room_note_hint))
                     OutlinedTextField(
                         value = noteText,
                         onValueChange = { noteText = it.take(280) },
-                        label = { Text("Nota") },
+                        label = { Text(text(R.string.room_note)) },
                         maxLines = 4,
                     )
                 }
@@ -149,20 +152,20 @@ fun ReadingRoomPanel(
                         addingNote = false
                         onPlaceNote()
                     }
-                }, enabled = noteText.isNotBlank()) { Text("Scegli il punto") }
+                }, enabled = noteText.isNotBlank()) { Text(text(R.string.room_choose_point)) }
             },
-            dismissButton = { TextButton(onClick = { addingNote = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { addingNote = false }) { Text(text(R.string.room_cancel)) } },
         )
     }
     if (leaving) {
         AlertDialog(
             onDismissRequest = { leaving = false },
-            title = { Text(if (room.host) "Chiudere la stanza?" else "Lasciare la stanza?") },
+            title = { Text(if (room.host) text(R.string.room_confirm_close) else text(R.string.room_confirm_leave)) },
             text = {
                 val message = if (room.host) {
-                    "La stanza si chiuderà per tutti. Gli schizzi sono temporanei e verranno rimossi."
+                    text(R.string.room_close_reading_hint)
                 } else {
-                    "La lettura continua sul tuo telefono. Gli schizzi della stanza sono temporanei."
+                    text(R.string.room_leave_reading_hint)
                 }
                 Text(message)
             },
@@ -170,9 +173,9 @@ fun ReadingRoomPanel(
                 TextButton(onClick = {
                     manager.watch.controller.leave()
                     leaving = false
-                }) { Text("Conferma") }
+                }) { Text(text(R.string.room_confirm)) }
             },
-            dismissButton = { TextButton(onClick = { leaving = false }) { Text("Resta") } },
+            dismissButton = { TextButton(onClick = { leaving = false }) { Text(text(R.string.room_stay)) } },
         )
     }
     ReadingRoomContent(
@@ -194,14 +197,13 @@ fun ReadingRoomPanel(
                         putExtra(
                             Intent.EXTRA_TEXT,
                             if (short.code.isNotBlank()) {
-                                WatchShortRooms.shareText(short.code)
+                                WatchShortRooms.shareText(short.code, text)
                             } else {
-                                "Leggiamo o guardiamo insieme su Nyanime!\n${link.orEmpty()}\n\n" +
-                                    "Invito completo: ${room.invite}"
+                                text(R.string.room_share_full_invite, link.orEmpty(), room.invite)
                             },
                         )
                     },
-                    "Invita nella stanza",
+                    text(R.string.room_invite_room),
                 ),
             )
         },
@@ -232,6 +234,7 @@ fun ReadingRoomContent(
     onVideo: (() -> Unit)? = null,
     onRetry: () -> Unit = {},
 ) {
+    val text = rememberRoomText()
     val colors = MaterialTheme.colorScheme
     val interventions = remember(history) {
         history.filter { it.kind in setOf(ReadingEditKind.Stroke, ReadingEditKind.Note) }
@@ -241,9 +244,9 @@ fun ReadingRoomContent(
     openedNote?.let { edit ->
         AlertDialog(
             onDismissRequest = { openedNote = null },
-            title = { Text("Nota nella stanza") },
+            title = { Text(text(R.string.room_room_note)) },
             text = { Text(edit.note?.text.orEmpty()) },
-            confirmButton = { TextButton(onClick = { openedNote = null }) { Text("Chiudi") } },
+            confirmButton = { TextButton(onClick = { openedNote = null }) { Text(text(R.string.room_close_dialog)) } },
         )
     }
     LazyColumn(
@@ -265,26 +268,27 @@ fun ReadingRoomContent(
                 ) {
                     Icon(Icons.Default.MenuBook, null, Modifier.size(26.dp), tint = colors.onPrimaryContainer)
                     Text(
-                        "Leggi insieme",
+                        text(R.string.room_read),
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                     )
-                    IconButton(onClick = onShare) { Icon(Icons.Default.Share, "Invita nella stanza") }
+                    IconButton(onClick = onShare) { Icon(Icons.Default.Share, text(R.string.room_invite_room)) }
                 }
-                Text("La stessa stanza. Ognuno al proprio ritmo.", style = MaterialTheme.typography.bodyMedium)
-                Text(room.status, style = MaterialTheme.typography.labelLarge, color = colors.onPrimaryContainer)
+                Text(text(R.string.room_reading_intro), style = MaterialTheme.typography.bodyMedium)
+                Text(room.status(text), style = MaterialTheme.typography.labelLarge, color = colors.onPrimaryContainer)
                 if (saveFailed) {
                     Text(
-                        "Le annotazioni sono visibili, ma non riusciamo a salvarle per il rientro. " +
-                            "Tieni aperta la stanza finché il problema si risolve.",
+                        text(R.string.room_reading_save_failed),
                         color = colors.error,
                     )
                 }
                 if (room.relayCount == 0 ||
                     !room.connected
                 ) {
-                    TextButton(onClick = onRetry) { Text("Riprova connessione", color = colors.onPrimaryContainer) }
+                    TextButton(onClick = onRetry) {
+                        Text(text(R.string.room_retry_connection), color = colors.onPrimaryContainer)
+                    }
                 }
             }
         }
@@ -293,7 +297,7 @@ fun ReadingRoomContent(
                 LinearProgressIndicator(
                     Modifier.fillMaxWidth().semantics {
                         contentDescription =
-                            "Apertura della pagina"
+                            text(R.string.room_opening_page)
                     },
                 )
             }
@@ -307,27 +311,29 @@ fun ReadingRoomContent(
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = colors.secondaryContainer)) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Il tuo punto è al sicuro", fontWeight = FontWeight.Bold)
+                        Text(text(R.string.room_position_safe), fontWeight = FontWeight.Bold)
                         Text(bookmark.position.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            "${bookmark.position.chapterName} · p. ${bookmark.position.page + 1}",
+                            text(R.string.room_chapter_page, bookmark.position.chapterName, bookmark.position.page + 1),
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Button(onClick = onReturn, enabled = !tools.opening) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(18.dp))
-                            Text("Torna al mio punto", Modifier.padding(start = 8.dp))
+                            Text(text(R.string.room_return_position), Modifier.padding(start = 8.dp))
                         }
                     }
                 }
             }
         }
-        item { Text("Nella stanza", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+        item {
+            Text(text(R.string.room_in_room), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        }
         if (room.others.isEmpty()) {
             item {
                 Text(
-                    "Invita un amico con il codice che usi già per Guarda insieme. Non serve aprire un'altra stanza.",
+                    text(R.string.room_reading_invite_hint),
                     color = colors.onSurfaceVariant,
                 )
             }
@@ -357,15 +363,15 @@ fun ReadingRoomContent(
                         }
                         Column(Modifier.weight(1f)) {
                             Text(
-                                peer.name + if (own) " · Tu" else "",
+                                peer.name + if (own) text(R.string.room_you_suffix) else "",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                             )
                             Text(
                                 when {
-                                    !room.connected && !own -> "Ultimo punto condiviso"
-                                    peer.reading -> "Sta leggendo"
-                                    else -> "Nella stanza"
+                                    !room.connected && !own -> text(R.string.room_last_position)
+                                    peer.reading -> text(R.string.room_reading)
+                                    else -> text(R.string.room_in_room)
                                 },
                                 style = MaterialTheme.typography.labelMedium,
                                 color = colors.onSurfaceVariant,
@@ -396,8 +402,14 @@ fun ReadingRoomContent(
                             LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
                         }
                         Text(
-                            "Pagina ${position.page + 1} di ${position.pages}" +
-                                if (!peer.reading || (!room.connected && !own)) " · ultimo punto" else "",
+                            text(R.string.room_page_count, position.page + 1, position.pages) +
+                                if (!peer.reading ||
+                                    (!room.connected && !own)
+                                ) {
+                                    text(R.string.room_last_position_suffix)
+                                } else {
+                                    ""
+                                },
                             style = MaterialTheme.typography.labelLarge,
                         )
                         if (!own) {
@@ -407,12 +419,12 @@ fun ReadingRoomContent(
                                 enabled =
                                 !tools.opening && !same && room.connected,
                             ) {
-                                Text(if (same) "Siete sulla stessa pagina" else "Raggiungi questa pagina")
+                                Text(if (same) text(R.string.room_same_page) else text(R.string.room_jump_page))
                             }
                         }
                     } else {
                         Text(
-                            "Può aprire un manga o guardare un video senza uscire dalla stanza.",
+                            text(R.string.room_can_switch_content),
                             color = colors.onSurfaceVariant,
                         )
                     }
@@ -421,13 +433,17 @@ fun ReadingRoomContent(
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Lascia un segno", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
-                    "Disegna sulla pagina. Gli amici lo vedranno quando la aprono. Raggiungi la loro pagina per scarabocchiare insieme.",
+                    text(R.string.room_leave_mark),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text(R.string.room_drawing_hint),
                     color = colors.onSurfaceVariant,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Mostra gli schizzi", Modifier.weight(1f))
+                    Text(text(R.string.room_show_sketches), Modifier.weight(1f))
                     Switch(checked = tools.visible, onCheckedChange = onVisible)
                 }
                 if (current !=
@@ -436,24 +452,24 @@ fun ReadingRoomContent(
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = onDraw, enabled = room.supported) {
                             Icon(Icons.Default.Draw, null)
-                            Text("Disegna", Modifier.padding(start = 8.dp))
+                            Text(text(R.string.room_draw), Modifier.padding(start = 8.dp))
                         }
                         if (room.crdtEnabled) {
-                            OutlinedButton(onClick = onAddNote) { Text("Lascia una nota") }
+                            OutlinedButton(onClick = onAddNote) { Text(text(R.string.room_add_note)) }
                         }
                     }
                 }
                 Text(
                     if (room.crdtEnabled) {
-                        "I segni restano nella stanza. Puoi nasconderli solo qui oppure rimuovere e ripristinare i tuoi segni per tutti."
+                        text(R.string.room_annotations_hint)
                     } else {
-                        "Questa stanza usa ancora la modalità disegno precedente."
+                        text(R.string.room_old_drawing)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant,
                 )
                 Text(
-                    "Nella stanza mostriamo la pagina intera, senza ritagliare i bordi, per allineare i disegni. Le tue preferenze tornano appena esci.",
+                    text(R.string.room_page_alignment),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant,
                 )
@@ -462,7 +478,7 @@ fun ReadingRoomContent(
         if (room.crdtEnabled && interventions.isNotEmpty()) {
             item {
                 Text(
-                    "Interventi nella stanza",
+                    text(R.string.room_annotations),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                 )
@@ -488,21 +504,33 @@ fun ReadingRoomContent(
                         Text(
                             (
                                 room.members[edit.author]?.name
-                                    ?: if (edit.author == room.localId) "Tu" else "Partecipante"
+                                    ?: if (edit.author ==
+                                        room.localId
+                                    ) {
+                                        text(R.string.room_you)
+                                    } else {
+                                        text(R.string.room_participant)
+                                    }
                                 ) +
                                 " · " +
-                                if (edit.kind == ReadingEditKind.Note) edit.note?.text.orEmpty() else "Schizzo",
+                                if (edit.kind ==
+                                    ReadingEditKind.Note
+                                ) {
+                                    edit.note?.text.orEmpty()
+                                } else {
+                                    text(R.string.room_sketch)
+                                },
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            "${edit.page.chapterName} · pagina ${edit.page.page + 1}",
+                            text(R.string.room_annotation_page, edit.page.chapterName, edit.page.page + 1),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.onSurfaceVariant,
                         )
                         if (edit.kind == ReadingEditKind.Note) {
                             Text(
-                                "Tocca per leggere",
+                                text(R.string.room_read_note),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = colors.primary,
                             )
@@ -510,27 +538,29 @@ fun ReadingRoomContent(
                     }
                     if (room.host || edit.author == room.localId) {
                         TextButton(onClick = { onSharedVisibility(edit, !visible) }) {
-                            Text(if (visible) "Nascondi" else "Ripristina")
+                            Text(if (visible) text(R.string.room_hide) else text(R.string.room_restore))
                         }
                     }
                 }
             }
             if (interventions.size > visibleHistory) {
                 item {
-                    TextButton(onClick = { visibleHistory += 50 }) { Text("Mostra altri interventi") }
+                    TextButton(onClick = { visibleHistory += 50 }) { Text(text(R.string.room_more_annotations)) }
                 }
             }
         }
         item {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onChooseManga) { Text("Altri manga") }
+                OutlinedButton(onClick = onChooseManga) { Text(text(R.string.room_other_manga)) }
                 OutlinedButton(onClick = onShare) {
                     Icon(Icons.Default.Share, null, Modifier.size(18.dp))
-                    Text("Invita", Modifier.padding(start = 6.dp))
+                    Text(text(R.string.room_invite), Modifier.padding(start = 6.dp))
                 }
-                TextButton(onClick = onQr) { Text("Codice QR") }
-                onVideo?.let { TextButton(onClick = it) { Text("Controlli video") } }
-                TextButton(onClick = onLeave) { Text(if (room.host) "Chiudi stanza" else "Lascia stanza") }
+                TextButton(onClick = onQr) { Text(text(R.string.room_qr_code)) }
+                onVideo?.let { TextButton(onClick = it) { Text(text(R.string.room_video_controls)) } }
+                TextButton(onClick = onLeave) {
+                    Text(if (room.host) text(R.string.room_close_short) else text(R.string.room_leave_short))
+                }
             }
         }
     }
@@ -538,6 +568,7 @@ fun ReadingRoomContent(
 
 @Composable
 fun ReadingReaderOverlay(manager: ReadingTogetherManager, menuVisible: Boolean, onOpenRoom: () -> Unit) {
+    val text = rememberRoomText()
     val room by manager.controller.state.collectAsState()
     val tools by manager.tools.collectAsState()
     var clear by remember { mutableStateOf(false) }
@@ -546,12 +577,12 @@ fun ReadingReaderOverlay(manager: ReadingTogetherManager, menuVisible: Boolean, 
     if (clear) {
         AlertDialog(
             onDismissRequest = { clear = false },
-            title = { Text("Cancellare gli schizzi?") },
+            title = { Text(text(R.string.room_clear_sketches_title)) },
             text = {
                 val message = if (room.host) {
-                    "Rimuovi tutti gli schizzi di questa pagina, anche quelli degli amici."
+                    text(R.string.room_clear_all_hint)
                 } else {
-                    "Rimuovi i tuoi schizzi da questa pagina anche per gli amici."
+                    text(R.string.room_clear_own_hint)
                 }
                 Text(message)
             },
@@ -559,9 +590,9 @@ fun ReadingReaderOverlay(manager: ReadingTogetherManager, menuVisible: Boolean, 
                 TextButton(onClick = {
                     manager.currentPage()?.let(manager.controller::clear)
                     clear = false
-                }) { Text("Cancella") }
+                }) { Text(text(R.string.room_delete)) }
             },
-            dismissButton = { TextButton(onClick = { clear = false }) { Text("Annulla") } },
+            dismissButton = { TextButton(onClick = { clear = false }) { Text(text(R.string.room_cancel)) } },
         )
     }
     Box(
@@ -579,7 +610,7 @@ fun ReadingReaderOverlay(manager: ReadingTogetherManager, menuVisible: Boolean, 
             ) {
                 TextButton(onClick = { activity?.let(manager::returnToOwn) }, enabled = !tools.opening) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
-                    Text("Torna al mio punto", Modifier.padding(start = 8.dp))
+                    Text(text(R.string.room_return_position), Modifier.padding(start = 8.dp))
                 }
             }
         }
@@ -592,8 +623,10 @@ fun ReadingReaderOverlay(manager: ReadingTogetherManager, menuVisible: Boolean, 
                 shadowElevation = 4.dp,
             ) {
                 Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Tocca la pagina per lasciare la nota", Modifier.weight(1f).padding(start = 8.dp))
-                    IconButton(onClick = manager::finishNote) { Icon(Icons.Default.Close, "Annulla nota") }
+                    Text(text(R.string.room_place_note), Modifier.weight(1f).padding(start = 8.dp))
+                    IconButton(onClick = manager::finishNote) {
+                        Icon(Icons.Default.Close, text(R.string.room_cancel_note))
+                    }
                 }
             }
         }
@@ -606,14 +639,18 @@ fun ReadingReaderOverlay(manager: ReadingTogetherManager, menuVisible: Boolean, 
             ) {
                 Column(Modifier.padding(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Disegna", Modifier.weight(1f).padding(start = 8.dp), fontWeight = FontWeight.Bold)
+                        Text(
+                            text(R.string.room_draw),
+                            Modifier.weight(1f).padding(start = 8.dp),
+                            fontWeight = FontWeight.Bold,
+                        )
                         IconButton(onClick = {
                             manager.currentPage()?.let(manager.controller::undo)
-                        }) { Icon(Icons.AutoMirrored.Filled.Undo, "Annulla l'ultimo schizzo") }
-                        TextButton(onClick = { clear = true }) { Text("Pulisci") }
+                        }) { Icon(Icons.AutoMirrored.Filled.Undo, text(R.string.room_undo_sketch)) }
+                        TextButton(onClick = { clear = true }) { Text(text(R.string.room_clear)) }
                         IconButton(onClick = {
                             manager.setDrawing(false)
-                        }) { Icon(Icons.Default.Close, "Fine disegno") }
+                        }) { Icon(Icons.Default.Close, text(R.string.room_finish_drawing)) }
                     }
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -626,13 +663,19 @@ fun ReadingReaderOverlay(manager: ReadingTogetherManager, menuVisible: Boolean, 
                                 label = { Box(Modifier.size(18.dp).background(Color(color), CircleShape)) },
                                 modifier = Modifier.semantics {
                                     contentDescription =
-                                        listOf("Giallo", "Verde acqua", "Blu", "Corallo", "Bianco")[index]
+                                        listOf(
+                                            text(R.string.room_yellow),
+                                            text(R.string.room_teal),
+                                            text(R.string.room_blue),
+                                            text(R.string.room_coral),
+                                            text(R.string.room_white),
+                                        )[index]
                                 },
                             )
                         }
                         AssistChip(onClick = { manager.setWidth(tools.width % 3 + 1) }, label = {
                             Text(
-                                listOf("Fine", "Medio", "Spesso")[
+                                listOf(text(R.string.room_thin), text(R.string.room_medium), text(R.string.room_thick))[
                                     tools.width -
                                         1,
                                 ],
@@ -640,7 +683,7 @@ fun ReadingReaderOverlay(manager: ReadingTogetherManager, menuVisible: Boolean, 
                         })
                     }
                     Text(
-                        "Trascina per disegnare · due dita per muovere la pagina",
+                        text(R.string.room_draw_gestures),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(8.dp),
                     )
@@ -657,13 +700,20 @@ fun ReadingReaderOverlay(manager: ReadingTogetherManager, menuVisible: Boolean, 
                     val friend = room.others.values.firstOrNull { it.reading && it.position != null }
                     Column(Modifier.weight(1f).clickable(onClick = onOpenRoom).padding(vertical = 10.dp)) {
                         Text(
-                            if (room.connected) "Insieme · ${room.members.size}" else "Riconnessione…",
+                            if (room.connected) {
+                                text(
+                                    R.string.room_together_count,
+                                    room.members.size,
+                                )
+                            } else {
+                                text(R.string.room_reconnecting_short)
+                            },
                             style = MaterialTheme.typography.labelMedium,
                         )
                         Text(
                             friend?.let {
-                                "${it.name} · p. ${it.position!!.page + 1}"
-                            } ?: "Apri la stanza",
+                                text(R.string.room_chapter_page, it.name, it.position!!.page + 1)
+                            } ?: text(R.string.room_open_room),
                             style = MaterialTheme.typography.labelLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -674,10 +724,16 @@ fun ReadingReaderOverlay(manager: ReadingTogetherManager, menuVisible: Boolean, 
                     }) {
                         Icon(
                             if (tools.visible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            if (tools.visible) "Nascondi schizzi" else "Mostra schizzi",
+                            if (tools.visible) {
+                                text(
+                                    R.string.room_hide_sketches,
+                                )
+                            } else {
+                                text(R.string.room_show_sketches_short)
+                            },
                         )
                     }
-                    IconButton(onClick = onOpenRoom) { Icon(Icons.Default.Group, "Apri la stanza") }
+                    IconButton(onClick = onOpenRoom) { Icon(Icons.Default.Group, text(R.string.room_open_room)) }
                 }
             }
         }

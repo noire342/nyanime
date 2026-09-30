@@ -4,6 +4,8 @@ import eu.kanade.tachiyomi.data.watch.WatchMember
 import eu.kanade.tachiyomi.data.watch.WatchMessage
 import eu.kanade.tachiyomi.data.watch.WatchMessageType
 import eu.kanade.tachiyomi.data.watch.WatchRoomState
+import eu.kanade.tachiyomi.data.watch.roomTextForTest
+import eu.kanade.tachiyomi.data.watch.testRoomText
 import eu.kanade.tachiyomi.data.watch.watchJson
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -26,7 +28,7 @@ class ReadingRoomTest {
         author: String = guestId,
     ) = ReadingStroke(id.toString(16).padStart(32, '0'), author, 0, 2, listOf(0, 0, 10000, 10000))
 
-    private inner class Pairing(scope: TestScope, crdt: Boolean = false) {
+    private inner class Pairing(scope: TestScope, crdt: Boolean = false, guestLanguage: String = "it") {
         var drop = false
         var duplicate = false
         var loseNextAcknowledgement = false
@@ -35,21 +37,27 @@ class ReadingRoomTest {
         val host: ReadingRoomController
         val guest: ReadingRoomController
         init {
-            host = ReadingRoomController(scope.backgroundScope, { scope.testScheduler.currentTime }) { value, target ->
-                hostMessages.add(value to target)
-                if (loseNextAcknowledgement && value.acknowledgement > 0) {
-                    loseNextAcknowledgement = false
-                } else if (!drop && (target.isBlank() || target == guestId)) {
-                    deliverToGuest(value)
+            host =
+                ReadingRoomController(scope.backgroundScope, testRoomText, {
+                    scope.testScheduler.currentTime
+                }) { value, target ->
+                    hostMessages.add(value to target)
+                    if (loseNextAcknowledgement && value.acknowledgement > 0) {
+                        loseNextAcknowledgement = false
+                    } else if (!drop && (target.isBlank() || target == guestId)) {
+                        deliverToGuest(value)
+                    }
                 }
-            }
-            guest = ReadingRoomController(scope.backgroundScope, { scope.testScheduler.currentTime }) { value, _ ->
-                guestMessages.add(value)
-                if (!drop) {
-                    host.receive(guestId, value, false)
-                    if (duplicate) host.receive(guestId, value, false)
+            guest =
+                ReadingRoomController(scope.backgroundScope, roomTextForTest(guestLanguage), {
+                    scope.testScheduler.currentTime
+                }) { value, _ ->
+                    guestMessages.add(value)
+                    if (!drop) {
+                        host.receive(guestId, value, false)
+                        if (duplicate) host.receive(guestId, value, false)
+                    }
                 }
-            }
             val members = listOf(WatchMember(hostId, "A", false, false), WatchMember(guestId, "B", false, false))
             host.roomChanged(
                 WatchRoomState(
@@ -107,7 +115,7 @@ class ReadingRoomTest {
     }
 
     @Test fun guestRestoresJournalBeforeHostAdvertisesReadingVersion() = runTest {
-        val guest = ReadingRoomController(backgroundScope, { testScheduler.currentTime }) { _, _ -> }
+        val guest = ReadingRoomController(backgroundScope, testRoomText, { testScheduler.currentTime }) { _, _ -> }
         val joining = WatchRoomState(
             active = true,
             localMemberId = guestId,
@@ -158,6 +166,18 @@ class ReadingRoomTest {
         runCurrent()
         assertTrue(pair.guest.state.value.pending.isEmpty())
         assertTrue(pair.guest.state.value.notice.contains("12"))
+        assertEquals(12, pair.guest.state.value.strokes(page).size)
+    }
+
+    @Test fun annotationErrorsUseTheGuestsLanguage() = runTest {
+        val pair = Pairing(this, guestLanguage = "en")
+        runCurrent()
+        repeat(12) { pair.guest.draw(page, stroke(it + 1)) }
+        pair.guest.draw(page, stroke(13))
+        assertEquals(
+            "This page already has 12 sketches. Clear some before continuing.",
+            pair.guest.state.value.notice,
+        )
         assertEquals(12, pair.guest.state.value.strokes(page).size)
     }
 

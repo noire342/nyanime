@@ -21,13 +21,14 @@ import kotlinx.coroutines.flow.onEach
 
 /** Keeps only the tiny room connection alive while browsing. Backgrounding still pauses playback. */
 class WatchSessionService : Service() {
+    private val text by lazy { RoomText.from(this) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     override fun onBind(intent: Intent?) = null
     override fun onCreate() {
         super.onCreate()
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Insieme su Nyanime", NotificationManager.IMPORTANCE_LOW),
+            NotificationChannel(CHANNEL, text(R.string.room_notification), NotificationManager.IMPORTANCE_LOW),
         )
         val notification = notification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -46,7 +47,7 @@ class WatchSessionService : Service() {
     }
     private fun notification(): Notification = Notification.Builder(this, CHANNEL)
         .setSmallIcon(R.drawable.ic_play_arrow_24dp)
-        .setContentTitle("Insieme su Nyanime")
+        .setContentTitle(text(R.string.room_notification))
         .setContentText(WatchTogetherManager.get(this).controller.state.value.message)
         .setContentIntent(
             PendingIntent.getActivity(
@@ -60,7 +61,7 @@ class WatchSessionService : Service() {
         .setVisibility(Notification.VISIBILITY_PRIVATE)
         .addAction(
             R.drawable.ic_close_24dp,
-            "Lascia la stanza",
+            text(R.string.room_leave),
             PendingIntent.getService(
                 this,
                 ID,

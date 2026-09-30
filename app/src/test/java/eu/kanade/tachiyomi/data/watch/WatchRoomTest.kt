@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.data.watch
 
+import eu.kanade.tachiyomi.data.watch.testRoomText
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -106,12 +107,15 @@ class WatchRoomTest {
         val hostPlayer = Player { scope.testScheduler.currentTime }
         val guestPlayer = Player { scope.testScheduler.currentTime }
         val host =
-            WatchRoomController(scope.backgroundScope, hostPlayer, { scope.testScheduler.currentTime }, {
+            WatchRoomController(scope.backgroundScope, testRoomText, hostPlayer, { scope.testScheduler.currentTime }, {
                 1_800_000_000_000L +
                     scope.testScheduler.currentTime
             }, network::factory)
         val guest =
-            WatchRoomController(scope.backgroundScope, guestPlayer, { scope.testScheduler.currentTime + 90_000 }, {
+            WatchRoomController(scope.backgroundScope, testRoomText, guestPlayer, {
+                scope.testScheduler.currentTime +
+                    90_000
+            }, {
                 1_800_000_000_000L +
                     scope.testScheduler.currentTime
             }, network::factory)
@@ -271,14 +275,14 @@ class WatchRoomTest {
         val activity = room.host.state.value.activity!!
         assertEquals("Friend", activity.name)
         assertEquals(room.network.endpoints[1].publicKey, activity.actorId)
-        assertEquals("Friend è andato a 2:15", activity.label)
+        assertEquals("Friend è andato a 2:15", activity.label(testRoomText))
         assertEquals(activity, room.guest.state.value.activity)
         room.advance(3000)
         assertEquals(null, room.host.state.value.activity)
         assertEquals(null, room.guest.state.value.activity)
         room.host.requestPause(true)
         room.advance(500)
-        assertEquals("Host ha messo in pausa", room.guest.state.value.activity?.label)
+        assertEquals("Host ha messo in pausa", room.guest.state.value.activity?.label(testRoomText))
         assertTrue(room.guest.state.value.activity!!.id > activity.id)
     }
 
@@ -443,7 +447,7 @@ class WatchRoomTest {
             override fun speed(value: Double): Unit = error("Inactive room changed speed")
             override fun userResumed(): Unit = error("Inactive room changed local safety")
         }
-        val controller = WatchRoomController(backgroundScope, player, { testScheduler.currentTime })
+        val controller = WatchRoomController(backgroundScope, testRoomText, player, { testScheduler.currentTime })
         controller.playerAttached()
         controller.hold()
         controller.resync()
@@ -773,6 +777,7 @@ class WatchRoomTest {
         val guests = (1..7).map {
             WatchRoomController(
                 backgroundScope,
+                testRoomText,
                 Player { testScheduler.currentTime },
                 { testScheduler.currentTime },
                 { 1_800_000_000_000L + testScheduler.currentTime },
@@ -1083,7 +1088,7 @@ class WatchRoomTest {
             }
         }
         val host =
-            WatchRoomController(backgroundScope, player, {
+            WatchRoomController(backgroundScope, testRoomText, player, {
                 testScheduler.currentTime
             }, { 1800000000000L }, network::factory)
         host.setReadingMode(true)
@@ -1093,6 +1098,7 @@ class WatchRoomTest {
         val guest =
             WatchRoomController(
                 backgroundScope,
+                testRoomText,
                 Player {
                     testScheduler.currentTime
                 },

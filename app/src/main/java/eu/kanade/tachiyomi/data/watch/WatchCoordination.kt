@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.data.watch
 
+import eu.kanade.tachiyomi.R
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
@@ -108,13 +109,13 @@ internal class WatchDriftCorrector {
 internal fun remainingSeconds(deadline: Long?, now: Long): Int? =
     deadline?.let { ((it - now).coerceAtLeast(0) + 999).div(1000).toInt() }
 
-fun WatchProblem.description(): String = when (this) {
-    WatchProblem.None -> "Pronto"
-    WatchProblem.Opening -> "Preparazione episodio"
-    WatchProblem.Buffering -> "Caricamento"
-    WatchProblem.MissingSource -> "Estensione mancante"
-    WatchProblem.SourceError -> "La fonte non risponde"
-    WatchProblem.DifferentEdition -> "Versione video diversa"
-    WatchProblem.LocalPause -> "Pausa su questo telefono"
-    WatchProblem.Connection -> "Riconnessione"
+fun WatchProblem.description(text: RoomText): String = when (this) {
+    WatchProblem.None -> text(R.string.room_ready)
+    WatchProblem.Opening -> text(R.string.room_opening)
+    WatchProblem.Buffering -> text(R.string.room_loading)
+    WatchProblem.MissingSource -> text(R.string.room_missing_extension)
+    WatchProblem.SourceError -> text(R.string.room_source_unavailable)
+    WatchProblem.DifferentEdition -> text(R.string.room_different_edition)
+    WatchProblem.LocalPause -> text(R.string.room_local_pause_short)
+    WatchProblem.Connection -> text(R.string.room_reconnection)
 }

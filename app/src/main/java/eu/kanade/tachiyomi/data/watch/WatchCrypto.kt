@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.data.watch
 
+import eu.kanade.tachiyomi.R
 import fr.acinq.secp256k1.Secp256k1
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -48,13 +49,16 @@ data class WatchInvite(
     fun link(): String = encode().let { if (it.startsWith("NY1.")) "nyanime://watch/v1#" + it else it }
 
     fun validate(now: Long): WatchInvite {
-        require(version == 1) { "Versione dell'invito non supportata. Aggiorna Nyanime." }
-        require(secret.matches(Regex("[0-9a-f]{32}")) && owner.matches(Regex("[0-9a-f]{24}"))) { "Invito non valido." }
-        require(expires > now && expires - now <= 86_400_000L) { "Invito scaduto. Chiedi un nuovo invito." }
-        require(relays.size in 1..3 && relays.distinct().size == relays.size) { "Relay non validi." }
+        roomRequire(version == 1, R.string.room_invite_version_error)
+        roomRequire(
+            secret.matches(Regex("[0-9a-f]{32}")) && owner.matches(Regex("[0-9a-f]{24}")),
+            R.string.room_invite_invalid,
+        )
+        roomRequire(expires > now && expires - now <= 86_400_000L, R.string.room_invite_expired)
+        roomRequire(relays.size in 1..3 && relays.distinct().size == relays.size, R.string.room_relays_invalid)
         relays.forEach {
             val uri = URI(it)
-            require(
+            roomRequire(
                 it.length <= 200 &&
                     uri.scheme == "wss" &&
                     !uri.host.isNullOrBlank() &&
@@ -62,7 +66,8 @@ data class WatchInvite(
                     uri.rawQuery == null &&
                     uri.rawFragment == null &&
                     (uri.port == -1 || uri.port == 443),
-            ) { "Usa un indirizzo relay sicuro wss:// sulla porta 443." }
+                R.string.room_relay_secure,
+            )
         }
         return this
     }
@@ -70,9 +75,9 @@ data class WatchInvite(
     companion object {
         val defaultRelays = listOf("wss://relay.primal.net", "wss://relay.snort.social")
         fun codeFromLink(text: String, now: Long): String {
-            require(text.length <= 5000) { "Invito troppo lungo." }
+            roomRequire(text.length <= 5000, R.string.room_invite_too_long)
             val uri = URI(text)
-            require(
+            roomRequire(
                 uri.scheme == "nyanime" &&
                     uri.host == "watch" &&
                     uri.path == "/v1" &&
@@ -80,9 +85,8 @@ data class WatchInvite(
                     uri.port == -1 &&
                     uri.rawQuery == null &&
                     !uri.rawFragment.isNullOrBlank(),
-            ) {
-                "Link d'invito non valido."
-            }
+                R.string.room_invite_link_invalid,
+            )
             val shortCode = uri.rawFragment.orEmpty()
             return if (shortCode.matches(Regex("[0-9]{8}"))) shortCode else parse(text, now).encode()
         }
@@ -96,10 +100,10 @@ data class WatchInvite(
                 .validate(now)
 
         fun parse(text: String, now: Long): WatchInvite {
-            require(text.length <= 5000) { "Invito troppo lungo." }
+            roomRequire(text.length <= 5000, R.string.room_invite_too_long)
             Regex("NY1\\.([A-Za-z0-9_-]{38})(?![A-Za-z0-9_-])").find(text)?.let {
                 val data = Base64.getUrlDecoder().decode(it.groupValues[1])
-                require(data.size == 28 && watchBase64(data) == it.groupValues[1]) { "Codice non valido." }
+                roomRequire(data.size == 28 && watchBase64(data) == it.groupValues[1], R.string.room_code_invalid)
                 return WatchInvite(
                     secret = data.copyOfRange(0, 16).watchHex(),
                     owner = data.copyOfRange(16, 28).watchHex(),
@@ -108,7 +112,7 @@ data class WatchInvite(
                 ).validate(now)
             }
             val encoded = Regex("nyanime://watch/v1#([A-Za-z0-9_-]+)").find(text.trim())?.groupValues?.get(1)
-                ?: throw IllegalArgumentException("Incolla l'invito completo ricevuto dal tuo amico.")
+                ?: throw RoomValidationException(R.string.room_paste_invite)
             return watchJson.decodeFromString<WatchInvite>(
                 Base64.getUrlDecoder().decode(encoded).decodeToString(),
             ).validate(now)

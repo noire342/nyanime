@@ -66,6 +66,7 @@ import eu.kanade.domain.items.episode.model.toSEpisode
 import eu.kanade.presentation.share.ContentShareDialog
 import eu.kanade.presentation.theme.TachiyomiTheme
 import eu.kanade.tachiyomi.BuildConfig
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.animesource.model.ChapterType
 import eu.kanade.tachiyomi.animesource.model.Hoster
 import eu.kanade.tachiyomi.animesource.model.HttpServer
@@ -1813,7 +1814,7 @@ class PlayerActivity : BaseActivity() {
     internal fun changeEpisode(episodeId: Long?, autoPlay: Boolean = false, fromWatchRoom: Boolean = false) {
         viewModel.endHoldSpeed()
         if (viewModel.watchTogether.active && !viewModel.watchTogether.state.value.host && !fromWatchRoom) {
-            showToast("L'episodio viene scelto da chi ha creato la stanza")
+            showToast(getString(R.string.room_host_selects_episode))
             return
         }
         videoLoadJob?.cancel()

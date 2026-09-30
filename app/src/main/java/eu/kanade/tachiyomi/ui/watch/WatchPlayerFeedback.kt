@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.watch.WatchActivity
 import eu.kanade.tachiyomi.data.watch.WatchMember
 import eu.kanade.tachiyomi.data.watch.WatchProblem
@@ -51,8 +52,11 @@ fun WatchRecoveryCaption(
     onDetails: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val text = rememberRoomText()
     AnimatedContent(
-        targetState = room.preparationCaption(loading).takeIf { visible && room.recovery == WatchRecovery.Details },
+        targetState = room.preparationCaption(text, loading).takeIf {
+            visible && room.recovery == WatchRecovery.Details
+        },
         modifier = modifier.widthIn(max = 280.dp),
         transitionSpec = {
             fadeIn(tween(if (reduceMotion) 0 else 220))
@@ -72,7 +76,11 @@ fun WatchRecoveryCaption(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text("Dettagli stanza", color = Color(0xFFFF6983), style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text(R.string.room_details),
+                        color = Color(0xFFFF6983),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
                 }
             }
         }
@@ -81,16 +89,17 @@ fun WatchRecoveryCaption(
 
 @Composable
 fun WatchParticipantStrip(members: List<WatchMember>, modifier: Modifier = Modifier) {
+    val text = rememberRoomText()
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         members.take(8).forEach { member ->
             key(member.id) {
                 val ready = member.ready && !member.buffering && member.problem == WatchProblem.None
                 val color = if (ready) Color(0xFF80D4AA) else Color(0xFFFFB76C)
                 val status = if (ready) {
-                    "Pronto"
+                    text(R.string.room_ready)
                 } else {
                     member.problem.takeIf { it != WatchProblem.None }
-                        ?.description() ?: "Caricamento"
+                        ?.description(text) ?: text(R.string.room_loading)
                 }
                 Box(
                     Modifier.size(26.dp).background(Color.Black.copy(alpha = 0.65f), CircleShape)
@@ -112,6 +121,7 @@ fun WatchParticipantStrip(members: List<WatchMember>, modifier: Modifier = Modif
 
 @Composable
 fun WatchActivityCaption(activity: WatchActivity?, reduceMotion: Boolean, modifier: Modifier = Modifier) {
+    val text = rememberRoomText()
     AnimatedContent(
         targetState = activity,
         contentKey = { it?.id },
@@ -126,7 +136,7 @@ fun WatchActivityCaption(activity: WatchActivity?, reduceMotion: Boolean, modifi
     ) { visible ->
         if (visible != null) {
             Text(
-                visible.label,
+                visible.label(text),
                 color = Color.White,
                 style = MaterialTheme.typography.bodyMedium.copy(shadow = Shadow(Color.Black, blurRadius = 12f)),
                 textAlign = TextAlign.Center,

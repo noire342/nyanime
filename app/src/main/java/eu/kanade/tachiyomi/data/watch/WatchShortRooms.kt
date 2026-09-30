@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.data.watch
 
+import eu.kanade.tachiyomi.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -24,6 +25,7 @@ data class WatchShortState(
 /** Eight digits identify a temporary rendezvous, never the room's encryption key. */
 class WatchShortRooms(
     private val scope: CoroutineScope,
+    private val text: RoomText,
     private val onInvite: (String, String) -> Unit,
     private val transportFactory: (WatchInvite, WatchIdentity) -> WatchTransport = { invite, identity ->
         NostrWatchTransport(invite, identity)
@@ -58,8 +60,8 @@ class WatchShortRooms(
 
     fun join(code: String, name: String) {
         close()
-        require(code.matches(Regex("[0-9]{8}"))) { "Il codice deve avere 8 cifre." }
-        displayName = name.trim().take(32).ifBlank { "Spettatore" }
+        require(code.matches(Regex("[0-9]{8}"))) { text(R.string.room_code_digits_error) }
+        displayName = name.trim().take(32).ifBlank { text(R.string.room_viewer) }
         start(code, true)
         val token = generation
         retry = scope.launch {
@@ -89,7 +91,7 @@ class WatchShortRooms(
         mutableState.value = WatchShortState(
             code = code,
             waiting = joining,
-            message = if (joining) "Cerco la stanza e aspetto la conferma…" else "Preparo il codice…",
+            message = if (joining) text(R.string.room_find_room) else text(R.string.room_prepare_code),
         )
         val network = transportFactory(sideInvite, sideIdentity)
         transport = network
@@ -102,16 +104,16 @@ class WatchShortRooms(
                         mutableState.value = mutableState.value.copy(
                             relayCount = count,
                             message = when (network.relayFailure()) {
-                                WatchRelayFailure.Rejected -> "I relay non accettano gli inviti di questa stanza."
-                                WatchRelayFailure.RateLimited -> "Relay occupati. Riprovo tra poco…"
+                                WatchRelayFailure.Rejected -> text(R.string.room_invite_rejected)
+                                WatchRelayFailure.RateLimited -> text(R.string.room_relay_busy)
                                 WatchRelayFailure.None -> if (count > 0) {
                                     if (joining) {
-                                        "Aspetto la conferma del tuo amico…"
+                                        text(R.string.room_waiting_approval)
                                     } else {
-                                        "Codice pronto · valido per 10 minuti"
+                                        text(R.string.room_code_ready)
                                     }
                                 } else {
-                                    "Collegamento agli inviti…"
+                                    text(R.string.room_connect_invites)
                                 }
                             },
                         )
@@ -131,7 +133,7 @@ class WatchShortRooms(
             if (current.requests.any { it.id == sender } || current.requests.size >= 3) return
             mutableState.value = current.copy(
                 requests = current.requests +
-                    WatchShortRequest(sender, message.name.ifBlank { "Un amico" }.take(32)),
+                    WatchShortRequest(sender, message.name.ifBlank { text(R.string.room_friend) }.take(32)),
             )
         } else if (current.waiting && message.command == "join-accept" && message.target == identity?.publicKey) {
             val unlocked = runCatching { decrypt(message.invitation, sender, current.code) }.getOrNull() ?: return
@@ -217,12 +219,7 @@ class WatchShortRooms(
             return "nyanime://watch/v1#$code"
         }
 
-        fun shareText(code: String): String =
-            "Guardiamo insieme su Nyanime!\n\n" +
-                "Codice stanza: $code\n" +
-                "${link(code)}\n\n" +
-                "Se il link non si apre, usa Guarda insieme → Inserisci codice e digita $code. " +
-                "Chi ha creato la stanza confermerà il tuo ingresso."
+        fun shareText(code: String, text: RoomText): String = text(R.string.room_share_invite, code, link(code))
 
         private fun rendezvous(
             code: String,
