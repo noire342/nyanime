@@ -8,6 +8,15 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 30 settembre 2026 — Impostazioni delle notifiche più facili da trovare
+
+- Aggiunta «Notifiche e uscite» direttamente nelle Impostazioni, con orari dei
+  promemoria, avvisi per nuovi episodi e capitoli, permessi Android e notifiche di prova.
+- Le scelte sono raggiungibili anche dalla ricerca delle impostazioni; la Libreria
+  rimanda alla stessa schermata. Gli orari si conservano quando i promemoria sono spenti.
+- I promemoria si possono attivare anche mentre si scelgono gli orari, senza tornare
+  indietro. Il salvataggio riprogramma gli avvisi anche uscendo subito dalla schermata.
+
 ## 30 settembre 2026 — Traduzioni inglesi più complete
 
 - Stanze, inviti, QR, lettura condivisa e schizzi seguono la lingua dell’app,

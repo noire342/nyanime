@@ -658,4 +658,7 @@
     <string name="content_open_session_active">È attiva una stanza o una sessione Cast. Puoi aprire la scheda senza cambiare la sessione. Termina la sessione prima di aprire questo episodio o capitolo.</string>
     <string name="content_open_page_missing">La pagina condivisa non è disponibile in questo capitolo.</string>
     <string name="content_open_busy">Termina la stanza o il Cast prima di aprire questo episodio o capitolo.</string>
+    <string name="pref_release_notifications">Notifiche e uscite</string>
+    <string name="pref_release_notifications_summary">Orari dei promemoria, nuovi episodi e capitoli, permessi</string>
+    <string name="pref_release_delivery">Permessi e ricezione</string>
 </resources>

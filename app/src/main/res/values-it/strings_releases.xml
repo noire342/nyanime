@@ -36,7 +36,8 @@
     <string name="release_reminder_two_minutes">2 minuti prima</string>
     <string name="release_reminder_airing">All’orario annunciato</string>
     <string name="release_reminder_times_footer">Puoi ricevere più promemoria per la stessa uscita; quelli coincidenti o scaduti vengono saltati. I nuovi episodi e capitoli disponibili hanno notifiche separate.</string>
-    <string name="release_reminder_times_disabled">I promemoria sono disattivati. Puoi riattivarli nella schermata precedente.</string>
+    <string name="release_reminder_times_disabled">I promemoria sono disattivati. Gli orari scelti restano salvati.</string>
+    <string name="release_notification_allowed">Android consente le notifiche per nuovi contenuti e promemoria.</string>
     <string name="release_open_notification_settings">Apri le impostazioni delle notifiche</string>
     <string name="release_reminder_exact_hint">Android può ritardare gli avvisi, soprattutto quelli pochi minuti prima. Consenti gli allarmi puntuali per renderli più affidabili.</string>
     <string name="release_test_reminder">Prova un promemoria</string>

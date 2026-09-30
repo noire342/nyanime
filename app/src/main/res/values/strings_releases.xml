@@ -36,7 +36,8 @@
     <string name="release_reminder_two_minutes">2 minutes before</string>
     <string name="release_reminder_airing">At the announced time</string>
     <string name="release_reminder_times_footer">You can receive several reminders for one release; coinciding or expired alerts are skipped. Newly available episodes and chapters have separate notifications.</string>
-    <string name="release_reminder_times_disabled">Reminders are off. You can enable them on the previous screen.</string>
+    <string name="release_reminder_times_disabled">Reminders are off. Your selected times are kept.</string>
+    <string name="release_notification_allowed">Android allows notifications for new content and reminders.</string>
     <string name="release_open_notification_settings">Open notification settings</string>
     <string name="release_reminder_exact_hint">Android may delay alerts, especially those only a few minutes before. Allow precise alarms to make them more reliable.</string>
     <string name="release_test_reminder">Test a reminder</string>

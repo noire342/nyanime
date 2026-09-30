@@ -165,7 +165,6 @@ object SettingsLibraryScreen : SearchableSettings {
     ): Preference.PreferenceGroup {
         val context = LocalContext.current
 
-        val scope = rememberCoroutineScope()
         val navigator = LocalNavigator.currentOrThrow
         val autoUpdateIntervalPref = libraryPreferences.autoUpdateInterval()
         val autoUpdateInterval by autoUpdateIntervalPref.collectAsState()
@@ -237,53 +236,10 @@ object SettingsLibraryScreen : SearchableSettings {
                     title = context.getString(eu.kanade.tachiyomi.R.string.release_unified),
                     subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_unified_description),
                 ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = eu.kanade.tachiyomi.data.releases.ReleasePreferences().enabled,
-                    title = context.getString(eu.kanade.tachiyomi.R.string.release_monitor),
-                    subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_monitor_description),
-                    onValueChanged = {
-                        ContextCompat.getMainExecutor(context).execute {
-                            eu.kanade.tachiyomi.data.releases.ReleaseMonitor.setup(context)
-                            scope.launch { eu.kanade.tachiyomi.data.releases.ReleaseReminders.schedule(context) }
-                        }
-                        true
-                    },
-                ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = eu.kanade.tachiyomi.data.releases.ReleasePreferences().availability,
-                    title = context.getString(eu.kanade.tachiyomi.R.string.release_available),
-                    subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_available_description),
-                ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = eu.kanade.tachiyomi.data.releases.ReleasePreferences().reminders,
-                    title = context.getString(eu.kanade.tachiyomi.R.string.release_reminder),
-                    subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_reminder_description),
-                    onValueChanged = {
-                        ContextCompat.getMainExecutor(context).execute {
-                            scope.launch { eu.kanade.tachiyomi.data.releases.ReleaseReminders.schedule(context) }
-                        }
-                        true
-                    },
-                ),
                 Preference.PreferenceItem.TextPreference(
-                    title = context.getString(eu.kanade.tachiyomi.R.string.release_reminder_times),
-                    subtitle = context.getString(eu.kanade.tachiyomi.R.string.release_reminder_times_settings_summary),
-                    onClick = {
-                        navigator.push(eu.kanade.presentation.components.releases.ReleaseReminderSettingsScreen())
-                    },
-                ),
-                Preference.PreferenceItem.TextPreference(
-                    title = context.getString(eu.kanade.tachiyomi.R.string.release_test_notification),
-                    subtitle = if (eu.kanade.tachiyomi.data.releases.ReleaseNotifications.canPost(context)) {
-                        context.getString(eu.kanade.tachiyomi.R.string.release_test_description)
-                    } else {
-                        context.getString(eu.kanade.tachiyomi.R.string.release_notification_blocked)
-                    },
-                    onClick = { eu.kanade.tachiyomi.data.releases.ReleaseStatus.showTestNotification(context) },
-                ),
-                Preference.PreferenceItem.TextPreference(
-                    title = context.getString(eu.kanade.tachiyomi.R.string.release_status),
-                    onClick = { navigator.push(eu.kanade.presentation.components.releases.ReleaseStatusScreen()) },
+                    title = stringResource(AYMR.strings.pref_release_notifications),
+                    subtitle = stringResource(AYMR.strings.pref_release_notifications_summary),
+                    onClick = { navigator.push(SettingsReleaseNotificationsScreen) },
                 ),
                 Preference.PreferenceItem.MultiSelectListPreference(
                     preference = libraryPreferences.autoUpdateDeviceRestrictions(),

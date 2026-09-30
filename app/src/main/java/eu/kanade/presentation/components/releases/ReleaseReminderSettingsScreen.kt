@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -38,10 +39,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.more.settings.widget.SwitchPreferenceWidget
 import eu.kanade.presentation.motion.ModernMotion
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.releases.ReleaseMonitor
 import eu.kanade.tachiyomi.data.releases.ReleaseNotifications
 import eu.kanade.tachiyomi.data.releases.ReleasePreferences
 import eu.kanade.tachiyomi.data.releases.ReleaseReminderKind
@@ -55,6 +58,8 @@ class ReleaseReminderSettingsScreen : Screen() {
         val context = LocalContext.current
         val navigator = LocalNavigator.currentOrThrow
         val preferences = remember { ReleasePreferences() }
+        val reminders by preferences.reminders.changes().collectAsState(preferences.reminders.get())
+        val monitoring by preferences.enabled.changes().collectAsState(preferences.enabled.get())
         val lifecycleOwner = LocalLifecycleOwner.current
         var exact by remember { mutableStateOf(ReleaseReminders.exactAllowed(context)) }
         var canPost by remember { mutableStateOf(ReleaseNotifications.canPost(context, ReleaseReminders.CHANNEL)) }
@@ -122,12 +127,31 @@ class ReleaseReminderSettingsScreen : Screen() {
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 )
                             }
-                            if (!preferences.reminders.get()) {
+                            SwitchPreferenceWidget(
+                                title = stringResource(R.string.release_reminder),
+                                checked = reminders,
+                                onCheckedChanged = { enabled ->
+                                    preferences.reminders.set(enabled)
+                                    ReleaseReminders.reschedule(context)
+                                },
+                            )
+                            if (!reminders) {
                                 Text(
                                     stringResource(R.string.release_reminder_times_disabled),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 )
+                            }
+                            if (!monitoring) {
+                                Text(
+                                    stringResource(R.string.release_disabled),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                TextButton(onClick = {
+                                    preferences.enabled.set(true)
+                                    ReleaseMonitor.setup(context)
+                                    ReleaseReminders.reschedule(context)
+                                }) { Text(stringResource(R.string.release_enable_monitor)) }
                             }
                         }
                     }

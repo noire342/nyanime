@@ -749,4 +749,7 @@
     <string name="content_open_session_active">A room or Cast session is active. You can open the title details without changing the session. End the session before opening this episode or chapter.</string>
     <string name="content_open_page_missing">The shared page is not available in this chapter.</string>
     <string name="content_open_busy">End the room or Cast session before opening this episode or chapter.</string>
+    <string name="pref_release_notifications">Notifications and releases</string>
+    <string name="pref_release_notifications_summary">Reminder times, new episodes and chapters, permissions</string>
+    <string name="pref_release_delivery">Permissions and delivery</string>
 </resources>

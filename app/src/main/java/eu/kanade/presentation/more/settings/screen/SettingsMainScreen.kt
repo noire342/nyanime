@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.GetApp
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Security
@@ -193,6 +194,12 @@ object SettingsMainScreen : Screen() {
             subtitleRes = MR.strings.pref_appearance_summary,
             icon = Icons.Outlined.Palette,
             screen = SettingsAppearanceScreen,
+        ),
+        Item(
+            titleRes = AYMR.strings.pref_release_notifications,
+            subtitleRes = AYMR.strings.pref_release_notifications_summary,
+            icon = Icons.Outlined.NotificationsActive,
+            screen = SettingsReleaseNotificationsScreen,
         ),
         Item(
             titleRes = MR.strings.pref_category_library,
