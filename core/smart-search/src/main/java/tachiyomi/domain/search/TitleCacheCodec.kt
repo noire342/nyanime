@@ -9,12 +9,29 @@ class TitleCacheCodec(private val json: Json = Json { ignoreUnknownKeys = true }
         json.decodeFromString<List<SearchTitle>>(raw).takeLast(CAPACITY).mapNotNull(::sanitize)
     }.getOrDefault(emptyList())
 
-    fun encode(items: Collection<SearchTitle>): String = json.encodeToString(
-        items.takeLastBounded().mapNotNull(::sanitize),
-    )
+    fun encode(items: Collection<SearchTitle>): String {
+        val records = ArrayDeque<SearchTitle>()
+        var bytes = 2 // JSON array brackets.
+        for (item in items.takeLastBounded().asReversed().mapNotNull(::sanitize)) {
+            val size = json.encodeToString(item).toByteArray(Charsets.UTF_8).size + if (records.isEmpty()) 0 else 1
+            if (bytes + size > MAX_BYTES) break
+            records.addFirst(item)
+            bytes += size
+        }
+        return json.encodeToString(records.toList())
+    }
 
     fun sanitize(item: SearchTitle): SearchTitle? {
-        if (item.key.length !in 1..128 || !validName(item.title) || item.origin.length > 32) return null
+        if (item.key.length !in 1..128 ||
+            !validName(item.title) ||
+            item.origin.length > 32 ||
+            item.key.contains("://") ||
+            item.origin.contains("://") ||
+            item.key.any(Char::isISOControl) ||
+            item.origin.any(Char::isISOControl)
+        ) {
+            return null
+        }
         return item.copy(aliases = item.aliases.filter(::validName).distinct().take(15))
     }
 

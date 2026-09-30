@@ -1,10 +1,12 @@
 package eu.kanade.presentation.more.settings.screen
 
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.fragment.app.FragmentActivity
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -13,8 +15,11 @@ import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.screen.browse.AnimeExtensionStoresScreen
 import eu.kanade.presentation.more.settings.screen.browse.MangaExtensionReposScreen
+import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.search.SmartTitleSearch
 import eu.kanade.tachiyomi.util.system.AuthenticatorUtil.authenticate
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.launch
 import mihon.domain.extension.anime.interactor.GetAnimeExtensionStoreCountAsFlow
 import mihon.domain.extensionrepo.manga.interactor.GetMangaExtensionRepoCount
 import tachiyomi.core.common.i18n.stringResource
@@ -34,6 +39,7 @@ object SettingsBrowseScreen : SearchableSettings {
     @Composable
     override fun getPreferences(): List<Preference> {
         val context = LocalContext.current
+        val scope = rememberCoroutineScope()
         val navigator = LocalNavigator.currentOrThrow
 
         val sourcePreferences = remember { Injekt.get<SourcePreferences>() }
@@ -44,6 +50,31 @@ object SettingsBrowseScreen : SearchableSettings {
         val animeReposCount by getExtensionStoreCountAsFlow().collectAsState(0)
 
         return listOf(
+            Preference.PreferenceGroup(
+                title = context.getString(R.string.search_smart_settings),
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = sourcePreferences.tolerantSearch(),
+                        title = context.getString(R.string.search_tolerant),
+                        subtitle = context.getString(R.string.search_tolerant_summary),
+                    ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = sourcePreferences.onlineSearchAssistance(),
+                        title = context.getString(R.string.search_catalog_assistance),
+                        subtitle = context.getString(R.string.search_catalog_summary),
+                    ),
+                    Preference.PreferenceItem.TextPreference(
+                        title = context.getString(R.string.search_clear_cache),
+                        subtitle = context.getString(R.string.search_clear_cache_summary),
+                        onClick = {
+                            scope.launch {
+                                Injekt.get<SmartTitleSearch>().clear()
+                                Toast.makeText(context, R.string.search_cache_cleared, Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                    ),
+                ),
+            ),
             Preference.PreferenceGroup(
                 title = stringResource(MR.strings.label_sources),
                 preferenceItems = persistentListOf(

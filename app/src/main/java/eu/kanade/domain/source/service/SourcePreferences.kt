@@ -11,6 +11,9 @@ class SourcePreferences(
     private val preferenceStore: PreferenceStore,
 ) {
 
+    fun tolerantSearch() = preferenceStore.getBoolean("tolerant_title_search", true)
+    fun onlineSearchAssistance() = preferenceStore.getBoolean("online_title_search_assistance", true)
+
     // Common options
 
     fun sourceDisplayMode() = preferenceStore.getObject(

@@ -16,6 +16,23 @@ class TitleCacheTest {
     }
 
     @Test
+    fun `encoded Unicode aliases never exceed the byte limit`() {
+        val records = (0 until 5_000).map { number ->
+            SearchTitle(
+                "test:$number",
+                "界".repeat(200),
+                SearchMedium.MANGA,
+                (0 until 15).map { "別".repeat(200) + it },
+            )
+        }
+        val encoded = codec.encode(records)
+        (encoded.toByteArray(Charsets.UTF_8).size <= TitleCacheCodec.MAX_BYTES) shouldBe true
+        val decoded = codec.decode(encoded)
+        decoded.isNotEmpty() shouldBe true
+        decoded.last().key shouldBe "test:4999"
+    }
+
+    @Test
     fun `cache is bounded recoverable and rebuilds the runtime index`() {
         val records = (0..5_010).map { SearchTitle("test:$it", "Synthetic Volume $it", SearchMedium.MANGA) }
         val decoded = codec.decode(codec.encode(records))

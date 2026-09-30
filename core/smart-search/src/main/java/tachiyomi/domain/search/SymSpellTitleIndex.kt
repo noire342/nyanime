@@ -40,7 +40,12 @@ class SymSpellTitleIndex(private val capacity: Int = 5_000) {
     fun candidates(query: String, medium: SearchMedium): List<SearchTitle> {
         val words = TitleNormalizer.words(query).split(' ').filter { it.isNotBlank() }
         val numbers = TitleNormalizer.numericParts(query)
-        val eligible = if (numbers.isEmpty()) null else editions[numbers].orEmpty()
+        val eligible = if (numbers.isEmpty()) {
+            null
+        } else {
+            editions.entries.filter { TitleNormalizer.preservesNumbers(numbers, it.key) }
+                .flatMapTo(mutableSetOf()) { it.value }
+        }
         val evidence = mutableMapOf<String, Int>()
         fun record(matches: Collection<String>, weight: Int) {
             matches.forEach { key ->
@@ -59,11 +64,16 @@ class SymSpellTitleIndex(private val capacity: Int = 5_000) {
                 }
             }
         }
-        return evidence.entries.sortedByDescending { it.value }.mapNotNull { records[it.key] }
+        return evidence.entries.sortedByDescending { it.value }.asSequence().mapNotNull { records[it.key] }
             .filter { item ->
                 item.medium == medium &&
-                    (numbers.isEmpty() || item.names.any { TitleNormalizer.numericParts(it) == numbers })
-            }.take(600)
+                    (
+                        numbers.isEmpty() ||
+                            item.names.any { name ->
+                                TitleNormalizer.preservesNumbers(numbers, TitleNormalizer.numericParts(name))
+                            }
+                        )
+            }.take(600).toList()
     }
 
     @Synchronized

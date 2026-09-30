@@ -21,6 +21,19 @@ class TitleSearchTest {
         matcher.score("Solar Gate 2", "Solar Gate 3") shouldBe 0
         matcher.score("Qx", "Qy") shouldBe 0
         matcher.score("Solar Gate", "Solar Gate 2") shouldBe 82
+        matcher.score("Synthetc Volume", "Synthetic Volume 12") shouldBe 75
+        (matcher.score("Synthetc", "Synthetic Volume") >= 75) shouldBe true
+    }
+
+    @Test
+    fun `numbers belonging to names survive additional season or part suffixes`() {
+        matcher.score("Synthetic Protocol 47", "Synthetic Protocol 48") shouldBe 0
+        (matcher.score("Synthetic Protocol 47", "Synthetic Protocol 47 Season 2") >= 75) shouldBe true
+        matcher.score("Synthetic Protocol 47 Season 2", "Synthetic Protocol 47 Season 3") shouldBe 0
+        val index = SymSpellTitleIndex()
+        index.add(listOf(title("Synthetic Protocol 47 Season 2")))
+        matcher.rank("Synthetc Protocol 47", index.candidates("Synthetc Protocol 47", SearchMedium.VIDEO))
+            .single().item.title shouldBe "Synthetic Protocol 47 Season 2"
     }
 
     @Test
@@ -179,6 +192,49 @@ class TitleSearchTest {
         }
         session.search(adapter, 1).items shouldBe listOf("Solar Gate")
         adapter.calls shouldBe listOf(1 to "golden portl", 1 to "Golden Portal", 1 to "Solar Gate")
+    }
+
+    @Test
+    fun `partial typo can recover a full edition name without inventing words`() = runTest {
+        val name = "Solar;Gate (Translated)"
+        val session = SearchSession("slar gate", SearchMedium.VIDEO, Provider(listOf(title(name))), matcher)
+        val adapter = Adapter { _, query -> SearchPage(if (query == name) listOf(name) else emptyList(), false) }
+        session.search(adapter, 1).items shouldBe listOf(name)
+        adapter.calls shouldBe listOf(1 to "slar gate", 1 to name)
+        session.query shouldBe "slar gate"
+    }
+
+    @Test
+    fun `refresh reuses verified source spelling without exhausting discovery retries`() = runTest {
+        val provider = Provider(listOf(title("Solar Gate", aliases = listOf("Golden Portal"))))
+        val session = SearchSession("golden portl", SearchMedium.VIDEO, provider, matcher)
+        var revision = 1
+        val adapter = Adapter { _, query ->
+            SearchPage(if (query == "Solar Gate") listOf("Solar Gate Bonus $revision") else emptyList(), false)
+        }
+        session.search(adapter, 1).items shouldBe listOf("Solar Gate Bonus 1")
+        revision = 2
+        session.search(adapter, 1).items shouldBe listOf("Solar Gate Bonus 2")
+        provider.calls shouldBe 1
+        adapter.calls.takeLast(2) shouldBe listOf(1 to "golden portl", 1 to "Solar Gate")
+    }
+
+    @Test
+    fun `cancelled candidate lookup cannot publish suggestions`() = runTest {
+        val provider = object : SearchCandidateProvider {
+            override suspend fun candidates(query: String, medium: SearchMedium, online: Boolean): List<SearchTitle> {
+                delay(10_000)
+                return listOf(title("Solar Gate"))
+            }
+            override suspend fun remember(items: List<SearchTitle>) = Unit
+        }
+        val session = SearchSession("slar gate", SearchMedium.VIDEO, provider, matcher)
+        val lookup = async { session.suggestions() }
+        delay(10)
+        lookup.cancel()
+        lookup.join()
+        session.assistance.value.suggestions shouldBe emptyList()
+        session.assistance.value.loading shouldBe false
     }
 
     @Test

@@ -23,6 +23,10 @@ import uy.kohesive.injekt.api.get
 
 class DiscoveryModule(private val app: Application) : InjektModule {
     override fun InjektRegistrar.registerInjectables() {
+        addSingletonFactory { eu.kanade.tachiyomi.data.search.SmartTitleSearch(app) }
+        addSingletonFactory<tachiyomi.domain.search.TitleSearch> {
+            get<eu.kanade.tachiyomi.data.search.SmartTitleSearch>()
+        }
         addSingletonFactory {
             DiscoveryDatabase(AndroidSqliteDriver(DiscoveryDatabase.Schema, app, "discovery.db"))
         }

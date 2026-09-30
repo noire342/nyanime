@@ -3,6 +3,7 @@ package tachiyomi.domain.search
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -18,6 +19,7 @@ data class SearchAssistance(
     val suggestions: List<SearchTitle> = emptyList(),
     val correctedQuery: String? = null,
     val loading: Boolean = false,
+    val resolved: Boolean = false,
     val unavailable: Boolean = false,
     val exact: Boolean = false,
     val enabled: Boolean = false,
@@ -63,31 +65,36 @@ class SearchSession(
     private val cursors = mutableMapOf<String, MutableList<Cursor<*>>>()
     private val displayed = mutableMapOf<String, MutableSet<String>>()
     private val extraRequests = mutableMapOf<String, SearchRequestBudget>()
+    private data class RecoveredQuery(val query: String, val expected: List<String>, val canPage: Boolean)
+    private val recoveredQueries = java.util.concurrent.ConcurrentHashMap<String, RecoveredQuery>()
 
     suspend fun suggestions(): List<SearchTitle> = candidateLock.withLock {
         candidateSnapshot?.let { return@withLock it }
         if (!canAssist()) return@withLock emptyList()
-        mutableAssistance.value = mutableAssistance.value.copy(loading = true)
+        mutableAssistance.update { it.copy(loading = true) }
         try {
             val found = matcher.rank(query, provider.candidates(query, medium, online)).take(5).map { it.item }
             candidateSnapshot = found
-            mutableAssistance.value = mutableAssistance.value.copy(suggestions = found, loading = false)
+            mutableAssistance.update { it.copy(suggestions = found, loading = false, resolved = true) }
             found
         } catch (failure: SearchCandidateFailure) {
             val found = matcher.rank(query, failure.local).take(5).map { it.item }
             candidateSnapshot = found
-            mutableAssistance.value = mutableAssistance.value.copy(
-                suggestions = found,
-                loading = false,
-                unavailable = true,
-            )
+            mutableAssistance.update {
+                it.copy(
+                    suggestions = found,
+                    loading = false,
+                    unavailable = true,
+                    resolved = true,
+                )
+            }
             found
         } catch (cancelled: CancellationException) {
-            mutableAssistance.value = mutableAssistance.value.copy(loading = false)
+            mutableAssistance.update { it.copy(loading = false) }
             throw cancelled
         } catch (_: Exception) {
             candidateSnapshot = emptyList()
-            mutableAssistance.value = mutableAssistance.value.copy(loading = false, unavailable = true)
+            mutableAssistance.update { it.copy(loading = false, unavailable = true, resolved = true) }
             emptyList()
         }
     }
@@ -106,7 +113,31 @@ class SearchSession(
         remember(original.items.map(adapter::title))
         val branches = mutableListOf(Cursor<T>(query, 2, original.hasNextPage))
         val merged = original.items.toMutableList()
-        if (canAssist() && original.items.none { matcher.score(query, adapter.title(it).title) >= 92 }) {
+        val previousRecovery = recoveredQueries[adapter.key]
+        if (canAssist() && previousRecovery != null) {
+            val recovered = try {
+                adapter.fetch(1, previousRecovery.query)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                mutableAssistance.update { it.copy(unavailable = true) }
+                null
+            }
+            if (recovered != null) {
+                remember(recovered.items.map(adapter::title))
+                merged += recovered.items.filter { item ->
+                    adapter.title(item).names.any { name ->
+                        previousRecovery.expected.any {
+                            matcher.score(it, name) >=
+                                75
+                        }
+                    }
+                }
+                branches += Cursor(previousRecovery.query, 2, recovered.hasNextPage && previousRecovery.canPage)
+            }
+        } else if (canAssist() &&
+            original.items.none { item -> adapter.title(item).names.any { matcher.score(query, it) >= 92 } }
+        ) {
             val candidates = suggestions()
             val ranked = matcher.rank(query, candidates)
             val first = ranked.firstOrNull()
@@ -121,11 +152,14 @@ class SearchSession(
                 requireNotNull(first).item.names
                     .filter { name ->
                         TitleNormalizer.numericParts(name) == TitleNormalizer.numericParts(query) &&
-                            LexicalTitleMatcher.editDistance(
-                                TitleNormalizer.compact(query),
-                                TitleNormalizer.compact(name),
-                                2,
-                            ) <= 2
+                            (
+                                LexicalTitleMatcher.editDistance(
+                                    TitleNormalizer.compact(query),
+                                    TitleNormalizer.compact(name),
+                                    2,
+                                ) <= 2 ||
+                                    matcher.score(query, name) >= 85
+                                )
                     }.maxByOrNull { matcher.score(query, it) }
             } else {
                 null
@@ -153,21 +187,22 @@ class SearchSession(
                     throw cancelled
                 } catch (_: Exception) {
                     // Preserve the successful original response and suggestions.
-                    mutableAssistance.value = mutableAssistance.value.copy(unavailable = true)
+                    mutableAssistance.update { it.copy(unavailable = true) }
                     break
                 }
                 remember(recovered.items.map(adapter::title))
                 val namedVariant = corrected != null && variant in listOf(corrected, first?.item?.title)
+                val expected = if (namedVariant) listOfNotNull(corrected, variant) else listOf(corrected ?: query)
                 val pertinent = recovered.items.filter {
                     val item = adapter.title(it)
-                    val expected = if (namedVariant) listOfNotNull(corrected, variant) else listOf(corrected ?: query)
                     item.names.any { name -> expected.any { matcher.score(it, name) >= 75 } }
                 }
                 merged += pertinent
                 // An anchor is a single bounded probe, never a crawl of a broad catalog.
                 branches += Cursor(variant, 2, recovered.hasNextPage && pertinent.isNotEmpty() && namedVariant)
-                if (pertinent.isNotEmpty() && corrected != null) {
-                    mutableAssistance.value = mutableAssistance.value.copy(correctedQuery = variant)
+                if (pertinent.isNotEmpty()) {
+                    mutableAssistance.update { it.copy(correctedQuery = variant) }
+                    recoveredQueries[adapter.key] = RecoveredQuery(variant, expected, namedVariant)
                     break
                 }
             }
@@ -177,7 +212,7 @@ class SearchSession(
         synchronized(displayed) { displayed[adapter.key] = unique.mapTo(mutableSetOf(), adapter::identity) }
         val ordered = if (canAssist()) {
             unique.sortedByDescending {
-                matcher.score(query, adapter.title(it).title)
+                adapter.title(it).names.maxOfOrNull { name -> matcher.score(query, name) } ?: 0
             }
         } else {
             unique

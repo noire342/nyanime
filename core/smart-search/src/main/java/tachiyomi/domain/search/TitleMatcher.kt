@@ -39,6 +39,9 @@ object TitleNormalizer {
 
     fun numericParts(value: String) = numbers.findAll(words(value)).map { it.value }.toList()
 
+    fun preservesNumbers(query: List<String>, candidate: List<String>) =
+        query.isEmpty() || (candidate.size >= query.size && query.indices.all { query[it] == candidate[it] })
+
     /** Accent folding is secondary and Latin-only: Japanese voicing marks retain their meaning. */
     fun folded(value: String): String = words(value).map { character ->
         if (Character.UnicodeScript.of(character.code) == Character.UnicodeScript.LATIN) {
@@ -50,51 +53,92 @@ object TitleNormalizer {
 }
 
 class LexicalTitleMatcher : TitleMatcher {
-    override fun score(query: String, title: String): Int {
-        val wanted = TitleNormalizer.words(query)
-        val actual = TitleNormalizer.words(title)
-        if (wanted.isBlank() || actual.isBlank()) return 0
-        val wantedNumbers = TitleNormalizer.numericParts(wanted)
-        val actualNumbers = TitleNormalizer.numericParts(actual)
-        if (wantedNumbers.isNotEmpty() && wantedNumbers != actualNumbers) return 0
-        val editionPenalty = if (wantedNumbers.isEmpty() && actualNumbers.isNotEmpty()) 12 else 0
-        if (wanted == actual) return 100
-        val a = wanted.replace(" ", "")
-        val b = actual.replace(" ", "")
-        if (a == b) return 99
-        if (TitleNormalizer.folded(wanted) == TitleNormalizer.folded(actual)) return 98
-        if (actual.startsWith(wanted) || (a.length >= 3 && b.startsWith(a))) return 94 - editionPenalty
-        val expected = wanted.split(' ')
-        val available = actual.split(' ')
-        if (expected.all { word -> available.any { it == word } }) return 93 - editionPenalty
-        if (wanted.length < 4) return 0
-        val limit = if (a.length < 8) 1 else 2
-        val distance = editDistance(a, b, limit)
-        if (distance <= limit) return (96 - distance * 7 - editionPenalty).coerceAtLeast(0)
-        // Partial queries also tolerate mistakes, but every word must be grounded in this title.
-        if (expected.size > 1) {
-            val costs = expected.map { word ->
-                val maximum = if (word.length < 4) {
-                    0
-                } else if (word.length < 8) {
-                    1
-                } else {
-                    2
-                }
-                available.minOfOrNull { editDistance(word, it, maximum) } ?: maximum + 1
-            }
-            if (expected.indices.all { costs[it] <= if (expected[it].length < 4) 0 else 1 } && costs.sum() <= 2) {
-                return 90 - costs.sum() * 5 - editionPenalty
-            }
-        }
-        return 0
+    private data class NormalizedTitle(
+        val words: String,
+        val compact: String,
+        val numbers: List<String>,
+        val tokens: List<String>,
+        val folded: String,
+    )
+    private data class DistanceKey(val first: String, val second: String, val limit: Int)
+
+    // Bounded, memory-only normalization. It never writes titles or user queries to disk.
+    private val normalized = object : LinkedHashMap<String, NormalizedTitle>(256, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, NormalizedTitle>) = size > 4_096
     }
 
-    override fun rank(query: String, candidates: Collection<SearchTitle>): List<TitleMatch> = candidates
-        .distinctBy { it.key }
-        .map { item -> TitleMatch(item, item.names.maxOfOrNull { score(query, it) } ?: 0) }
-        .filter { it.score >= 75 }
-        .sortedWith(compareByDescending<TitleMatch> { it.score }.thenBy { it.item.title })
+    private fun prepare(value: String): NormalizedTitle = synchronized(normalized) {
+        normalized.getOrPut(value) {
+            val words = TitleNormalizer.words(value)
+            NormalizedTitle(
+                words,
+                words.replace(" ", ""),
+                TitleNormalizer.numericParts(words),
+                words.split(' '),
+                TitleNormalizer.folded(words),
+            )
+        }
+    }
+
+    override fun score(query: String, title: String): Int = score(prepare(query), prepare(title), null)
+
+    private fun score(
+        wanted: NormalizedTitle,
+        actual: NormalizedTitle,
+        distances: MutableMap<DistanceKey, Int>?,
+    ): Int {
+        fun distance(first: String, second: String, limit: Int): Int {
+            if (first == second) return 0
+            if (kotlin.math.abs(first.length - second.length) > limit) return limit + 1
+            if (distances == null) return editDistance(first, second, limit)
+            return distances.getOrPut(DistanceKey(first, second, limit)) { editDistance(first, second, limit) }
+        }
+        if (wanted.words.isBlank() || actual.words.isBlank()) return 0
+        if (!TitleNormalizer.preservesNumbers(wanted.numbers, actual.numbers)) return 0
+        val editionPenalty = if (wanted.numbers != actual.numbers) 12 else 0
+        if (wanted.words == actual.words) return 100
+        val a = wanted.compact
+        val b = actual.compact
+        if (a == b) return 99
+        if (wanted.folded == actual.folded) return 98
+        if (actual.words.startsWith(wanted.words) || (a.length >= 3 && b.startsWith(a))) return 94 - editionPenalty
+        if (wanted.tokens.all { word -> actual.tokens.any { it == word } }) return 93 - editionPenalty
+        if (wanted.words.length < 4) return 0
+        val limit = if (a.length < 8) 1 else 2
+        val compactDistance = distance(a, b, limit)
+        if (compactDistance <= limit) return (96 - compactDistance * 7 - editionPenalty).coerceAtLeast(0)
+        // Every query word must belong to this complete candidate, including partial searches.
+        var totalCost = 0
+        for (word in wanted.tokens) {
+            val maximum = if (word.length < 4) {
+                0
+            } else if (word.length < 8) {
+                1
+            } else {
+                2
+            }
+            var best = maximum + 1
+            for (available in actual.tokens) {
+                best = minOf(best, distance(word, available, maximum))
+                if (best == 0) break
+            }
+            if (best > if (word.length < 4) 0 else 1) return 0
+            totalCost += best
+            if (totalCost > 2) return 0
+        }
+        return 92 - totalCost * 5 - editionPenalty
+    }
+
+    override fun rank(query: String, candidates: Collection<SearchTitle>): List<TitleMatch> {
+        val wanted = prepare(query)
+        val distances = mutableMapOf<DistanceKey, Int>()
+        return candidates.distinctBy { it.key }
+            .map { item ->
+                TitleMatch(item, item.names.maxOfOrNull { score(wanted, prepare(it), distances) } ?: 0)
+            }
+            .filter { it.score >= 75 }
+            .sortedWith(compareByDescending<TitleMatch> { it.score }.thenBy { it.item.title })
+    }
 
     companion object {
         /** Bounded optimal-string-alignment distance, including adjacent letter transpositions. */
