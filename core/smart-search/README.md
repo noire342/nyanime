@@ -17,6 +17,9 @@ e delle parti hanno precedenza; un numero finale separato senza candidati
 numerati plausibili può recuperare il titolo base riconosciuto. Il `1` può
 indicare una prima stagione senza numero nel titolo. Il confronto completo,
 i vincoli numerici e l'interpretazione scelta valgono anche nelle pagine successive.
+Le grafie equivalenti mantengono l'ampiezza della query breve: una ricerca
+non viene ristretta al primo nome completo del catalogo. Più recuperi verificati
+conservano ciascuno il proprio cursore e rimangono disponibili dopo il refresh.
 
 ## Dipendenza e licenza
 

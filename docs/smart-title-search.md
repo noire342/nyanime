@@ -20,6 +20,12 @@ lo riattiva. Il testo digitato resta visibile. Il candidato plausibile meglio
 valutato viene usato anche per recuperare risultati, lasciando visibili le altre
 alternative: non occorre toccare un suggerimento per avviare il recupero.
 Questo non seleziona un'opera né modifica associazioni o tracking.
+Le varianti di spazi e punteggiatura conservano l'ampiezza della query:
+`nova loop` può recuperare il frammento dinamico `Nova:Loop`, senza trasformarsi
+nel nome completo di una singola stagione. Il recupero prosegue anche se il testo
+originale aveva già un risultato pertinente. Le grafie equivalenti note vengono
+unite entro il budget; ciascuna mantiene il proprio cursore e viene riutilizzata
+durante il refresh. I nomi si ricavano sempre dai titoli e alias disponibili.
 Filtri e categorie restano applicati. Se la fonte non restituisce alcun titolo
 pertinente, l'app non trasforma i suggerimenti di catalogo in risultati fittizi.
 
@@ -132,7 +138,9 @@ Il motore restituisce uno stato esplicito quando l'aiuto non è disponibile.
 I test versionati usano esclusivamente nomi sintetici. Coprono normalizzazione,
 refusi e alias, edizioni numerate, numeri finali non riconosciuti, prima stagione implicita, ambiguità con
 recupero esplicito e alternative visibili, originali falliti, budget condivisi,
-paginazione interrotta, deduplicazione, offline e cache danneggiata.
+paginazione interrotta, deduplicazione, offline e cache danneggiata. Test dedicati
+confrontano la prima ricerca e le successive con dati runtime già memorizzati,
+grafie equivalenti, famiglie di titoli e cursori distinti per più recuperi.
 I parser dei cataloghi e la compatibilità dei metadati hanno test dedicati.
 
 La normalizzazione usa anche una cache di 4.096 nomi esclusivamente in memoria;

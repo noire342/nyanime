@@ -71,7 +71,7 @@ class SearchSession(
         val canPage: Boolean,
         val interpretation: String,
     )
-    private val recoveredQueries = java.util.concurrent.ConcurrentHashMap<String, RecoveredQuery>()
+    private val recoveredQueries = java.util.concurrent.ConcurrentHashMap<String, List<RecoveredQuery>>()
 
     suspend fun suggestions(): List<SearchTitle> = candidateLock.withLock {
         candidateSnapshot?.let { return@withLock it }
@@ -120,25 +120,35 @@ class SearchSession(
         val merged = original.items.toMutableList()
         val previousRecovery = recoveredQueries[adapter.key]
         if (canAssist() && previousRecovery != null) {
-            val recovered = try {
-                adapter.fetch(1, previousRecovery.query)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                mutableAssistance.update { it.copy(unavailable = true) }
-                null
-            }
-            if (recovered != null) {
-                remember(recovered.items.map(adapter::title))
-                merged += recovered.items.filter {
-                    pertinent(adapter.title(it), previousRecovery.expected, previousRecovery.interpretation)
+            for (recovery in previousRecovery) {
+                val recovered = try {
+                    adapter.fetch(1, recovery.query)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    mutableAssistance.update { it.copy(unavailable = true) }
+                    null
                 }
-                branches += Cursor(previousRecovery.query, 2, recovered.hasNextPage && previousRecovery.canPage)
+                if (recovered != null) {
+                    remember(recovered.items.map(adapter::title))
+                    merged += recovered.items.filter {
+                        pertinent(adapter.title(it), recovery.expected, recovery.interpretation)
+                    }
+                    branches += Cursor(recovery.query, 2, recovered.hasNextPage && recovery.canPage)
+                }
             }
         } else if (canAssist() &&
-            original.items.none { matcher.rank(query, listOf(adapter.title(it))).any { it.score >= 92 } }
+            (
+                original.items.none { matcher.rank(query, listOf(adapter.title(it))).any { it.score >= 92 } } ||
+                    TitleNormalizer.equivalentSpellings(
+                        query,
+                        original.items.flatMap {
+                            adapter.title(it).names
+                        },
+                    ).isNotEmpty()
+                )
         ) {
-            val candidates = suggestions()
+            val candidates = suggestions() + original.items.map(adapter::title)
             val ranked = matcher.rank(query, candidates)
             val first = ranked.firstOrNull()
             val interpretation = if (first?.numericFallback ==
@@ -166,7 +176,10 @@ class SearchSession(
             } else {
                 null
             }
+            // An equivalent short spelling must stay a broad search, not become one full catalog title.
+            val spellings = TitleNormalizer.equivalentSpellings(interpretation, ranked.flatMap { it.item.names })
             val attempts = buildList {
+                addAll(spellings)
                 corrected?.let(::add)
                 if (corrected != null &&
                     first != null &&
@@ -176,7 +189,10 @@ class SearchSession(
                 }
                 recoveryAnchor(corrected ?: first?.item?.title)?.let(::add)
             }.distinctBy { it.trim().lowercase() }.filter { it != query }.take(2)
+            val verified = mutableListOf<RecoveredQuery>()
             for (variant in attempts) {
+                val equivalent = variant in spellings
+                if (verified.isNotEmpty() && !equivalent) break
                 val budget = synchronized(extraRequests) {
                     extraRequests.getOrPut(adapter.key) { SearchRequestBudget(2) }
                 }
@@ -191,8 +207,10 @@ class SearchSession(
                     break
                 }
                 remember(recovered.items.map(adapter::title))
-                val namedVariant = corrected != null && variant in listOf(corrected, first?.item?.title)
-                val expected = if (namedVariant) {
+                val namedVariant = equivalent || (corrected != null && variant in listOf(corrected, first?.item?.title))
+                val expected = if (equivalent) {
+                    listOf(interpretation, variant)
+                } else if (namedVariant) {
                     listOfNotNull(corrected, variant, first?.item?.title) +
                         ranked.filter { candidate ->
                             candidate.item.names.any { TitleNormalizer.compact(it) == TitleNormalizer.compact(variant) }
@@ -205,11 +223,22 @@ class SearchSession(
                 // An anchor is a single bounded probe, never a crawl of a broad catalog.
                 branches += Cursor(variant, 2, recovered.hasNextPage && matches.isNotEmpty() && namedVariant)
                 if (matches.isNotEmpty()) {
-                    mutableAssistance.update { it.copy(correctedQuery = corrected ?: variant) }
-                    recoveredQueries[adapter.key] = RecoveredQuery(variant, expected, namedVariant, interpretation)
-                    break
+                    if (verified.isEmpty()) {
+                        mutableAssistance.update {
+                            it.copy(
+                                correctedQuery = if (equivalent) {
+                                    variant
+                                } else {
+                                    corrected
+                                        ?: variant
+                                },
+                            )
+                        }
+                    }
+                    verified += RecoveredQuery(variant, expected, namedVariant, interpretation)
                 }
             }
+            if (verified.isNotEmpty()) recoveredQueries[adapter.key] = verified
         }
         synchronized(cursors) { cursors[adapter.key] = branches.toMutableList<Cursor<*>>() }
         val unique = merged.distinctBy(adapter::identity)
@@ -245,7 +274,7 @@ class SearchSession(
             val filtered = if (branch.query == query) {
                 result.items
             } else {
-                val recovery = recoveredQueries[adapter.key]?.takeIf { it.query == branch.query }
+                val recovery = recoveredQueries[adapter.key]?.firstOrNull { it.query == branch.query }
                 val expected = recovery?.expected ?: listOf(branch.query)
                 result.items.filter { pertinent(adapter.title(it), expected, recovery?.interpretation ?: query) }
             }

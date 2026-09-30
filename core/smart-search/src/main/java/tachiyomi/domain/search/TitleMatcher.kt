@@ -42,6 +42,29 @@ object TitleNormalizer {
     fun preservesNumbers(query: List<String>, candidate: List<String>) =
         query.isEmpty() || (candidate.size >= query.size && query.indices.all { query[it] == candidate[it] })
 
+    /** Real title fragments with the same letters/numbers, retaining their original separators. */
+    fun equivalentSpellings(query: String, names: Iterable<String>): List<String> {
+        val wanted = compact(query)
+        if (wanted.length < 3) return emptyList()
+        val tokens = Regex("[\\p{L}\\p{N}]+")
+        val spellings = names.flatMap { name ->
+            val parts = tokens.findAll(name.take(256)).toList()
+            buildList {
+                for (start in parts.indices) {
+                    for (end in start..parts.lastIndex) {
+                        val fragment = name.substring(parts[start].range.first, parts[end].range.last + 1)
+                        val joined = compact(fragment)
+                        if (joined == wanted) add(fragment)
+                        if (joined.length >= wanted.length) break
+                    }
+                }
+            }
+        }
+        return spellings.distinctBy { it.lowercase(Locale.ROOT) }
+            .filterNot { it.equals(query.trim(), ignoreCase = true) }
+            .sortedBy { kotlin.math.abs(words(it).split(' ').size - words(query).split(' ').size) }
+    }
+
     /** A separate trailing number can be a season/part, but never overrides a matching numbered name. */
     fun trailingNumberBase(value: String): String? {
         val tokens = words(value).split(' ')

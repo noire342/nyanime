@@ -8,6 +8,14 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 1 ottobre 2026 — Risultati completi per grafie equivalenti
+
+- La ricerca con spazi o punteggiatura diversa conserva la query breve e recupera
+  anche stagioni, parti e titoli collegati, senza restringersi al primo nome completo.
+- Un risultato iniziale non blocca il recupero delle grafie equivalenti note;
+  refresh e paginazione conservano tutte le varianti verificate, entro i limiti esistenti.
+- Aggiunte verifiche della prima ricerca e delle successive con cache già alimentata.
+
 ## 30 settembre 2026 — Ricerca intelligente dei titoli
 
 - Home, Sfoglia, singole fonti e libreria riconoscono punteggiatura diversa,
