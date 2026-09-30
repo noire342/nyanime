@@ -336,7 +336,7 @@ object HomeScreen : Screen() {
         val shape = RoundedCornerShape(32.dp)
         val dark = LocalDarkTheme.current
         val barColors = if (dark) {
-            listOf(Color(0xFF760C1A), Color(0xFFC0192A))
+            listOf(Color(0xFF26080E), Color(0xFF490D19))
         } else {
             listOf(Color(0xFFFFFCF8), Color(0xFFFFF3E9))
         }
@@ -356,7 +356,7 @@ object HomeScreen : Screen() {
                 contentColor = if (dark) Color.White else Color(0xFF32251F),
                 border = BorderStroke(
                     1.dp,
-                    if (dark) Color.White.copy(alpha = 0.18f) else Color(0xFFE4DAD2),
+                    if (dark) Color.White.copy(alpha = 0.10f) else Color(0xFFE4DAD2),
                 ),
             ) {
                 BoxWithConstraints {
