@@ -122,7 +122,11 @@ fun TabbedScreen(
                 ) { page ->
                     MangaSectionTheme(legacy = pageScopedTheme && tabs[page].legacyManga) {
                         tabs[page].content(
-                            PaddingValues(bottom = contentPadding.calculateBottomPadding()),
+                            PaddingValues(
+                                bottom =
+                                contentPadding.calculateBottomPadding() +
+                                    eu.kanade.tachiyomi.ui.home.LocalFloatingNavigationInset.current,
+                            ),
                             snackbarHostState,
                         )
                     }

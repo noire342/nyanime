@@ -1,67 +1,67 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="190 135 1680 410" preserveAspectRatio="xMinYMid meet">
 <defs>
 <linearGradient id="grad1" x1="1466.19" y1="257.093" x2="1474.94" y2="447.892" gradientUnits="userSpaceOnUse">
-<stop offset="0%" style="stop-color: rgb(254, 163, 70);" />
-<stop offset="33.5079%" style="stop-color: rgb(252, 137, 17);" />
-<stop offset="100%" style="stop-color: rgb(240, 90, 2);" />
+<stop offset="0%" style="stop-color: rgb(216, 117, 49);" />
+<stop offset="33.5079%" style="stop-color: rgb(214, 99, 12);" />
+<stop offset="100%" style="stop-color: rgb(204, 65, 1);" />
 </linearGradient>
 </defs>
 <defs>
 <linearGradient id="grad2" x1="874.991" y1="259.699" x2="879.991" y2="446.633" gradientUnits="userSpaceOnUse">
-<stop offset="0%" style="stop-color: rgb(253, 160, 62);" />
-<stop offset="32.6203%" style="stop-color: rgb(252, 136, 16);" />
-<stop offset="100%" style="stop-color: rgb(240, 92, 2);" />
+<stop offset="0%" style="stop-color: rgb(215, 115, 43);" />
+<stop offset="32.6203%" style="stop-color: rgb(214, 98, 11);" />
+<stop offset="100%" style="stop-color: rgb(204, 66, 1);" />
 </linearGradient>
 </defs>
 <defs>
 <linearGradient id="grad3" x1="649.587" y1="262.674" x2="653.36" y2="524.647" gradientUnits="userSpaceOnUse">
-<stop offset="0%" style="stop-color: rgb(253, 142, 13);" />
-<stop offset="100%" style="stop-color: rgb(236, 82, 2);" />
+<stop offset="0%" style="stop-color: rgb(215, 102, 9);" />
+<stop offset="100%" style="stop-color: rgb(201, 59, 1);" />
 </linearGradient>
 </defs>
 <defs>
 <linearGradient id="grad4" x1="1742.3" y1="259.858" x2="1747.69" y2="446.78" gradientUnits="userSpaceOnUse">
-<stop offset="0%" style="stop-color: rgb(254, 161, 65);" />
-<stop offset="100%" style="stop-color: rgb(239, 91, 1);" />
+<stop offset="0%" style="stop-color: rgb(216, 116, 46);" />
+<stop offset="100%" style="stop-color: rgb(203, 66, 1);" />
 </linearGradient>
 </defs>
 <defs>
 <linearGradient id="grad5" x1="1107.32" y1="259.48" x2="1116.92" y2="446.233" gradientUnits="userSpaceOnUse">
-<stop offset="0%" style="stop-color: rgb(254, 163, 68);" />
-<stop offset="36.3636%" style="stop-color: rgb(252, 134, 15);" />
-<stop offset="100%" style="stop-color: rgb(237, 89, 3);" />
+<stop offset="0%" style="stop-color: rgb(216, 117, 48);" />
+<stop offset="36.3636%" style="stop-color: rgb(214, 96, 10);" />
+<stop offset="100%" style="stop-color: rgb(201, 64, 2);" />
 </linearGradient>
 </defs>
 <defs>
 <linearGradient id="grad6" x1="437.585" y1="177.666" x2="486.671" y2="468.553" gradientUnits="userSpaceOnUse">
-<stop offset="0%" style="stop-color: rgb(254, 199, 134);" />
-<stop offset="51.5254%" style="stop-color: rgb(254, 136, 6);" />
-<stop offset="100%" style="stop-color: rgb(247, 89, 3);" />
+<stop offset="0%" style="stop-color: rgb(216, 143, 94);" />
+<stop offset="51.5254%" style="stop-color: rgb(216, 98, 4);" />
+<stop offset="100%" style="stop-color: rgb(210, 64, 2);" />
 </linearGradient>
 </defs>
 <defs>
 <linearGradient id="grad7" x1="178.649" y1="183.583" x2="314.612" y2="447.634" gradientUnits="userSpaceOnUse">
-<stop offset="0%" style="stop-color: rgb(253, 136, 4);" />
-<stop offset="100%" style="stop-color: rgb(246, 88, 3);" />
+<stop offset="0%" style="stop-color: rgb(215, 98, 3);" />
+<stop offset="100%" style="stop-color: rgb(209, 63, 2);" />
 </linearGradient>
 </defs>
 <defs>
 <linearGradient id="grad8" x1="281.264" y1="239.319" x2="430.717" y2="464.183" gradientUnits="userSpaceOnUse">
-<stop offset="0%" style="stop-color: rgb(254, 211, 155);" />
-<stop offset="100%" style="stop-color: rgb(254, 155, 39);" />
+<stop offset="0%" style="stop-color: rgb(216, 152, 108);" />
+<stop offset="100%" style="stop-color: rgb(216, 112, 27);" />
 </linearGradient>
 </defs>
 <defs>
 <linearGradient id="grad9" x1="1258.01" y1="263.679" x2="1272.05" y2="443.13" gradientUnits="userSpaceOnUse">
-<stop offset="0%" style="stop-color: rgb(253, 158, 58);" />
-<stop offset="32.7778%" style="stop-color: rgb(253, 135, 14);" />
-<stop offset="100%" style="stop-color: rgb(239, 90, 3);" />
+<stop offset="0%" style="stop-color: rgb(215, 114, 41);" />
+<stop offset="32.7778%" style="stop-color: rgb(215, 97, 10);" />
+<stop offset="100%" style="stop-color: rgb(203, 65, 2);" />
 </linearGradient>
 </defs>
 <defs>
 <linearGradient id="grad10" x1="1263.87" y1="196.399" x2="1266.11" y2="226.316" gradientUnits="userSpaceOnUse">
-<stop offset="0%" style="stop-color: rgb(254, 158, 51);" />
-<stop offset="100%" style="stop-color: rgb(253, 138, 13);" />
+<stop offset="0%" style="stop-color: rgb(216, 114, 36);" />
+<stop offset="100%" style="stop-color: rgb(215, 99, 9);" />
 </linearGradient>
 </defs>
 <defs>

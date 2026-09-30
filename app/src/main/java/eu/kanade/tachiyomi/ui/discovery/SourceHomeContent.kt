@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +34,7 @@ import eu.kanade.presentation.discovery.ContinueWatchingRow
 import eu.kanade.presentation.discovery.HomeLoadingSkeleton
 import eu.kanade.presentation.discovery.HomeLoadingTransition
 import eu.kanade.presentation.discovery.HomePosterRowSkeleton
+import eu.kanade.presentation.discovery.HomeSelectionChip
 import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.LocalAnimeRow
 import eu.kanade.presentation.discovery.SectionHeader
@@ -172,7 +172,10 @@ private fun DiscoveryTab.SourceHomeReadyContent(
             LazyColumn(
                 modifier = Modifier.nsfwSourcePrivacy(PrivacyMedia.VIDEO, source.sourceIds),
                 state = listState,
-                contentPadding = PaddingValues(bottom = 24.dp),
+                contentPadding = PaddingValues(
+                    bottom =
+                    24.dp + eu.kanade.tachiyomi.ui.home.LocalFloatingNavigationInset.current,
+                ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (!access.offline && source.searchable) {
@@ -263,11 +266,12 @@ private fun DiscoveryTab.SourceHomeReadyContent(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     items(row.sections, key = { it.id }) { variant ->
-                                        FilterChip(
-                                            selected = variant.id == section.id,
-                                            onClick = { selection = variant.id },
-                                            label = { Text(variant.group?.tab ?: variant.title) },
-                                        )
+                                        HomeSelectionChip(
+                                            variant.group?.tab ?: variant.title,
+                                            variant.id == section.id,
+                                        ) {
+                                            selection = variant.id
+                                        }
                                     }
                                 }
                             }

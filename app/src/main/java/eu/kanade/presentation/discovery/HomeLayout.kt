@@ -11,7 +11,10 @@ internal object HomeLayout {
         return width < primaryWidth + secondaryWidth
     }
 
-    fun heroHeight(width: Dp): Dp = if (width < 600.dp) (width * 1.25f).coerceIn(400.dp, 540.dp) else 380.dp
+    fun heroHeight(width: Dp, fontScale: Float = 1f): Dp {
+        val base = if (width < 600.dp) (width * 0.94f).coerceIn(360.dp, 430.dp) else 400.dp
+        return base + (72 * (fontScale - 1f).coerceIn(0f, 1f)).dp
+    }
 
     fun posterWidth(fontScale: Float): Dp = (132 * fontScale.coerceIn(1f, 1.5f)).dp
 

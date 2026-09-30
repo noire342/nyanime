@@ -232,7 +232,10 @@ data object DiscoveryTab : Tab {
             ) {
                 LazyColumn(
                     state = listState,
-                    contentPadding = PaddingValues(bottom = 24.dp),
+                    contentPadding = PaddingValues(
+                        bottom =
+                        24.dp + eu.kanade.tachiyomi.ui.home.LocalFloatingNavigationInset.current,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     item(key = "hero") {

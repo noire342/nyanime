@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Star
@@ -22,6 +24,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,6 +58,7 @@ fun MangaSourceAction(
     item: MangaHomeItem,
     modifier: Modifier = Modifier,
     discover: Boolean = false,
+    compact: Boolean = false,
     onOpen: ((Manga) -> Unit)? = null,
 ) {
     val registry = remember { Injekt.get<MangaHomeRegistry>() }
@@ -96,18 +101,31 @@ fun MangaSourceAction(
         }
     }
     if (listing.homes.size < 2 || listing.homes.none { it.id == item.manga.source }) return
-    AssistChip(
-        onClick = { expanded = true },
-        modifier = modifier,
-        label = {
-            Text(
-                if (variants.size > 1) "${variants.size} fonti" else sourceName,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        leadingIcon = { Icon(Icons.Outlined.SwapHoriz, contentDescription = null, Modifier.size(18.dp)) },
-    )
+    val label = if (variants.size > 1) "${variants.size} fonti" else sourceName
+    if (compact) {
+        Surface(
+            onClick = { expanded = true },
+            modifier = modifier.heightIn(min = 32.dp),
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+            Row(
+                Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.SwapHoriz, null, Modifier.size(16.dp))
+                Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    } else {
+        AssistChip(
+            onClick = { expanded = true },
+            modifier = modifier,
+            label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            leadingIcon = { Icon(Icons.Outlined.SwapHoriz, contentDescription = null, Modifier.size(18.dp)) },
+        )
+    }
     if (expanded) {
         ModalBottomSheet(onDismissRequest = { expanded = false }) {
             Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {

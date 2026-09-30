@@ -199,7 +199,11 @@ internal fun LibrariesTab.AllLibrariesContent() {
                     AllLibraryShelf(
                         entries = entries,
                         displayMode = displayMode,
-                        contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
+                        contentPadding = PaddingValues(
+                            bottom =
+                            contentPadding.calculateBottomPadding() +
+                                eu.kanade.tachiyomi.ui.home.LocalFloatingNavigationInset.current,
+                        ),
                         onOpen = { entry ->
                             acknowledgeShelfNotices(viewedNotices, entry.status)
                             when (entry) {

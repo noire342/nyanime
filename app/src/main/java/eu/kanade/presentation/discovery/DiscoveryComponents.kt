@@ -124,10 +124,7 @@ fun metadataLabel(value: String?): String? = when (value) {
 fun SectionHeader(title: String, more: (() -> Unit)? = null) {
     if (!LocalNyanimeStyle.current) return eu.kanade.presentation.discovery.legacy.SectionHeader(title, more)
     Row(
-        Modifier.fillMaxWidth().padding(
-            horizontal = 16.dp,
-            vertical = 8.dp,
-        ),
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -135,11 +132,17 @@ fun SectionHeader(title: String, more: (() -> Unit)? = null) {
             Modifier.weight(1f).semantics {
                 heading()
             },
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
         if (more != null) {
-            IconButton(onClick = more) { Icon(Icons.AutoMirrored.Filled.ArrowForward, "Mostra tutti: $title") }
+            TextButton(onClick = more) {
+                Text("Vedi tutti", maxLines = 1)
+                Spacer(Modifier.width(4.dp))
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, "Mostra tutti: $title", Modifier.size(18.dp))
+            }
         }
     }
 }
@@ -210,7 +213,7 @@ fun PosterCard(
     ) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                .clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             if (cover is AnimeCover || cover is Anime) {
                 SourceHomeArtwork(
@@ -263,6 +266,7 @@ fun PosterCard(
             minLines = 2,
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
         )
         Text(
             subtitle.orEmpty(),
@@ -371,7 +375,7 @@ fun LocalAnimeRow(
                     val openDetails = posterOpen(poster, item.anime.title) { onOpen(item) }
                     Column(Modifier.width(cardWidth).nsfwPrivacy(item.anime)) {
                         Box(
-                            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(4.dp))
+                            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(14.dp))
                                 .clickable(role = Role.Button, onClickLabel = "Apri scheda", onClick = openDetails)
                                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                         ) {
@@ -389,9 +393,9 @@ fun LocalAnimeRow(
                             )
                             FilledIconButton(
                                 onClick = { onPlay(item) },
-                                modifier = Modifier.align(Alignment.Center).size(48.dp).posterForeground(poster),
+                                modifier = Modifier.align(Alignment.Center).size(52.dp).posterForeground(poster),
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = Color.Black.copy(alpha = 0.75f),
+                                    containerColor = Color.Black.copy(alpha = 0.66f),
                                     contentColor = Color.White,
                                 ),
                             ) {
@@ -405,7 +409,7 @@ fun LocalAnimeRow(
                                 progress = { item.progress.coerceIn(0f, 1f) },
                                 modifier = Modifier.align(
                                     Alignment.BottomCenter,
-                                ).fillMaxWidth().height(3.dp).posterForeground(poster),
+                                ).fillMaxWidth().height(4.dp).posterForeground(poster),
                                 trackColor = Color.White.copy(alpha = 0.3f),
                                 gapSize = 0.dp,
                                 drawStopIndicator = {},

@@ -1,5 +1,6 @@
 package eu.kanade.presentation.more
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
@@ -56,6 +57,7 @@ fun MoreScreen(
     Scaffold { contentPadding ->
         ScrollbarLazyColumn(
             modifier = Modifier.padding(contentPadding),
+            contentPadding = PaddingValues(bottom = eu.kanade.tachiyomi.ui.home.LocalFloatingNavigationInset.current),
         ) {
             item {
                 LogoHeader()

@@ -31,11 +31,9 @@ import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,13 +66,17 @@ import coil3.Extras
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import eu.kanade.presentation.discovery.HomeExploreAction
+import eu.kanade.presentation.discovery.HomeGenreChip
 import eu.kanade.presentation.discovery.HomeLoadingTransition
 import eu.kanade.presentation.discovery.HomeMotion
 import eu.kanade.presentation.discovery.HomePosterRowSkeleton
+import eu.kanade.presentation.discovery.HomeSelectionChip
 import eu.kanade.presentation.discovery.HomeSkeleton
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.privacy.nsfwPrivacy
 import eu.kanade.presentation.privacy.privacyRegion
+import eu.kanade.presentation.util.formatChapterNumber
 import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.discovery.MangaGenreLabels
 import eu.kanade.tachiyomi.data.discovery.MangaHomeChapter
@@ -177,7 +179,10 @@ fun MangaHomeContent(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 24.dp),
+                contentPadding = PaddingValues(
+                    bottom =
+                    24.dp + eu.kanade.tachiyomi.ui.home.LocalFloatingNavigationInset.current,
+                ),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (categories.isNotEmpty()) {
@@ -187,19 +192,15 @@ fun MangaHomeContent(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             item {
-                                AssistChip(
-                                    onClick = onExplore,
-                                    label = { Text("Esplora e filtra") },
-                                    leadingIcon = { Icon(Icons.Outlined.Tune, null) },
-                                )
+                                HomeExploreAction(onExplore)
                             }
                             if (categories.size > 8) {
                                 item {
-                                    AssistChip(onClick = { genresOpen = true }, label = { Text("Tutti i generi") })
+                                    HomeGenreChip("Tutti i generi") { genresOpen = true }
                                 }
                             }
                             items(categories, key = { MangaGenreLabels.key(it) }) { category ->
-                                AssistChip(onClick = { onGenre(category) }, label = { Text(category) })
+                                HomeGenreChip(category) { onGenre(category) }
                             }
                         }
                     }
@@ -207,9 +208,9 @@ fun MangaHomeContent(
                 if (home != null) {
                     item("hero") {
                         Surface(
-                            shape = RoundedCornerShape(18.dp),
+                            shape = RoundedCornerShape(20.dp),
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                         ) {
                             HomeLoadingTransition(
                                 loading = awaitingFeatured,
@@ -228,10 +229,10 @@ fun MangaHomeContent(
                                     BoxWithConstraints(
                                         Modifier.fillMaxWidth().heightIn(min = 222.dp).nsfwPrivacy(featuredItem.manga),
                                     ) {
-                                        val posterWidth = (maxWidth * 0.34f).coerceIn(72.dp, 128.dp)
+                                        val posterWidth = (maxWidth * 0.34f).coerceIn(76.dp, 132.dp)
                                         Row(
-                                            Modifier.padding(14.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                            Modifier.padding(12.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(14.dp),
                                         ) {
                                             Artwork(
                                                 featuredItem.manga.copy(favorite = false),
@@ -240,7 +241,7 @@ fun MangaHomeContent(
                                             )
                                             Column(
                                                 Modifier.weight(1f),
-                                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalArrangement = Arrangement.spacedBy(7.dp),
                                             ) {
                                                 Text(
                                                     "IN PRIMO PIANO",
@@ -250,25 +251,30 @@ fun MangaHomeContent(
                                                 )
                                                 Text(
                                                     featuredItem.manga.title,
-                                                    style = MaterialTheme.typography.titleLarge,
+                                                    style = MaterialTheme.typography.headlineSmall,
                                                     fontWeight = FontWeight.Bold,
                                                     maxLines = 3,
                                                     overflow = TextOverflow.Ellipsis,
                                                 )
-                                                if (featuredItem.alternateSources.isNotEmpty()) {
+                                                featuredItem.presentation?.chapters?.firstOrNull()?.let { chapter ->
                                                     Text(
-                                                        "${featuredItem.alternateSources.size + 1} fonti disponibili",
-                                                        style = MaterialTheme.typography.labelSmall,
+                                                        chapter.label,
+                                                        style = MaterialTheme.typography.labelMedium,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
                                                     )
                                                 }
                                                 MangaSourceAction(featuredItem, onOpen = onManga)
-                                                Spacer(Modifier.weight(1f))
-                                                Button(onClick = {
-                                                    featuredItem.presentation?.chapters?.firstOrNull()?.let {
-                                                        onChapter(featuredItem, it)
-                                                    } ?: onManga(featuredItem.manga)
-                                                }) {
+                                                Button(
+                                                    onClick = {
+                                                        featuredItem.presentation?.chapters?.firstOrNull()?.let {
+                                                            onChapter(featuredItem, it)
+                                                        } ?: onManga(featuredItem.manga)
+                                                    },
+                                                    modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
+                                                    shape = RoundedCornerShape(12.dp),
+                                                ) {
                                                     Text(
                                                         if (featuredItem.presentation?.chapters?.isNotEmpty() ==
                                                             true
@@ -277,6 +283,12 @@ fun MangaHomeContent(
                                                         } else {
                                                             "Apri manga"
                                                         },
+                                                    )
+                                                    Spacer(Modifier.width(6.dp))
+                                                    Icon(
+                                                        Icons.AutoMirrored.Outlined.ArrowForward,
+                                                        null,
+                                                        Modifier.size(18.dp),
                                                     )
                                                 }
                                             }
@@ -304,18 +316,12 @@ fun MangaHomeContent(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             item(key = "all") {
-                                FilterChip(
-                                    selected = state.mixed,
-                                    onClick = onSelectAll,
-                                    label = { Text("Per te") },
-                                )
+                                HomeSelectionChip("Per te", state.mixed, onSelectAll)
                             }
                             items(state.homes, key = { it.key }) {
-                                FilterChip(
-                                    selected = !state.mixed && it.key == home?.key,
-                                    onClick = { onSelectHome(it.key) },
-                                    label = { Text(it.sourceName) },
-                                )
+                                HomeSelectionChip(it.sourceName, !state.mixed && it.key == home?.key) {
+                                    onSelectHome(it.key)
+                                }
                             }
                         }
                     }
@@ -336,13 +342,13 @@ fun MangaHomeContent(
                                         onClick = { onResume(history) },
                                         shape = RoundedCornerShape(12.dp),
                                         color = MaterialTheme.colorScheme.surfaceContainer,
-                                        modifier = Modifier.width(260.dp).nsfwPrivacy(history.coverData),
+                                        modifier = Modifier.width(282.dp).nsfwPrivacy(history.coverData),
                                     ) {
                                         Row(
                                             Modifier.padding(10.dp),
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                                         ) {
-                                            Artwork(history.coverData, history.title, Modifier.width(60.dp))
+                                            Artwork(history.coverData, history.title, Modifier.width(68.dp))
                                             Column(Modifier.weight(1f).align(Alignment.CenterVertically)) {
                                                 Text(
                                                     history.title,
@@ -350,10 +356,17 @@ fun MangaHomeContent(
                                                     overflow = TextOverflow.Ellipsis,
                                                     fontWeight = FontWeight.SemiBold,
                                                 )
+                                                if (history.chapterNumber > -1) {
+                                                    Text(
+                                                        "Cap. ${formatChapterNumber(history.chapterNumber)}",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                    )
+                                                }
                                                 Text(
                                                     "Riprendi la lettura",
                                                     style = MaterialTheme.typography.labelMedium,
-                                                    color = MaterialTheme.colorScheme.primary,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
                                             }
                                         }
@@ -380,15 +393,15 @@ fun MangaHomeContent(
                                 items(personalUpdates, key = { it.chapterId }) { update ->
                                     Surface(
                                         onClick = { onUpdate(update) },
-                                        shape = RoundedCornerShape(12.dp),
+                                        shape = RoundedCornerShape(16.dp),
                                         color = MaterialTheme.colorScheme.surfaceContainer,
-                                        modifier = Modifier.width(260.dp).nsfwPrivacy(update.coverData),
+                                        modifier = Modifier.width(282.dp).nsfwPrivacy(update.coverData),
                                     ) {
                                         Row(
                                             Modifier.padding(10.dp),
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                                         ) {
-                                            Artwork(update.coverData, update.mangaTitle, Modifier.width(60.dp))
+                                            Artwork(update.coverData, update.mangaTitle, Modifier.width(68.dp))
                                             Column(Modifier.weight(1f).align(Alignment.CenterVertically)) {
                                                 Text(
                                                     update.mangaTitle,
@@ -497,7 +510,7 @@ fun MangaHomeContent(
                                                     fontWeight = FontWeight.SemiBold,
 
                                                 )
-                                                MangaSourceSelector(entry, state, onManga, onPreferredSource)
+                                                MangaSourceSelector(entry, onManga)
                                                 entry.presentation?.chapters.orEmpty().forEach { chapter ->
                                                     ChapterButton(
                                                         chapter,
@@ -567,9 +580,11 @@ fun MangaHomeContent(
 private fun SectionTitle(title: String, modifier: Modifier = Modifier) {
     Text(
         title,
-        modifier.padding(horizontal = 20.dp),
+        modifier.padding(horizontal = 16.dp),
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
     )
 }
 
@@ -616,7 +631,7 @@ private fun MangaUpdateCard(
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.titleMedium,
                 )
-                MangaSourceSelector(item, state, onSourceManga, onPreferredSource)
+                MangaSourceSelector(item, onSourceManga)
                 item.presentation?.badges?.takeIf { it.isNotEmpty() }?.let {
                     Text(
                         it.joinToString(" · "),
@@ -648,11 +663,9 @@ private fun MangaUpdateCard(
 @Composable
 private fun MangaSourceSelector(
     item: MangaHomeItem,
-    state: MangaHomeState,
     onManga: (Manga) -> Unit,
-    onPreferredSource: (Long) -> Unit,
 ) {
-    MangaSourceAction(item, onOpen = onManga)
+    MangaSourceAction(item, compact = true, onOpen = onManga)
 }
 
 @Composable
@@ -705,7 +718,7 @@ private fun Artwork(data: Any, title: String, modifier: Modifier = Modifier) {
     }
     Box(
         modifier.aspectRatio(2f / 3f)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
         Icon(

@@ -8,6 +8,16 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 30 settembre 2026 — Home e navigazione
+
+- Copertine protagoniste, sezioni e stati di caricamento riorganizzati nella
+  Home per rendere più chiari titoli, azioni e contenuti in evidenza.
+- Categorie e filtri conservano la disposizione compatta originale; i comandi
+  della testata mantengono una posizione stabile quando cambiano le novità.
+- Barra inferiore flottante più contrastata, senza alone o fondale esterno. Le
+  pagine scorrono sotto la barra e lasciano libero l'ultimo contenuto a fine elenco.
+- Il logo vettoriale arancione della modalità chiara usa una tonalità più scura.
+
 ## 30 settembre 2026 — Libreria Anime e Manga ridisegnata
 
 - Libreria ModernUI più leggibile, con testata compatta, categorie ordinate,

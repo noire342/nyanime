@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -36,6 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -46,8 +48,6 @@ import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.motion.PosterSource
 import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.motion.posterForeground
-import eu.kanade.presentation.theme.nyanimeBrandColors
-import eu.kanade.presentation.theme.nyanimeHeroGradient
 
 /** Artwork and actions stay owned by the existing catalogue/source integration. */
 @Composable
@@ -68,67 +68,69 @@ internal fun CinematicHero(
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val compact = maxWidth < 600.dp
-        val artworkHeight = HomeLayout.heroHeight(maxWidth)
-        Box(Modifier.fillMaxWidth().heightIn(min = artworkHeight)) {
+        val artworkHeight = HomeLayout.heroHeight(maxWidth, LocalDensity.current.fontScale)
+        Box(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+                .height(artworkHeight).clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFF171717)),
+        ) {
             artwork()
             Box(
                 Modifier.matchParentSize().posterForeground(poster, zIndex = 1f).background(
-                    nyanimeHeroGradient(artworkHeight),
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.08f),
+                        0.30f to Color.Transparent,
+                        0.58f to Color.Black.copy(alpha = 0.56f),
+                        1f to Color.Black.copy(alpha = 0.94f),
+                    ),
                 ),
             )
             Column(
-                Modifier.fillMaxWidth().posterForeground(poster).padding(horizontal = 24.dp)
-                    .padding(top = artworkHeight * 0.52f, bottom = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                horizontalAlignment = if (compact) Alignment.CenterHorizontally else Alignment.Start,
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().posterForeground(poster)
+                    .padding(horizontal = 20.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.Start,
             ) {
                 Text(
                     eyebrow.uppercase(),
-                    color = nyanimeBrandColors.artworkText.copy(alpha = 0.85f),
+                    color = Color.White.copy(alpha = 0.82f),
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Box(
-                    Modifier.widthIn(max = 680.dp).fillMaxWidth()
-                        .height(
-                            with(LocalDensity.current) {
-                                MaterialTheme.typography.headlineMedium.lineHeight.toDp() *
-                                    3
-                            },
-                        ),
-                ) {
+                Text(
+                    title,
+                    modifier = Modifier.widthIn(max = 680.dp),
+                    color = Color.White,
+                    style = if (compact) {
+                        MaterialTheme.typography.headlineSmall
+                    } else {
+                        MaterialTheme.typography.headlineMedium
+                    },
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!metadata.isNullOrBlank()) {
                     Text(
-                        title,
-                        modifier = Modifier.align(if (compact) Alignment.BottomCenter else Alignment.BottomStart),
-                        color = nyanimeBrandColors.artworkText,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        textAlign = if (compact) TextAlign.Center else TextAlign.Start,
-                        maxLines = 3,
+                        metadata,
+                        color = Color.White.copy(alpha = 0.82f),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Text(
-                    metadata.orEmpty(),
-                    color = nyanimeBrandColors.artworkText.copy(alpha = 0.86f),
-                    style = MaterialTheme.typography.labelMedium,
-                    textAlign = if (compact) TextAlign.Center else TextAlign.Start,
-                    maxLines = 2,
-                    minLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
                 if (!compact) {
                     Text(
                         description.orEmpty(),
                         modifier = Modifier.widthIn(max = 640.dp),
-                        color = nyanimeBrandColors.artworkText.copy(alpha = 0.8f),
+                        color = Color.White.copy(alpha = 0.78f),
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
-                        minLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Spacer(Modifier.size(4.dp))
                 HeroActions(actionLabel, onOpen, onSources, { showInformation = true })
             }
         }
@@ -163,10 +165,10 @@ private fun HeroPrimaryAction(label: String, onOpen: () -> Unit, modifier: Modif
     Button(
         onClick = onOpen,
         modifier = modifier.heightIn(min = 48.dp),
-        shape = RoundedCornerShape(4.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = nyanimeBrandColors.actionBackground,
-            contentColor = nyanimeBrandColors.actionText,
+            containerColor = Color.White,
+            contentColor = Color.Black,
         ),
     ) {
         Text(
@@ -185,12 +187,12 @@ private fun HeroPrimaryAction(label: String, onOpen: () -> Unit, modifier: Modif
 @Composable
 private fun HeroSecondaryActions(onSources: (() -> Unit)?, onInformation: () -> Unit) {
     if (onSources != null) {
-        IconButton(onClick = onSources) {
-            Icon(Icons.Outlined.SwapHoriz, "Scegli la fonte", tint = nyanimeBrandColors.artworkText)
+        IconButton(onClick = onSources, modifier = Modifier.background(Color.White.copy(alpha = 0.16f), CircleShape)) {
+            Icon(Icons.Outlined.SwapHoriz, "Scegli la fonte", tint = Color.White)
         }
     }
-    IconButton(onClick = onInformation) {
-        Icon(Icons.Outlined.Info, "Informazioni", tint = nyanimeBrandColors.artworkText)
+    IconButton(onClick = onInformation, modifier = Modifier.background(Color.White.copy(alpha = 0.16f), CircleShape)) {
+        Icon(Icons.Outlined.Info, "Informazioni", tint = Color.White)
     }
 }
 
@@ -198,10 +200,14 @@ private fun HeroSecondaryActions(onSources: (() -> Unit)?, onInformation: () -> 
 internal fun CarouselPosition(page: Int, count: Int, onBrowse: (() -> Unit)? = null) {
     if (count <= 1 && onBrowse == null) return
     val duration = if (modernMotionEnabled()) 220 else 0
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         if (count > 1) {
             Row(
-                Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                Modifier.weight(1f),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -226,8 +232,8 @@ internal fun CarouselPosition(page: Int, count: Int, onBrowse: (() -> Unit)? = n
             }
         }
         if (onBrowse != null) {
-            TextButton(onClick = onBrowse, modifier = Modifier.fillMaxWidth()) {
-                Text("Tutti i titoli in evidenza", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = onBrowse) {
+                Text("Vedi tutti", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.size(8.dp))
                 Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(16.dp))
             }

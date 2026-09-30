@@ -1,15 +1,9 @@
 package eu.kanade.presentation.discovery
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -18,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -141,24 +136,21 @@ private fun HomeHeaderActions(
 ) {
     val motion = appMotionEnabled()
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
-        AnimatedVisibility(
-            visible = onUpdates != null && hasUpdates,
-            enter = if (motion) expandHorizontally(tween(220)) + fadeIn(tween(160)) else EnterTransition.None,
-            exit = if (motion) shrinkHorizontally(tween(180)) + fadeOut(tween(120)) else ExitTransition.None,
-        ) {
-            IconButton(onClick = { onUpdates?.invoke() }, enabled = hasUpdates && onUpdates != null) {
-                Icon(
-                    Icons.Outlined.Adjust,
-                    contentDescription = "Vai alle tue novità",
-                )
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            Crossfade(
+                targetState = onUpdates != null && hasUpdates,
+                animationSpec = tween(if (motion) 160 else 0),
+                label = "homeUpdatesAction",
+            ) { visible ->
+                if (visible) {
+                    IconButton(onClick = { onUpdates?.invoke() }) {
+                        Icon(Icons.Outlined.Adjust, contentDescription = "Vai alle tue novità")
+                    }
+                }
             }
         }
-        AnimatedVisibility(
-            visible = onSearch != null,
-            enter = if (motion) expandHorizontally(tween(220)) + fadeIn(tween(160)) else EnterTransition.None,
-            exit = if (motion) shrinkHorizontally(tween(180)) + fadeOut(tween(120)) else ExitTransition.None,
-        ) {
+        eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
+        Box(Modifier.width(if (compactSearch) 48.dp else 96.dp).height(48.dp), contentAlignment = Alignment.Center) {
             val description = "Cerca " + (homes.firstOrNull { it.id == selectedHome }?.title ?: "anime")
             if (compactSearch) {
                 IconButton(onClick = { onSearch?.invoke() }, enabled = onSearch != null) {
@@ -168,7 +160,7 @@ private fun HomeHeaderActions(
                 Surface(
                     onClick = { onSearch?.invoke() },
                     enabled = onSearch != null,
-                    modifier = Modifier.widthIn(min = 96.dp).heightIn(min = 48.dp).semantics {
+                    modifier = Modifier.fillMaxWidth().height(48.dp).semantics {
                         role = Role.Button
                         contentDescription = description
                     },

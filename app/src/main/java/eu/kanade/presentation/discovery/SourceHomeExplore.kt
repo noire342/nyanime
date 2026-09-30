@@ -45,6 +45,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.motion.ModernMotion
@@ -95,21 +99,47 @@ fun SourceHomeExploreBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item {
-            AssistChip(
-                onClick = onBrowse,
-                label = { Text("Esplora e filtra") },
-                leadingIcon = { Icon(Icons.Outlined.Tune, null) },
-            )
+            HomeExploreAction(onBrowse)
         }
         if (categories.size > 8) {
             item {
-                AssistChip(onClick = { genresOpen = true }, label = { Text("Tutti i generi") })
+                HomeGenreChip("Tutti i generi") { genresOpen = true }
             }
         }
         items(categories, key = { it.id }) { category ->
-            AssistChip(onClick = { onCategory(category) }, label = { Text(category.title) })
+            HomeGenreChip(category.title) { onCategory(category) }
         }
     }
+}
+
+@Composable
+fun HomeExploreAction(onClick: () -> Unit) {
+    AssistChip(
+        onClick = onClick,
+        label = { Text("Esplora e filtra") },
+        leadingIcon = { Icon(Icons.Outlined.Tune, null) },
+    )
+}
+
+@Composable
+fun HomeGenreChip(title: String, onClick: () -> Unit) {
+    AssistChip(
+        onClick = onClick,
+        label = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+    )
+}
+
+@Composable
+fun HomeSelectionChip(title: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        modifier = Modifier.semantics {
+            role = Role.Tab
+            this.selected = selected
+        },
+        label = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+    )
 }
 
 @Composable

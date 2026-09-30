@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
@@ -77,47 +78,35 @@ fun HomeHeroSkeleton(withBrowseAction: Boolean = true, withSourceAction: Boolean
         Column {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val compact = maxWidth < 600.dp
-                val artworkHeight = HomeLayout.heroHeight(maxWidth)
-                val typography = MaterialTheme.typography
+                val artworkHeight = HomeLayout.heroHeight(maxWidth, LocalDensity.current.fontScale)
                 val density = LocalDensity.current
-                val titleHeight = with(density) { typography.headlineMedium.lineHeight.toDp() * 3 }
-                val eyebrowHeight = with(density) { typography.labelMedium.lineHeight.toDp() }
-                val metadataHeight = eyebrowHeight * 2
-                Box(Modifier.fillMaxWidth().heightIn(min = artworkHeight)) {
+                Box(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(artworkHeight)
+                        .clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow),
+                ) {
                     Box(
                         Modifier.matchParentSize().background(
                             Brush.verticalGradient(
                                 listOf(
+                                    MaterialTheme.colorScheme.surfaceContainerHigh,
                                     MaterialTheme.colorScheme.surfaceContainerLow,
-                                    MaterialTheme.colorScheme.background,
                                 ),
                             ),
                         ),
                     )
                     Column(
-                        Modifier.fillMaxWidth().padding(horizontal = 24.dp)
-                            .padding(top = artworkHeight * 0.52f, bottom = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        horizontalAlignment = if (compact) Alignment.CenterHorizontally else Alignment.Start,
+                        Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalAlignment = Alignment.Start,
                     ) {
-                        SkeletonBlock(Modifier.width(140.dp).height(eyebrowHeight))
-                        Box(
-                            Modifier.widthIn(max = 680.dp).fillMaxWidth().height(titleHeight),
-                            contentAlignment = if (compact) Alignment.BottomCenter else Alignment.BottomStart,
-                        ) {
-                            Column(
-                                Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                horizontalAlignment = if (compact) Alignment.CenterHorizontally else Alignment.Start,
-                            ) {
-                                SkeletonBlock(Modifier.fillMaxWidth(0.85f).height(24.dp))
-                                SkeletonBlock(Modifier.fillMaxWidth(0.65f).height(24.dp))
-                            }
-                        }
-                        SkeletonBlock(Modifier.fillMaxWidth(0.6f).height(metadataHeight))
+                        SkeletonBlock(Modifier.width(140.dp).height(14.dp))
+                        SkeletonBlock(Modifier.fillMaxWidth(0.85f).height(28.dp))
+                        SkeletonBlock(Modifier.fillMaxWidth(0.65f).height(28.dp))
+                        SkeletonBlock(Modifier.fillMaxWidth(0.56f).height(14.dp))
                         if (!compact) {
-                            SkeletonBlock(Modifier.fillMaxWidth(0.8f).height(metadataHeight))
+                            SkeletonBlock(Modifier.fillMaxWidth(0.8f).height(28.dp))
                         }
+                        Spacer(Modifier.height(4.dp))
                         BoxWithConstraints(Modifier.widthIn(max = 420.dp).fillMaxWidth()) {
                             val stacked = HomeLayout.stackHeroActions(maxWidth, density.fontScale, withSourceAction)
                             val secondary: @Composable () -> Unit = {
@@ -148,15 +137,16 @@ fun HomeHeroSkeleton(withBrowseAction: Boolean = true, withSourceAction: Boolean
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().height(11.dp), horizontalArrangement = Arrangement.Center) {
-                repeat(5) {
-                    SkeletonBlock(Modifier.padding(horizontal = 3.dp).size(if (it == 0) 20.dp else 5.dp, 3.dp))
+            Row(
+                Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.Center) {
+                    repeat(5) {
+                        SkeletonBlock(Modifier.padding(horizontal = 3.dp).size(if (it == 0) 20.dp else 5.dp, 3.dp))
+                    }
                 }
-            }
-            if (withBrowseAction) {
-                Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
-                    SkeletonBlock(Modifier.width(180.dp).height(16.dp))
-                }
+                if (withBrowseAction) SkeletonBlock(Modifier.width(80.dp).height(16.dp))
             }
         }
     }
