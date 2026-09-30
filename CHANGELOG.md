@@ -8,6 +8,17 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 30 settembre 2026 — Ricerca intelligente dei titoli
+
+- Home, Sfoglia, singole fonti e libreria riconoscono punteggiatura diversa,
+  parole unite, refusi e alias, mantenendo il testo originale e i filtri.
+- Suggerimenti di titolo distinti dai risultati disponibili, recuperi limitati
+  e comando per alternare ricerca esatta e intelligente.
+- Aiuto online facoltativo dei cataloghi, cache locale cancellabile e nessuna
+  nuova memorizzazione persistente in incognito. La libreria resta tutta locale.
+- Nessun aggiornamento obbligatorio delle estensioni e nessuna modifica automatica
+  al tracking o alle associazioni dei titoli. [Dettagli e licenze](docs/smart-title-search.md).
+
 ## 30 settembre 2026 — Impostazioni delle notifiche più facili da trovare
 
 - Aggiunta «Notifiche e uscite» direttamente nelle Impostazioni, con orari dei

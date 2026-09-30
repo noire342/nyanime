@@ -25,6 +25,7 @@ android {
 }
 
 dependencies {
+    implementation(projects.core.smartSearch)
     implementation(androidx.test.ext)
     implementation(androidx.test.espresso.core)
     implementation(androidx.test.uiautomator)

@@ -36,6 +36,7 @@ Lo [storico AniYomi](history/aniyomi-changelog.md) rimane archiviato separatamen
 | Google Cast e UPnP/DLNA | SDK e protocolli per i ricevitori; [integrazione Cast](casting.md). |
 | AniSkip | Dati facoltativi per il salto dei segmenti; [integrazione](aniskip.md). |
 | AniList e Kitsu | Metadati e cataloghi, distinti dalle fonti di riproduzione; [scoperta](discovery-home.md). |
+| SymSpellKt 3.4.0 | Correzione lessicale con dizionario costruito durante l’uso; MIT, Adam Brown, Lucky Sharma e Wolf Garbe. [Integrazione e avvisi completi](smart-title-search.md#licenza-della-dipendenza). |
 | FlexibleAdapter | Artefatto upstream conservato senza modifiche nel [mirror vincolato](../vendor/README.md), con la [licenza](../vendor/FlexibleAdapter-LICENSE). |
 
 L'elenco orienta tra i componenti principali; non sostituisce l'elenco completo

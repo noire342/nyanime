@@ -24,6 +24,7 @@ I documenti tecnici in inglese conservano i nomi delle API e dei componenti.
 | --- | --- |
 | [AnimeSchedule facoltativo](animeschedule.md) | Collegamento guidato, RAW/SUB/DUB, limiti e widget. |
 | [Uscite e calendario](release-monitor.md) | Segui, avvisi, controlli mirati, date annunciate e recupero. |
+| [Ricerca intelligente](smart-title-search.md) | Motore comune, suggerimenti, limiti, privacy e licenza SymSpellKt. |
 | [Home e scoperta](discovery-home.md) | Cataloghi, associazione alle fonti, calendario, cache e ripresa. |
 | [API Home anime](extension-home-api.md) | Contratto dichiarativo generico delle estensioni. |
 | [API Home manga](manga-home-api.md) | Sezioni manga, capitoli, classifiche e identità degli elementi. |

@@ -336,3 +336,13 @@ anche il collegamento a quella pagina, distinto dal salvataggio dell’immagine.
 Il destinatario deve avere la stessa estensione installata e abilitata.
 L’app risolve il riferimento preciso del contenuto tramite i contratti generici
 delle estensioni, senza indovinare un’alternativa. [Dettagli](content-sharing.md).
+
+## Ricerca intelligente dei titoli
+
+Home, ricerca globale, singole fonti e libreria tollerano punteggiatura, parole
+unite, refusi e alias disponibili. I suggerimenti dei cataloghi pubblici sono
+facoltativi e distinti dai risultati realmente disponibili nelle estensioni.
+Il testo originale e i filtri restano applicati; la ricerca esatta è sempre
+accessibile. La libreria usa soltanto dati locali. Cache cancellabile, nessun
+catalogo precompilato e nessun cambiamento alle identità del tracking.
+[Funzionamento, impostazioni e limiti](smart-title-search.md).

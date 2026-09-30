@@ -52,8 +52,9 @@ si crea una stanza e si condivide il suo codice o link.
   aggiornamenti e paginazione dichiarati dall'estensione.
 - Home delle estensioni manga: novità, classifiche, titoli in evidenza, aggiornamenti
   e pulsanti per aprire i capitoli esatti.
-- Ricerca globale anime e manga, nelle singole fonti e nelle librerie, con nuovi
-  tentativi per fonte e conservazione dei risultati durante gli aggiornamenti.
+- [Ricerca intelligente](docs/smart-title-search.md) nelle Home, in Sfoglia, nelle
+  fonti e nelle librerie: refusi, punteggiatura e alias, con suggerimenti dinamici
+  facoltativi e testo originale preservato. Nessun catalogo precompilato.
 - “Continua a guardare” anche nelle Home Anime e Cartoni, titoli nascondibili e
   ripristinabili senza cancellare cronologia o avanzamento; “Continua a leggere”
   nelle Home manga compatibili.
