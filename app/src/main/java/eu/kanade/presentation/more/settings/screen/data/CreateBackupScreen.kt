@@ -1,9 +1,8 @@
 package eu.kanade.presentation.more.settings.screen.data
 
-import android.content.ActivityNotFoundException
+import android.Manifest
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
@@ -16,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -23,11 +23,11 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.WarningBanner
 import eu.kanade.presentation.util.Screen
+import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.backup.BackupExportStore
 import eu.kanade.tachiyomi.data.backup.create.BackupCreateJob
-import eu.kanade.tachiyomi.data.backup.create.BackupCreator
 import eu.kanade.tachiyomi.data.backup.create.BackupOptions
 import eu.kanade.tachiyomi.util.system.DeviceUtil
-import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.flow.update
 import tachiyomi.core.common.i18n.stringResource
@@ -37,8 +37,9 @@ import tachiyomi.presentation.core.components.LazyColumnWithAction
 import tachiyomi.presentation.core.components.SectionCard
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
+import androidx.compose.ui.res.stringResource as androidStringResource
 
-class CreateBackupScreen(private val completePreset: Boolean = false) : Screen() {
+class CreateBackupScreen(private val completePreset: Boolean = true) : Screen() {
 
     @Composable
     override fun Content() {
@@ -48,20 +49,19 @@ class CreateBackupScreen(private val completePreset: Boolean = false) : Screen()
             CreateBackupScreenModel(if (completePreset) BackupOptions.complete() else BackupOptions())
         }
         val state by model.state.collectAsState()
-
-        val chooseBackupDir = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.CreateDocument("application/*"),
-        ) {
-            if (it != null) {
-                context.contentResolver.takePersistableUriPermission(
-                    it,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                )
-                model.createBackup(context, it)
-                navigator.pop()
+        val permissionRequest =
+            rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                if (granted) {
+                    model.createBackup(context)
+                    navigator.pop()
+                } else {
+                    android.widget.Toast.makeText(
+                        context,
+                        context.getString(R.string.quick_backup_permission),
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                }
             }
-        }
 
         Scaffold(
             topBar = {
@@ -78,13 +78,15 @@ class CreateBackupScreen(private val completePreset: Boolean = false) : Screen()
                 actionEnabled = state.options.canCreate(),
                 onClickAction = {
                     if (!BackupCreateJob.isManualJobRunning(context)) {
-                        try {
-                            chooseBackupDir.launch(BackupCreator.getFilename())
-                        } catch (e: ActivityNotFoundException) {
-                            context.toast(MR.strings.file_picker_error)
+                        if (BackupExportStore.requiresLegacyStoragePermission() &&
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                            PackageManager.PERMISSION_GRANTED
+                        ) {
+                            permissionRequest.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        } else {
+                            model.createBackup(context)
+                            navigator.pop()
                         }
-                    } else {
-                        context.toast(MR.strings.backup_in_progress)
                     }
                 },
             ) {
@@ -96,6 +98,10 @@ class CreateBackupScreen(private val completePreset: Boolean = false) : Screen()
 
                 item {
                     SectionCard(MR.strings.backup_complete_title) {
+                        Text(
+                            androidStringResource(R.string.quick_backup_subtitle),
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
                         Text(
                             stringResource(MR.strings.backup_complete_description),
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -168,8 +174,8 @@ private class CreateBackupScreenModel(initialOptions: BackupOptions) :
         }
     }
 
-    fun createBackup(context: Context, uri: Uri) {
-        BackupCreateJob.startNow(context, uri, state.value.options)
+    fun createBackup(context: Context) {
+        BackupCreateJob.startNow(context, state.value.options)
     }
 
     @Immutable

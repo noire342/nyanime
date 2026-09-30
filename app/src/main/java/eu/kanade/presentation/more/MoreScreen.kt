@@ -1,5 +1,6 @@
 package eu.kanade.presentation.more
 
+import android.net.Uri
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -20,6 +21,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.vectorResource
 import eu.kanade.domain.ui.model.NavStyle
+import eu.kanade.presentation.more.settings.screen.data.QuickBackupCard
 import eu.kanade.presentation.more.settings.widget.SwitchPreferenceWidget
 import eu.kanade.presentation.more.settings.widget.TextPreferenceWidget
 import eu.kanade.tachiyomi.R
@@ -46,6 +48,8 @@ fun MoreScreen(
     onClickCategories: () -> Unit,
     onClickStats: () -> Unit,
     onClickStorage: () -> Unit,
+    onViewBackups: () -> Unit,
+    onRestoreBackup: (Uri) -> Unit,
     onClickDataAndStorage: () -> Unit,
     onClickPlayerSettings: () -> Unit,
     onClickSettings: () -> Unit,
@@ -65,6 +69,27 @@ fun MoreScreen(
             item(key = "ready-app-update") {
                 ReadyAppUpdateSurface(allowDismiss = false)
             }
+            item(key = "quick-backup") {
+                QuickBackupCard(onViewBackups = onViewBackups, onRestoreBackup = onRestoreBackup)
+            }
+            item {
+                TextPreferenceWidget(
+                    title = "Guarda e leggi insieme",
+                    subtitle = "Una stanza per video, manga e schizzi condivisi",
+                    icon = Icons.Outlined.PeopleOutline,
+                    onPreferenceClick = {
+                        context.startActivity(
+                            android.content.Intent(
+                                context,
+                                eu.kanade.tachiyomi.ui.watch.WatchTogetherActivity::class.java,
+                            ),
+                        )
+                    },
+                )
+            }
+
+            item { HorizontalDivider() }
+
             item {
                 SwitchPreferenceWidget(
                     title = stringResource(MR.strings.label_downloaded_only),
@@ -81,24 +106,6 @@ fun MoreScreen(
                     icon = ImageVector.vectorResource(R.drawable.ic_glasses_24dp),
                     checked = incognitoMode,
                     onCheckedChanged = onIncognitoModeChange,
-                )
-            }
-
-            item { HorizontalDivider() }
-
-            item {
-                TextPreferenceWidget(
-                    title = "Guarda e leggi insieme",
-                    subtitle = "Una stanza per video, manga e schizzi condivisi",
-                    icon = Icons.Outlined.PeopleOutline,
-                    onPreferenceClick = {
-                        context.startActivity(
-                            android.content.Intent(
-                                context,
-                                eu.kanade.tachiyomi.ui.watch.WatchTogetherActivity::class.java,
-                            ),
-                        )
-                    },
                 )
             }
 

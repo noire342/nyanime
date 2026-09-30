@@ -19,19 +19,25 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.rememberScreenModel
+import cafe.adriel.voyager.core.model.screenModelScope
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.WarningBanner
 import eu.kanade.presentation.util.Screen
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.backup.BackupFileValidator
 import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreJob
 import eu.kanade.tachiyomi.data.backup.restore.RestoreOptions
 import eu.kanade.tachiyomi.util.system.DeviceUtil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.LabeledCheckbox
 import tachiyomi.presentation.core.components.LazyColumnWithAction
@@ -69,6 +75,57 @@ class RestoreBackupScreen(
                     navigator.pop()
                 },
             ) {
+                if (state.loading) {
+                    item {
+                        SectionCard {
+                            Text(
+                                context.getString(R.string.quick_backup_checking),
+                                modifier = Modifier.padding(16.dp),
+                            )
+                        }
+                    }
+                }
+
+                state.preview?.let { preview ->
+                    item {
+                        SectionCard {
+                            Text(
+                                context.getString(
+                                    R.string.quick_backup_contents,
+                                    preview.animeCount,
+                                    preview.mangaCount,
+                                    preview.episodeCount,
+                                    preview.chapterCount,
+                                    preview.extensionCount,
+                                ),
+                                modifier = Modifier.padding(16.dp),
+                            )
+                            Text(
+                                context.getString(
+                                    R.string.quick_backup_settings_contents,
+                                    preview.settingCount,
+                                    context.getString(
+                                        if (preview.containsPrivateSettings) {
+                                            R.string.quick_backup_yes
+                                        } else {
+                                            R.string.quick_backup_no
+                                        },
+                                    ),
+                                ),
+                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            if (preview.extensionCount > 0) {
+                                Text(
+                                    context.getString(R.string.quick_backup_extensions_note),
+                                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                    }
+                }
+
                 if (DeviceUtil.isMiui && DeviceUtil.isMiuiOptimizationDisabled()) {
                     item {
                         WarningBanner(MR.strings.restore_miui_warning)
@@ -170,7 +227,7 @@ private class RestoreBackupScreenModel(
 ) : StateScreenModel<RestoreBackupScreenModel.State>(State()) {
 
     init {
-        validate(uri.toUri())
+        screenModelScope.launch { validate(uri.toUri()) }
     }
 
     fun toggle(setter: (RestoreOptions, Boolean) -> RestoreOptions, enabled: Boolean) {
@@ -189,13 +246,14 @@ private class RestoreBackupScreenModel(
         )
     }
 
-    private fun validate(uri: Uri) {
+    private suspend fun validate(uri: Uri) {
         val results = try {
-            BackupFileValidator(context).validate(uri)
+            withContext(Dispatchers.IO) { BackupFileValidator(context).validate(uri) }
         } catch (e: Exception) {
             setError(
                 error = InvalidRestore(uri, e.message.toString()),
                 canRestore = false,
+                preview = null,
             )
             return
         }
@@ -204,18 +262,21 @@ private class RestoreBackupScreenModel(
             setError(
                 error = MissingRestoreComponents(uri, results.missingSources, results.missingTrackers),
                 canRestore = true,
+                preview = results,
             )
             return
         }
 
-        setError(error = null, canRestore = true)
+        setError(error = null, canRestore = true, preview = results)
     }
 
-    private fun setError(error: Any?, canRestore: Boolean) {
+    private fun setError(error: Any?, canRestore: Boolean, preview: BackupFileValidator.Results?) {
         mutableState.update {
             it.copy(
                 error = error,
                 canRestore = canRestore,
+                loading = false,
+                preview = preview,
             )
         }
     }
@@ -224,6 +285,8 @@ private class RestoreBackupScreenModel(
     data class State(
         val error: Any? = null,
         val canRestore: Boolean = false,
+        val loading: Boolean = true,
+        val preview: BackupFileValidator.Results? = null,
         val options: RestoreOptions = RestoreOptions(),
     )
 }

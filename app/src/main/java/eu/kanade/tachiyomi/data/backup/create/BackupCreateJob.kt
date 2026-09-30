@@ -15,7 +15,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import com.hippo.unifile.UniFile
+import eu.kanade.tachiyomi.data.backup.BackupExportStore
 import eu.kanade.tachiyomi.data.backup.BackupNotifier
 import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreJob
 import eu.kanade.tachiyomi.data.notification.Notifications
@@ -40,6 +40,8 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
 
     override suspend fun doWork(): Result {
         val isAutoBackup = inputData.getBoolean(IS_AUTO_BACKUP_KEY, true)
+        val isPublicManualBackup = !isAutoBackup && inputData.getBoolean(PUBLIC_DOWNLOADS_KEY, false)
+        var pendingUri: Uri? = null
 
         if (isAutoBackup && BackupRestoreJob.isRunning(context)) return Result.retry()
 
@@ -49,19 +51,26 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
             ?: BackupOptions()
 
         return try {
-            val uri = inputData.getString(LOCATION_URI_KEY)?.toUri()
-                ?: getAutomaticBackupLocation()
-                ?: throw IllegalStateException("Cartella backup non accessibile. Controlla Dati e archiviazione.")
-            val location = BackupCreator(context, isAutoBackup).backup(uri, options)
+            setProgress(workDataOf(PROGRESS_PHASE to "preparing"))
+            val uri =
+                (if (isPublicManualBackup) BackupExportStore.createPending(context).also { pendingUri = it } else null)
+                    ?: inputData.getString(LOCATION_URI_KEY)?.toUri()
+                    ?: getAutomaticBackupLocation()
+                    ?: throw IllegalStateException("Cartella backup non accessibile. Controlla Dati e archiviazione.")
+            val location = BackupCreator(context, isAutoBackup).backup(uri, options) { phase ->
+                setProgress(workDataOf(PROGRESS_PHASE to phase))
+            }
+            pendingUri?.let { BackupExportStore.publish(context, it) }
             if (isAutoBackup) {
                 backupPreferences.autoBackupFailures().set(0)
                 backupPreferences.autoBackupError().set("")
             }
             if (!isAutoBackup) {
-                notifier.showBackupComplete(UniFile.fromUri(context, location.toUri())!!)
+                notifier.showBackupComplete(location.toUri(), if (isPublicManualBackup) "Download/Nyanime" else null)
             }
-            Result.success()
+            Result.success(workDataOf(RESULT_URI to location))
         } catch (e: Exception) {
+            pendingUri?.let { runCatching { BackupExportStore.delete(context, it) } }
             if (e is CancellationException) throw e
             logcat(LogPriority.ERROR, e)
             if (isAutoBackup) {
@@ -74,7 +83,7 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
             } else {
                 notifier.showBackupError(e.message)
             }
-            Result.failure()
+            Result.failure(workDataOf(RESULT_ERROR to (e.message ?: "Backup non riuscito.")))
         } finally {
             context.cancelNotification(Notifications.ID_BACKUP_PROGRESS)
         }
@@ -98,6 +107,12 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
     }
 
     companion object {
+        const val PROGRESS_PHASE = "progress_phase"
+        const val RESULT_URI = "result_uri"
+        const val RESULT_ERROR = "result_error"
+
+        fun observeManual(context: Context) = context.workManager.getWorkInfosForUniqueWorkFlow(TAG_MANUAL)
+
         fun isManualJobRunning(context: Context): Boolean {
             return context.workManager.isRunning(TAG_MANUAL)
         }
@@ -140,6 +155,20 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
                 .build()
             context.workManager.enqueueUniqueWork(TAG_MANUAL, ExistingWorkPolicy.KEEP, request)
         }
+
+        fun startNow(context: Context, options: BackupOptions = BackupOptions.complete()) {
+            val request = OneTimeWorkRequestBuilder<BackupCreateJob>()
+                .addTag(TAG_MANUAL)
+                .setInputData(
+                    workDataOf(
+                        IS_AUTO_BACKUP_KEY to false,
+                        PUBLIC_DOWNLOADS_KEY to true,
+                        OPTIONS_KEY to options.asBooleanArray(),
+                    ),
+                )
+                .build()
+            context.workManager.enqueueUniqueWork(TAG_MANUAL, ExistingWorkPolicy.KEEP, request)
+        }
     }
 }
 
@@ -148,4 +177,5 @@ private const val TAG_MANUAL = "$TAG_AUTO:manual"
 
 private const val IS_AUTO_BACKUP_KEY = "is_auto_backup" // Boolean
 private const val LOCATION_URI_KEY = "location_uri" // String
+private const val PUBLIC_DOWNLOADS_KEY = "public_downloads" // Boolean
 private const val OPTIONS_KEY = "options" // BooleanArray

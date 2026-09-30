@@ -8,6 +8,16 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 30 settembre 2026 — Backup più semplici
+
+- Un backup completo si avvia con un tocco da Altro o da Dati e archiviazione,
+  con avanzamento visibile anche cambiando schermata.
+- I backup manuali vengono salvati in Download/Nyanime e verificati prima di
+  comparire tra i file. Contengono anche impostazioni sensibili ed estensioni,
+  ma non i video o i capitoli scaricati.
+- Il ripristino mostra i backup trovati sul dispositivo e un'anteprima del loro
+  contenuto; rimane possibile selezionare un file esterno o un vecchio `.tachibk`.
+
 ## 30 settembre 2026 — Home e navigazione
 
 - Copertine protagoniste, sezioni e stati di caricamento riorganizzati nella

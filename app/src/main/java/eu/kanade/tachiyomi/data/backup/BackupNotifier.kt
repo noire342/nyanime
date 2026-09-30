@@ -2,8 +2,8 @@ package eu.kanade.tachiyomi.data.backup
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.core.app.NotificationCompat
-import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.security.SecurityPreferences
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
@@ -13,7 +13,6 @@ import eu.kanade.tachiyomi.util.system.cancelNotification
 import eu.kanade.tachiyomi.util.system.notificationBuilder
 import eu.kanade.tachiyomi.util.system.notify
 import tachiyomi.core.common.i18n.stringResource
-import tachiyomi.core.common.storage.displayablePath
 import tachiyomi.i18n.MR
 import uy.kohesive.injekt.injectLazy
 import java.io.File
@@ -68,18 +67,18 @@ class BackupNotifier(private val context: Context) {
         }
     }
 
-    fun showBackupComplete(file: UniFile) {
+    fun showBackupComplete(uri: Uri, location: String? = null) {
         context.cancelNotification(Notifications.ID_BACKUP_PROGRESS)
 
         with(completeNotificationBuilder) {
             setContentTitle(context.stringResource(MR.strings.backup_created))
-            setContentText(file.displayablePath)
+            setContentText(location ?: uri.lastPathSegment)
 
             clearActions()
             addAction(
                 R.drawable.ic_share_24dp,
                 context.stringResource(MR.strings.action_share),
-                NotificationReceiver.shareBackupPendingBroadcast(context, file.uri),
+                NotificationReceiver.shareBackupPendingBroadcast(context, uri),
             )
 
             show(Notifications.ID_BACKUP_COMPLETE)

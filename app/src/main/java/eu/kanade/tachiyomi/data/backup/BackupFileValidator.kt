@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.data.backup
 import android.content.Context
 import android.net.Uri
 import eu.kanade.tachiyomi.data.track.TrackerManager
+import tachiyomi.core.common.preference.Preference
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import tachiyomi.domain.source.manga.service.MangaSourceManager
 import uy.kohesive.injekt.Injekt
@@ -67,11 +68,29 @@ class BackupFileValidator(
             .map { it.name }
             .sorted()
 
-        return Results(missingSources, missingTrackers)
+        return Results(
+            missingSources = missingSources,
+            missingTrackers = missingTrackers,
+            animeCount = backup.backupAnime.size,
+            mangaCount = backup.backupManga.size,
+            episodeCount = backup.backupAnime.sumOf { it.episodes.size },
+            chapterCount = backup.backupManga.sumOf { it.chapters.size },
+            extensionCount = backup.backupExtensions.size,
+            settingCount = backup.backupPreferences.size + backup.backupSourcePreferences.sumOf { it.prefs.size },
+            containsPrivateSettings = backup.backupPreferences.any { Preference.isPrivate(it.key) } ||
+                backup.backupSourcePreferences.any { group -> group.prefs.any { Preference.isPrivate(it.key) } },
+        )
     }
 
     data class Results(
         val missingSources: List<String>,
         val missingTrackers: List<String>,
+        val animeCount: Int,
+        val mangaCount: Int,
+        val episodeCount: Int,
+        val chapterCount: Int,
+        val extensionCount: Int,
+        val settingCount: Int,
+        val containsPrivateSettings: Boolean,
     )
 }

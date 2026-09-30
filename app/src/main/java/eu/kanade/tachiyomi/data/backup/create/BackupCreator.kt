@@ -83,7 +83,7 @@ class BackupCreator(
     private val extensionsBackupCreator: ExtensionsBackupCreator = ExtensionsBackupCreator(context),
 ) {
 
-    suspend fun backup(uri: Uri, options: BackupOptions): String {
+    suspend fun backup(uri: Uri, options: BackupOptions, onPhase: suspend (String) -> Unit = {}): String {
         var file: UniFile? = null
         try {
             file = if (isAutoBackup) {
@@ -95,9 +95,10 @@ class BackupCreator(
                 UniFile.fromUri(context, uri)
             }
 
-            if (file == null || !file.isFile) {
+            if (isAutoBackup && (file == null || !file.isFile)) {
                 throw IllegalStateException(context.stringResource(MR.strings.create_backup_file_error))
             }
+            val fileUri = file?.uri ?: uri
 
             val nonFavoriteAnime = if (options.readEntries) {
                 animeRepository.getWatchedAnimeNotInLibrary()
@@ -157,7 +158,16 @@ class BackupCreator(
                 throw IllegalStateException(context.stringResource(MR.strings.empty_backup_error))
             }
 
-            file.openOutputStream()
+            onPhase("saving")
+            val output = if (isAutoBackup) {
+                file?.openOutputStream()
+            } else {
+                context.contentResolver.openOutputStream(
+                    fileUri,
+                    "wt",
+                )
+            }
+            (output ?: throw IllegalStateException(context.stringResource(MR.strings.create_backup_file_error)))
                 .also {
                     // Force overwrite old file
                     (it as? FileOutputStream)?.channel?.truncate(0)
@@ -165,9 +175,9 @@ class BackupCreator(
                 .sink().gzip().buffer().use {
                     it.write(byteArray)
                 }
-            val fileUri = file.uri
 
             // Make sure it's a valid backup file
+            onPhase("verifying")
             BackupFileValidator(context).validate(fileUri)
 
             if (isAutoBackup) {
