@@ -20,6 +20,7 @@ kotlin {
 }
 
 dependencies {
+    api(projects.core.smartSearch)
     implementation(projects.sourceApi)
     implementation(projects.core.common)
 
