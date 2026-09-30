@@ -77,8 +77,11 @@ class LibraryShelfStatusTest {
 
         assertFalse(after.containsKey(1))
         assertEquals(1, after.getValue(2).newReleaseCount)
-        assertEquals(2, mangaShelfStatuses(notices.take(2), emptyList(), viewed = viewed, now = now)
-            .getValue(1).newReleaseCount)
+        assertEquals(
+            2,
+            mangaShelfStatuses(notices.take(2), emptyList(), viewed = viewed, now = now)
+                .getValue(1).newReleaseCount,
+        )
     }
 
     private fun notice(itemId: Long, entryId: Long, number: Double) = ReleaseStore.Notice(
