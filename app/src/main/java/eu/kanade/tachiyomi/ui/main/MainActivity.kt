@@ -607,9 +607,7 @@ class MainActivity : BaseActivity() {
             }
             Intent.ACTION_VIEW -> {
                 // Versioned content links always resolve through an installed extension.
-                if (intent.scheme.equals("nyanime", ignoreCase = true) &&
-                    intent.data?.host.equals("open", ignoreCase = true)
-                ) {
+                if (ContentLinks.isContentUri(intent.data.toString())) {
                     navigator.popUntilRoot()
                     navigator.push(SharedContentScreen(intent.data.toString()))
                 }

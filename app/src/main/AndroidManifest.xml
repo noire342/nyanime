@@ -176,6 +176,12 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="nyanime" android:host="open" />
             </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="noire342.github.io" android:path="/open/" />
+            </intent-filter>
         </activity>
 
         <activity

@@ -1,13 +1,13 @@
 package eu.kanade.tachiyomi.data.share
 
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.net.URI
 import java.util.Base64
 
 class ContentLinksTest {
@@ -54,7 +54,7 @@ class ContentLinksTest {
 
     @Test
     fun `unsupported routes and malformed encoding are rejected`() {
-        val encoded = ContentLinks.encode(anime)
+        val encoded = raw(Json.encodeToString(anime))
         listOf(
             encoded.replace("/v1#", "/v2#"),
             encoded.replace("/v1#", "/v1?key=1#"),
@@ -66,6 +66,40 @@ class ContentLinksTest {
             ContentLinks.PREFIX,
         ).forEach { assertNull(ContentLinks.decode(it), it.take(60)) }
         assertNull(ContentLinks.decode(ContentLinks.PREFIX + "a".repeat(ContentLinks.MAX_LINK_LENGTH)))
+    }
+
+    @Test
+    fun `clickable readable links keep references exact and use a display only slug`() {
+        val encoded = ContentLinks.encode(anime)
+        assertTrue(encoded.startsWith(ContentLinks.WEB_PREFIX + "v2/anime/titolo-di-prova-seconda-parte?"))
+        assertTrue(encoded.contains("ref=/catalogue/title%3Fedition%3D2%26lang%3Den"))
+        assertEquals(anime, ContentLinks.decode(encoded.replace("titolo-di-prova-seconda-parte?", "another-title?")))
+        assertEquals(anime, ContentLinks.decode(raw(Json.encodeToString(anime))))
+        assertEquals(
+            anime,
+            ContentLinks.decode(encoded.replace(ContentLinks.WEB_PREFIX, "nyanime://open/v2#")),
+        )
+    }
+
+    @Test
+    fun `spoofed web origins ambiguous fields and invalid numeric or utf8 values are rejected`() {
+        val link = anime.copy(itemUrl = "/episode/1", positionMs = 42_000)
+        val encoded = ContentLinks.encode(link)
+        listOf(
+            encoded.replace("https://", "http://"),
+            encoded.replace("noire342.github.io", "noire342.github.io.example.org"),
+            encoded.replace("noire342.github.io", "user@noire342.github.io"),
+            encoded.replace("noire342.github.io", "noire342.github.io:443"),
+            encoded.replace("/open/#", "/open/?key=1#"),
+            encoded.replace("v2/anime/", "v3/anime/"),
+            encoded.replace("v2/anime/", "v2/unknown/"),
+            encoded + "&source=23",
+            encoded + "&%73ource=23",
+            encoded.replace("at=42000", "at=not-a-number"),
+            encoded.replace("title=Titolo", "title=%FFTitolo"),
+            encoded.replace("title=Titolo", "title=%00Titolo"),
+        ).forEach { assertNull(ContentLinks.decode(it), it.take(100)) }
+        assertNull(ContentLinks.decode(ContentLinks.encode(manga.copy(itemUrl = "/c/1", page = 2)) + "&at=0"))
     }
 
     @Test
@@ -114,13 +148,20 @@ class ContentLinksTest {
     @Test
     fun `emitted payload contains only the public content contract`() {
         val encoded = ContentLinks.encode(anime.copy(itemUrl = "/1", positionMs = 42_000))
-        val decoded = String(Base64.getUrlDecoder().decode(encoded.substringAfter('#')), Charsets.UTF_8)
-        val keys = Json.parseToJsonElement(decoded).jsonObject.keys
+        val uri = URI(encoded)
+        assertNull(uri.rawQuery)
+        val keys = uri.rawFragment.substringAfter('?').split('&').map { it.substringBefore('=') }.toSet()
         assertTrue(
             keys.all {
                 it in setOf(
-                    "version", "medium", "sourceId", "sourceName", "entryUrl", "title",
-                    "itemUrl", "itemTitle", "positionMs", "page",
+                    "source",
+                    "sourceName",
+                    "ref",
+                    "title",
+                    "item",
+                    "itemTitle",
+                    "at",
+                    "page",
                 )
             },
         )

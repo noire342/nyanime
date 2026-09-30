@@ -8,6 +8,15 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 30 settembre 2026 — Collegamenti condivisi apribili dall’app
+
+- Schede, episodi con minutaggio e capitoli con pagina vengono condivisi con link
+  HTTPS e titolo leggibile, adatti alle applicazioni di messaggistica.
+- Il sito Nyanime permette di aprire il contenuto anche nelle versioni precedenti;
+  l’app aggiornata riconosce i collegamenti verificati. I vecchi link restano validi.
+- I riferimenti rimangono dati opachi forniti dalle estensioni: nessuna fonte o
+  regola di sito entra nell’app.
+
 ## 30 settembre 2026 — Orari personalizzati per i promemoria
 
 - I promemoria delle trasmissioni anime possono essere combinati: 24 ore prima o alle 09:00,
@@ -17,6 +26,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   l’uscita o troppo tardi vengono saltati; scelte coincidenti non duplicano la notifica.
 - Le preferenze già esistenti per 24 ore prima e all’uscita restano attive dopo
   l’aggiornamento. Le notifiche di contenuti disponibili nella fonte restano separate.
+- La riprogrammazione completa il salvataggio anche uscendo subito dalle impostazioni;
+  cambiare la lingua del telefono conserva gli orari scelti.
 
 ## 30 settembre 2026 — Backup più semplici
 

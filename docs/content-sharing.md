@@ -16,15 +16,26 @@ stesso identificatore. Se l’estensione manca o è disabilitata, viene mostrato
 l’errore e, se disponibile, il suo nome. Un riferimento che non esiste più non
 viene sostituito con il primo risultato di una ricerca.
 
-Alcune applicazioni di messaggistica non rendono cliccabili gli schemi di link
-personalizzati. In questo caso si può condividere il messaggio ricevuto con
-Nyanime tramite il menu Condividi di Android: entrambe le destinazioni anime e
-manga riconoscono automaticamente il tipo contenuto nel link.
+I nuovi collegamenti sono HTTPS su `https://noire342.github.io/open/` e si possono
+toccare nelle applicazioni di messaggistica. Android associa il dominio all'app
+mediante il certificato della distribuzione pubblica. Se la versione installata
+non supporta ancora questi link, il sito mostra un pulsante per aprirla usando il
+contratto precedente. Si può anche condividere il messaggio ricevuto con Nyanime
+tramite il menu Condividi di Android.
 
 I file locali non sono condivisibili con un link: il destinatario non possiede
 quel file. Condividere l’immagine di una pagina rimane un’azione separata.
 
-## Contratto `nyanime://open/v1#…`
+## Contratto leggibile HTTPS v2 e compatibilità v1
+
+Il frammento segue `v2/anime/titolo-leggibile?source=…&ref=…&title=…` (oppure
+`manga`). Il titolo nel percorso è soltanto decorativo: la risoluzione usa sempre
+l'identificatore dell'estensione e i suoi riferimenti esatti. I campi aggiuntivi
+`item`, `itemTitle`, `at` e `page` indicano episodio/capitolo e posizione.
+Tutti i riferimenti sono nel frammento, che il browser non invia al sito.
+Il sito non risolve le fonti e non memorizza i contenuti condivisi.
+
+Il contratto precedente `nyanime://open/v1#…` viene ancora riconosciuto.
 
 Il frammento è un JSON codificato in Base64 URL-safe senza padding. Il contratto
 pubblico versionato contiene solo:
