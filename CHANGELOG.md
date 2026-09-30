@@ -26,6 +26,7 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   della testata mantengono una posizione stabile quando cambiano le novità.
 - Barra inferiore flottante più contrastata, senza alone o fondale esterno. Le
   pagine scorrono sotto la barra e lasciano libero l'ultimo contenuto a fine elenco.
+- In modalità scura il fondale della barra inferiore è più scuro e uniforme.
 - Il logo vettoriale arancione della modalità chiara usa una tonalità più scura.
 
 ## 30 settembre 2026 — Libreria Anime e Manga ridisegnata
