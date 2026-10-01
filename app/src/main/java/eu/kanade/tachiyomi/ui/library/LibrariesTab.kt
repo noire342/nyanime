@@ -40,6 +40,8 @@ import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryTab
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import kotlinx.coroutines.flow.MutableStateFlow
+import tachiyomi.i18n.MR
+import tachiyomi.presentation.core.i18n.stringResource
 import eu.kanade.presentation.util.Tab as AppTab
 
 /** One personal collection destination; discovery belongs to Home. */
@@ -61,7 +63,7 @@ data object LibrariesTab : AppTab {
     override val options: TabOptions
         @Composable get() = TabOptions(
             index = 1u,
-            title = "Libreria",
+            title = stringResource(MR.strings.label_library),
             icon = rememberVectorPainter(Icons.Outlined.CollectionsBookmark),
         )
 
@@ -110,7 +112,7 @@ private fun ModernLibraryHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "Libreria",
+            text = stringResource(MR.strings.label_library),
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.ExtraBold,
@@ -180,7 +182,7 @@ private fun LegacyLibraryHeader(
     onManga: () -> Unit,
 ) {
     Text(
-        "Libreria",
+        stringResource(MR.strings.label_library),
         Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),
         style = MaterialTheme.typography.headlineMedium,
     )

@@ -8,6 +8,11 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 1 ottobre 2026 — Lingua della Libreria
+
+- Il pulsante Libreria e le intestazioni della raccolta seguono la lingua scelta
+  nell'app, mostrando «Library» in inglese e «Libreria» in italiano.
+
 ## 1 ottobre 2026 — Affidabilità della Home
 
 - Migliorato il coordinamento tra dati locali e inizializzazione asincrona delle estensioni.
