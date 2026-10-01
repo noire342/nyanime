@@ -118,6 +118,8 @@ import eu.kanade.tachiyomi.ui.search.AtlasPanel
 import eu.kanade.tachiyomi.ui.search.AtlasSearchBar
 import eu.kanade.tachiyomi.ui.search.AtlasSearchScreenModel
 import eu.kanade.tachiyomi.ui.search.AtlasSearchTab
+import eu.kanade.tachiyomi.ui.search.AtlasUpgradeDialog
+import eu.kanade.tachiyomi.ui.search.AtlasUpgradeNotice
 import eu.kanade.tachiyomi.ui.search.LocalAtlasSearch
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import kotlinx.coroutines.channels.Channel
@@ -166,6 +168,8 @@ object HomeScreen : Screen() {
         val navStyle = eu.kanade.domain.ui.model.NavStyle.DISCOVERY
         val navigator = LocalNavigator.currentOrThrow
         val atlas = rememberScreenModel { AtlasSearchScreenModel() }
+        val upgradeNotice = remember { AtlasUpgradeNotice(Injekt.get()) }
+        val upgradeNoticeState by upgradeNotice.state.collectAsState()
         val headerHost = remember { DiscoveryHeaderHost() }
         TabNavigator(
             tab = defaultTab,
@@ -195,6 +199,15 @@ object HomeScreen : Screen() {
             }
             val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
             BackHandler(enabled = searching && !imeVisible, onBack = closeAtlas)
+            if (upgradeNoticeState == AtlasUpgradeNotice.PENDING && navigator.lastItem == HomeScreen) {
+                AtlasUpgradeDialog(
+                    onDismiss = upgradeNotice::acknowledge,
+                    onSearch = {
+                        upgradeNotice.acknowledge()
+                        selectTab(AtlasSearchTab)
+                    },
+                )
+            }
             MangaSectionTheme(legacy = false) {
                 val modern = LocalNyanimeStyle.current
                 val motion = modernMotionEnabled()

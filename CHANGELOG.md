@@ -19,6 +19,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   memoria facoltativa della ricerca e preferenze per tastiera e ricerca mentre scrivi.
 - Ritorno dalle schede con filtri e posizione conservati, dissolvenze coordinate,
   controlli adattati alla tastiera e testi in italiano e inglese.
+- Breve guida al primo aggiornamento per trovare Cerca e Sfoglia, senza mostrarla
+  nelle nuove installazioni; campo di ricerca più leggibile e placeholder centrato.
 - Richieste limitate e condivise tra i due tipi di contenuto, risultati obsoleti scartati
   e comportamento incognito/Solo scaricati conservato. [Guida](docs/atlas-search.md).
 

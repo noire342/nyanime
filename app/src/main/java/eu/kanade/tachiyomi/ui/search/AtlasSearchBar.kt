@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
@@ -81,7 +80,7 @@ fun AtlasSearchBar(model: AtlasSearchScreenModel, compact: Boolean, onClose: () 
                 keyboard?.hide()
             }),
             decorationBox = { input ->
-                androidx.compose.foundation.layout.Box(Modifier.padding(vertical = 12.dp)) {
+                Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
                     if (state.input.isEmpty()) {
                         Text(
                             stringResource(R.string.atlas_hint),

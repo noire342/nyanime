@@ -35,4 +35,12 @@
     <string name="atlas_manga">Manga</string>
     <string name="atlas_preparing_help">Verifico i titoli corrispondenti…</string>
     <string name="atlas_stale_filters">Questi filtri non sono più disponibili. Aggiorna l’estensione e selezionali di nuovo.</string>
+    <string name="atlas_intro_title">La ricerca si è rinnovata</string>
+    <string name="atlas_intro_description">Cerca ha preso il posto di Sfoglia nella barra in basso.</string>
+    <string name="atlas_intro_search_title">Anime e manga, insieme</string>
+    <string name="atlas_intro_search_body">Trova titoli con categorie e filtri.</string>
+    <string name="atlas_intro_browse_title">Ti serve Sfoglia?</string>
+    <string name="atlas_intro_browse_body">Lo trovi in Altro, oppure tieni premuto Cerca.</string>
+    <string name="atlas_intro_try">Prova Cerca</string>
+    <string name="atlas_intro_done">Ho capito</string>
 </resources>

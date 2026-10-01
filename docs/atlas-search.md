@@ -17,6 +17,13 @@ Opening Search starts on All with empty text and the keyboard closed. Initially,
 Atlante uses bounded public snapshots already obtained by Home. It never starts
 an empty search across all extensions to populate this view.
 
+Existing installations receive a short, dismissible introduction to Search and
+the Browse shortcuts after upgrading. Fresh installations do not receive it,
+including on later upgrades. The installation-local marker is initialized before
+the previous Android version is updated, works when preview revisions share a
+version code, and is excluded from portable backups. Dismissing the guide or
+choosing Try Search acknowledges it permanently on that installation.
+
 Search settings, also available in Settings → Browse, offer:
 
 - Remember last search: off initially; remembers text, category and genres.

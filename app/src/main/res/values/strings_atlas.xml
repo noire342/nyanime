@@ -35,4 +35,12 @@
     <string name="atlas_manga">Manga</string>
     <string name="atlas_preparing_help">Checking matching titles…</string>
     <string name="atlas_stale_filters">These filters are no longer available. Update the extension and choose them again.</string>
+    <string name="atlas_intro_title">Search has a new home</string>
+    <string name="atlas_intro_description">Search replaces Browse in the bottom bar.</string>
+    <string name="atlas_intro_search_title">Anime and manga, together</string>
+    <string name="atlas_intro_search_body">Find titles with categories and filters.</string>
+    <string name="atlas_intro_browse_title">Looking for Browse?</string>
+    <string name="atlas_intro_browse_body">Open More → Browse, or press and hold Search.</string>
+    <string name="atlas_intro_try">Try Search</string>
+    <string name="atlas_intro_done">Got it</string>
 </resources>
