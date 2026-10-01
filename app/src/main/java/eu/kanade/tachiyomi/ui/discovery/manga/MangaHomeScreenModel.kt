@@ -82,6 +82,22 @@ class MangaHomeScreenModel(
 
     init {
         screenModelScope.launch {
+            state.collect { current ->
+                eu.kanade.tachiyomi.ui.search.AtlasExploreCache.offer(
+                    current.rows.values.flatMap {
+                        it.page?.items.orEmpty()
+                    }.filterNot { incognito.await(it.manga.source) }
+                        .map {
+                            eu.kanade.tachiyomi.ui.search.AtlasEntry.manga(
+                                it,
+                                eu.kanade.tachiyomi.ui.discovery.DiscoveryTab.MANGA_CATEGORY,
+                                "Manga",
+                            )
+                        },
+                )
+            }
+        }
+        screenModelScope.launch {
             combine(service.identityChanges, uiPreferences.preferredMangaHomeSource().changes()) { _, preferred ->
                 preferred
             }

@@ -7,7 +7,7 @@ descrizioni o temi. Non richiede un aggiornamento delle estensioni.
 
 ## Uso e impostazioni
 
-Home, Sfoglia e singole fonti condividono lo stesso motore. Sotto il campo di
+[Atlante](atlas-search.md), Sfoglia e singole fonti condividono lo stesso motore. Sotto il campo di
 ricerca compaiono suggerimenti di titolo: toccarne uno avvia una nuova ricerca.
 Lo stesso testo compare una sola volta nei suggerimenti, anche quando è noto
 a più cataloghi o fonti; le identità dei candidati rimangono distinte nel motore.
@@ -94,6 +94,7 @@ AniSkip o associazioni di opere. Le Home conservano il loro merge per ID verific
 - La ricerca originale viene eseguita prima dei recuperi.
 - Massimo due tentativi aggiuntivi per estensione e query, mantenendo i filtri.
 - Massimo tre richieste di catalogo per query, condivise tra tutte le estensioni.
+  In Atlante il budget è condiviso anche tra le sessioni video e manga.
 - Kitsu è il primo aiuto; AniList fornisce un'alternativa e alias dinamici.
 - Timeout dei cataloghi di 12 secondi; limitazione delle richieste e rispetto
   del backoff del servizio. Nessuna scansione massiva delle estensioni.

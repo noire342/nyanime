@@ -142,8 +142,7 @@ private fun DiscoveryTab.SourceHomeReadyContent(
         ?: source.rows.firstOrNull()?.sections?.firstOrNull()?.takeIf { modern }
     val hasNewUpdates = hasNewLibraryUpdateNotice(updateKeys, lastSeenAt)
     val updatesSectionKey = "updates:" + source.id
-    val updatesIndex = (if (!access.offline && source.searchable) 1 else 0) +
-        (if (!access.offline && heroSection != null) 1 else 0) +
+    val updatesIndex = (if (!access.offline && heroSection != null) 1 else 0) +
         1
     HandleHomeUpdateRequest(listState, page.key, updatesIndex, active)
     AcknowledgeUpdateNoticeWhenVisible(
@@ -178,23 +177,6 @@ private fun DiscoveryTab.SourceHomeReadyContent(
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (!access.offline && source.searchable) {
-                    item(key = "explore:" + source.id) {
-                        eu.kanade.presentation.discovery.SourceHomeExploreBar(
-                            source.categories,
-                            onBrowse = {
-                                navigator.push(
-                                    SourceHomeListScreen(
-                                        homeKey,
-                                        SourceHomeRequest.SEARCH,
-                                        "Esplora ${source.title}",
-                                    ),
-                                )
-                            },
-                            onCategory = { navigator.push(SourceHomeListScreen(homeKey, it.id, it.title)) },
-                        )
-                    }
-                }
                 if (!access.offline && heroSection != null) {
                     item(key = "hero:" + source.id) {
                         LaunchedEffect(access, heroSection.id, active) { if (active) model.load(heroSection.id) }

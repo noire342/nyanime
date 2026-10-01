@@ -8,6 +8,19 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 1 ottobre 2026 — Atlante, ricerca unificata
+
+- Cerca riunisce anime e manga, con categorie della Home, risultati progressivi
+  e scelta delle fonti alternative quando gli ID verificati identificano la stessa opera.
+- La barra inferiore si trasforma nel campo di ricerca; generi e filtri sono disponibili
+  sopra il campo, con accesso ai filtri avanzati delle singole fonti. Sfoglia si trova in Altro.
+- Esplorazione con copertine già disponibili, suggerimenti ed esatta/intelligente,
+  memoria facoltativa della ricerca e preferenze per tastiera e ricerca mentre scrivi.
+- Ritorno dalle schede con filtri e posizione conservati, dissolvenze coordinate,
+  controlli adattati alla tastiera e testi in italiano e inglese.
+- Richieste limitate e condivise tra i due tipi di contenuto, risultati obsoleti scartati
+  e comportamento incognito/Solo scaricati conservato. [Guida](docs/atlas-search.md).
+
 ## 1 ottobre 2026 — Risultati completi per grafie equivalenti
 
 - La ricerca con spazi o punteggiatura diversa conserva la query breve e recupera

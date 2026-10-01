@@ -119,10 +119,6 @@ fun MangaHomeContent(
     } else {
         home?.sections.orEmpty()
     }
-    val categories = MangaGenreLabels.distinct(
-        (if (state.mixed) state.homes.flatMap { it.categories } else home?.categories.orEmpty())
-            .map { it.title },
-    )
     val featuredRow = sections.firstOrNull()?.let { state.rows[it.id] }
     val featuredItem = featuredRow?.page?.items?.firstOrNull()
     val awaitingFeatured = featuredRow?.page == null && featuredRow?.error == null && featuredRow?.loading != false
@@ -135,33 +131,6 @@ fun MangaHomeContent(
         }
     }
     var pulled by remember { mutableStateOf(false) }
-    var genresOpen by remember { mutableStateOf(false) }
-    var genreQuery by remember { mutableStateOf("") }
-    if (genresOpen) {
-        ModalBottomSheet(onDismissRequest = { genresOpen = false }) {
-            Column(Modifier.imePadding().padding(horizontal = 20.dp)) {
-                Text(androidStringResource(R.string.home_all_genres), style = MaterialTheme.typography.headlineSmall)
-                OutlinedTextField(
-                    value = genreQuery,
-                    onValueChange = { genreQuery = it },
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                    placeholder = { Text(androidStringResource(R.string.home_search_genre)) },
-                    singleLine = true,
-                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                )
-                LazyColumn(contentPadding = PaddingValues(bottom = 36.dp)) {
-                    items(categories.filter { it.contains(genreQuery.trim(), ignoreCase = true) }) { category ->
-                        TextButton(onClick = {
-                            genresOpen = false
-                            onGenre(category)
-                        }, modifier = Modifier.fillMaxWidth()) {
-                            Text(category, modifier = Modifier.fillMaxWidth())
-                        }
-                    }
-                }
-            }
-        }
-    }
     val refreshing = state.rows.values.any { it.loading }
     LaunchedEffect(refreshing) { if (!refreshing) pulled = false }
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -187,26 +156,6 @@ fun MangaHomeContent(
                 ),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                if (categories.isNotEmpty()) {
-                    item("categories") {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 20.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            item {
-                                HomeExploreAction(onExplore)
-                            }
-                            if (categories.size > 8) {
-                                item {
-                                    HomeGenreChip(androidStringResource(R.string.home_all_genres)) { genresOpen = true }
-                                }
-                            }
-                            items(categories, key = { MangaGenreLabels.key(it) }) { category ->
-                                HomeGenreChip(category) { onGenre(category) }
-                            }
-                        }
-                    }
-                }
                 if (home != null) {
                     item("hero") {
                         Surface(

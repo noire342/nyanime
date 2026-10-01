@@ -7,6 +7,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
@@ -23,6 +25,8 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -44,9 +48,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +61,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -66,6 +74,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEach
+import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
@@ -91,6 +100,11 @@ import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryTab
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import eu.kanade.tachiyomi.ui.more.MoreTab
 import eu.kanade.tachiyomi.ui.more.ReadyAppUpdateSurface
+import eu.kanade.tachiyomi.ui.search.AtlasGenreBar
+import eu.kanade.tachiyomi.ui.search.AtlasSearchBar
+import eu.kanade.tachiyomi.ui.search.AtlasSearchScreenModel
+import eu.kanade.tachiyomi.ui.search.AtlasSearchTab
+import eu.kanade.tachiyomi.ui.search.LocalAtlasSearch
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
@@ -111,6 +125,9 @@ import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 
 val LocalFloatingNavigationInset = compositionLocalOf { 0.dp }
+
+private val LocalSelectHomeTab = compositionLocalOf<(eu.kanade.presentation.util.Tab) -> Unit> { {} }
+private val LocalCloseAtlas = compositionLocalOf<() -> Unit> { {} }
 
 object HomeScreen : Screen() {
 
@@ -134,19 +151,49 @@ object HomeScreen : Screen() {
         }
         val navStyle = eu.kanade.domain.ui.model.NavStyle.DISCOVERY
         val navigator = LocalNavigator.currentOrThrow
+        val atlas = rememberScreenModel { AtlasSearchScreenModel() }
         TabNavigator(
             tab = defaultTab,
             key = TAB_NAVIGATOR_KEY,
         ) { tabNavigator ->
+            var originTag by rememberSaveable { mutableStateOf(navigationTag(defaultTab)) }
+            val closeAtlas: () -> Unit = {
+                atlas.close()
+                tabNavigator.current = (navStyle.visibleTabs + navStyle.overflowTabs)
+                    .firstOrNull { navigationTag(it) == originTag } ?: defaultTab
+            }
+            val selectTab: (eu.kanade.presentation.util.Tab) -> Unit = { tab ->
+                if (tab == AtlasSearchTab) {
+                    if (tabNavigator.current != AtlasSearchTab) {
+                        originTag = navigationTag(tabNavigator.current)
+                        atlas.open()
+                    }
+                } else if (tabNavigator.current == AtlasSearchTab) {
+                    atlas.close()
+                }
+                tabNavigator.current = tab
+            }
+            val searching = tabNavigator.current == AtlasSearchTab
+            LaunchedEffect(searching) {
+                if (searching && !atlas.state.value.open) atlas.open()
+                if (!searching && atlas.state.value.open) atlas.close()
+            }
+            val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+            BackHandler(enabled = searching && !imeVisible, onBack = closeAtlas)
             MangaSectionTheme(legacy = false) {
                 val modern = LocalNyanimeStyle.current
                 val motion = modernMotionEnabled()
                 // Provide usable navigator to content screen
-                CompositionLocalProvider(LocalNavigator provides navigator) {
+                CompositionLocalProvider(
+                    LocalNavigator provides navigator,
+                    LocalAtlasSearch provides atlas,
+                    LocalSelectHomeTab provides selectTab,
+                    LocalCloseAtlas provides closeAtlas,
+                ) {
                     val bottomNavVisible by produceState(initialValue = true) {
                         showBottomNavEvent.receiveAsFlow().collectLatest { value = it }
                     }
-                    val showNavigation = !isTabletUi() &&
+                    val showNavigation = (searching || !isTabletUi()) &&
                         bottomNavVisible &&
                         tabNavigator.current !in navStyle.overflowTabs
                     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -154,7 +201,11 @@ object HomeScreen : Screen() {
                         val systemNavigationInset = with(LocalDensity.current) {
                             WindowInsets.navigationBars.getBottom(this).toDp()
                         }
-                        val floatingInset = if (modern && showNavigation) {
+                        var measuredFooter by remember { mutableStateOf(0.dp) }
+                        val density = LocalDensity.current
+                        val floatingInset = if (modern && showNavigation && measuredFooter > 0.dp) {
+                            measuredFooter
+                        } else if (modern && showNavigation) {
                             (if (compactNavigation) 60.dp else 68.dp) + 26.dp + systemNavigationInset
                         } else {
                             0.dp
@@ -222,7 +273,9 @@ object HomeScreen : Screen() {
                                 motion,
                                 tabNavigator.current,
                                 navStyle.visibleTabs,
-                                Modifier.align(Alignment.BottomCenter),
+                                Modifier.align(Alignment.BottomCenter).onSizeChanged {
+                                    measuredFooter = with(density) { it.height.toDp() }
+                                },
                             )
                         }
                     }
@@ -233,7 +286,7 @@ object HomeScreen : Screen() {
                 tabNavigator.current = defaultTab
             }
             BackHandler(
-                enabled = tabNavigator.current != defaultTab,
+                enabled = tabNavigator.current != defaultTab && tabNavigator.current != AtlasSearchTab,
                 onBack = goToStartScreen,
             )
 
@@ -296,7 +349,9 @@ object HomeScreen : Screen() {
         tabs: List<eu.kanade.presentation.util.Tab>,
         modifier: Modifier = Modifier,
     ) {
-        Column(modifier.posterForeground(zIndex = 3f)) {
+        val searching = currentTab == AtlasSearchTab
+        val atlas = LocalAtlasSearch.current
+        Column(modifier.posterForeground(zIndex = 3f).then(if (searching) Modifier.imePadding() else Modifier)) {
             if (currentTab != MoreTab) ReadyAppUpdateSurface(allowDismiss = true)
             eu.kanade.tachiyomi.ui.watch.WatchMiniController(includeNavigationInsets = !showNavigation)
             CastMiniController(includeNavigationInsets = !showNavigation)
@@ -318,7 +373,20 @@ object HomeScreen : Screen() {
                 },
             ) {
                 if (modern) {
-                    FloatingNavigationBar(tabs)
+                    Column {
+                        AnimatedVisibility(
+                            visible = searching,
+                            enter = fadeIn(tween(if (motion) ModernMotion.PAGE_MILLIS else 0)) +
+                                expandVertically(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0)),
+                            exit = fadeOut(tween(if (motion) ModernMotion.EXIT_MILLIS else 0)) +
+                                shrinkVertically(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0)),
+                        ) {
+                            Surface(color = MaterialTheme.colorScheme.background) {
+                                if (atlas != null) AtlasGenreBar(atlas)
+                            }
+                        }
+                        FloatingNavigationBar(tabs)
+                    }
                 } else {
                     NavigationBar(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -334,6 +402,7 @@ object HomeScreen : Screen() {
     @Composable
     private fun FloatingNavigationBar(tabs: List<eu.kanade.presentation.util.Tab>) {
         val shape = RoundedCornerShape(32.dp)
+        val motion = modernMotionEnabled()
         val dark = LocalDarkTheme.current
         val barColors = if (dark) {
             listOf(Color(0xFF26080E), Color(0xFF490D19))
@@ -368,7 +437,23 @@ object HomeScreen : Screen() {
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        tabs.fastForEach { FloatingNavigationItem(it, compact) }
+                        AnimatedContent(
+                            targetState = LocalTabNavigator.current.current == AtlasSearchTab,
+                            transitionSpec = { ModernMotion.transform(motion).using(null) },
+                            label = "atlasNavigationMorph",
+                        ) { searching ->
+                            if (searching) {
+                                AtlasSearchBar(
+                                    requireNotNull(LocalAtlasSearch.current),
+                                    compact,
+                                    LocalCloseAtlas.current,
+                                )
+                            } else {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    tabs.fastForEach { FloatingNavigationItem(it, compact) }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -380,6 +465,7 @@ object HomeScreen : Screen() {
         val tabNavigator = LocalTabNavigator.current
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
+        val selectTab = LocalSelectHomeTab.current
         val selected = tabNavigator.current::class == tab::class
         val title = tab.options.title
         val motion = modernMotionEnabled()
@@ -403,7 +489,7 @@ object HomeScreen : Screen() {
                 .clip(RoundedCornerShape(27.dp))
                 .clickable {
                     if (!selected) {
-                        tabNavigator.current = tab
+                        selectTab(tab)
                     } else {
                         scope.launch { tab.onReselect(navigator) }
                     }
@@ -447,6 +533,7 @@ object HomeScreen : Screen() {
         val tabNavigator = LocalTabNavigator.current
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
+        val selectTab = LocalSelectHomeTab.current
         val selected = tabNavigator.current::class == tab::class
         NavigationBarItem(
             colors = if (LocalNyanimeStyle.current) {
@@ -464,7 +551,7 @@ object HomeScreen : Screen() {
             selected = selected,
             onClick = {
                 if (!selected) {
-                    tabNavigator.current = tab
+                    selectTab(tab)
                 } else {
                     scope.launch { tab.onReselect(navigator) }
                 }
@@ -491,6 +578,7 @@ object HomeScreen : Screen() {
         val tabNavigator = LocalTabNavigator.current
         val navigator = LocalNavigator.currentOrThrow
         val scope = rememberCoroutineScope()
+        val selectTab = LocalSelectHomeTab.current
         val selected = tabNavigator.current::class == tab::class
         NavigationRailItem(
             colors = if (LocalNyanimeStyle.current) {
@@ -506,7 +594,7 @@ object HomeScreen : Screen() {
             selected = selected,
             onClick = {
                 if (!selected) {
-                    tabNavigator.current = tab
+                    selectTab(tab)
                 } else {
                     scope.launch { tab.onReselect(navigator) }
                 }
@@ -598,6 +686,7 @@ object HomeScreen : Screen() {
         LibrariesTab -> "libraries"
         AnimeLibraryTab -> "library_anime"
         MangaLibraryTab -> "library_manga"
+        AtlasSearchTab -> "search"
         BrowseTab -> "browse"
         MoreTab -> "more"
         eu.kanade.tachiyomi.ui.discovery.DiscoveryTab -> "discovery"

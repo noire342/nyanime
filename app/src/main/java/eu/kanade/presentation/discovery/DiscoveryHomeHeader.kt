@@ -99,7 +99,6 @@ fun DiscoveryHomeHeader(
     Surface(modifier = Modifier.posterForeground(zIndex = 3f), color = MaterialTheme.colorScheme.background) {
         Column(Modifier.statusBarsPadding()) {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val compactSearch = maxWidth < (if (onBack != null) 408.dp else 360.dp)
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 12.dp).heightIn(min = 54.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -114,14 +113,7 @@ fun DiscoveryHomeHeader(
                         Modifier.weight(1f).padding(start = 4.dp),
                         refreshKey = artworkRefreshKey,
                     )
-                    HomeHeaderActions(
-                        onSearch,
-                        onUpdates,
-                        selectedHome,
-                        homes,
-                        hasUpdates,
-                        compactSearch = compactSearch,
-                    )
+                    HomeHeaderActions(onUpdates, hasUpdates)
                 }
             }
             HomeContentSwitch(selectedHome, homes, categoryOrder, onSelect, onPrioritizeCategory)
@@ -130,14 +122,7 @@ fun DiscoveryHomeHeader(
 }
 
 @Composable
-private fun HomeHeaderActions(
-    onSearch: (() -> Unit)?,
-    onUpdates: (() -> Unit)?,
-    selectedHome: String?,
-    homes: List<SourceHomeGroup>,
-    hasUpdates: Boolean,
-    compactSearch: Boolean,
-) {
+private fun HomeHeaderActions(onUpdates: (() -> Unit)?, hasUpdates: Boolean) {
     val motion = appMotionEnabled()
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
@@ -154,41 +139,6 @@ private fun HomeHeaderActions(
             }
         }
         eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
-        Box(Modifier.width(if (compactSearch) 48.dp else 96.dp).height(48.dp), contentAlignment = Alignment.Center) {
-            val description = androidStringResource(
-                R.string.home_search_category,
-                homes.firstOrNull { it.id == selectedHome }?.title ?: androidStringResource(R.string.home_anime),
-            )
-            if (compactSearch) {
-                IconButton(onClick = { onSearch?.invoke() }, enabled = onSearch != null) {
-                    Icon(Icons.Outlined.Search, contentDescription = description)
-                }
-            } else {
-                Surface(
-                    onClick = { onSearch?.invoke() },
-                    enabled = onSearch != null,
-                    modifier = Modifier.fillMaxWidth().height(48.dp).semantics {
-                        role = Role.Button
-                        contentDescription = description
-                    },
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) {
-                    Row(
-                        Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                    ) {
-                        Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Text(
-                            androidStringResource(R.string.home_search),
-                            style = MaterialTheme.typography.labelLarge,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
-        }
         eu.kanade.tachiyomi.ui.community.CommunityAvatarButton()
     }
 }

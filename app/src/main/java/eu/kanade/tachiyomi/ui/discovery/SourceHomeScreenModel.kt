@@ -30,7 +30,16 @@ class SourceHomeScreenModel(
 
     init {
         screenModelScope.launch {
-            feeds.sections.collect { sections -> mutableState.update { it.copy(sections = sections) } }
+            feeds.sections.collect { sections ->
+                mutableState.update { it.copy(sections = sections) }
+                state.value.access.group?.let { group ->
+                    val privacy = Injekt.get<eu.kanade.domain.source.anime.interactor.GetAnimeIncognitoState>()
+                    eu.kanade.tachiyomi.ui.search.AtlasExploreCache.offer(
+                        sections.values.flatMap { it.data?.items.orEmpty() }.filterNot { privacy.await(it.source) }
+                            .map { eu.kanade.tachiyomi.ui.search.AtlasEntry.video(it, group.id, group.title) },
+                    )
+                }
+            }
         }
         screenModelScope.launch {
             accessFlow.collectLatest { access ->

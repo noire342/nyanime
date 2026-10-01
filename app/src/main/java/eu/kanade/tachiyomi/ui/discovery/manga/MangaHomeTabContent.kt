@@ -55,7 +55,6 @@ internal fun MangaHomeTabContent(
     val updateKeys = state.updates.map { it.inboxKey() }.toSet()
     val hasNewUpdates = hasNewLibraryUpdateNotice(updateKeys, lastSeenAt)
     val updatesIndex = 2 +
-        (if (state.homes.flatMap { it.categories }.isNotEmpty()) 1 else 0) +
         (if (state.selected != null) 1 else 0) +
         (if (state.homes.size > 1) 1 else 0) +
         (if (state.history.isNotEmpty()) 1 else 0) +

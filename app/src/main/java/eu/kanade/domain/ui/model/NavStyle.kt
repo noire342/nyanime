@@ -44,6 +44,7 @@ enum class NavStyle(
     @Composable
     fun overflowIcon(tab: Tab): ImageVector = when (tab) {
         eu.kanade.tachiyomi.ui.discovery.DiscoveryTab -> Icons.Outlined.Home
+        BrowseTab -> Icons.Outlined.Explore
         HistoriesTab -> Icons.Outlined.History
         UpdatesTab -> ImageVector.vectorResource(id = R.drawable.ic_updates_outline_24dp)
         else -> moreIcon
@@ -51,7 +52,7 @@ enum class NavStyle(
 
     val overflowTabs: List<Tab>
         get() = if (this == DISCOVERY) {
-            listOf(UpdatesTab, HistoriesTab)
+            listOf(BrowseTab, UpdatesTab, HistoriesTab)
         } else {
             listOf(moreTab, eu.kanade.tachiyomi.ui.discovery.DiscoveryTab, HistoriesTab, UpdatesTab)
                 .distinct().filterNot { it in visibleTabs }
@@ -63,8 +64,8 @@ enum class NavStyle(
                 return listOf(
                     eu.kanade.tachiyomi.ui.discovery.DiscoveryTab,
                     LibrariesTab,
+                    eu.kanade.tachiyomi.ui.search.AtlasSearchTab,
                     eu.kanade.tachiyomi.ui.releases.ReleasesTab,
-                    BrowseTab,
                     MoreTab,
                 )
             }

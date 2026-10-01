@@ -11,6 +11,7 @@ import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryTab
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import eu.kanade.tachiyomi.ui.more.MoreTab
 import eu.kanade.tachiyomi.ui.releases.ReleasesTab
+import eu.kanade.tachiyomi.ui.search.AtlasSearchTab
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import io.mockk.every
 import io.mockk.mockk
@@ -24,11 +25,11 @@ class DiscoveryNavigationTest {
     @Test
     fun `new navigation keeps all destinations with no duplicate or lost tab`() {
         assertEquals(
-            listOf(DiscoveryTab, LibrariesTab, ReleasesTab, BrowseTab, MoreTab),
+            listOf(DiscoveryTab, LibrariesTab, AtlasSearchTab, ReleasesTab, MoreTab),
             NavStyle.DISCOVERY.visibleTabs,
         )
-        assertEquals(listOf(UpdatesTab, HistoriesTab), NavStyle.DISCOVERY.overflowTabs)
-        assertEquals(7, (NavStyle.DISCOVERY.visibleTabs + NavStyle.DISCOVERY.overflowTabs).distinct().size)
+        assertEquals(listOf(BrowseTab, UpdatesTab, HistoriesTab), NavStyle.DISCOVERY.overflowTabs)
+        assertEquals(8, (NavStyle.DISCOVERY.visibleTabs + NavStyle.DISCOVERY.overflowTabs).distinct().size)
         NavStyle.entries.filterNot { it == NavStyle.DISCOVERY }.forEach {
             val all = it.visibleTabs + it.overflowTabs
             assertEquals(5, it.visibleTabs.size)
