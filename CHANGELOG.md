@@ -8,6 +8,12 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 1 ottobre 2026 — Affidabilità della Home
+
+- Migliorato il coordinamento tra dati locali e inizializzazione asincrona delle estensioni.
+- Gestiti gli aggiornamenti del registro delle estensioni senza modificare i dati
+  persistenti o introdurre richieste di rete aggiuntive.
+
 ## 1 ottobre 2026 — Atlante, ricerca unificata
 
 - Cerca riunisce anime e manga, con categorie della Home, risultati progressivi

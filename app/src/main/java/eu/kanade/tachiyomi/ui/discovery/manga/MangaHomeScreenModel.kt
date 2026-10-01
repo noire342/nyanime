@@ -10,6 +10,7 @@ import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.tachiyomi.data.discovery.MangaHomeChapter
 import eu.kanade.tachiyomi.data.discovery.MangaHomeItem
+import eu.kanade.tachiyomi.data.discovery.MangaHomeLocalContent
 import eu.kanade.tachiyomi.data.discovery.MangaHomeMerge
 import eu.kanade.tachiyomi.data.discovery.MangaHomePage
 import eu.kanade.tachiyomi.data.discovery.MangaHomeRegistry
@@ -146,46 +147,14 @@ class MangaHomeScreenModel(
                 if (selected != null && !offline) refresh()
             }
         }
+        val localContent = MangaHomeLocalContent(manager, preferences, base, incognito, uiPreferences)
         screenModelScope.launch {
-            combine(
-                Injekt.get<GetMangaHistory>().subscribe(""),
-                preferences.disabledMangaSources().changes(),
-                preferences.enabledLanguages().changes(),
-                base.incognitoMode().changes(),
-                combine(
-                    preferences.incognitoMangaExtensions().changes(),
-                    uiPreferences.showMangaInOtherLanguages().changes(),
-                ) { _, showOtherLanguages -> showOtherLanguages },
-            ) { history, disabled, languages, private, showOtherLanguages ->
-                if (private) {
-                    emptyList()
-                } else {
-                    history.filter {
-                        it.coverData.sourceId.toString() !in disabled &&
-                            manager.get(it.coverData.sourceId)?.lang in languages &&
-                            (showOtherLanguages || manager.get(it.coverData.sourceId)?.lang == "it") &&
-                            !incognito.await(it.coverData.sourceId)
-                    }.distinctBy { it.mangaId }.take(20)
-                }
-            }.collect { history -> mutableState.update { it.copy(history = history) } }
+            localContent.history(Injekt.get<GetMangaHistory>().subscribe(""))
+                .collect { history -> mutableState.update { it.copy(history = history) } }
         }
         screenModelScope.launch {
-            combine(
-                getUpdates.subscribe(Instant.now().minusSeconds(30L * 86_400)),
-                uiPreferences.dismissedLibraryUpdates().changes(),
-                base.incognitoMode().changes(),
-                uiPreferences.showMangaInOtherLanguages().changes(),
-            ) { updates, dismissed, private, showOtherLanguages ->
-                if (private) {
-                    emptyList()
-                } else {
-                    updates
-                        .distinctBy { it.mangaId }
-                        .filter { showOtherLanguages || manager.get(it.sourceId)?.lang == "it" }
-                        .filterNot { it.read || it.inboxKey() in dismissed }
-                        .take(30)
-                }
-            }.collect { updates -> mutableState.update { it.copy(updates = updates) } }
+            localContent.updates(getUpdates.subscribe(Instant.now().minusSeconds(30L * 86_400)))
+                .collect { updates -> mutableState.update { it.copy(updates = updates) } }
         }
     }
 

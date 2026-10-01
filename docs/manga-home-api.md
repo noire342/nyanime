@@ -73,3 +73,10 @@ Continua a leggere uses the existing local history and chapter order. In Solo
 scaricati no Home feed requests run and resume selects an available download.
 Incognito hides local reading history and changes to extension access discard
 Home rows. There is no additional persistent manga Home cache.
+
+Local history and update rows also observe source registration and initialization.
+After an app upgrade or a cold start, stored rows must become visible when their
+extensions finish loading, even if neither the database nor user preferences change.
+Extension replacement reevaluates visibility without deleting or rewriting history,
+chapter progress or bookmarks. This observation does not fetch a source Home or
+refresh a chapter list.
