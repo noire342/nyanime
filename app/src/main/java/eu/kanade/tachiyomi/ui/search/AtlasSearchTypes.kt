@@ -122,6 +122,24 @@ data class AtlasRoute(
 
 data class AtlasGenre(val key: String, val label: String, val sections: Map<String, SourceHomeSection>)
 
+data class AtlasSelection(val category: String?, val genres: List<AtlasGenre>, val selected: Set<String>) {
+    companion object {
+        /** Restored selections are validated only after extension initialization has completed. */
+        fun resolve(
+            category: String?,
+            selected: Set<String>,
+            categories: Set<String?>,
+            routes: List<AtlasRoute>,
+            initializing: Boolean,
+        ): AtlasSelection {
+            val scope = category?.takeIf { it.isNotBlank() && (initializing || it in categories) }
+            val genres = AtlasFilters.genres(routes.filter { scope == null || it.category == scope })
+            val kept = if (initializing) selected else selected.intersect(genres.map { it.key }.toSet())
+            return AtlasSelection(scope, genres, kept)
+        }
+    }
+}
+
 object AtlasFilters {
     fun genres(routes: List<AtlasRoute>): List<AtlasGenre> = routes.flatMap { route ->
         route.home?.categories.orEmpty().map { Triple(MangaGenreLabels.key(it.title), route.key, it) }

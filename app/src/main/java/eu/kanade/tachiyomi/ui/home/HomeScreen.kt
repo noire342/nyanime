@@ -13,7 +13,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,10 +31,16 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Adjust
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
@@ -46,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,6 +71,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -81,6 +89,9 @@ import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.TabNavigator
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.ui.UiPreferences
+import eu.kanade.presentation.discovery.DiscoveryHeaderHost
+import eu.kanade.presentation.discovery.LocalDiscoveryHeaderHost
+import eu.kanade.presentation.discovery.SourceHomeWordmark
 import eu.kanade.presentation.motion.ModernMotion
 import eu.kanade.presentation.motion.modernMotionEnabled
 import eu.kanade.presentation.motion.posterForeground
@@ -89,8 +100,10 @@ import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.presentation.theme.MangaSectionTheme
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.isTabletUi
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.browse.BrowseTab
 import eu.kanade.tachiyomi.ui.cast.CastMiniController
+import eu.kanade.tachiyomi.ui.discovery.DiscoveryTab
 import eu.kanade.tachiyomi.ui.download.DownloadsTab
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
@@ -101,6 +114,7 @@ import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import eu.kanade.tachiyomi.ui.more.MoreTab
 import eu.kanade.tachiyomi.ui.more.ReadyAppUpdateSurface
 import eu.kanade.tachiyomi.ui.search.AtlasGenreBar
+import eu.kanade.tachiyomi.ui.search.AtlasPanel
 import eu.kanade.tachiyomi.ui.search.AtlasSearchBar
 import eu.kanade.tachiyomi.ui.search.AtlasSearchScreenModel
 import eu.kanade.tachiyomi.ui.search.AtlasSearchTab
@@ -152,6 +166,7 @@ object HomeScreen : Screen() {
         val navStyle = eu.kanade.domain.ui.model.NavStyle.DISCOVERY
         val navigator = LocalNavigator.currentOrThrow
         val atlas = rememberScreenModel { AtlasSearchScreenModel() }
+        val headerHost = remember { DiscoveryHeaderHost() }
         TabNavigator(
             tab = defaultTab,
             key = TAB_NAVIGATOR_KEY,
@@ -187,6 +202,7 @@ object HomeScreen : Screen() {
                 CompositionLocalProvider(
                     LocalNavigator provides navigator,
                     LocalAtlasSearch provides atlas,
+                    LocalDiscoveryHeaderHost provides if (modern) headerHost else null,
                     LocalSelectHomeTab provides selectTab,
                     LocalCloseAtlas provides closeAtlas,
                 ) {
@@ -203,6 +219,11 @@ object HomeScreen : Screen() {
                         }
                         var measuredFooter by remember { mutableStateOf(0.dp) }
                         val density = LocalDensity.current
+                        var measuredHeader by remember { mutableStateOf(0.dp) }
+                        val headerInset = measuredHeader.takeIf { it > 0.dp } ?: with(density) {
+                            WindowInsets.statusBars.getTop(this).toDp() + 54.dp
+                        }
+                        val showHeader = modern && (tabNavigator.current == DiscoveryTab || searching)
                         val floatingInset = if (modern && showNavigation && measuredFooter > 0.dp) {
                             measuredFooter
                         } else if (modern && showNavigation) {
@@ -245,10 +266,11 @@ object HomeScreen : Screen() {
                                         if (modern) {
                                             ModernMotion.transform(motion).using(null)
                                         } else {
+                                            val exit = materialFadeThroughOut(durationMillis = TAB_FADE_DURATION)
                                             val fade = materialFadeThroughIn(
                                                 initialScale = 1f,
                                                 durationMillis = TAB_FADE_DURATION,
-                                            ) togetherWith materialFadeThroughOut(durationMillis = TAB_FADE_DURATION)
+                                            ) togetherWith exit
                                             fade
                                         }
                                     },
@@ -258,11 +280,30 @@ object HomeScreen : Screen() {
                                         CompositionLocalProvider(
                                             LocalFloatingNavigationInset provides floatingInset,
                                         ) {
-                                            Box(Modifier.testTag("content_${navigationTag(it)}")) {
+                                            val pinned = modern && (it == DiscoveryTab || it == AtlasSearchTab)
+                                            Box(
+                                                Modifier.fillMaxSize()
+                                                    .padding(top = if (pinned) headerInset else 0.dp)
+                                                    .testTag("content_${navigationTag(it)}"),
+                                            ) {
                                                 it.Content()
                                             }
                                         }
                                     }
+                                }
+                                AnimatedVisibility(
+                                    visible = showHeader,
+                                    enter = ModernMotion.enter(if (motion) ModernMotion.PAGE_MILLIS else 0),
+                                    exit = fadeOut(tween(if (motion) ModernMotion.EXIT_MILLIS else 0)),
+                                    modifier = Modifier.align(Alignment.TopCenter),
+                                ) {
+                                    PersistentDiscoveryHeader(
+                                        headerHost,
+                                        atlas,
+                                        searching,
+                                        motion,
+                                        Modifier.onSizeChanged { measuredHeader = with(density) { it.height.toDp() } },
+                                    )
                                 }
                             }
                         }
@@ -341,6 +382,44 @@ object HomeScreen : Screen() {
     }
 
     @Composable
+    private fun PersistentDiscoveryHeader(
+        host: DiscoveryHeaderHost,
+        atlas: AtlasSearchScreenModel,
+        searching: Boolean,
+        motion: Boolean,
+        modifier: Modifier = Modifier,
+    ) {
+        val state by host.state.collectAsState()
+        Row(
+            modifier.fillMaxWidth().posterForeground(zIndex = 3f).background(MaterialTheme.colorScheme.background)
+                .statusBarsPadding().heightIn(min = 54.dp).padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SourceHomeWordmark(state.logo, Modifier.weight(1f), refreshKey = state.refreshKey)
+            eu.kanade.tachiyomi.ui.watch.WatchTogetherButton()
+            AnimatedContent(
+                targetState = searching,
+                transitionSpec = { ModernMotion.transform(motion).using(null) },
+                label = "discoveryHeaderActions",
+            ) { search ->
+                if (search) {
+                    IconButton(onClick = { atlas.showPanel(AtlasPanel.SETTINGS) }) {
+                        Icon(Icons.Outlined.Tune, stringResource(R.string.atlas_settings))
+                    }
+                } else {
+                    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                        if (state.hasUpdates) {
+                            IconButton(onClick = { host.onUpdates?.invoke() }) {
+                                Icon(Icons.Outlined.Adjust, stringResource(R.string.home_updates))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
     private fun HomeBottomControls(
         showNavigation: Boolean,
         modern: Boolean,
@@ -381,7 +460,16 @@ object HomeScreen : Screen() {
                             exit = fadeOut(tween(if (motion) ModernMotion.EXIT_MILLIS else 0)) +
                                 shrinkVertically(tween(if (motion) ModernMotion.RESIZE_MILLIS else 0)),
                         ) {
-                            Surface(color = MaterialTheme.colorScheme.background) {
+                            Box(
+                                Modifier.fillMaxWidth().background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.background.copy(alpha = 0f),
+                                            MaterialTheme.colorScheme.background.copy(alpha = 0.65f),
+                                        ),
+                                    ),
+                                ),
+                            ) {
                                 if (atlas != null) AtlasGenreBar(atlas)
                             }
                         }
@@ -404,6 +492,7 @@ object HomeScreen : Screen() {
         val shape = RoundedCornerShape(32.dp)
         val motion = modernMotionEnabled()
         val dark = LocalDarkTheme.current
+        val selectTab = LocalSelectHomeTab.current
         val barColors = if (dark) {
             listOf(Color(0xFF26080E), Color(0xFF490D19))
         } else {
@@ -447,6 +536,7 @@ object HomeScreen : Screen() {
                                     requireNotNull(LocalAtlasSearch.current),
                                     compact,
                                     LocalCloseAtlas.current,
+                                    onBrowse = { selectTab(BrowseTab) },
                                 )
                             } else {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -468,6 +558,7 @@ object HomeScreen : Screen() {
         val selectTab = LocalSelectHomeTab.current
         val selected = tabNavigator.current::class == tab::class
         val title = tab.options.title
+        val browseTitle = BrowseTab.options.title
         val motion = modernMotionEnabled()
         val dark = LocalDarkTheme.current
         val scale by animateFloatAsState(
@@ -487,13 +578,17 @@ object HomeScreen : Screen() {
         Column(
             Modifier.weight(1f).heightIn(min = if (compact) 60.dp else 68.dp)
                 .clip(RoundedCornerShape(27.dp))
-                .clickable {
-                    if (!selected) {
-                        selectTab(tab)
-                    } else {
-                        scope.launch { tab.onReselect(navigator) }
-                    }
-                }
+                .combinedClickable(
+                    onLongClick = if (tab == AtlasSearchTab) ({ selectTab(BrowseTab) }) else null,
+                    onLongClickLabel = browseTitle.takeIf { tab == AtlasSearchTab },
+                    onClick = {
+                        if (!selected) {
+                            selectTab(tab)
+                        } else {
+                            scope.launch { tab.onReselect(navigator) }
+                        }
+                    },
+                )
                 .semantics {
                     role = Role.Tab
                     this.selected = selected

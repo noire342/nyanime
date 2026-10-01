@@ -2,13 +2,12 @@
 <resources>
     <string name="atlas_search">Cerca</string>
     <string name="atlas_close">Chiudi ricerca</string>
-    <string name="atlas_hint">Cerca titoli, scopri storie…</string>
+    <string name="atlas_hint">Cerca…</string>
     <string name="atlas_clear">Cancella testo</string>
     <string name="atlas_all">Tutti</string>
     <string name="atlas_explore">Esplora</string>
     <string name="atlas_results">Risultati</string>
     <string name="atlas_categories">Scegli una categoria</string>
-    <string name="atlas_explore_subtitle">Storie dalle categorie Home che hai abilitato.</string>
     <string name="atlas_query_scope">“%1$s” · %2$s</string>
     <string name="atlas_search_help">Suggerimenti e ricerca esatta</string>
     <string name="atlas_discover">Scopri nelle tue fonti</string>

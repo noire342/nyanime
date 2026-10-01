@@ -7,7 +7,8 @@ its source management, extension updates, migration and native source filters.
 ## Opening and navigation
 
 Search turns the floating navigation surface into a text field. The header stays
-fixed and page changes use the existing ModernMotion fade. Genres and Filters
+outside the page transition so opening or closing Search never fades the logo.
+Page changes use the existing ModernMotion fade. Genres and Filters
 appear above the field; the normal Home no longer duplicates these controls.
 The compact All selector opens the same categories in the same saved order as
 Home. Categories come from installed Home capabilities, never provider names.
@@ -23,7 +24,8 @@ Search settings, also available in Settings → Browse, offer:
 - Search as you type: on initially, with a 350 ms debounce.
 
 Submitting searches immediately. Back first dismisses the keyboard, then closes
-Search and restores the previous tab and its position. Returning from a title
+Search and restores the previous tab and its position. Holding Search opens Browse,
+including the search action inside the expanded field. Returning from a title
 preserves the query, filters and grid position. A new query resets the grid to the
 beginning. Incognito queries are not saved as a remembered search.
 

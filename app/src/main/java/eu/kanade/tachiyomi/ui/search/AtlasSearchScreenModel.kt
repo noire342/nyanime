@@ -80,7 +80,7 @@ data class AtlasState(
     val panel: AtlasPanel? = null,
 ) {
     val exploring get() = query.isBlank() && selectedGenres.isEmpty()
-    val loading get() = progress.values.any { it.loading }
+    val loading get() = (open && initializing) || progress.values.any { it.loading }
     val more get() = progress.values.any { it.more }
     val failures get() = progress.values.count { it.error != null }
     val scopedRoutes get() = routes.filter { category == null || it.category == category }
@@ -247,20 +247,29 @@ class AtlasSearchScreenModel : StateScreenModel<AtlasState>(AtlasState()) {
             }
             if (route.source.toString() in pinned) 0 else 1
         }
-        val category = state.value.category?.takeIf { selected -> choices.any { it.id == selected } }
-        val genres = AtlasFilters.genres(routes.filter { category == null || it.category == category })
-        val selected = state.value.selectedGenres.intersect(genres.map { it.key }.toSet())
-        val changed = routes != state.value.routes || state.value.offline != base.downloadedOnly().get()
+        val initializing = videoListing.loading || mangaListing.loading
+        val selection = AtlasSelection.resolve(
+            state.value.category,
+            state.value.selectedGenres,
+            choices.map { it.id }.toSet(),
+            routes,
+            initializing,
+        )
+        val changed = routes != state.value.routes ||
+            state.value.offline != base.downloadedOnly().get() ||
+            state.value.initializing != initializing ||
+            state.value.category != selection.category ||
+            state.value.selectedGenres != selection.selected
         mutableState.update {
             it.copy(
-                initializing = videoListing.loading || mangaListing.loading,
+                initializing = initializing,
                 routes = routes,
                 categories = choices,
-                category = category,
-                genres = genres,
-                selectedGenres = selected,
+                category = selection.category,
+                genres = selection.genres,
+                selectedGenres = selection.selected,
                 offline = base.downloadedOnly().get(),
-                removedFilters = it.removedFilters + (it.selectedGenres.size - selected.size),
+                removedFilters = it.removedFilters + (it.selectedGenres.size - selection.selected.size),
             )
         }
         if (state.value.open && changed) {
@@ -274,34 +283,22 @@ class AtlasSearchScreenModel : StateScreenModel<AtlasState>(AtlasState()) {
         runner.reset()
         logicalQuery = null
         val remember = preferences.rememberAtlasSearch().get() && !base.incognitoMode().get()
-        val category = if (remember) {
-            preferences.lastAtlasCategory().get().takeIf { key ->
-                state.value.categories.any {
-                    it.id == key
-                }
-            }
-        } else {
-            null
-        }
         val input = if (remember) preferences.lastAtlasQuery().get() else ""
-        val genres = AtlasFilters.genres(state.value.routes.filter { category == null || it.category == category })
-        val selected = if (remember) {
-            preferences.lastAtlasGenres().get().intersect(
-                genres.map {
-                    it.key
-                }.toSet(),
-            )
-        } else {
-            emptySet()
-        }
+        val selection = AtlasSelection.resolve(
+            if (remember) preferences.lastAtlasCategory().get() else null,
+            if (remember) preferences.lastAtlasGenres().get() else emptySet(),
+            state.value.categories.map { it.id }.toSet(),
+            state.value.routes,
+            state.value.initializing,
+        )
         mutableState.update {
             it.copy(
                 open = true,
                 input = input,
                 query = "",
-                category = category,
-                selectedGenres = selected,
-                genres = genres,
+                category = selection.category,
+                selectedGenres = selection.selected,
+                genres = selection.genres,
                 exact = false,
                 panel = null,
                 cards = emptyList(),
@@ -433,6 +430,7 @@ class AtlasSearchScreenModel : StateScreenModel<AtlasState>(AtlasState()) {
             showExplore()
             return
         }
+        if (state.value.initializing) return
         val current = state.value
         val assistanceTicket = revision
         val eligible = current.eligible
@@ -466,7 +464,13 @@ class AtlasSearchScreenModel : StateScreenModel<AtlasState>(AtlasState()) {
 
     fun loadMore() {
         val current = state.value
-        if (current.offline || current.exploring || current.input.trim() != current.query) return
+        if (current.initializing ||
+            current.offline ||
+            current.exploring ||
+            current.input.trim() != current.query
+        ) {
+            return
+        }
         current.eligible.forEach { route ->
             val progress = current.progress[route.key] ?: return@forEach
             if (progress.more && !progress.loading && progress.error == null) {

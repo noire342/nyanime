@@ -1,6 +1,8 @@
 package eu.kanade.tachiyomi.ui.search
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,15 +28,14 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -60,11 +61,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,10 +80,12 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.presentation.discovery.LocalDiscoveryHeaderHost
 import eu.kanade.presentation.discovery.SourceHomeWordmark
 import eu.kanade.presentation.motion.ModernMotion
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.presentation.privacy.privacyRegion
+import eu.kanade.presentation.theme.LocalDarkTheme
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
@@ -159,6 +166,13 @@ data object AtlasSearchTab : Tab {
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                                Text(
+                                    target.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                                 Text(route?.language?.uppercase().orEmpty(), style = MaterialTheme.typography.bodySmall)
                             }
                             Icon(Icons.Outlined.ExpandMore, null)
@@ -209,14 +223,16 @@ private fun AtlasSearchContent(
         }
     }
     Column(Modifier.fillMaxSize().privacyRegion(PrivacyArea.SEARCH)) {
-        Row(
-            Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 54.dp).padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SourceHomeWordmark(null, Modifier.weight(1f))
-            WatchTogetherButton()
-            IconButton(onClick = { model.showPanel(AtlasPanel.SETTINGS) }) {
-                Icon(Icons.Outlined.Tune, stringResource(R.string.atlas_settings))
+        if (LocalDiscoveryHeaderHost.current == null) {
+            Row(
+                Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 54.dp).padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SourceHomeWordmark(null, Modifier.weight(1f))
+                WatchTogetherButton()
+                IconButton(onClick = { model.showPanel(AtlasPanel.SETTINGS) }) {
+                    Icon(Icons.Outlined.Tune, stringResource(R.string.atlas_settings))
+                }
             }
         }
         LazyVerticalGrid(
@@ -266,16 +282,18 @@ private fun AtlasSearchContent(
                             }
                         }
                     }
-                    Text(
-                        if (state.exploring) {
-                            stringResource(R.string.atlas_explore_subtitle)
-                        } else {
-                            stringResource(R.string.atlas_query_scope, state.query, categoryLabel(state))
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
+                    if (!state.exploring) {
+                        Text(
+                            stringResource(
+                                R.string.atlas_query_scope,
+                                state.query.ifBlank { state.input.trim() },
+                                categoryLabel(state),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
                 }
             }
             if (!state.exploring) {
@@ -630,13 +648,18 @@ private fun AtlasPanelContent(
 @Composable
 private fun AtlasSetting(label: Int, preference: tachiyomi.core.common.preference.Preference<Boolean>) {
     val checked by preference.changes().collectAsState(initial = preference.get())
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+            .toggleable(value = checked, role = Role.Switch, onValueChange = preference::set)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
             stringResource(label),
             Modifier.weight(1f).padding(end = 12.dp),
             style = MaterialTheme.typography.bodyLarge,
         )
-        Switch(checked = checked, onCheckedChange = preference::set)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -665,29 +688,74 @@ private fun AtlasCategoryRow(label: String, selected: Boolean, onClick: () -> Un
 @Composable
 fun AtlasGenreBar(model: AtlasSearchScreenModel) {
     val state by model.state.collectAsState()
-    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         item {
-            FilterChip(
+            AtlasGenrePill(
                 selected = state.selectedGenres.isNotEmpty(),
                 onClick = { model.showPanel(AtlasPanel.FILTERS) },
-                label = {
-                    Text(stringResource(R.string.atlas_filters))
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Outlined.FilterList,
-                        null,
-                        Modifier.size(18.dp),
-                    )
-                },
+                label = stringResource(R.string.atlas_filters),
+                isFilter = true,
+                count = state.selectedGenres.size,
             )
         }
         items(state.genres, key = { it.key }) { genre ->
-            FilterChip(
+            AtlasGenrePill(
                 selected = genre.key in state.selectedGenres,
                 onClick = { model.toggleGenre(genre.key) },
-                label = { Text(genre.label, maxLines = 1) },
+                label = genre.label,
             )
+        }
+    }
+}
+
+@Composable
+private fun AtlasGenrePill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    isFilter: Boolean = false,
+    count: Int = 0,
+) {
+    val dark = LocalDarkTheme.current
+    val motion = appMotionEnabled()
+    val accent = MaterialTheme.colorScheme.primary
+    val base = if (dark) Color(0xFF29181C) else Color(0xFFFFF9F2)
+    val color by animateColorAsState(
+        targetValue = if (selected) {
+            accent.copy(alpha = if (dark) 0.24f else 0.12f).compositeOver(base)
+        } else {
+            base
+        },
+        animationSpec = tween(if (motion) ModernMotion.RESIZE_MILLIS else 0),
+        label = "atlasGenreSelection",
+    )
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = color,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(
+            1.dp,
+            if (selected) {
+                accent.copy(alpha = 0.6f)
+            } else {
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
+            },
+        ),
+        modifier = Modifier.heightIn(min = 44.dp).semantics { this.selected = selected },
+    ) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (isFilter) Icon(Icons.Outlined.Tune, null, Modifier.size(18.dp))
+            Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            if (count > 0) Text(count.toString(), style = MaterialTheme.typography.labelLarge)
         }
     }
 }

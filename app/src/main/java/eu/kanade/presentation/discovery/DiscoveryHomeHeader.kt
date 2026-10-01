@@ -37,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -96,24 +97,28 @@ fun DiscoveryHomeHeader(
             hasUpdates,
         )
     }
+    val host = LocalDiscoveryHeaderHost.current
+    if (host != null) SideEffect { host.update(logo, artworkRefreshKey, hasUpdates, onUpdates) }
     Surface(modifier = Modifier.posterForeground(zIndex = 3f), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.statusBarsPadding()) {
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 12.dp).heightIn(min = 54.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, androidStringResource(R.string.home_back))
+        Column(if (host == null) Modifier.statusBarsPadding() else Modifier) {
+            if (host == null) {
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp).heightIn(min = 54.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (onBack != null) {
+                            IconButton(onClick = onBack) {
+                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, androidStringResource(R.string.home_back))
+                            }
                         }
+                        SourceHomeWordmark(
+                            logo,
+                            Modifier.weight(1f).padding(start = 4.dp),
+                            refreshKey = artworkRefreshKey,
+                        )
+                        HomeHeaderActions(onUpdates, hasUpdates)
                     }
-                    SourceHomeWordmark(
-                        logo,
-                        Modifier.weight(1f).padding(start = 4.dp),
-                        refreshKey = artworkRefreshKey,
-                    )
-                    HomeHeaderActions(onUpdates, hasUpdates)
                 }
             }
             HomeContentSwitch(selectedHome, homes, categoryOrder, onSelect, onPrioritizeCategory)

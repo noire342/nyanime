@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.search
 
+import eu.kanade.tachiyomi.data.discovery.MangaGenreLabels
 import eu.kanade.tachiyomi.data.discovery.MangaHomeItem
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -97,6 +98,25 @@ class AtlasSearchPolicyTest {
     )
     private val video = AtlasRoute("video:1", SearchMedium.VIDEO, 1, "Source A", "en", "video", "Video", home)
     private val native = AtlasRoute("video:2", SearchMedium.VIDEO, 2, "Source B", "en", "native", "Video")
+
+    @Test
+    fun rememberedScopeSurvivesColdExtensionInitialization() {
+        val selected = setOf(MangaGenreLabels.key("Adventure"))
+        val pending = AtlasSelection.resolve("video", selected, emptySet(), emptyList(), initializing = true)
+        assertEquals("video", pending.category)
+        assertEquals(selected, pending.selected)
+        val ready = AtlasSelection.resolve(pending.category, pending.selected, setOf("video"), listOf(video), false)
+        assertEquals("video", ready.category)
+        assertEquals(selected, ready.selected)
+    }
+
+    @Test
+    fun missingRememberedOptionsAreRemovedOnlyAfterInitialization() {
+        val pending = AtlasSelection.resolve("removed", setOf("missing"), emptySet(), emptyList(), true)
+        val ready = AtlasSelection.resolve(pending.category, pending.selected, setOf("video"), listOf(video), false)
+        assertNull(ready.category)
+        assertEquals(emptySet<String>(), ready.selected)
+    }
 
     @Test
     fun nativeSourcesRemainSearchableWithoutInventedGenreSupport() {
