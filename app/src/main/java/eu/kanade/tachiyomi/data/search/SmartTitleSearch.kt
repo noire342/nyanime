@@ -57,10 +57,16 @@ class SmartTitleSearch(context: Context) : TitleSearch {
     private var loaded = false
     private var libraryAt = 0L
 
-    override fun session(query: String, medium: SearchMedium, exact: Boolean, sourceId: Long?): SearchSession {
+    override fun session(
+        query: String,
+        medium: SearchMedium,
+        exact: Boolean,
+        sourceId: Long?,
+        catalogBudget: SearchRequestBudget?,
+    ): SearchSession {
         val private = if (medium == SearchMedium.VIDEO) animePrivacy.await(sourceId) else mangaPrivacy.await(sourceId)
         val provider = object : SearchCandidateProvider {
-            private val budget = SearchRequestBudget(3)
+            private val budget = catalogBudget ?: SearchRequestBudget(3)
             override suspend fun candidates(query: String, medium: SearchMedium, online: Boolean): List<SearchTitle> =
                 withContext(Dispatchers.IO) {
                     val local = lock.withLock {

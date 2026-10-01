@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.NewReleases
@@ -74,6 +75,8 @@ import tachiyomi.source.local.entries.anime.LocalAnimeSource
 data class BrowseAnimeSourceScreen(
     val sourceId: Long,
     private val listingQuery: String?,
+    private val initialSection: tachiyomi.domain.discovery.SourceHomeSection? = null,
+    private val initialControls: List<tachiyomi.domain.discovery.SourceHomeFilter> = emptyList(),
 ) : Screen(), AssistContentScreen {
 
     private var assistUrl: String? = null
@@ -87,7 +90,14 @@ data class BrowseAnimeSourceScreen(
             return
         }
 
-        val screenModel = rememberScreenModel { BrowseAnimeSourceScreenModel(sourceId, listingQuery) }
+        val screenModel = rememberScreenModel {
+            BrowseAnimeSourceScreenModel(
+                sourceId,
+                listingQuery,
+                initialSection = initialSection,
+                initialControls = initialControls,
+            )
+        }
         val state by screenModel.state.collectAsState()
 
         val navigator = LocalNavigator.currentOrThrow
@@ -112,6 +122,20 @@ data class BrowseAnimeSourceScreen(
         val haptic = LocalHapticFeedback.current
         val uriHandler = LocalUriHandler.current
         val snackbarHostState = remember { SnackbarHostState() }
+
+        if (state.initialFilterError) {
+            tachiyomi.presentation.core.screens.EmptyScreen(
+                message = androidx.compose.ui.res.stringResource(eu.kanade.tachiyomi.R.string.atlas_stale_filters),
+                actions = kotlinx.collections.immutable.persistentListOf(
+                    tachiyomi.presentation.core.screens.EmptyScreenAction(
+                        MR.strings.action_close,
+                        Icons.AutoMirrored.Outlined.ArrowBack,
+                        { navigator.pop() },
+                    ),
+                ),
+            )
+            return
+        }
 
         val onHelpClick = { uriHandler.openUri(LocalAnimeSource.HELP_URL) }
         val onWebViewClick = f@{

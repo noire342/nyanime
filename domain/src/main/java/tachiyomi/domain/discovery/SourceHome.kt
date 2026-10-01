@@ -13,10 +13,10 @@ data class SourceHomeSection(
     val dateFilter: String? = null,
     val moreSelections: Map<String, String>? = null,
     val browseValues: Map<String, List<String>> = emptyMap(),
-)
+) : java.io.Serializable
 
 /** Optional presentation only; requests and caches still use the concrete section ID. */
-data class SourceHomeSectionGroup(val id: String, val title: String, val tab: String)
+data class SourceHomeSectionGroup(val id: String, val title: String, val tab: String) : java.io.Serializable
 
 data class SourceHomeSource(
     val id: Long,

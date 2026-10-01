@@ -22,6 +22,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import tachiyomi.domain.discovery.SourceHomeRequest
 import tachiyomi.domain.entries.manga.interactor.NetworkToLocalManga
+import tachiyomi.domain.search.searchTitle
 import tachiyomi.domain.source.manga.service.MangaSourceManager
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
@@ -197,6 +198,7 @@ class MangaHomeService(
                                 ),
                                 presentation,
                                 remote.title,
+                                searchAliases = remote.searchTitle(source.id).aliases,
                             ),
                         )
                     }.distinctBy(MangaHomeItem::key)

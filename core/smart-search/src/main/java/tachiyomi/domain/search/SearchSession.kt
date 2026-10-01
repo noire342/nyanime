@@ -35,7 +35,13 @@ interface ExtensionSearchAdapter<T> {
 }
 
 interface TitleSearch {
-    fun session(query: String, medium: SearchMedium, exact: Boolean = false, sourceId: Long? = null): SearchSession
+    fun session(
+        query: String,
+        medium: SearchMedium,
+        exact: Boolean = false,
+        sourceId: Long? = null,
+        catalogBudget: SearchRequestBudget? = null,
+    ): SearchSession
 }
 
 /** One session per user query, shared by all sources. Each source/query owns its pagination. */

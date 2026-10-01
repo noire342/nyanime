@@ -6,7 +6,7 @@ data class SourceHomeFilter(
     val kind: Kind,
     val options: List<String> = emptyList(),
     val defaults: List<String> = emptyList(),
-) {
+) : java.io.Serializable {
     enum class Kind { SINGLE, MULTIPLE, TEXT }
     fun accepts(values: List<String>) = when (kind) {
         Kind.SINGLE -> values.size == 1 && values.single() in options

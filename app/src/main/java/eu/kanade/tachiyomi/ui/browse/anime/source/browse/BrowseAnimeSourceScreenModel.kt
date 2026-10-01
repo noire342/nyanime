@@ -79,6 +79,8 @@ class BrowseAnimeSourceScreenModel(
     private val updateAnime: UpdateAnime = Injekt.get(),
     private val addTracks: AddAnimeTracks = Injekt.get(),
     private val getIncognitoState: GetAnimeIncognitoState = Injekt.get(),
+    initialSection: tachiyomi.domain.discovery.SourceHomeSection? = null,
+    initialControls: List<tachiyomi.domain.discovery.SourceHomeFilter> = emptyList(),
 ) : StateScreenModel<BrowseAnimeSourceScreenModel.State>(State(Listing.valueOf(listingQuery))) {
 
     private val titleSearch: TitleSearch = Injekt.get()
@@ -93,16 +95,42 @@ class BrowseAnimeSourceScreenModel(
         mutableState.update {
             var query: String? = null
             var listing = it.listing
+            val displayFilters = source.getFilterList()
+            var initialFilterError = false
 
             if (listing is Listing.Search) {
                 query = listing.query
                 listing = Listing.Search(query, source.getFilterList())
             }
 
+            initialSection?.let { section ->
+                val filters = source.getFilterList()
+                try {
+                    eu.kanade.tachiyomi.data.discovery.ExtensionHomeFilters.apply(filters, section)
+                    eu.kanade.tachiyomi.data.discovery.ExtensionHomeFilters.applyBrowse(
+                        filters,
+                        initialControls,
+                        section.browseValues,
+                    )
+                    eu.kanade.tachiyomi.data.discovery.ExtensionHomeFilters.apply(displayFilters, section)
+                    eu.kanade.tachiyomi.data.discovery.ExtensionHomeFilters.applyBrowse(
+                        displayFilters,
+                        initialControls,
+                        section.browseValues,
+                    )
+                    listing = Listing.Search(query, filters)
+                } catch (_: IllegalArgumentException) {
+                    // Never run an unfiltered request when a declared capability became stale.
+                    initialFilterError = true
+                } catch (_: IllegalStateException) {
+                    initialFilterError = true
+                }
+            }
             it.copy(
                 listing = listing,
-                filters = source.getFilterList(),
+                filters = displayFilters,
                 toolbarQuery = query,
+                initialFilterError = initialFilterError,
             )
         }
 
@@ -402,6 +430,7 @@ class BrowseAnimeSourceScreenModel(
         val listing: Listing,
         val filters: AnimeFilterList = AnimeFilterList(),
         val toolbarQuery: String? = null,
+        val initialFilterError: Boolean = false,
         val assistance: SearchAssistance = SearchAssistance(),
         val dialog: Dialog? = null,
     ) {

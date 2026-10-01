@@ -59,6 +59,7 @@ data class MangaHomeItem(
     val sourceTitle: String = manga.title,
     val sourceVariants: List<MangaHomeVariant> = emptyList(),
     val stableKey: String? = null,
+    val searchAliases: List<String> = emptyList(),
 ) {
     val key: String get() = stableKey ?: (manga.source.toString() + ":" + manga.url + ":" + presentation?.id.orEmpty())
     val alternateSources: List<Manga> get() = sourceVariants.map { it.manga }

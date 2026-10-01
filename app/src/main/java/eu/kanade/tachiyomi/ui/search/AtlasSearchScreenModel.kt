@@ -1,0 +1,716 @@
+package eu.kanade.tachiyomi.ui.search
+
+import cafe.adriel.voyager.core.model.StateScreenModel
+import cafe.adriel.voyager.core.model.screenModelScope
+import eu.kanade.domain.base.BasePreferences
+import eu.kanade.domain.entries.anime.model.toDomainAnime
+import eu.kanade.domain.entries.manga.model.toDomainManga
+import eu.kanade.domain.source.anime.interactor.GetAnimeIncognitoState
+import eu.kanade.domain.source.manga.interactor.GetMangaIncognitoState
+import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.domain.ui.UiPreferences
+import eu.kanade.presentation.discovery.HomeCategories
+import eu.kanade.presentation.discovery.HomeCategory
+import eu.kanade.presentation.util.ioCoroutineScope
+import eu.kanade.tachiyomi.data.discovery.DiscoverySourceService
+import eu.kanade.tachiyomi.data.discovery.ExtensionHomeRegistry
+import eu.kanade.tachiyomi.data.discovery.ExtensionHomeServices
+import eu.kanade.tachiyomi.data.discovery.MangaHomeItem
+import eu.kanade.tachiyomi.data.discovery.MangaHomePresentation
+import eu.kanade.tachiyomi.data.discovery.MangaHomeRegistry
+import eu.kanade.tachiyomi.data.discovery.MangaHomeService
+import eu.kanade.tachiyomi.data.track.SourceTrackingHints
+import eu.kanade.tachiyomi.extension.manga.MangaExtensionManager
+import eu.kanade.tachiyomi.ui.browse.SourceSearchRunner
+import eu.kanade.tachiyomi.ui.discovery.DiscoveryTab
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import tachiyomi.domain.discovery.SourceHomeGroup
+import tachiyomi.domain.discovery.SourceHomeRequest
+import tachiyomi.domain.entries.anime.interactor.NetworkToLocalAnime
+import tachiyomi.domain.entries.manga.interactor.NetworkToLocalManga
+import tachiyomi.domain.search.ExtensionSearchAdapter
+import tachiyomi.domain.search.SearchAssistance
+import tachiyomi.domain.search.SearchMedium
+import tachiyomi.domain.search.SearchPage
+import tachiyomi.domain.search.SearchRequestBudget
+import tachiyomi.domain.search.SearchSession
+import tachiyomi.domain.search.TitleSearch
+import tachiyomi.domain.search.runtimeSearchTitle
+import tachiyomi.domain.search.searchAliases
+import tachiyomi.domain.search.searchTitle
+import tachiyomi.domain.source.anime.service.AnimeSourceManager
+import tachiyomi.domain.source.manga.service.MangaSourceManager
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
+import java.io.IOException
+
+data class AtlasProgress(
+    val loading: Boolean = false,
+    val nextPage: Int = 1,
+    val more: Boolean = false,
+    val error: String? = null,
+)
+
+data class AtlasState(
+    val open: Boolean = false,
+    val initializing: Boolean = true,
+    val input: String = "",
+    val query: String = "",
+    val category: String? = null,
+    val categories: List<HomeCategory> = emptyList(),
+    val routes: List<AtlasRoute> = emptyList(),
+    val genres: List<AtlasGenre> = emptyList(),
+    val selectedGenres: Set<String> = emptySet(),
+    val cards: List<AtlasCard> = emptyList(),
+    val progress: Map<String, AtlasProgress> = emptyMap(),
+    val assistance: Map<SearchMedium, SearchAssistance> = emptyMap(),
+    val exact: Boolean = false,
+    val offline: Boolean = false,
+    val removedFilters: Int = 0,
+    val scrollRevision: Int = 0,
+    val panel: AtlasPanel? = null,
+) {
+    val exploring get() = query.isBlank() && selectedGenres.isEmpty()
+    val loading get() = progress.values.any { it.loading }
+    val more get() = progress.values.any { it.more }
+    val failures get() = progress.values.count { it.error != null }
+    val scopedRoutes get() = routes.filter { category == null || it.category == category }
+    val selected get() = genres.filter { it.key in selectedGenres }
+    val eligible get() = scopedRoutes.filter { AtlasFilters.request(it, selected) != null }
+}
+
+enum class AtlasPanel { CATEGORIES, FILTERS, ASSISTANCE, SETTINGS }
+
+/** One presentation session, distinct media engines and one shared external allowance. */
+class AtlasSearchScreenModel : StateScreenModel<AtlasState>(AtlasState()) {
+    private val videoRegistry: ExtensionHomeRegistry = Injekt.get()
+    private val mangaRegistry: MangaHomeRegistry = Injekt.get()
+    private val videoHomes: ExtensionHomeServices = Injekt.get()
+    private val mangaHomes: MangaHomeService = Injekt.get()
+    private val videos: AnimeSourceManager = Injekt.get()
+    private val mangas: MangaSourceManager = Injekt.get()
+    private val visibility: DiscoverySourceService = Injekt.get()
+    private val mangaExtensions: MangaExtensionManager = Injekt.get()
+    private val preferences: SourcePreferences = Injekt.get()
+    private val uiPreferences: UiPreferences = Injekt.get()
+    private val base: BasePreferences = Injekt.get()
+    private val videoPrivacy: GetAnimeIncognitoState = Injekt.get()
+    private val mangaPrivacy: GetMangaIncognitoState = Injekt.get()
+    private val toVideo: NetworkToLocalAnime = Injekt.get()
+    private val toManga: NetworkToLocalManga = Injekt.get()
+    private val engine: TitleSearch = Injekt.get()
+    private val runner = SourceSearchRunner<String>(ioCoroutineScope, concurrency = 5)
+    private var debounce: Job? = null
+    private var logicalQuery: String? = null
+    private var budget = SearchRequestBudget(3)
+    private val sessions = mutableMapOf<Triple<SearchMedium, Boolean, Boolean>, SearchSession>()
+    private val assistanceJobs = mutableListOf<Job>()
+    private val received = linkedMapOf<String, List<AtlasEntry>>()
+    private val arrivalOrder = linkedSetOf<String>()
+    private var revision = 0
+
+    override fun onDispose() {
+        revision++
+        debounce?.cancel()
+        runner.reset()
+        assistanceJobs.forEach { it.cancel() }
+        super.onDispose()
+    }
+
+    init {
+        screenModelScope.launch {
+            merge(
+                videoRegistry.observe().map { Unit },
+                mangaRegistry.observe().map { Unit },
+                uiPreferences.homeCategoryOrder().changes().map { Unit },
+                base.downloadedOnly().changes().map { Unit },
+                preferences.pinnedAnimeSources().changes().map { Unit },
+                preferences.pinnedMangaSources().changes().map { Unit },
+            ).collectLatest { rebuildRoutes() }
+        }
+        screenModelScope.launch {
+            merge(
+                preferences.tolerantSearch().changes().map { Unit },
+                preferences.onlineSearchAssistance().changes().map { Unit },
+                base.incognitoMode().changes().map { Unit },
+                preferences.incognitoAnimeExtensions().changes().map { Unit },
+                preferences.incognitoMangaExtensions().changes().map { Unit },
+            ).collectLatest {
+                sessions.clear()
+                if (state.value.open) submit()
+            }
+        }
+        screenModelScope.launch {
+            AtlasExploreCache.snapshots.collect { if (state.value.exploring) showExplore() }
+        }
+        screenModelScope.launch {
+            merge(
+                preferences.hideInAnimeLibraryItems().changes().map { Unit },
+                preferences.hideInMangaLibraryItems().changes().map { Unit },
+            ).collect {
+                if (state.value.exploring) showExplore() else publishCards()
+            }
+        }
+    }
+
+    private suspend fun rebuildRoutes() {
+        val (videoListing, mangaListing) = withContext(Dispatchers.IO) {
+            videoRegistry.current() to mangaRegistry.current()
+        }
+        val videoSources = videos.getAll().filter(visibility::isEnabled)
+        val mangaSources = mangas.getCatalogueSources().filter { source ->
+            source.id.toString() !in preferences.disabledMangaSources().get() &&
+                (
+                    source.lang in preferences.enabledLanguages().get() ||
+                        (uiPreferences.showMangaInOtherLanguages().get() && source.lang != "it")
+                    ) &&
+                (uiPreferences.showMangaInOtherLanguages().get() || source.lang == "it") &&
+                (
+                    preferences.showNsfwSource().get() ||
+                        mangaExtensions.installedExtensionsFlow.value.none { extension ->
+                            extension.isNsfw && extension.sources.any { it.id == source.id }
+                        }
+                    )
+        }
+        val videoRoutes = videoListing.homes.filter { it.search != null }.map { home ->
+            AtlasRoute(
+                "video:${home.key}",
+                SearchMedium.VIDEO,
+                home.id,
+                home.sourceName,
+                home.language,
+                home.homeId,
+                home.title,
+                home,
+            )
+        } +
+            videoSources.filter { source ->
+                videoListing.homes.none {
+                    it.id == source.id && it.search != null
+                }
+            }.map { source ->
+                AtlasRoute(
+                    "video:${source.id}",
+                    SearchMedium.VIDEO,
+                    source.id,
+                    source.name,
+                    source.lang,
+                    DEFAULT_VIDEO,
+                    "",
+                )
+            }
+        val mangaRoutes = mangaListing.homes.filter { it.search != null }.map { home ->
+            AtlasRoute(
+                "manga:${home.key}",
+                SearchMedium.MANGA,
+                home.id,
+                home.sourceName,
+                home.language,
+                DiscoveryTab.MANGA_CATEGORY,
+                "",
+                home,
+            )
+        } +
+            mangaSources.filter { source ->
+                mangaListing.homes.none {
+                    it.id == source.id && it.search != null
+                }
+            }.map { source ->
+                AtlasRoute(
+                    "manga:${source.id}",
+                    SearchMedium.MANGA,
+                    source.id,
+                    source.name,
+                    source.lang,
+                    DiscoveryTab.MANGA_CATEGORY,
+                    "",
+                )
+            }
+        val choices = HomeCategories.choices(
+            videoListing.groups + SourceHomeGroup(DiscoveryTab.MANGA_CATEGORY, "Manga", emptyList()),
+            uiPreferences.homeCategoryOrder().get(),
+        ).map { if (it.id == null) it.copy(id = DEFAULT_VIDEO) else it }
+        val routes = (videoRoutes + mangaRoutes).sortedBy { route ->
+            val pinned = if (route.medium == SearchMedium.VIDEO) {
+                preferences.pinnedAnimeSources().get()
+            } else {
+                preferences.pinnedMangaSources().get()
+            }
+            if (route.source.toString() in pinned) 0 else 1
+        }
+        val category = state.value.category?.takeIf { selected -> choices.any { it.id == selected } }
+        val genres = AtlasFilters.genres(routes.filter { category == null || it.category == category })
+        val selected = state.value.selectedGenres.intersect(genres.map { it.key }.toSet())
+        val changed = routes != state.value.routes || state.value.offline != base.downloadedOnly().get()
+        mutableState.update {
+            it.copy(
+                initializing = videoListing.loading || mangaListing.loading,
+                routes = routes,
+                categories = choices,
+                category = category,
+                genres = genres,
+                selectedGenres = selected,
+                offline = base.downloadedOnly().get(),
+                removedFilters = it.removedFilters + (it.selectedGenres.size - selected.size),
+            )
+        }
+        if (state.value.open && changed) {
+            submit()
+        } else if (state.value.exploring) {
+            showExplore()
+        }
+    }
+
+    fun open() {
+        runner.reset()
+        logicalQuery = null
+        val remember = preferences.rememberAtlasSearch().get() && !base.incognitoMode().get()
+        val category = if (remember) {
+            preferences.lastAtlasCategory().get().takeIf { key ->
+                state.value.categories.any {
+                    it.id == key
+                }
+            }
+        } else {
+            null
+        }
+        val input = if (remember) preferences.lastAtlasQuery().get() else ""
+        val genres = AtlasFilters.genres(state.value.routes.filter { category == null || it.category == category })
+        val selected = if (remember) {
+            preferences.lastAtlasGenres().get().intersect(
+                genres.map {
+                    it.key
+                }.toSet(),
+            )
+        } else {
+            emptySet()
+        }
+        mutableState.update {
+            it.copy(
+                open = true,
+                input = input,
+                query = "",
+                category = category,
+                selectedGenres = selected,
+                genres = genres,
+                exact = false,
+                panel = null,
+                cards = emptyList(),
+                progress = emptyMap(),
+                assistance = emptyMap(),
+                scrollRevision = it.scrollRevision + 1,
+            )
+        }
+        submit()
+    }
+
+    fun close() {
+        revision++
+        debounce?.cancel()
+        runner.reset()
+        assistanceJobs.forEach { it.cancel() }
+        val privateScope = state.value.scopedRoutes.any { route ->
+            if (route.medium == SearchMedium.VIDEO) {
+                videoPrivacy.await(route.source)
+            } else {
+                mangaPrivacy.await(route.source)
+            }
+        }
+        if (preferences.rememberAtlasSearch().get() && !base.incognitoMode().get() && !privateScope) {
+            preferences.lastAtlasQuery().set(state.value.input)
+            preferences.lastAtlasCategory().set(state.value.category.orEmpty())
+            preferences.lastAtlasGenres().set(state.value.selectedGenres)
+        } else {
+            preferences.lastAtlasQuery().delete()
+            preferences.lastAtlasCategory().delete()
+            preferences.lastAtlasGenres().delete()
+        }
+        mutableState.update {
+            it.copy(
+                open = false,
+                panel = null,
+                progress = it.progress.mapValues {
+                        (
+                            _,
+                            p,
+                        ),
+                    ->
+                    p.copy(loading = false)
+                },
+            )
+        }
+    }
+
+    fun edit(value: String) {
+        revision++
+        assistanceJobs.forEach { it.cancel() }
+        mutableState.update { it.copy(input = value.take(256)) }
+        debounce?.cancel()
+        runner.reset()
+        mutableState.update { it.copy(progress = it.progress.mapValues { (_, p) -> p.copy(loading = false) }) }
+        if (preferences.liveAtlasSearch().get()) {
+            debounce = screenModelScope.launch {
+                delay(350)
+                submit()
+            }
+        }
+    }
+
+    fun selectCategory(category: String?) {
+        val valid = category?.takeIf { key -> state.value.categories.any { it.id == key } }
+        val genres = AtlasFilters.genres(state.value.routes.filter { valid == null || it.category == valid })
+        val kept = state.value.selectedGenres.intersect(genres.map { it.key }.toSet())
+        mutableState.update {
+            it.copy(
+                category = valid,
+                genres = genres,
+                selectedGenres = kept,
+                removedFilters = it.removedFilters + (it.selectedGenres.size - kept.size),
+            )
+        }
+        submit()
+    }
+
+    fun toggleGenre(key: String) {
+        if (state.value.genres.none { it.key == key }) return
+        mutableState.update {
+            it.copy(
+                selectedGenres = if (key in it.selectedGenres) it.selectedGenres - key else it.selectedGenres + key,
+            )
+        }
+        submit()
+    }
+
+    fun clearGenres() {
+        mutableState.update { it.copy(selectedGenres = emptySet()) }
+        submit()
+    }
+    fun showPanel(panel: AtlasPanel?) {
+        mutableState.update { it.copy(panel = panel) }
+    }
+    fun toggleExact() {
+        mutableState.update { it.copy(exact = !it.exact) }
+        submit()
+    }
+    fun useSuggestion(value: String) {
+        mutableState.update { it.copy(input = value, exact = false) }
+        submit()
+    }
+
+    fun submit() {
+        debounce?.cancel()
+        runner.reset()
+        assistanceJobs.forEach { it.cancel() }
+        assistanceJobs.clear()
+        revision++
+        val query = state.value.input.trim()
+        if (logicalQuery != query) {
+            logicalQuery = query
+            budget = SearchRequestBudget(3)
+            sessions.clear()
+        }
+        received.clear()
+        arrivalOrder.clear()
+        mutableState.update {
+            it.copy(
+                query = query,
+                cards = emptyList(),
+                progress = emptyMap(),
+                assistance = emptyMap(),
+                scrollRevision = it.scrollRevision + 1,
+            )
+        }
+        if (state.value.exploring || state.value.offline) {
+            showExplore()
+            return
+        }
+        val current = state.value
+        val assistanceTicket = revision
+        val eligible = current.eligible
+        eligible.map { it.medium }.distinct().forEach { medium ->
+            val privateSource = privateSource(medium, current)
+            val session = sessions.getOrPut(Triple(medium, current.exact, privateSource != null)) {
+                engine.session(query, medium, current.exact, sourceId = privateSource, catalogBudget = budget)
+            }
+            assistanceJobs += screenModelScope.launch {
+                session.assistance.collect { assistance ->
+                    if (assistanceTicket == revision &&
+                        state.value.query == query &&
+                        state.value.exact == current.exact
+                    ) {
+                        mutableState.update {
+                            it.copy(assistance = it.assistance + (medium to assistance))
+                        }
+                    }
+                }
+            }
+        }
+        mutableState.update {
+            it.copy(
+                progress = eligible.associate { route ->
+                    route.key to AtlasProgress(loading = true)
+                },
+            )
+        }
+        eligible.forEach { fetch(it, 1, current) }
+    }
+
+    fun loadMore() {
+        val current = state.value
+        if (current.offline || current.exploring || current.input.trim() != current.query) return
+        current.eligible.forEach { route ->
+            val progress = current.progress[route.key] ?: return@forEach
+            if (progress.more && !progress.loading && progress.error == null) {
+                mutableState.update { it.copy(progress = it.progress + (route.key to progress.copy(loading = true))) }
+                fetch(route, progress.nextPage, current)
+            }
+        }
+    }
+
+    fun retryFailures() {
+        val current = state.value
+        current.eligible.forEach { route ->
+            val progress = current.progress[route.key] ?: return@forEach
+            if (progress.error != null && !progress.loading) {
+                mutableState.update {
+                    it.copy(
+                        progress = it.progress +
+                            (
+                                route.key to progress.copy(
+                                    loading = true,
+                                    error = null,
+                                )
+                                ),
+                    )
+                }
+                fetch(route, progress.nextPage, current)
+            }
+        }
+    }
+
+    private fun isPrivate(medium: SearchMedium, source: Long) = if (medium == SearchMedium.VIDEO) {
+        videoPrivacy.await(source)
+    } else {
+        mangaPrivacy.await(source)
+    }
+
+    private fun privateSource(medium: SearchMedium, snapshot: AtlasState) = snapshot.eligible.firstOrNull {
+        it.medium == medium && isPrivate(it.medium, it.source)
+    }?.source
+
+    private fun showExplore() {
+        val current = state.value
+        if (!current.exploring || current.offline) {
+            if (current.offline) {
+                mutableState.update {
+                    it.copy(cards = emptyList())
+                }
+            }
+            return
+        }
+        val public = AtlasExploreCache.snapshots.value.filter { entry ->
+            current.routes.any { it.source == entry.source && it.medium == entry.medium } &&
+                (current.category == null || current.category == entry.category) &&
+                !isPrivate(entry.medium, entry.source) &&
+                visibleEntry(entry)
+        }.map { entry ->
+            entry.copy(
+                targets = entry.targets.filter { target ->
+                    current.routes.any {
+                        it.source == target.source && it.medium == target.medium
+                    }
+                },
+            )
+        }
+        mutableState.update { it.copy(cards = AtlasCards.merge(public)) }
+    }
+
+    private fun visibleEntry(entry: AtlasEntry) = when (entry.medium) {
+        SearchMedium.VIDEO -> !preferences.hideInAnimeLibraryItems().get() || entry.anime?.favorite != true
+        SearchMedium.MANGA -> !preferences.hideInMangaLibraryItems().get() || entry.manga?.favorite != true
+    }
+
+    private fun publishCards() {
+        val entries = received.values.flatten().associateBy { it.key }
+        val cards = AtlasCards.merge(arrivalOrder.mapNotNull(entries::get).filter(::visibleEntry))
+        mutableState.update { it.copy(cards = cards) }
+    }
+
+    private fun fetch(route: AtlasRoute, page: Int, snapshot: AtlasState) {
+        val ticket = revision
+        val selected = snapshot.selected
+        val request = AtlasFilters.request(route, selected) ?: return
+        val session = sessions.getValue(
+            Triple(
+                route.medium,
+                snapshot.exact,
+                privateSource(route.medium, snapshot) != null,
+            ),
+        )
+        runner.submit(route.key, fetch = {
+            val adapter = adapter(route, request, snapshot.selectedGenres.sorted().joinToString("|"))
+            if (snapshot.query.isBlank()) adapter.fetch(page, "") else session.search(adapter, page)
+        }) { result ->
+            screenModelScope.launch {
+                if (ticket != revision || !state.value.open) return@launch
+                val progress = state.value.progress[route.key] ?: return@launch
+                result.fold(
+                    onSuccess = { response ->
+                        val previous = if (page == 1) emptyList() else received[route.key].orEmpty()
+                        received[route.key] = previous + response.items
+                        response.items.forEach { arrivalOrder += it.key }
+                        publishCards()
+                        mutableState.update {
+                            it.copy(
+                                progress = it.progress +
+                                    (
+                                        route.key to AtlasProgress(
+                                            nextPage = page + 1,
+                                            more = response.hasNextPage,
+                                        )
+                                        ),
+                            )
+                        }
+                    },
+                    onFailure = { error ->
+                        mutableState.update {
+                            it.copy(
+                                progress = it.progress +
+                                    (
+                                        route.key to progress.copy(
+                                            loading = false,
+                                            error = error.message ?: error.javaClass.simpleName,
+                                        )
+                                        ),
+                            )
+                        }
+                    },
+                )
+            }
+        }
+    }
+
+    private fun adapter(
+        route: AtlasRoute,
+        request: SourceHomeRequest,
+        controls: String,
+    ) = object : ExtensionSearchAdapter<AtlasEntry> {
+        override val key = route.key + ":" + controls + ":" + route.home?.revision.orEmpty()
+        override fun identity(item: AtlasEntry) = item.key
+        override fun title(item: AtlasEntry) = runtimeSearchTitle(
+            item.source,
+            item.url,
+            item.title,
+            item.medium,
+            item.aliases,
+        )
+        override suspend fun fetch(page: Int, query: String): SearchPage<AtlasEntry> {
+            if (base.downloadedOnly().get() || route !in state.value.routes) throw IOException("Source unavailable")
+            if (route.home != null) {
+                if (route.medium == SearchMedium.VIDEO) {
+                    val access = videoRegistry.access(route.home.key)
+                    val value = videoHomes.forHome(route.home.key).repository.observe(
+                        access,
+                        request.copy(page = page, query = query),
+                        refresh = true,
+                    ).first { !it.loading }
+                    value.error?.let { throw IOException(it) }
+                    val data = value.data ?: throw IOException("No search response")
+                    return SearchPage(
+                        data.items.map {
+                            AtlasEntry.video(
+                                it,
+                                route.category,
+                                route.categoryTitle,
+                            )
+                        },
+                        data.hasNextPage,
+                    )
+                }
+                val response = mangaHomes.fetch(route.home.key, request.copy(page = page, query = query))
+                return SearchPage(
+                    response.items.map {
+                        AtlasEntry.manga(
+                            it,
+                            route.category,
+                            route.categoryTitle,
+                        )
+                    },
+                    response.hasNextPage,
+                )
+            }
+            if (route.medium == SearchMedium.VIDEO) {
+                val source = videos.get(route.source) ?: throw IOException("Source unavailable")
+                val response = source.getSearchAnime(page, query, source.getFilterList())
+                return SearchPage(
+                    response.animes.map { remote ->
+                        val local = toVideo.await(remote.toDomainAnime(source.id))
+                        val anime = local.copy(
+                            thumbnailUrl = remote.thumbnail_url?.takeIf(String::isNotBlank) ?: local.thumbnailUrl,
+                        )
+                        val hints = SourceTrackingHints.from(remote)
+                        val ids = buildMap {
+                            hints?.anilistId?.let { put("anilist", it) }
+                            hints?.malId?.let { put("myanimelist", it) }
+                        }
+                        val entry = AtlasEntry.video(anime, route.category, route.categoryTitle)
+                        entry.copy(aliases = searchAliases(remote.memo), catalogIds = entry.catalogIds + ids)
+                    },
+                    response.hasNextPage,
+                )
+            }
+            val source = mangas.get(route.source) as? eu.kanade.tachiyomi.source.CatalogueSource
+                ?: throw IOException("Source unavailable")
+            val response = source.getSearchManga(page, query, source.getFilterList())
+            return SearchPage(
+                response.mangas.map { remote ->
+                    val hints = SourceTrackingHints.from(remote)
+                    val ids = buildMap {
+                        hints?.anilistId?.let {
+                            put(
+                                "anilist",
+                                it,
+                            )
+                        }
+                        hints?.malId?.let {
+                            put(
+                                "myanimelist",
+                                it,
+                            )
+                        }
+                        hints?.mangaUpdatesId?.let {
+                            put(
+                                "mangaupdates",
+                                it,
+                            )
+                        }
+                    }
+                    val local = toManga.await(remote.toDomainManga(source.id))
+                    val manga = local.copy(
+                        thumbnailUrl = remote.thumbnail_url?.takeIf(String::isNotBlank) ?: local.thumbnailUrl,
+                    )
+                    val item = MangaHomeItem(manga, MangaHomePresentation(catalogIds = ids), remote.title)
+                    AtlasEntry.manga(
+                        item,
+                        route.category,
+                        route.categoryTitle,
+                    ).copy(aliases = remote.searchTitle(source.id).aliases)
+                },
+                response.hasNextPage,
+            )
+        }
+    }
+
+    companion object {
+        const val DEFAULT_VIDEO = "nyanime:catalog-video"
+    }
+}
