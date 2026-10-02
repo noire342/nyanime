@@ -330,6 +330,7 @@ private val playerSettingScreens = listOf(
 
 private val settingScreens = listOf(
     SettingsAppearanceScreen,
+    SettingsGesturesScreen,
     SettingsReleaseNotificationsScreen,
     SettingsLibraryScreen,
     SettingsReaderScreen,

@@ -8,6 +8,15 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 2 ottobre 2026 — Doppio tap posteriore
+
+- Nuovo gesto facoltativo in Impostazioni → Gesti, disattivato inizialmente: azioni
+  personalizzabili per navigazione, player, lettore manga e telecomando TV.
+- Prova guidata, calibrazione con tre doppi tocchi, sensibilità e conferma tattile;
+  menu rapido per Cerca, Libreria, Le tue uscite e Guarda insieme.
+- Ascolto limitato all’app in primo piano, sospeso durante tocchi, finestre e PiP;
+  comandi del player compatibili con le stanze e calibrazione locale al telefono.
+
 ## 2 ottobre 2026 — Notizie dalle estensioni
 
 - Nuovo tipo di estensione Notizie, separato dalle fonti video e manga: si abilita da

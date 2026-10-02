@@ -16,8 +16,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.screen.SearchableSettings
+import eu.kanade.presentation.more.settings.screen.SettingsGesturesScreen
 import eu.kanade.tachiyomi.ui.player.PlayerLongPressAction
 import eu.kanade.tachiyomi.ui.player.SingleActionGesture
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
@@ -42,8 +45,14 @@ object PlayerSettingsGesturesScreen : SearchableSettings {
     @Composable
     override fun getPreferences(): List<Preference> {
         val gesturePreferences = remember { Injekt.get<GesturePreferences>() }
+        val navigator = LocalNavigator.currentOrThrow
 
         return listOf(
+            Preference.PreferenceItem.TextPreference(
+                title = stringResource(AYMR.strings.back_tap_title),
+                subtitle = stringResource(AYMR.strings.back_tap_summary),
+                onClick = { navigator.push(SettingsGesturesScreen) },
+            ),
             getSlidersGroup(gesturePreferences = gesturePreferences),
             getSeekingGroup(gesturePreferences = gesturePreferences),
             getLongPressGroup(gesturePreferences = gesturePreferences),
