@@ -8,11 +8,10 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,10 +36,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -48,13 +47,14 @@ import eu.kanade.tachiyomi.R
 import androidx.compose.ui.res.stringResource as androidStringResource
 
 internal object PanoramaResumeLayout {
-    // Leave a visible part of the next card, including on narrow screens. A single item uses
-    // the available width; tablet cards stay comfortably reachable instead of growing forever.
-    fun width(viewport: Dp, count: Int): Dp = (viewport - if (count > 1) 64.dp else 40.dp)
-        .coerceIn(1.dp, 340.dp)
+    // One compact bookmark and a peek at the next; tablets show several, not an oversized card.
+    fun width(viewport: Dp, count: Int): Dp = (viewport - if (count > 1) 56.dp else 40.dp)
+        .coerceIn(1.dp, 380.dp)
+
+    fun coverWidth(width: Dp, height: Dp): Dp = (height * .64f).coerceAtMost(width * .28f)
 }
 
-/** One large, direct resume target. The menu never intercepts the card's primary action. */
+/** A short bookmark: the whole surface resumes, while its separate menu keeps every secondary action. */
 @Composable
 internal fun PanoramaWatchResumeCard(
     title: String,
@@ -68,110 +68,104 @@ internal fun PanoramaWatchResumeCard(
     artwork: @Composable (Modifier) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Surface(
-        onClick = onResume,
-        modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .35f)),
-    ) {
-        Column {
-            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
-                artwork(Modifier.fillMaxSize())
-                Box(
-                    Modifier.matchParentSize().then(foregroundModifier).background(
-                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .8f))),
-                    ),
-                )
-                Row(
-                    Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(14.dp).then(foregroundModifier),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+    val height = watchResumeHeight()
+    val resumeLabel = androidStringResource(R.string.home_resume_action)
+    BoxWithConstraints(modifier) {
+        val coverWidth = PanoramaResumeLayout.coverWidth(maxWidth, height)
+        Surface(
+            onClick = onResume,
+            modifier = Modifier.fillMaxWidth().height(height),
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .3f)),
+        ) {
+            Row(Modifier.fillMaxSize()) {
+                Box(Modifier.width(coverWidth).fillMaxHeight()) {
+                    artwork(Modifier.fillMaxSize())
                     Box(
-                        Modifier.size(44.dp).background(Color.White, CircleShape),
+                        Modifier.align(Alignment.Center).then(foregroundModifier).size(38.dp)
+                            .background(Color.Black.copy(alpha = .76f), CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(28.dp), tint = Color.Black)
+                        Icon(Icons.Filled.PlayArrow, resumeLabel, Modifier.size(24.dp), tint = Color.White)
                     }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                }
+                Box(Modifier.weight(1f).fillMaxHeight().then(foregroundModifier)) {
+                    Column(
+                        Modifier.fillMaxSize().padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
                         Text(
-                            androidStringResource(R.string.home_resume_action),
-                            style = MaterialTheme.typography.titleSmall,
+                            title,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
+                            minLines = 2,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            episode,
+                            modifier = Modifier.padding(end = 36.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        timing?.let {
-                            Text(
-                                it,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White.copy(alpha = .9f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                        Text(
+                            timing ?: resumeLabel,
+                            modifier = Modifier.padding(end = 36.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
-                }
-            }
-            // The seam stays in place even when duration is unknown; no fabricated progress.
-            LinearProgressIndicator(
-                progress = { progress?.coerceIn(0f, 1f) ?: 0f },
-                modifier = Modifier.fillMaxWidth().height(3.dp),
-                color = panoramaAccent(manga = false),
-                trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .4f),
-                gapSize = 0.dp,
-                drawStopIndicator = {},
-            )
-            Column(
-                Modifier.fillMaxWidth().heightIn(
-                    min = watchResumeDetailsHeight(),
-                ).padding(14.dp).then(foregroundModifier),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        title,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        minLines = 2,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Box {
+                    Box(Modifier.align(Alignment.BottomEnd).padding(end = 2.dp, bottom = 4.dp)) {
                         IconButton(onClick = { expanded = true }, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Outlined.MoreHoriz, androidStringResource(R.string.home_panorama_options, title))
                         }
                         DropdownMenu(expanded, onDismissRequest = { expanded = false }) { menu { expanded = false } }
                     }
+                    if (progress != null) {
+                        LinearProgressIndicator(
+                            progress = { progress.coerceIn(0f, 1f) },
+                            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().height(2.dp),
+                            color = panoramaAccent(manga = false),
+                            trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .4f),
+                            gapSize = 0.dp,
+                            drawStopIndicator = {},
+                        )
+                    }
                 }
-                Text(
-                    episode,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    minLines = 2,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
         }
     }
 }
 
 @Composable
-private fun watchResumeDetailsHeight(): Dp = with(LocalDensity.current) {
-    (MaterialTheme.typography.titleMedium.lineHeight.toDp() * 2).coerceAtLeast(48.dp) +
-        MaterialTheme.typography.bodySmall.lineHeight.toDp() *
-        2 +
-        34.dp
+private fun watchResumeHeight(): Dp {
+    val density = LocalDensity.current
+    val typography = MaterialTheme.typography
+    val measurer = rememberTextMeasurer(cacheSize = 3)
+    return remember(density, typography, measurer) {
+        // Measure the actual lines: Android's non-linear font scaling means converting
+        // lineHeight from sp alone can underestimate the space needed by large text.
+        val textHeight = measurer.measure(
+            "M\nM",
+            typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+        ).size.height +
+            measurer.measure("M", typography.bodySmall).size.height +
+            measurer.measure("M", typography.labelMedium).size.height
+        (with(density) { textHeight.toDp() } + 32.dp).coerceAtLeast(116.dp)
+    }
 }
 
 @Composable
 internal fun PanoramaWatchResumeSkeleton() {
+    val height = watchResumeHeight()
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val width = PanoramaResumeLayout.width(maxWidth, 2)
+        val coverWidth = PanoramaResumeLayout.coverWidth(width, height)
         HomeSkeleton {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 20.dp),
@@ -179,19 +173,16 @@ internal fun PanoramaWatchResumeSkeleton() {
                 userScrollEnabled = false,
             ) {
                 items(2) {
-                    Column(
-                        Modifier.width(width).clip(RoundedCornerShape(20.dp))
+                    Row(
+                        Modifier.width(width).height(height).clip(RoundedCornerShape(18.dp))
                             .background(MaterialTheme.colorScheme.surfaceContainerLow),
                     ) {
-                        SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-                        SkeletonBlock(Modifier.fillMaxWidth().height(3.dp))
-                        Column(
-                            Modifier.height(watchResumeDetailsHeight()).padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            SkeletonBlock(Modifier.fillMaxWidth(.85f).height(18.dp))
-                            SkeletonBlock(Modifier.fillMaxWidth(.55f).height(18.dp))
-                            SkeletonBlock(Modifier.fillMaxWidth(.65f).height(14.dp))
+                        SkeletonBlock(Modifier.width(coverWidth).fillMaxHeight())
+                        Column(Modifier.weight(1f).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SkeletonBlock(Modifier.fillMaxWidth(.9f).height(16.dp))
+                            SkeletonBlock(Modifier.fillMaxWidth(.65f).height(16.dp))
+                            SkeletonBlock(Modifier.fillMaxWidth(.55f).height(12.dp))
+                            SkeletonBlock(Modifier.fillMaxWidth(.45f).height(10.dp))
                         }
                     }
                 }

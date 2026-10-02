@@ -8,6 +8,13 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 2 ottobre 2026 — Ripresa compatta nella Home
+
+- «Continua a guardare» usa segnalibri orizzontali compatti: piccola copertina verticale,
+  titolo, episodio, minutaggio e avanzamento, con ripresa al tocco e menu separato.
+- Altezza adattata ai caratteri grandi e skeleton delle stesse dimensioni, mantenendo
+  apertura della scheda, nascondi con annullamento e ripresa del finale.
+
 ## 2 ottobre 2026 — Carosello senza intestazione
 
 - Rimossa la riga «In evidenza» con la freccia sopra il carosello, anche durante

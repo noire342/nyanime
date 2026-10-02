@@ -84,10 +84,10 @@ fun PanoramaPlaceholderScreenshot() {
 }
 
 @PreviewTest
-@Preview(name = "WatchResumeNarrow", widthDp = 280, heightDp = 430, locale = "it")
-@Preview(name = "WatchResumeLargeText", widthDp = 320, heightDp = 540, fontScale = 1.5f, locale = "en")
-@Preview(name = "WatchResumeDark", widthDp = 390, heightDp = 450, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Preview(name = "WatchResumeWide", widthDp = 840, heightDp = 450)
+@Preview(name = "WatchResumeNarrow", widthDp = 280, heightDp = 260, locale = "it")
+@Preview(name = "WatchResumeLargeText", widthDp = 320, heightDp = 330, fontScale = 1.5f, locale = "en")
+@Preview(name = "WatchResumeDark", widthDp = 390, heightDp = 260, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "WatchResumeWide", widthDp = 840, heightDp = 260)
 @Composable
 fun PanoramaWatchResumeScreenshot() {
     TachiyomiPreviewTheme(appTheme = AppTheme.NYANIME) {

@@ -33,11 +33,15 @@ The app contains no provider-specific routing or catalogue assumptions.
 
 ## Personal sections
 
-Continue watching presents one landscape card per title in a horizontal row. Artwork,
-a direct resume action, elapsed/total time, progress and the episode name have separate
-space. The next card peeks in on phones; tablet cards have a bounded width. All entries
-remain reachable, with stable identity keys. The menu retains details, hiding with Undo
-and the optional unfinished-ending action. Skeletons reserve the same card geometry.
+Continue watching presents compact horizontal bookmarks, normally 116 dp tall. A small
+portrait cover carries the play affordance; title, episode and elapsed/total time sit
+beside it, with a thin progress line. The whole surface resumes playback. The separate
+48 dp menu target retains details, hiding with Undo and the optional unfinished-ending
+action. Space is reserved beside the metadata for that target, including with large text.
+The next bookmark peeks in on phones; tablet widths are bounded. All entries remain
+reachable, with stable identity keys. Card height follows measured text, including
+Android's non-linear font scaling; skeletons reserve exactly the same geometry.
+Unknown duration never fabricates an advancement.
 
 Continue reading retains its compact columns of up to three cards. Manga cards resume
 the stored chapter; progress not present in the history contract is not invented.

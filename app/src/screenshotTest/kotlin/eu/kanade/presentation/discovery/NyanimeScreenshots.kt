@@ -159,7 +159,6 @@ private fun HomePreview(modern: Boolean) {
                             SourceFeaturedSection(
                                 SectionState(SourceHomePage(previewAnime, false), loading = false),
                                 title = "In evidenza",
-                                onBrowse = {},
                                 onRetry = {},
                                 onOpen = {},
                             )
