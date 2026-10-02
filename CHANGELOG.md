@@ -8,6 +8,10 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 2 ottobre 2026 — Aumento della numerazione
+
+- Aumento di numerazione, nessun cambiamento alle funzionalità dell'app.
+
 ## 1 ottobre 2026 — Lingua della Libreria
 
 - Il pulsante Libreria e le intestazioni della raccolta seguono la lingua scelta
