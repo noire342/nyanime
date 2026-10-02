@@ -218,6 +218,7 @@ dependencies {
     implementation(projects.core.privacyDisplay)
     implementation(projects.coreMetadata)
     implementation(projects.sourceApi)
+    implementation(projects.newsApi)
     implementation(projects.sourceLocal)
     implementation(projects.data)
     implementation(projects.domain)

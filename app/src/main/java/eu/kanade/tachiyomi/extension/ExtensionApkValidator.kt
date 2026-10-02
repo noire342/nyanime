@@ -10,6 +10,11 @@ import java.io.File
 
 /** Verification precedes every installer backend, including loading APKs privately. */
 object ExtensionApkValidator {
+    enum class Kind(val feature: String) {
+        ANIME("tachiyomi.animeextension"),
+        MANGA("tachiyomi.extension"),
+        NEWS("nyanime.newsextension"),
+    }
     data class Expected(
         val packageName: String,
         val versionCode: Long,
@@ -20,6 +25,7 @@ object ExtensionApkValidator {
         val anime: Boolean = false,
         val libVersion: Double,
         val installed: ExtensionPackageMetadata? = null,
+        val kind: Kind = if (anime) Kind.ANIME else Kind.MANGA,
     )
 
     @Suppress("DEPRECATION")
@@ -37,9 +43,11 @@ object ExtensionApkValidator {
         info.applicationInfo?.publicSourceDir = file.absolutePath
         require(info.packageName == expected.packageName)
         require(PackageInfoCompat.getLongVersionCode(info) == expected.versionCode)
-        val feature = if (expected.anime) "tachiyomi.animeextension" else "tachiyomi.extension"
+        val feature = expected.kind.feature
         require(info.reqFeatures?.any { it.name == feature } == true)
-        val api = if (expected.anime) {
+        val api = if (expected.kind == Kind.NEWS) {
+            info.applicationInfo?.metaData?.getInt("nyanime.news.api")?.takeIf { it > 0 }?.toDouble()
+        } else if (expected.kind == Kind.ANIME) {
             info.applicationInfo?.metaData?.getInt("aniyomix.extensionLib")?.takeUnless { it == 0 }?.toDouble()
                 ?: info.versionName?.substringBeforeLast('.')?.toDoubleOrNull()
         } else {
