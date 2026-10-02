@@ -19,6 +19,9 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 
 ## 2 ottobre 2026 — Riconoscimento del doppio tap
 
+- I tocchi decisi non vengono più scartati per la sola intensità o per il
+  contraccolpo laterale; il filtro di rotazione non prolunga il blocco a telefono fermo.
+- Il contatore della prova continua ad aggiornarsi anche dopo la calibrazione.
 - Corretto il filtro che scartava i tocchi posteriori quando il telefono oscillava
   brevemente nella mano, rendendo intermittente anche la calibrazione.
 - Riconoscimento dei rimbalzi del tocco e quiete proporzionata alla sua intensità,

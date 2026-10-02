@@ -116,7 +116,9 @@ internal fun BackTapGuide(coordinator: BackTapCoordinator) {
                         val text = when {
                             !listening -> stringResource(AYMR.strings.back_tap_sensor_unavailable)
                             test.calibrating -> stringResource(AYMR.strings.back_tap_calibration_wait)
-                            test.completed == 3 -> stringResource(AYMR.strings.back_tap_calibration_done)
+                            test.completed == 3 -> stringResource(AYMR.strings.back_tap_calibration_done) +
+                                "\n" +
+                                stringResource(AYMR.strings.back_tap_detected, test.detections)
                             test.detections > 0 -> stringResource(AYMR.strings.back_tap_detected, test.detections)
                             else -> stringResource(AYMR.strings.back_tap_test_wait)
                         }

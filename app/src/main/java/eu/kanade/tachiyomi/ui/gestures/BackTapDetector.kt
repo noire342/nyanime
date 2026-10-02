@@ -63,7 +63,10 @@ class BackTapDetector(private val threshold: Double = 2.4) {
         rotation[2] = alpha * rotation[2] + (1 - alpha) * z
         // A tap rocks a handheld phone. Reject sustained turning, not each short gyro excursion.
         val magnitude = sqrt(rotation.sumOf { it * it })
-        if (magnitude > 1.35) {
+        val instantaneous = sqrt(x * x + y * y + z * z)
+        // The low-pass tail of a strong tap can last >100 ms after the phone has stopped turning.
+        // Both signals must still indicate rotation throughout the rejection window.
+        if (magnitude > 1.35 && instantaneous > 1.35) {
             if (rotatingSince == 0L) rotatingSince = time
             if (time - rotatingSince >= 100 * MS) suppress(time, 250)
         } else {
@@ -98,7 +101,8 @@ class BackTapDetector(private val threshold: Double = 2.4) {
         }
         // The two sensor streams are not phase-locked: the last gyro sample may be slightly newer.
         if (time < blockedUntil || time - gyroTime !in -30 * MS..80 * MS) return null
-        if (lateral > maxOf(5.0, limit * 2.0) && lateral > normal) {
+        // Classify the direction at the impulse peak. A hand can recoil sideways afterwards.
+        if (pulse == null && pair == null && lateral > maxOf(5.0, limit * 2.0) && lateral > normal) {
             suppress(time, 250)
             return null
         }
@@ -149,7 +153,9 @@ class BackTapDetector(private val threshold: Double = 2.4) {
         }
         if (time - active.start >= 80 * MS && normal < abs(active.z) * 0.5) {
             pulse = null
-            if (active.lateral > abs(active.z) * 0.9 || abs(active.z) > 35) {
+            // A hard ceiling on amplitude rejects firm taps (and sensor saturation). Single
+            // impacts still need a second, comparable impulse to form a gesture.
+            if (active.lateral > abs(active.z) * 0.9) {
                 first = null
                 return null
             }

@@ -12,8 +12,11 @@ La sensibilità e il feedback tattile sono regolabili.
 di altri progetti. Richiede accelerometro e giroscopio. Campiona a 100 Hz su un
 thread dedicato, rimuove la gravità e cerca impulsi brevi sull’asse perpendicolare
 allo schermo. Le due pulsazioni devono essere distanti 120–550 ms. La rotazione
-viene filtrata e deve essere sostenuta: l'oscillazione breve prodotta da un tocco
-non annulla la coppia. Ogni impulso viene osservato per almeno 80 ms, includendo
+viene filtrata e deve essere sostenuta sia nel segnale istantaneo sia in quello
+filtrato: la coda del filtro dopo un tocco deciso non prolunga il blocco.
+La direzione viene valutata sul picco, senza annullare l'impulso per il contraccolpo
+laterale successivo. L'intensità non ha un tetto massimo: gli urti singoli vengono
+esclusi per assenza di un secondo impulso comparabile. Ogni impulso viene osservato per almeno 80 ms, includendo
 i rimbalzi di polarità opposta, e la quiete dipende dalla sua ampiezza anziché
 da una soglia assoluta troppo stretta. Impulsi prolungati, movimenti laterali,
 terzi tocchi e vibrazioni ravvicinate sono scartati. La consegna attende almeno

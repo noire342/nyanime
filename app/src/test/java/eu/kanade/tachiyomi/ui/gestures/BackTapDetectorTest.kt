@@ -159,6 +159,30 @@ class BackTapDetectorTest {
         assertEquals(1, gestures.size)
     }
 
+    @Test fun firmTapsAreNotRejectedByTheirAmplitudeOrFilteredGyroTail() {
+        for (strength in listOf(24.0, 42.0, 60.0)) {
+            val gestures = trace(
+                impulse = { doubleArrayOf(0.1, 0.2, tap(it, 1400, strength) + tap(it, 1700, strength)) },
+                rotation = { if (it in 1410..1470 || it in 1710..1770) 6.0 else 0.0 },
+            )
+            assertEquals(1, gestures.size, "strength=$strength")
+        }
+    }
+
+    @Test fun briefLateralRecoilAfterANormalImpulseDoesNotCancelTheTap() {
+        val gestures = trace(impulse = {
+            val recoil = if (it in 1430..1440 || it in 1730..1740) 8.0 else 0.0
+            doubleArrayOf(recoil, 0.1, tap(it, 1400, 12.0) + tap(it, 1700, 12.0))
+        })
+        assertEquals(1, gestures.size)
+        // Sideways impacts with no screen-normal dominance remain invalid.
+        assertTrue(
+            trace(impulse = {
+                doubleArrayOf(tap(it, 1400, 18.0) + tap(it, 1700, 18.0), 0.0, tap(it, 1400) + tap(it, 1700))
+            }).isEmpty(),
+        )
+    }
+
     @Test fun bipolarRecoilBelongsToItsTapAndDoesNotCancelThePair() {
         val gestures = trace(impulse = {
             val first = tap(it, 1400) - tap(it, 1460, 3.5)
