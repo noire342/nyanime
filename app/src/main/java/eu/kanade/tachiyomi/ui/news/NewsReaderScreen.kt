@@ -96,6 +96,10 @@ data class NewsReaderScreen(val articleKey: String) : Screen {
 }
 
 class NewsReaderActivity : BaseActivity() {
+    init {
+        registerSecureActivity(this)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val key = intent.getStringExtra(ARTICLE)?.takeIf { it.matches(Regex("[a-f0-9]{64}")) }

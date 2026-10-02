@@ -481,7 +481,13 @@ private fun NewsTopicDialog(source: String, topic: NewsTopic, onClose: () -> Uni
                         )
                     items(ranked) { title ->
                         TextButton(onClick = { connect(title.ids) }, enabled = !busy && title.ids.isNotEmpty()) {
-                            Text(title.title)
+                            Column(Modifier.fillMaxWidth()) {
+                                Text(title.title)
+                                Text(
+                                    title.medium.name.lowercase().replaceFirstChar { it.uppercase() },
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
                         }
                     }
                     if (ranked.isEmpty()) {
