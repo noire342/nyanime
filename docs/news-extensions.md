@@ -115,3 +115,8 @@ and live publisher tests belong exclusively in separate extension projects. Devi
 checks must cover first trust, enablement, native reading, save/offline, search/back,
 notification permission, restoration and large text; compilation alone is not proof
 of those Android paths.
+
+Source management displays the installed APK's application icon, loaded off the UI
+thread and refreshed when its version changes. Reading package resources does not
+instantiate untrusted source code. Missing or removed package resources use a generic
+news icon; publisher artwork remains exclusively inside extension APKs.

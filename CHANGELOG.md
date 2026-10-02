@@ -8,6 +8,11 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 2 ottobre 2026 — Icone delle estensioni Notizie
+
+- Le fonti Notizie mostrano l’icona del rispettivo APK anche se disabilitate,
+  con caricamento fuori dall’interfaccia e un segnaposto per i pacchetti senza icona.
+
 ## 2 ottobre 2026 — Notizie legate ai tuoi titoli
 
 - «Per te» riconosce anche i nomi alternativi e tradotti verificati nei cataloghi,

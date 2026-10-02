@@ -6,6 +6,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,12 +16,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Newspaper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -42,18 +45,24 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.LifecycleStartEffect
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
@@ -68,7 +77,9 @@ import eu.kanade.tachiyomi.data.news.NewsRepository
 import eu.kanade.tachiyomi.data.news.NewsRules
 import eu.kanade.tachiyomi.data.news.StoredNews
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import nyanime.news.api.NewsTopic
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -152,7 +163,12 @@ fun NewsSourcesContent(modifier: Modifier = Modifier) {
             val enabled = settings?.enabled == true && extension.trusted
             Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        NewsExtensionIcon(extension)
                         Column(Modifier.weight(1f)) {
                             Text(
                                 extension.source?.name ?: extension.label,
@@ -276,6 +292,39 @@ fun NewsSourcesContent(modifier: Modifier = Modifier) {
             dismissButton = { TextButton(onClick = { trust = null }) { Text(stringResource(R.string.news_cancel)) } },
         )
     }
+}
+
+/** Reads only package resources, including for disabled or untrusted extensions. */
+@Composable
+private fun NewsExtensionIcon(extension: NewsExtension) {
+    val context = LocalContext.current
+    val pixels = with(LocalDensity.current) { 44.dp.roundToPx() }
+    val icon by produceState<ImageBitmap?>(
+        initialValue = null,
+        extension.packageName,
+        extension.versionCode,
+        pixels,
+    ) {
+        value = withContext(Dispatchers.IO) {
+            try {
+                val info = context.packageManager.getApplicationInfo(extension.packageName, 0)
+                if (info.icon == 0) {
+                    null
+                } else {
+                    info.loadIcon(context.packageManager)
+                        .toBitmap(pixels, pixels).asImageBitmap()
+                }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+    val modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp))
+    icon?.let {
+        Image(bitmap = it, contentDescription = null, modifier = modifier)
+    } ?: Icon(Icons.Outlined.Newspaper, contentDescription = null, modifier = modifier)
 }
 
 class NewsStandaloneScreen : Screen {
