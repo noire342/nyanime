@@ -190,9 +190,6 @@ private fun DiscoveryTab.SourceHomeReadyContent(
                             refreshKey = state.artworkRefreshKey,
                             autoplay = rotateFeatured,
                             limit = if (featuredRow == null) 8 else null,
-                            onBrowse = {
-                                navigator.push(SourceHomeListScreen(homeKey, heroSection.id, heroSection.title))
-                            },
                             onRetry = { model.load(heroSection.id, true) },
                             onOpen = { openCard(it, false) },
                             onSources = { pendingChoice = it to false },
@@ -274,7 +271,7 @@ private fun DiscoveryTab.SourceHomeReadyContent(
                                     loading = value.awaitingContent,
                                     placeholder = {
                                         if (section.layout == "featured") {
-                                            PanoramaHeroSkeleton(showHeading = false)
+                                            PanoramaHeroSkeleton()
                                         } else {
                                             HomePosterRowSkeleton()
                                         }

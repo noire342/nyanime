@@ -8,6 +8,11 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 2 ottobre 2026 — Carosello senza intestazione
+
+- Rimossa la riga «In evidenza» con la freccia sopra il carosello, anche durante
+  il caricamento: le copertine partono direttamente sotto le categorie.
+
 ## 2 ottobre 2026 — Ripresa dalla Home e fluidità
 
 - Conservati gli angoli arrotondati delle copertine durante apertura e ritorno dalla

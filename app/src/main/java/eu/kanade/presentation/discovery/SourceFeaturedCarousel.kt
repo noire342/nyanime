@@ -28,7 +28,6 @@ fun SourceFeaturedCarousel(
     items: List<Anime>,
     refreshKey: Int = 0,
     title: String = androidStringResource(R.string.home_panorama_featured),
-    onBrowse: (() -> Unit)? = null,
     onSources: ((Anime) -> Unit)? = null,
     autoplay: Boolean = false,
     onClick: (Anime) -> Unit,
@@ -46,7 +45,6 @@ fun SourceFeaturedCarousel(
         artworkData = { it },
         privacyModifier = { Modifier.nsfwPrivacy(it) },
         heading = title,
-        onBrowse = onBrowse,
         autoplay = autoplay,
         onOpen = onClick,
         actions = { anime ->

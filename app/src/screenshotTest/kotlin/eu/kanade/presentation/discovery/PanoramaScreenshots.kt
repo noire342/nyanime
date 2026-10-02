@@ -46,7 +46,6 @@ fun PanoramaLoadedScreenshot() {
                     title = { it },
                     metadata = { "Avventura · Capitoli e storie" },
                     artworkData = { it },
-                    onBrowse = {},
                     onOpen = {},
                 ) { item, modifier, _ ->
                     Box(

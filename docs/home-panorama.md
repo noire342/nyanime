@@ -7,6 +7,8 @@ The app contains no provider-specific routing or catalogue assumptions.
 
 ## Featured carousel
 
+- Covers start directly below the Home categories, without a duplicate featured
+  heading or browse button. Loading placeholders reserve the same compact layout.
 - A lazily composed portrait pager presents one large cover and smaller side previews.
 - Swiping works in both directions across the collection boundary. Pager positions
   are virtual; content keys and selected-title recovery use extension identities.

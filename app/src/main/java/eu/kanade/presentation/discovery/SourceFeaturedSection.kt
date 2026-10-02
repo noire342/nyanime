@@ -12,14 +12,13 @@ import tachiyomi.domain.discovery.SourceHomePage
 import tachiyomi.domain.entries.anime.model.Anime
 import androidx.compose.ui.res.stringResource as androidStringResource
 
-/** One complete featured section: its browse action belongs to the carousel, never to an empty row. */
+/** Featured content opens directly from the carousel, without a duplicate browse heading. */
 @Composable
 fun SourceFeaturedSection(
     state: SectionState<SourceHomePage>,
     title: String,
     refreshKey: Int = 0,
     limit: Int? = null,
-    onBrowse: (() -> Unit)? = null,
     onRetry: () -> Unit,
     onOpen: (Anime) -> Unit,
     onSources: ((Anime) -> Unit)? = null,
@@ -30,7 +29,7 @@ fun SourceFeaturedSection(
         HomeLoadingTransition(
             loading = state.awaitingContent,
             placeholder = {
-                HomeHeroSkeleton(withBrowseAction = onBrowse != null, withSourceAction = onSources != null)
+                HomeHeroSkeleton(withBrowseAction = false, withSourceAction = onSources != null)
             },
         ) {
             if (items.isNotEmpty()) {
@@ -38,7 +37,6 @@ fun SourceFeaturedSection(
                     items,
                     refreshKey,
                     state.data?.title ?: title,
-                    onBrowse,
                     onSources,
                     autoplay,
                     onOpen,

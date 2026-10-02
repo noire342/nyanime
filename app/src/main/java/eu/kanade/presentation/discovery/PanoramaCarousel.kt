@@ -121,7 +121,6 @@ internal fun <T : Any> PanoramaCarousel(
     artworkData: (T) -> Any,
     privacyModifier: (T) -> Modifier = { Modifier },
     heading: String = androidStringResource(R.string.home_panorama_featured),
-    onBrowse: (() -> Unit)? = null,
     autoplay: Boolean = false,
     onOpen: (T) -> Unit,
     actions: @Composable (T) -> Unit = {},
@@ -188,7 +187,6 @@ internal fun <T : Any> PanoramaCarousel(
         }
         val positionLabel = androidStringResource(R.string.home_featured_position, heading, current + 1, items.size)
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (heading.isNotBlank()) SectionHeader(heading, onBrowse)
             BoxWithConstraints(Modifier.widthIn(max = 600.dp).fillMaxWidth()) {
                 val coverWidth = PanoramaPages.coverWidth(maxWidth)
                 val inset = (maxWidth - coverWidth) / 2
@@ -314,17 +312,9 @@ internal fun homeSectionHeaderHeight(): Dp = with(LocalDensity.current) {
 }
 
 @Composable
-internal fun PanoramaHeroSkeleton(showHeading: Boolean = true) {
+internal fun PanoramaHeroSkeleton() {
     HomeSkeleton {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            if (showHeading) {
-                Box(
-                    Modifier.fillMaxWidth().height(homeSectionHeaderHeight()).padding(horizontal = 20.dp),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    SkeletonBlock(Modifier.width(140.dp).height(20.dp))
-                }
-            }
             BoxWithConstraints(Modifier.widthIn(max = 600.dp).fillMaxWidth()) {
                 val coverWidth = PanoramaPages.coverWidth(maxWidth)
                 Box(

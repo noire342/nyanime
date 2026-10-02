@@ -190,9 +190,6 @@ fun MangaHomeContent(
                                 },
                                 artworkData = { it.manga.copy(favorite = false) },
                                 privacyModifier = { Modifier.nsfwPrivacy(it.manga) },
-                                onBrowse = featuredSection?.takeIf {
-                                    it.moreSelections != null || featuredRow?.page?.hasNextPage == true
-                                }?.let { section -> { onMore(section) } },
                                 autoplay = rotateFeatured,
                                 onOpen = { onManga(it.manga) },
                                 actions = { item ->
