@@ -55,10 +55,26 @@ controls or convert unavailable paid content into a full article.
 ## Personalization and notifications
 
 The personal set is the union of the library and explicit release follows, minus
-individual news exclusions. Direct catalogue IDs and verified prequel/sequel/source/
-adaptation edges can establish a match. A title resemblance alone cannot. A source
-topic without verified IDs can be linked explicitly to a work by the user; that
-mapping is scoped to the source's stable topic ID. No tracker is modified.
+individual news exclusions. Direct catalogue IDs, equivalent IDs and verified direct
+prequel/sequel/source/adaptation edges can establish a match. Catalogue titles,
+translations and synonyms also match exact normalized publisher topics, provided
+they do not conflict with another cached work of the applicable medium. These are
+relevance decisions, never new identities or tracker bindings. Numbered titles remain
+distinct. Explicit IDs and manual topic mappings take precedence over names.
+
+Bounded headline mentions and exact untracked library names may appear in For you,
+but cannot trigger personal alerts. Cards distinguish verified matches from mentions.
+Name uniqueness cannot be guaranteed across an entire catalogue: ambiguous names
+remain unlinked, with an optional manual association scoped to the source's topic ID.
+No title list or publisher rules are embedded in the app. Catalogue names and typed
+relations use the existing AniList API, with daily cache and hourly failure backoff.
+The first upgrade fetches the new name metadata even if older relation caches are fresh.
+
+Missing article metadata is enriched outside the rendering path, at most three
+articles per source and twelve per pass. New alert candidates take priority; failures
+retry after an hour. Newly acquired candidates remain eligible for classification for
+24 hours. Reading, disabling alerts, receipts, baseline dates and restore suppress
+late delivery. Saved article data and catalogue evidence survive feed revisions.
 
 Alerts default to Off. Each enabled source offers Off, Only my titles or All articles.
 The first successful fetch and the first fetch after enabling alerts establish a

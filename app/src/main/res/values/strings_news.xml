@@ -55,7 +55,10 @@
     <string name="news_personalize">Your interests</string>
     <string name="news_match">Connect to a title</string>
     <string name="news_match_help">Choose the exact work for this topic. This affects news only.</string>
-    <string name="news_no_identity">No verified catalog ID. Connect the title to a catalog first.</string>
+    <string name="news_no_identity">Name matching · Alerts require a verified connection.</string>
+    <string name="news_matching_progress">Matching news to your titles. Available articles remain readable.</string>
+    <string name="news_about_title">About %1$s</string>
+    <string name="news_title_mention">Title mentioned: %1$s</string>
     <string name="news_exclusions">News about these titles</string>
     <string name="news_unlink">Remove connection</string>
     <string name="news_source">Source</string>

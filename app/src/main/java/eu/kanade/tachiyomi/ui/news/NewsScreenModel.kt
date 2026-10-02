@@ -4,10 +4,13 @@ import androidx.compose.runtime.compositionLocalOf
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.domain.base.BasePreferences
+import eu.kanade.tachiyomi.data.news.NewsInterestIndex
+import eu.kanade.tachiyomi.data.news.NewsInterestMatch
 import eu.kanade.tachiyomi.data.news.NewsPersonalLibrary
 import eu.kanade.tachiyomi.data.news.NewsPersonalTitles
 import eu.kanade.tachiyomi.data.news.NewsRepository
 import eu.kanade.tachiyomi.data.news.NewsRules
+import eu.kanade.tachiyomi.data.news.NewsSnapshot
 import eu.kanade.tachiyomi.data.news.StoredNews
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -19,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import nyanime.news.api.NewsArticle
 import nyanime.news.api.NewsMedium
 import nyanime.news.api.NewsRequest
 import uy.kohesive.injekt.Injekt
@@ -35,6 +39,8 @@ data class NewsViewState(
     val category: String? = null,
     val items: List<StoredNews> = emptyList(),
     val personal: NewsPersonalLibrary = NewsPersonalLibrary(),
+    val matches: Map<String, NewsInterestMatch> = emptyMap(),
+    val personalizing: Boolean = false,
     val searching: Boolean = false,
     val busy: Boolean = false,
     val error: Boolean = false,
@@ -53,6 +59,29 @@ class NewsScreenModel : ScreenModel {
     private var generation = 0
     private val cursors = mutableMapOf<String, String?>()
     private var beforeSearch: NewsViewState? = null
+    private var indexSnapshot: NewsSnapshot? = null
+    private var indexLibrary: NewsPersonalLibrary? = null
+    private var interestIndex: NewsInterestIndex? = null
+    private val matchCache = mutableMapOf<String, Pair<NewsArticle, NewsInterestMatch?>>()
+
+    private fun index(snapshot: NewsSnapshot, library: NewsPersonalLibrary): NewsInterestIndex {
+        val previous = indexSnapshot
+        if (interestIndex == null ||
+            previous == null ||
+            indexLibrary != library ||
+            previous.works !== snapshot.works ||
+            previous.mappings !== snapshot.mappings ||
+            previous.excluded !== snapshot.excluded ||
+            previous.excludedTitles !== snapshot.excludedTitles ||
+            previous.relations !== snapshot.relations
+        ) {
+            interestIndex = NewsInterestIndex(snapshot, library)
+            indexSnapshot = snapshot
+            indexLibrary = library
+            matchCache.clear()
+        }
+        return requireNotNull(interestIndex)
+    }
 
     init {
         screenModelScope.launch {
@@ -83,7 +112,17 @@ class NewsScreenModel : ScreenModel {
             val view = transform(old)
             val snapshot = repository.store.state.value
             val enabled = repository.registry.state.value.filter { it.source != null }.map { it.packageName }.toSet()
-            val personal = NewsRules.personalIds(snapshot, view.personal.ids)
+            val matches = if (view.tab == 1) {
+                val index = index(snapshot, view.personal)
+                matchCache.keys.retainAll(snapshot.articles.keys)
+                snapshot.articles.values.mapNotNull { article ->
+                    val cached = matchCache[article.key]?.takeIf { it.first === article.article }
+                        ?: (article.article to index.match(article)).also { matchCache[article.key] = it }
+                    cached.second?.let { article.key to it }
+                }.toMap()
+            } else {
+                emptyMap()
+            }
             val items = snapshot.articles.values.asSequence()
                 .filter { (it.source in enabled || view.tab == 2 && it.saved) }
                 .filter { view.source == null || it.source == view.source }
@@ -91,7 +130,7 @@ class NewsScreenModel : ScreenModel {
                 .filter { view.category == null || view.category in it.article.categories }
                 .filter {
                     when (view.tab) {
-                        1 -> NewsRules.personal(it, snapshot, personal)
+                        1 -> it.key in matches
                         2 -> it.saved
                         else -> true
                     }
@@ -108,7 +147,7 @@ class NewsScreenModel : ScreenModel {
                     }.thenBy { it.key },
                 )
                 .distinctBy { it.article.url }.toList()
-            view.copy(items = items)
+            view.copy(items = items, matches = matches)
         }
     }
 
@@ -124,19 +163,22 @@ class NewsScreenModel : ScreenModel {
             try {
                 val personal = NewsPersonalTitles().load()
                 updateView { it.copy(personal = personal) }
-                repository.refresh(force)
+                repository.refresh(force, personalLibrary = personal)
                 if (token == generation) {
                     cursors.putAll(repository.store.state.value.checks.mapValues { it.value.nextCursor })
                     updateView { it.copy(canLoadMore = cursors.values.any { cursor -> cursor != null }) }
                 }
                 if (relationsJob?.isActive != true) {
                     relationsJob = screenModelScope.launch {
+                        updateView { it.copy(personalizing = true) }
                         try {
-                            repository.refreshRelations(personal.ids)
+                            repository.personalize(personal)
                         } catch (cancel: CancellationException) {
                             throw cancel
                         } catch (_: Exception) {
                             // Relation enrichment must never block the feed or discard previously verified links.
+                        } finally {
+                            updateView { it.copy(personalizing = false) }
                         }
                     }
                 }
@@ -148,6 +190,10 @@ class NewsScreenModel : ScreenModel {
                 if (token == generation) updateView { it.copy(busy = false) }
             }
         }
+    }
+
+    fun pausePersonalization() {
+        relationsJob?.cancel()
     }
 
     fun tab(tab: Int) {
@@ -169,6 +215,7 @@ class NewsScreenModel : ScreenModel {
     fun openSearch() {
         beforeSearch = state.value
         refreshJob?.cancel()
+        pausePersonalization()
         request?.cancel()
         generation++
         hits = emptySet()

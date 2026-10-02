@@ -90,8 +90,11 @@ class NewsStore(context: Context) {
                 articles = restored.articles + current.articles,
                 mappings = restored.mappings + current.mappings,
                 excluded = restored.excluded + current.excluded,
+                excludedTitles = restored.excludedTitles + current.excludedTitles,
+                works = restored.works + current.works,
                 receipts = restored.receipts + current.receipts + restored.articles.keys,
                 pending = emptySet(),
+                pendingClassification = emptySet(),
                 // The first post-restore fetch seeds a fresh baseline, including newly discovered sources.
                 checks = emptyMap(),
                 textScale = restored.textScale.coerceIn(0.85f, 1.6f),

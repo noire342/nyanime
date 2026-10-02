@@ -52,18 +52,29 @@ data class NewsSnapshot(
     val excluded: Set<NewsCatalogId> = emptySet(),
     val receipts: Set<String> = emptySet(),
     val pending: Set<String> = emptySet(),
+    val pendingClassification: Set<String> = emptySet(),
     val relations: Map<String, Set<NewsCatalogId>> = emptyMap(),
     val relationsCheckedAt: Long = 0,
     val relationChecks: Map<String, Long> = emptyMap(),
+    val works: Map<String, NewsCatalogWork> = emptyMap(),
+    val catalogChecks: Map<String, Long> = emptyMap(),
+    val metadataChecks: Map<String, Long> = emptyMap(),
+    val excludedTitles: Set<String> = emptySet(),
     val textScale: Float = 1f,
 )
 
 /** Pure policies shared by foreground refresh, the worker and restore. */
 object NewsRules {
     fun catalogKey(id: NewsCatalogId) = "${id.provider}:${id.medium}:${id.value}"
+    fun excludedIds(snapshot: NewsSnapshot): Set<NewsCatalogId> = snapshot.excluded +
+        snapshot.works.values.filter { work -> work.ids.any { it in snapshot.excluded } }.flatMap { it.ids }
+
     fun personalIds(snapshot: NewsSnapshot, roots: Set<NewsCatalogId>): Set<NewsCatalogId> {
-        val included = roots - snapshot.excluded
-        return included + included.flatMap { snapshot.relations[catalogKey(it)].orEmpty() }
+        val excluded = excludedIds(snapshot)
+        val included = roots - excluded
+        val equivalents = snapshot.works.values.filter { work -> work.ids.any { it in included } }.flatMap { it.ids }
+        val selected = included + equivalents
+        return (selected + selected.flatMap { snapshot.relations[catalogKey(it)].orEmpty() }) - excluded
     }
     fun key(source: String, id: String): String = digest("$source\u0000$id")
     fun topicKey(source: String, topic: String): String = key(source, topic)
@@ -94,7 +105,7 @@ object NewsRules {
         .flatMap { it.catalogIds + snapshot.mappings[topicKey(item.source, it.id)].orEmpty() }.toSet()
 
     fun personal(item: StoredNews, snapshot: NewsSnapshot, library: Set<NewsCatalogId>): Boolean =
-        identities(item, snapshot).any { it in library && it !in snapshot.excluded }
+        NewsInterestIndex(snapshot, NewsPersonalLibrary(), library).match(item) != null
 
     /** First successful fetch is a baseline, never a burst of historical notifications. */
     fun shouldNotify(
@@ -102,7 +113,14 @@ object NewsRules {
         before: NewsSnapshot,
         personal: Set<NewsCatalogId>,
         now: Long,
+        index: NewsInterestIndex = NewsInterestIndex(before, NewsPersonalLibrary(), personal),
     ): Boolean {
+        if (!eligibleForAlert(item, before, now)) return false
+        val source = before.sources[item.source] ?: return false
+        return source.alerts == NewsAlerts.ALL || index.match(item)?.reliable == true
+    }
+
+    fun eligibleForAlert(item: StoredNews, before: NewsSnapshot, now: Long): Boolean {
         val source = before.sources[item.source] ?: return false
         val baseline = before.checks[item.source]?.baseline?.takeIf { it > 0 } ?: return false
         val published = item.article.publishedAt ?: return false
@@ -113,7 +131,32 @@ object NewsRules {
             return false
         }
         if (published < baseline || published > now + 300_000 || now - published > 7 * 86_400_000L) return false
-        return source.alerts == NewsAlerts.ALL || personal(item, before, personal)
+        return true
+    }
+
+    /** Only newly acquired alert candidates can be promoted after catalog/article enrichment. */
+    fun classifyPending(snapshot: NewsSnapshot, library: NewsPersonalLibrary, now: Long): NewsSnapshot {
+        val index = NewsInterestIndex(snapshot, library)
+        val valid = snapshot.pendingClassification.mapNotNull(snapshot.articles::get).filter { item ->
+            val settings = snapshot.sources[item.source]
+            val baseline = snapshot.checks[item.source]?.baseline?.takeIf { it > 0 }
+            val published = item.article.publishedAt
+            settings?.enabled == true &&
+                settings.alerts == NewsAlerts.PERSONAL &&
+                !item.read &&
+                item.key !in snapshot.receipts &&
+                baseline != null &&
+                published != null &&
+                published >= baseline &&
+                published <= now + 300_000 &&
+                now - item.acquiredAt <= 86_400_000 &&
+                now - published <= 7 * 86_400_000L
+        }
+        val matched = valid.filter { index.match(it)?.reliable == true }.map { it.key }.toSet()
+        return snapshot.copy(
+            pending = snapshot.pending + matched,
+            pendingClassification = valid.map { it.key }.toSet() - matched,
+        )
     }
 
     fun merge(before: NewsSnapshot, source: String, entries: List<NewsArticle>, now: Long): NewsSnapshot {
@@ -131,7 +174,9 @@ object NewsRules {
                     attribution = old.article.attribution,
                     imageUrl = valid.imageUrl ?: old.article.imageUrl,
                     author = valid.author ?: old.article.author,
-                    topics = (valid.topics + old.article.topics).distinctBy { it.id }.take(100),
+                    topics = (valid.topics + old.article.topics).groupBy { it.id }.values.map { versions ->
+                        versions.first().copy(catalogIds = versions.flatMap { it.catalogIds }.toSet())
+                    }.take(100),
                 )
             } else {
                 valid
@@ -158,6 +203,7 @@ object NewsRules {
                     item.copy(article = item.article.copy(blocks = emptyList()))
                 }
             }
-        return before.copy(articles = retained.associateBy { it.key })
+        val kept = retained.associateBy { it.key }
+        return before.copy(articles = kept, metadataChecks = before.metadataChecks.filterKeys { it in kept })
     }
 }

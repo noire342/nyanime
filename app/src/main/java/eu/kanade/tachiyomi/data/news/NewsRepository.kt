@@ -36,6 +36,7 @@ class NewsRepository(private val context: Context, network: NetworkHelper) {
     val store = NewsStore(context)
     private val relations = NewsRelations(network, store)
     private val relationLock = Mutex()
+    private val personalizationLock = Mutex()
     private val semaphore = Semaphore(3)
     private val requests = NewsRequestGate()
     private val mutableLoading = MutableStateFlow<Set<String>>(emptySet())
@@ -112,14 +113,35 @@ class NewsRepository(private val context: Context, network: NetworkHelper) {
                             alerts = alerts ?: old.alerts,
                         )
                         ),
+                pendingClassification = snapshot.pendingClassification.filterTo(mutableSetOf()) {
+                    snapshot.articles[it]?.source != extension.packageName
+                },
             )
         }
         initialize()
     }
 
-    suspend fun refresh(force: Boolean = false, notificationsOnly: Boolean = false) = coroutineScope {
+    suspend fun refresh(
+        force: Boolean = false,
+        notificationsOnly: Boolean = false,
+        personalLibrary: NewsPersonalLibrary? = null,
+    ) = withContext(Dispatchers.IO) { refreshFeeds(force, notificationsOnly, personalLibrary) }
+
+    private suspend fun refreshFeeds(
+        force: Boolean,
+        notificationsOnly: Boolean,
+        personalLibrary: NewsPersonalLibrary?,
+    ) = coroutineScope {
         initialize()
         if (Injekt.get<BasePreferences>().downloadedOnly().get()) return@coroutineScope
+        val library = personalLibrary ?: if (store.state.value.sources.values.any {
+                it.enabled && it.alerts == NewsAlerts.PERSONAL
+            }
+        ) {
+            NewsPersonalTitles().load()
+        } else {
+            NewsPersonalLibrary()
+        }
         registry.state.value.filter { it.source != null }.map { extension ->
             async {
                 val id = extension.packageName
@@ -134,16 +156,16 @@ class NewsRepository(private val context: Context, network: NetworkHelper) {
                         if (!force && now - (previous.checks[id]?.checkedAt ?: 0) < 15 * 60_000) return@guarded
                         val page = source.feed(NewsRequest())
                         require(page.articles.size <= 200)
-                        val personal = if (previous.sources[id]?.alerts ==
-                            NewsAlerts.PERSONAL
-                        ) {
-                            NewsRules.personalIds(previous, NewsPersonalTitles().load().ids)
-                        } else {
-                            emptySet()
-                        }
+                        val personal = NewsRules.personalIds(previous, library.ids)
                         store.update { current ->
-                            val pending = page.articles.map { StoredNews(id, NewsRules.validate(it), now) }
-                                .filter { NewsRules.shouldNotify(it, current, personal, now) }
+                            val incoming = page.articles.map { StoredNews(id, NewsRules.validate(it), now) }
+                            val index = NewsInterestIndex(current, library)
+                            val pending = incoming.filter { NewsRules.shouldNotify(it, current, personal, now, index) }
+                            val classify = if (current.sources[id]?.alerts == NewsAlerts.PERSONAL) {
+                                incoming.filter { NewsRules.eligibleForAlert(it, current, now) && it !in pending }
+                            } else {
+                                emptyList()
+                            }
                             NewsRules.merge(current, id, page.articles, now).copy(
                                 checks =
                                 current.checks +
@@ -159,6 +181,7 @@ class NewsRepository(private val context: Context, network: NetworkHelper) {
                                             )
                                         ),
                                 pending = current.pending + pending.map { item -> item.key },
+                                pendingClassification = current.pendingClassification + classify.map { it.key },
                             )
                         }
                     }
@@ -177,12 +200,79 @@ class NewsRepository(private val context: Context, network: NetworkHelper) {
                 }
             }
         }.awaitAll()
+        if (notificationsOnly && library.titles.isNotEmpty()) personalize(library, notificationsOnly = true)
         NewsNotifications(context, this@NewsRepository).deliver()
     }
 
     suspend fun refreshRelations(roots: Set<nyanime.news.api.NewsCatalogId>) = relationLock.withLock {
         if (!Injekt.get<BasePreferences>().downloadedOnly().get()) {
             semaphore.withPermit { relations.refresh(roots) }
+        }
+    }
+
+    /** Small, source-neutral enrichment passes. Cached cards and reading never wait for this. */
+    suspend fun personalize(
+        library: NewsPersonalLibrary,
+        notificationsOnly: Boolean = false,
+    ) = withContext(Dispatchers.IO) {
+        if (library.titles.isEmpty() || Injekt.get<BasePreferences>().downloadedOnly().get()) return@withContext
+        if (!personalizationLock.tryLock()) return@withContext
+        try {
+            refreshRelations(library.ids)
+            val snapshot = store.state.value
+            val enabled = registry.state.value.filter {
+                it.source != null &&
+                    (
+                        !notificationsOnly || snapshot.sources[it.packageName]?.alerts == NewsAlerts.PERSONAL
+                        )
+            }.map { it.packageName }.toSet()
+            val now = System.currentTimeMillis()
+            val index = NewsInterestIndex(snapshot, library)
+            val due = snapshot.articles.values.filter {
+                it.source in enabled &&
+                    it.article.blocks.isEmpty() &&
+                    now - (snapshot.metadataChecks[it.key] ?: 0) >= 86_400_000 &&
+                    (it.key in snapshot.pendingClassification || index.match(it)?.reliable != true) &&
+                    now - it.acquiredAt <= 7 * 86_400_000L
+            }.sortedWith(
+                compareByDescending<StoredNews> { it.key in snapshot.pendingClassification }
+                    .thenByDescending { it.article.publishedAt ?: it.acquiredAt },
+            )
+                .groupBy { it.source }.values.flatMap { it.take(3) }.take(12)
+            coroutineScope {
+                due.map { item ->
+                    async {
+                        try {
+                            guarded(item.source) { source ->
+                                val current = store.state.value
+                                if (current.articles[item.key]?.article?.blocks?.isNotEmpty() == true ||
+                                    now - (current.metadataChecks[item.key] ?: 0) < 86_400_000
+                                ) {
+                                    return@guarded
+                                }
+                                val result = withTimeoutOrNull(15_000) { source.article(item.article) }
+                                    ?: throw IOException("Metadata request timed out")
+                                val detail = NewsRules.validate(result)
+                                require(detail.id == item.article.id && detail.url == item.article.url)
+                                store.update {
+                                    NewsRules.merge(it, item.source, listOf(detail), now)
+                                        .copy(metadataChecks = it.metadataChecks + (item.key to now))
+                                }
+                            }
+                        } catch (cancel: CancellationException) {
+                            throw cancel
+                        } catch (_: Exception) {
+                            store.update {
+                                it.copy(metadataChecks = it.metadataChecks + (item.key to (now - 23 * 3_600_000)))
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+            store.update { NewsRules.classifyPending(it, library, System.currentTimeMillis()) }
+            NewsNotifications(context, this@NewsRepository).deliver()
+        } finally {
+            personalizationLock.unlock()
         }
     }
 

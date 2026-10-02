@@ -55,7 +55,10 @@
     <string name="news_personalize">I tuoi interessi</string>
     <string name="news_match">Associa a un titolo</string>
     <string name="news_match_help">Scegli l’opera esatta per questo argomento. L’associazione vale solo per le notizie.</string>
-    <string name="news_no_identity">Nessun ID di catalogo verificato. Collega prima il titolo a un catalogo.</string>
+    <string name="news_no_identity">Abbinamento per nome · Gli avvisi richiedono un collegamento verificato.</string>
+    <string name="news_matching_progress">Organizzo le notizie per i tuoi titoli. Gli articoli già disponibili restano leggibili.</string>
+    <string name="news_about_title">Su %1$s</string>
+    <string name="news_title_mention">Titolo citato: %1$s</string>
     <string name="news_exclusions">Notizie su questi titoli</string>
     <string name="news_unlink">Rimuovi associazione</string>
     <string name="news_source">Fonte</string>

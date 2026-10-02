@@ -58,6 +58,8 @@ import coil3.compose.AsyncImage
 import eu.kanade.presentation.motion.ModernMotion
 import eu.kanade.presentation.motion.appMotionEnabled
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.news.NewsInterestMatch
+import eu.kanade.tachiyomi.data.news.NewsMatchKind
 import eu.kanade.tachiyomi.data.news.StoredNews
 import eu.kanade.tachiyomi.ui.home.LocalFloatingNavigationInset
 import kotlinx.coroutines.launch
@@ -83,14 +85,14 @@ fun NewsContent(model: NewsScreenModel, active: Boolean = true, search: Boolean 
     val indexed = remember(state.items) { state.items.associateBy { it.key } }
     val items = if (search) state.items else visibleKeys?.mapNotNull(indexed::get) ?: state.items
     val newItems = !search && visibleKeys != null && state.items.any { it.key !in visibleKeys.orEmpty() }
-    LaunchedEffect(state.items, state.generation, state.busy) {
-        if (visibleKeys == null && state.items.isNotEmpty() && !state.busy) {
+    LaunchedEffect(state.items, state.generation, state.busy, state.personalizing) {
+        if (visibleKeys == null && state.items.isNotEmpty()) {
             visibleKeys = state.items.map { it.key }
         }
     }
     LifecycleStartEffect(active, search) {
         if (active && !search) model.refresh()
-        onStopOrDispose { }
+        onStopOrDispose { model.pausePersonalization() }
     }
     PullRefresh(
         refreshing = state.busy,
@@ -142,7 +144,9 @@ fun NewsContent(model: NewsScreenModel, active: Boolean = true, search: Boolean 
             }
             if (!search) NewsFilterBar(model)
             Box(Modifier.fillMaxWidth().height(3.dp)) {
-                if (state.busy && items.isNotEmpty()) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if ((state.busy || state.tab == 1 && state.personalizing) && items.isNotEmpty()) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
             }
             AnimatedVisibility(
                 newItems,
@@ -195,7 +199,13 @@ fun NewsContent(model: NewsScreenModel, active: Boolean = true, search: Boolean 
                         ) {
                             Column(Modifier.padding(16.dp)) {
                                 Text(
-                                    stringResource(R.string.news_personal_note),
+                                    stringResource(
+                                        if (state.personalizing) {
+                                            R.string.news_matching_progress
+                                        } else {
+                                            R.string.news_personal_note
+                                        },
+                                    ),
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
                                 TextButton(onClick = { navigator.push(NewsInterestsScreen()) }) {
@@ -205,7 +215,7 @@ fun NewsContent(model: NewsScreenModel, active: Boolean = true, search: Boolean 
                         }
                     }
                 }
-                if (state.busy && items.isEmpty()) {
+                if ((state.busy || state.tab == 1 && state.personalizing) && items.isEmpty()) {
                     items(5) { NewsSkeleton() }
                 } else if (items.isEmpty()) {
                     item {
@@ -242,7 +252,11 @@ fun NewsContent(model: NewsScreenModel, active: Boolean = true, search: Boolean 
                     }
                 }
                 items(items, key = { it.key }) { item ->
-                    NewsCard(item, featured = item.key == items.firstOrNull()?.key && !search && state.tab == 0) {
+                    NewsCard(
+                        item,
+                        featured = item.key == items.firstOrNull()?.key && !search && state.tab == 0,
+                        match = state.matches[item.key],
+                    ) {
                         navigator.push(NewsReaderScreen(item.key))
                     }
                 }
@@ -357,7 +371,7 @@ fun NewsFilterBar(model: NewsScreenModel) {
 }
 
 @Composable
-private fun NewsCard(item: StoredNews, featured: Boolean, onClick: () -> Unit) {
+private fun NewsCard(item: StoredNews, featured: Boolean, match: NewsInterestMatch? = null, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
@@ -391,6 +405,22 @@ private fun NewsCard(item: StoredNews, featured: Boolean, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                 )
+                if (match != null && match.title.isNotBlank()) {
+                    Text(
+                        stringResource(
+                            if (match.kind in setOf(NewsMatchKind.LOCAL_TITLE, NewsMatchKind.HEADLINE)) {
+                                R.string.news_title_mention
+                            } else {
+                                R.string.news_about_title
+                            },
+                            match.title,
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             Box(
                 Modifier.size(if (featured) 106.dp else 84.dp)

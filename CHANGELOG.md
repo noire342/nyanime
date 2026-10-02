@@ -8,6 +8,15 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 2 ottobre 2026 — Notizie legate ai tuoi titoli
+
+- «Per te» riconosce anche i nomi alternativi e tradotti verificati nei cataloghi,
+  gli ID equivalenti e le relazioni dirette tra opere, senza modificare il tracking.
+- Le schede spiegano il collegamento al titolo seguito; le semplici citazioni possono
+  comparire nel feed, ma non generano notifiche personali senza un riscontro affidabile.
+- Recupero graduale dei dati mancanti degli articoli, cache degli abbinamenti e
+  esclusioni valide anche per gli ID equivalenti. Restano esclusi gli avvisi storici.
+
 ## 2 ottobre 2026 — Riconoscimento del doppio tap
 
 - Corretto il filtro che scartava i tocchi posteriori quando il telefono oscillava

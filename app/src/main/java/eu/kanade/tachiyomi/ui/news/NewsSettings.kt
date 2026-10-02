@@ -375,9 +375,12 @@ class NewsInterestsScreen : Screen {
                         if (topics.isEmpty()) item { Text(stringResource(R.string.news_no_topics)) }
                     } else {
                         val titles = library.titles.filter { it.title.contains(query, true) }
-                            .distinctBy { it.medium to (if (it.ids.isEmpty()) it.title else it.ids) }
-                            .sortedBy { it.title }
-                        items(titles) { title ->
+                            .groupBy { it.medium to (if (it.ids.isEmpty()) it.title else it.ids) }
+                            .values.sortedBy { it.first().title }
+                        items(titles) { group ->
+                            val title = group.first()
+                            val keys = group.map { it.key }.toSet()
+                            val ids = group.flatMap { it.ids }.toSet()
                             Surface(
                                 shape = RoundedCornerShape(18.dp),
                                 color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -399,16 +402,29 @@ class NewsInterestsScreen : Screen {
                                         )
                                     }
                                     Switch(
-                                        title.ids.isNotEmpty() && title.ids.none { it in snapshot.excluded },
+                                        keys.none { it in snapshot.excludedTitles } &&
+                                            ids.none { it in NewsRules.excludedIds(snapshot) },
                                         { enabled ->
                                             scope.launch {
                                                 try {
                                                     repository.store.update {
                                                         it.copy(
-                                                            excluded = if (enabled) {
-                                                                it.excluded - title.ids
+                                                            excludedTitles = if (enabled) {
+                                                                it.excludedTitles - keys
                                                             } else {
-                                                                it.excluded + title.ids
+                                                                it.excludedTitles +
+                                                                    keys
+                                                            },
+                                                            excluded = if (enabled) {
+                                                                val equivalents = it.works.values.filter { work ->
+                                                                    work.ids.any { id ->
+                                                                        id in
+                                                                            ids
+                                                                    }
+                                                                }.flatMap { work -> work.ids }
+                                                                it.excluded - ids - equivalents.toSet()
+                                                            } else {
+                                                                it.excluded + ids
                                                             },
                                                         )
                                                     }
@@ -419,7 +435,7 @@ class NewsInterestsScreen : Screen {
                                                 }
                                             }
                                         },
-                                        enabled = title.ids.isNotEmpty(),
+                                        enabled = true,
                                     )
                                 }
                             }

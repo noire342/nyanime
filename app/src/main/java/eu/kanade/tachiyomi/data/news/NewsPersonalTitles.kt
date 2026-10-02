@@ -14,7 +14,13 @@ import tachiyomi.domain.track.manga.repository.MangaTrackRepository
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
-data class NewsPersonalTitle(val title: String, val ids: Set<NewsCatalogId>, val medium: NewsMedium)
+data class NewsPersonalTitle(
+    val title: String,
+    val ids: Set<NewsCatalogId>,
+    val medium: NewsMedium,
+    val key: String = "",
+    val aliases: List<String> = emptyList(),
+)
 data class NewsPersonalLibrary(val titles: List<NewsPersonalTitle> = emptyList()) {
     val ids: Set<NewsCatalogId> get() = titles.flatMap { it.ids }.toSet()
 }
@@ -52,7 +58,13 @@ class NewsPersonalTitles {
                     animeTracks[entry.id].orEmpty().mapNotNull { track ->
                         trackId(track.trackerId, track.remoteId, NewsMedium.ANIME)
                     }
-                NewsPersonalTitle(entry.title, ids, NewsMedium.ANIME)
+                NewsPersonalTitle(
+                    entry.title,
+                    ids,
+                    NewsMedium.ANIME,
+                    NewsRules.key("ANIME:${entry.source}", entry.url),
+                    (entry.homePresentation?.aliases.orEmpty() + hints?.titles.orEmpty()).distinct(),
+                )
             } +
                 mangaEntries.map { entry ->
                     NewsPersonalTitle(
@@ -61,6 +73,7 @@ class NewsPersonalTitles {
                             trackId(it.trackerId, it.remoteId, NewsMedium.MANGA)
                         }.toSet(),
                         NewsMedium.MANGA,
+                        NewsRules.key("MANGA:${entry.source}", entry.url),
                     )
                 },
         )

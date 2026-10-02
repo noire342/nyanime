@@ -9,9 +9,13 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.news.NewsReaderActivity
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class NewsNotifications(private val context: Context, private val repository: NewsRepository) {
-    suspend fun deliver() {
+    suspend fun deliver() = deliveryLock.withLock { deliverLocked() }
+
+    private suspend fun deliverLocked() {
         val manager = NotificationManagerCompat.from(context)
         val channel = NotificationChannel(
             CHANNEL,
@@ -21,10 +25,20 @@ class NewsNotifications(private val context: Context, private val repository: Ne
         manager.createNotificationChannel(channel)
         val snapshot = repository.store.state.value
         val all = snapshot.pending.mapNotNull { snapshot.articles[it] }
+        val index = if (all.any { snapshot.sources[it.source]?.alerts == NewsAlerts.PERSONAL }) {
+            NewsInterestIndex(snapshot, NewsPersonalTitles().load())
+        } else {
+            null
+        }
         val enabled = all.filter {
             snapshot.sources[it.source]?.let { config ->
                 config.enabled &&
-                    config.alerts != NewsAlerts.OFF
+                    !it.read &&
+                    (
+                        config.alerts == NewsAlerts.ALL ||
+                            config.alerts == NewsAlerts.PERSONAL &&
+                            index?.match(it)?.reliable == true
+                        )
             } ==
                 true
         }
@@ -83,6 +97,7 @@ class NewsNotifications(private val context: Context, private val repository: Ne
     }
 
     companion object {
+        private val deliveryLock = Mutex()
         private const val CHANNEL = "news_articles"
     }
 }
