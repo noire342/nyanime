@@ -18,15 +18,23 @@ The app contains no provider-specific routing or catalogue assumptions.
   remains available. Accessibility reports the real collection size.
 - Scale, opacity and perspective are draw-layer changes. The caption reserves two
   title lines and a metadata line; it fades with the gesture without resizing the list.
+- Position is announced to accessibility without visible dots below the title.
+  Source actions fade out before the centered cover changes.
+- Navigation and category activity use tracked composition locals: only consumers
+  of the changing state are invalidated, not every descendant of the screen.
 - Images retain their previous painter during refresh/failure, with existing retry
   and source-resolution paths. Portrait transitions into detail screens are retained.
 
 ## Personal sections
 
-Continue groups the full local resume list into compact columns of up to three cards.
-Horizontal scrolling retains access to every entry. Video cards retain playback,
-details, hidden-item recovery and the optional unfinished-ending action. Manga cards
-resume the stored chapter; progress not present in the history contract is not invented.
+Continue watching presents one landscape card per title in a horizontal row. Artwork,
+a direct resume action, elapsed/total time, progress and the episode name have separate
+space. The next card peeks in on phones; tablet cards have a bounded width. All entries
+remain reachable, with stable identity keys. The menu retains details, hiding with Undo
+and the optional unfinished-ending action. Skeletons reserve the same card geometry.
+
+Continue reading retains its compact columns of up to three cards. Manga cards resume
+the stored chapter; progress not present in the history contract is not invented.
 
 Updates use compact cards with medium-specific borders. Their existing dismissal,
 reading/playback and navigation handlers are unchanged. New-content acknowledgement

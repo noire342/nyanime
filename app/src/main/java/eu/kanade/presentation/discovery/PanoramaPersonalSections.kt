@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import eu.kanade.presentation.motion.posterForeground
 import eu.kanade.presentation.motion.posterOpen
 import eu.kanade.presentation.motion.posterSource
 import eu.kanade.presentation.motion.posterSourcePlaceholder
@@ -228,91 +229,83 @@ internal fun PanoramaLocalAnimeRow(
             style = MaterialTheme.typography.bodyMedium,
         )
     }
-    HomeLoadingTransition(loading = state.awaitingContent, placeholder = { PanoramaResumeSkeleton() }) {
+    HomeLoadingTransition(
+        loading = state.awaitingContent,
+        placeholder = { if (resume) PanoramaWatchResumeSkeleton() else HomePosterRowSkeleton() },
+    ) {
         if (resume) {
-            // Keep the full resume list reachable without turning the Home into a long vertical wall.
-            val groups = entries.chunked(3)
             BoxWithConstraints(Modifier.fillMaxWidth().privacyRegion(PrivacyArea.RESUME)) {
-                val pageWidth = maxWidth - 40.dp
+                val cardWidth = PanoramaResumeLayout.width(maxWidth, entries.size)
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(groups, key = { it.first().anime.id }) { group ->
-                        Column(Modifier.width(pageWidth), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            group.forEach { item ->
-                                androidx.compose.runtime.key(item.anime.id) {
-                                    val poster = rememberPosterSource(item.anime)
-                                    val openDetails = posterOpen(poster, item.anime.title) { onOpen(item) }
-                                    PanoramaResumeCard(
-                                        title = item.anime.title,
-                                        subtitle = if (item.episode.totalSeconds >
-                                            0
-                                        ) {
-                                            androidStringResource(
-                                                R.string.home_panorama_episode_progress,
-                                                item.episode.name,
-                                                panoramaTime(item.episode.lastSecondSeen),
-                                                panoramaTime(item.episode.totalSeconds),
-                                            )
-                                        } else {
-                                            item.episode.name
-                                        },
-                                        onResume = { onPlay(item) },
-                                        modifier = Modifier.nsfwPrivacy(item.anime),
-                                        progress = item.progress,
-                                        menu = { close ->
-                                            DropdownMenuItem(text = {
-                                                Text(androidStringResource(R.string.home_resume_action))
-                                            }, onClick = {
-                                                close()
-                                                onPlay(item)
-                                            })
-                                            DropdownMenuItem(text = {
-                                                Text(androidStringResource(R.string.home_open_title_details))
-                                            }, onClick = {
-                                                close()
-                                                openDetails()
-                                            })
-                                            item.finale?.let { finale ->
-                                                DropdownMenuItem(text = {
-                                                    Text(androidStringResource(R.string.home_resume_ending))
-                                                }, onClick = {
-                                                    close()
-                                                    onPlay(
-                                                        item.copy(
-                                                            episode = finale,
-                                                            finale = null,
-                                                            forcedStartPositionMs = finale.lastSecondSeen,
-                                                        ),
-                                                    )
-                                                })
-                                            }
-                                            onHide?.let { hide ->
-                                                DropdownMenuItem(text = {
-                                                    Text(
-                                                        androidStringResource(
-                                                            R.string.home_hide_resume,
-                                                            item.anime.title,
-                                                        ),
-                                                    )
-                                                }, onClick = {
-                                                    close()
-                                                    hide(item)
-                                                })
-                                            }
-                                        },
-                                    ) { modifier ->
-                                        SourceHomeArtwork(
-                                            item.anime,
-                                            modifier.posterSource(poster),
-                                            item.anime.title,
-                                            initialPainter = posterSourcePlaceholder(poster),
-                                            onPainterReady = { poster.painter = it },
+                    items(entries, key = { it.anime.id }) { item ->
+                        val poster = rememberPosterSource(item.anime)
+                        val openDetails = posterOpen(poster, item.anime.title) { onOpen(item) }
+                        PanoramaWatchResumeCard(
+                            title = item.anime.title,
+                            episode = item.episode.name,
+                            timing = item.episode.totalSeconds.takeIf { it > 0 }?.let { total ->
+                                androidStringResource(
+                                    R.string.home_panorama_watch_progress,
+                                    panoramaTime(item.episode.lastSecondSeen.coerceIn(0L, total)),
+                                    panoramaTime(total),
+                                )
+                            },
+                            onResume = { onPlay(item) },
+                            modifier = Modifier.width(cardWidth).nsfwPrivacy(item.anime),
+                            foregroundModifier = Modifier.posterForeground(poster),
+                            progress = item.progress,
+                            menu = { close ->
+                                DropdownMenuItem(text = {
+                                    Text(androidStringResource(R.string.home_resume_action))
+                                }, onClick = {
+                                    close()
+                                    onPlay(item)
+                                })
+                                DropdownMenuItem(text = {
+                                    Text(androidStringResource(R.string.home_open_title_details))
+                                }, onClick = {
+                                    close()
+                                    openDetails()
+                                })
+                                item.finale?.let { finale ->
+                                    DropdownMenuItem(text = {
+                                        Text(androidStringResource(R.string.home_resume_ending))
+                                    }, onClick = {
+                                        close()
+                                        onPlay(
+                                            item.copy(
+                                                episode = finale,
+                                                finale = null,
+                                                forcedStartPositionMs = finale.lastSecondSeen,
+                                            ),
                                         )
-                                    }
+                                    })
                                 }
-                            }
+                                onHide?.let { hide ->
+                                    DropdownMenuItem(text = {
+                                        Text(
+                                            androidStringResource(
+                                                R.string.home_hide_resume,
+                                                item.anime.title,
+                                            ),
+                                        )
+                                    }, onClick = {
+                                        close()
+                                        hide(item)
+                                    })
+                                }
+                            },
+                        ) { modifier ->
+                            SourceHomeArtwork(
+                                item.anime,
+                                modifier.posterSource(poster),
+                                item.anime.title,
+                                initialPainter = posterSourcePlaceholder(poster),
+                                onPainterReady = { poster.painter = it },
+                            )
                         }
                     }
                 }

@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -26,7 +26,7 @@ internal object HomeMotion {
     const val PULSE_HALF_MILLIS = 1100
 }
 
-internal val LocalHomeContentActive = staticCompositionLocalOf { true }
+internal val LocalHomeContentActive = compositionLocalOf { true }
 
 /** Only the body fades. The header, its layout and its remembered state stay outside this scope. */
 @Composable

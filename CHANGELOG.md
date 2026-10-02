@@ -8,6 +8,14 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 2 ottobre 2026 — Ripresa dalla Home e fluidità
+
+- «Continua a guardare» nella Home diventa una fila di schede ampie: ripresa diretta,
+  episodio, minutaggio e avanzamento leggibili, con le altre azioni raccolte nel menu.
+- Migliorata la fluidità delle transizioni tra Home e schede, limitando i ricalcoli
+  agli elementi coinvolti; le azioni sulla copertina seguono la dissolvenza del titolo.
+- Rimossi gli indicatori sotto i titoli in primo piano per alleggerire la Home.
+
 ## 2 ottobre 2026 — Aumento della numerazione
 
 - Aumento di numerazione, nessun cambiamento alle funzionalità dell'app.

@@ -3,7 +3,6 @@ package eu.kanade.presentation.discovery
 import android.content.Context
 import android.view.accessibility.AccessibilityManager
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,13 +13,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
@@ -57,9 +54,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.ScrollAxisRange
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.collectionInfo
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.horizontalScrollAxisRange
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -189,6 +186,7 @@ internal fun <T : Any> PanoramaCarousel(
                 }
             }
         }
+        val positionLabel = androidStringResource(R.string.home_featured_position, heading, current + 1, items.size)
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (heading.isNotBlank()) SectionHeader(heading, onBrowse)
             BoxWithConstraints(Modifier.widthIn(max = 600.dp).fillMaxWidth()) {
@@ -204,6 +202,7 @@ internal fun <T : Any> PanoramaCarousel(
                     modifier = Modifier.fillMaxWidth().height(PanoramaPages.stageHeight(maxWidth))
                         .semantics {
                             collectionInfo = CollectionInfo(1, items.size)
+                            stateDescription = positionLabel
                             horizontalScrollAxisRange = ScrollAxisRange(
                                 value = { current.toFloat() },
                                 maxValue = { (items.size - 1).toFloat() },
@@ -243,7 +242,16 @@ internal fun <T : Any> PanoramaCarousel(
                     ) {
                         artwork(item, Modifier.fillMaxSize(), poster)
                         if (centered) {
-                            Box(Modifier.align(Alignment.TopEnd).padding(8.dp).posterForeground(poster)) {
+                            Box(
+                                Modifier.align(Alignment.TopEnd).padding(8.dp).posterForeground(poster)
+                                    .graphicsLayer {
+                                        alpha = if (motion) {
+                                            (1f - pager.currentPageOffsetFraction.absoluteValue * 2f).coerceIn(0f, 1f)
+                                        } else {
+                                            1f
+                                        }
+                                    },
+                            ) {
                                 actions(item)
                             }
                         }
@@ -283,33 +291,6 @@ internal fun <T : Any> PanoramaCarousel(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            val positionLabel = androidStringResource(R.string.home_featured_position, heading, current + 1, items.size)
-            Row(
-                Modifier.fillMaxWidth().height(28.dp).semantics { contentDescription = positionLabel },
-                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val start = (current - 3).coerceIn(0, (items.size - 7).coerceAtLeast(0))
-                repeat(items.size.coerceAtMost(7)) { dot ->
-                    val selected = start + dot == current
-                    val dotWidth by animateDpAsState(
-                        if (selected) 18.dp else 4.dp,
-                        tween(if (motion) HomeMotion.CONTENT_MILLIS else 0),
-                        label = "panoramaPosition",
-                    )
-                    Box(
-                        Modifier.size(dotWidth, 4.dp)
-                            .background(
-                                if (selected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = .25f)
-                                },
-                                RoundedCornerShape(4.dp),
-                            ),
-                    )
-                }
             }
         }
     }
@@ -376,9 +357,6 @@ internal fun PanoramaHeroSkeleton(showHeading: Boolean = true) {
             ) {
                 SkeletonBlock(Modifier.width(180.dp).height(24.dp))
                 SkeletonBlock(Modifier.padding(top = 12.dp).width(120.dp).height(16.dp))
-            }
-            Box(Modifier.height(28.dp), contentAlignment = Alignment.Center) {
-                SkeletonBlock(Modifier.width(48.dp).height(4.dp))
             }
         }
     }

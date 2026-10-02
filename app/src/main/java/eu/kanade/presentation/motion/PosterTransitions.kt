@@ -16,12 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
@@ -43,7 +43,9 @@ internal data class PosterScene(
 )
 
 @Suppress("CompositionLocalAllowlist")
-internal val LocalPosterScene = staticCompositionLocalOf<PosterScene?> { null }
+// Navigation changes this value at both ends of each transition. Track readers rather than
+// invalidating every descendant, including lists and the fixed Home header that do not use it.
+internal val LocalPosterScene = compositionLocalOf<PosterScene?> { null }
 
 /** Uses the navigator's real transition so interruption, pop and screen disposal have one owner. */
 @OptIn(ExperimentalSharedTransitionApi::class)

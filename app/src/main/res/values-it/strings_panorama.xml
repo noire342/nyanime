@@ -7,4 +7,5 @@
     <string name="home_panorama_new_episode">Nuovo episodio</string>
     <string name="home_panorama_new_chapter">Nuovo capitolo</string>
     <string name="home_panorama_read_chapter">Capitolo %1$s</string>
+    <string name="home_panorama_watch_progress">%1$s / %2$s</string>
 </resources>

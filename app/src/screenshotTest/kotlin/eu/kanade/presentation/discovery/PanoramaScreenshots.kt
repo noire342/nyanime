@@ -2,10 +2,15 @@ package eu.kanade.presentation.discovery
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -74,6 +79,54 @@ fun PanoramaPlaceholderScreenshot() {
             Column {
                 PanoramaHeroSkeleton()
                 PanoramaResumeSkeleton()
+            }
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "WatchResumeNarrow", widthDp = 280, heightDp = 430, locale = "it")
+@Preview(name = "WatchResumeLargeText", widthDp = 320, heightDp = 540, fontScale = 1.5f, locale = "en")
+@Preview(name = "WatchResumeDark", widthDp = 390, heightDp = 450, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "WatchResumeWide", widthDp = 840, heightDp = 450)
+@Composable
+fun PanoramaWatchResumeScreenshot() {
+    TachiyomiPreviewTheme(appTheme = AppTheme.NYANIME) {
+        Surface(Modifier.fillMaxSize()) {
+            Column {
+                SectionHeader("Continua a guardare")
+                BoxWithConstraints {
+                    val width = PanoramaResumeLayout.width(maxWidth, 3)
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(3) { index ->
+                            PanoramaWatchResumeCard(
+                                title = if (index ==
+                                    0
+                                ) {
+                                    "Un viaggio attraverso i ricordi di una città lontana"
+                                } else {
+                                    "Nuovi orizzonti"
+                                },
+                                episode = "Episodio 12 · Una promessa sotto il cielo d'estate",
+                                timing = "12:08 / 24:10",
+                                progress = .5f,
+                                onResume = {},
+                                modifier = Modifier.width(width),
+                                menu = {},
+                            ) { modifier ->
+                                Box(
+                                    modifier.background(
+                                        Brush.linearGradient(listOf(Color(0xFFBFA477), Color(0xFF315362))),
+                                    ),
+                                    contentAlignment = Alignment.Center,
+                                ) { Text("12", style = MaterialTheme.typography.displayLarge, color = Color.White) }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

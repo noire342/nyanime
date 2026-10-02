@@ -178,10 +178,10 @@ fun HomePosterRowSkeleton(wide: Boolean = false, modifier: Modifier = Modifier) 
 }
 
 @Composable
-fun HomeLoadingSkeleton(withSourceAction: Boolean = false) {
+fun HomeLoadingSkeleton(withSourceAction: Boolean = false, manga: Boolean = false) {
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp), userScrollEnabled = false) {
         item { HomeHeroSkeleton(withSourceAction = withSourceAction) }
-        item { PanoramaResumeSkeleton() }
+        item { if (manga) PanoramaResumeSkeleton() else PanoramaWatchResumeSkeleton() }
         items(1) {
             HomeSkeleton(Modifier.padding(horizontal = 16.dp)) {
                 SkeletonBlock(Modifier.width(160.dp).height(20.dp))
@@ -193,7 +193,7 @@ fun HomeLoadingSkeleton(withSourceAction: Boolean = false) {
 }
 
 @Composable
-fun HomeMangaLoadingSkeleton() = HomeLoadingSkeleton()
+fun HomeMangaLoadingSkeleton() = HomeLoadingSkeleton(manga = true)
 
 @Preview(widthDp = 320)
 @Composable
