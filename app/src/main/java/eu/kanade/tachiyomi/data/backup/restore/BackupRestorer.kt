@@ -138,6 +138,11 @@ class BackupRestorer(
                     backup.backupAnimeCategories.takeIf { options.categories },
                     backup.backupCategories.takeIf { options.categories },
                 ).join()
+                backup.newsState?.let {
+                    val news = Injekt.get<eu.kanade.tachiyomi.data.news.NewsRepository>()
+                    news.store.restore(it)
+                    news.initialize()
+                }
             }
             if (options.sourceSettings) {
                 restoreSourcePreferences(backup.backupSourcePreferences).join()
@@ -150,9 +155,6 @@ class BackupRestorer(
                 if (options.appSettings) {
                     backup.backupHiddenResume?.let { restoreHiddenResume(it) }
                     eu.kanade.tachiyomi.data.releases.ReleaseStore().restore(backup.releaseSubscriptions)
-                    backup.newsState?.let {
-                        Injekt.get<eu.kanade.tachiyomi.data.news.NewsRepository>().store.restore(it)
-                    }
                     eu.kanade.tachiyomi.data.releases.ReleaseMonitor.setup(context)
                 }
             }

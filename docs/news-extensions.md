@@ -81,6 +81,7 @@ image cache; missing offline images have a visible fallback. Video is never down
 
 The optional protobuf field 509 in `.nyabk` carries saved/read article state,
 preferences, exclusions and mappings. Older `.nyabk` and `.tachibk` remain readable.
+News is restored with App settings, independently of the Library restore option.
 Image caches are excluded. Trust decisions are not transferred to a different
 installation; restored extensions must be locally trusted. Incognito does not record
 reading progress, and downloaded-only mode does not request article data over the network.
