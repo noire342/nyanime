@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -27,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -47,6 +49,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
@@ -175,6 +180,9 @@ fun NewsSourcesContent(modifier: Modifier = Modifier) {
                                 }
                             },
                             enabled = extension.compatible && !busy,
+                            modifier = Modifier.semantics {
+                                contentDescription = extension.source?.name ?: extension.label
+                            },
                         )
                     }
                     if (!extension.compatible || extension.failed) {
@@ -189,13 +197,18 @@ fun NewsSourcesContent(modifier: Modifier = Modifier) {
                         Text(stringResource(R.string.news_notifications), style = MaterialTheme.typography.labelLarge)
                         NewsAlerts.entries.forEach { option ->
                             Row(
-                                Modifier.fillMaxWidth().clickable(enabled = !busy) {
+                                Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(
+                                    selected = settings?.alerts == option,
+                                    enabled = !busy,
+                                    role = Role.RadioButton,
+                                ) {
                                     configure(
                                         extension,
                                         true,
                                         option,
                                     )
                                 }.padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 val label = when (option) {
                                     NewsAlerts.OFF -> R.string.news_alert_off
@@ -211,7 +224,7 @@ fun NewsSourcesContent(modifier: Modifier = Modifier) {
                                         MaterialTheme.colorScheme.onSurface
                                     },
                                 )
-                                if (settings?.alerts == option) Text("✓", color = MaterialTheme.colorScheme.primary)
+                                RadioButton(settings?.alerts == option, onClick = null, enabled = !busy)
                             }
                         }
                     }
@@ -341,6 +354,13 @@ class NewsInterestsScreen : Screen {
                                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                             ) {
                                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                                    val publisher = snapshot.articles.values
+                                        .firstOrNull { it.source == entry.first }?.article?.publisher.orEmpty()
+                                    Text(
+                                        publisher,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                     Text(entry.second.title, style = MaterialTheme.typography.titleSmall)
                                     Text(
                                         stringResource(
@@ -424,6 +444,7 @@ internal fun NewsTopicLinks(item: StoredNews) {
 @Composable
 private fun NewsTopicDialog(source: String, topic: NewsTopic, onClose: () -> Unit) {
     val repository = remember { Injekt.get<NewsRepository>() }
+    val snapshot by repository.store.state.collectAsState()
     var library by remember { mutableStateOf(NewsPersonalLibrary()) }
     var query by remember { mutableStateOf("") }
     var failed by remember { mutableStateOf(false) }
@@ -500,8 +521,10 @@ private fun NewsTopicDialog(source: String, topic: NewsTopic, onClose: () -> Uni
         },
         confirmButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.news_close)) } },
         dismissButton = {
-            TextButton(onClick = { connect(null) }, enabled = !busy) {
-                Text(stringResource(R.string.news_unlink))
+            if (NewsRules.topicKey(source, topic.id) in snapshot.mappings) {
+                TextButton(onClick = { connect(null) }, enabled = !busy) {
+                    Text(stringResource(R.string.news_unlink))
+                }
             }
         },
     )

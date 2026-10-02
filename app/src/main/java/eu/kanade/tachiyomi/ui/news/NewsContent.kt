@@ -134,11 +134,10 @@ fun NewsContent(model: NewsScreenModel, active: Boolean = true, search: Boolean 
                         }
                     }
                 }
-                IconButton(onClick = { navigator.push(NewsSourcesScreen()) }) {
-                    Icon(
-                        Icons.Outlined.Tune,
-                        stringResource(R.string.news_manage),
-                    )
+                if (!search) {
+                    IconButton(onClick = { navigator.push(NewsSourcesScreen()) }) {
+                        Icon(Icons.Outlined.Tune, stringResource(R.string.news_manage))
+                    }
                 }
             }
             if (!search) NewsFilterBar(model)

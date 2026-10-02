@@ -61,6 +61,6 @@
     <string name="news_source">Fonte</string>
     <string name="news_categories">Categorie</string>
     <string name="news_more">Carica altri</string>
-    <string name="news_end">Hai letto tutte le notizie disponibili</string>
+    <string name="news_end">Fine dell’elenco</string>
     <string name="news_offline">Gli articoli salvati restano disponibili anche senza una fonte abilitata.</string>
 </resources>

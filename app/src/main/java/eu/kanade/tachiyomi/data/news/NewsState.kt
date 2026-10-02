@@ -28,7 +28,8 @@ data class StoredNews(
     val position: Int = 0,
     val offset: Int = 0,
 ) {
-    val key: String get() = NewsRules.key(source, article.id)
+    @kotlinx.serialization.Transient
+    val key: String = NewsRules.key(source, article.id)
 }
 
 @Serializable

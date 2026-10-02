@@ -61,6 +61,6 @@
     <string name="news_source">Source</string>
     <string name="news_categories">Categories</string>
     <string name="news_more">Load more</string>
-    <string name="news_end">You are all caught up</string>
+    <string name="news_end">End of the list</string>
     <string name="news_offline">Saved articles remain available without an enabled source.</string>
 </resources>

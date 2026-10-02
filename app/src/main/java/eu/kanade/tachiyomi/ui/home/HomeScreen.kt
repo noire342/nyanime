@@ -433,7 +433,10 @@ object HomeScreen : Screen() {
                             atlas.showPanel(AtlasPanel.SETTINGS)
                         }
                     }) {
-                        Icon(Icons.Outlined.Tune, stringResource(R.string.atlas_settings))
+                        Icon(
+                            Icons.Outlined.Tune,
+                            stringResource(if (newsMode) R.string.news_manage else R.string.atlas_settings),
+                        )
                     }
                 } else {
                     Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
