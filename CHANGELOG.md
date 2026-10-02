@@ -8,6 +8,13 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 2 ottobre 2026 — Riconoscimento del doppio tap
+
+- Corretto il filtro che scartava i tocchi posteriori quando il telefono oscillava
+  brevemente nella mano, rendendo intermittente anche la calibrazione.
+- Riconoscimento dei rimbalzi del tocco e quiete proporzionata alla sua intensità,
+  mantenendo i controlli contro rotazioni, scuotimenti e attivazioni accidentali.
+
 ## 2 ottobre 2026 — Doppio tap posteriore
 
 - Nuovo gesto facoltativo in Impostazioni → Gesti, disattivato inizialmente: azioni

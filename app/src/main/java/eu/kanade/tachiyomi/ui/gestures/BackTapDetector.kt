@@ -15,26 +15,32 @@ class BackTapDetector(private val threshold: Double = 2.4) {
     private val gravity = DoubleArray(3)
     private var lastSample = 0L
     private var gyroTime = 0L
-    private var gyroMagnitude = 0.0
+    private val rotation = DoubleArray(3)
+    private var rotatingSince = 0L
     private var blockedUntil = 0L
     private var noise = 0.12
     private var pulse: Pulse? = null
     private var first: Pulse? = null
-    private var pair: Gesture? = null
+    private var pair: PendingPair? = null
     private var quietSince = 0L
+    private var previousNormal = 0.0
 
     private data class Pulse(
         val start: Long,
         var peakTime: Long,
         var z: Double,
         var lateral: Double,
-        var quietSince: Long = 0,
+        var returned: Boolean = false,
     )
+
+    private data class PendingPair(val gesture: Gesture, val second: Pulse)
 
     fun reset(now: Long, quietMillis: Long = 250) {
         lastSample = 0
         gyroTime = 0
-        gyroMagnitude = 0.0
+        rotation.fill(0.0)
+        rotatingSince = 0L
+        previousNormal = 0.0
         noise = 0.12
         suppress(now, quietMillis)
     }
@@ -49,10 +55,20 @@ class BackTapDetector(private val threshold: Double = 2.4) {
 
     fun gyroscope(time: Long, x: Double, y: Double, z: Double) {
         if (time <= gyroTime || !x.isFinite() || !y.isFinite() || !z.isFinite()) return
+        val gap = time - gyroTime
+        val alpha = if (gyroTime == 0L || gap > 80 * MS) 0.0 else exp(-gap.toDouble() / (80 * MS))
         gyroTime = time
-        gyroMagnitude = sqrt(x * x + y * y + z * z)
-        // Turning, walking and putting the phone down must not combine with a previous tap.
-        if (gyroMagnitude > 1.35) suppress(time, 350)
+        rotation[0] = alpha * rotation[0] + (1 - alpha) * x
+        rotation[1] = alpha * rotation[1] + (1 - alpha) * y
+        rotation[2] = alpha * rotation[2] + (1 - alpha) * z
+        // A tap rocks a handheld phone. Reject sustained turning, not each short gyro excursion.
+        val magnitude = sqrt(rotation.sumOf { it * it })
+        if (magnitude > 1.35) {
+            if (rotatingSince == 0L) rotatingSince = time
+            if (time - rotatingSince >= 100 * MS) suppress(time, 250)
+        } else {
+            rotatingSince = 0L
+        }
     }
 
     fun accelerometer(time: Long, x: Double, y: Double, z: Double): Gesture? {
@@ -62,6 +78,7 @@ class BackTapDetector(private val threshold: Double = 2.4) {
         if (lastSample == 0L || gap > 80 * MS) {
             values.copyInto(gravity)
             lastSample = time
+            previousNormal = 0.0
             suppress(time, 250)
             return null
         }
@@ -74,77 +91,87 @@ class BackTapDetector(private val threshold: Double = 2.4) {
         val normal = abs(linear[2])
         val lateral = sqrt(linear[0] * linear[0] + linear[1] * linear[1])
         val limit = maxOf(threshold, noise * 6.0)
+        val risePerSecond = (normal - previousNormal) * 1_000_000_000 / gap
+        previousNormal = normal
         if (normal < limit * 0.45 && lateral < limit * 0.45) {
             noise += (normal - noise) * 0.025
         }
         // The two sensor streams are not phase-locked: the last gyro sample may be slightly newer.
-        if (time < blockedUntil || time - gyroTime !in -30 * MS..80 * MS || gyroMagnitude > 1.35) return null
-        if (lateral > maxOf(5.0, limit * 2.0)) {
-            suppress(time, 350)
+        if (time < blockedUntil || time - gyroTime !in -30 * MS..80 * MS) return null
+        if (lateral > maxOf(5.0, limit * 2.0) && lateral > normal) {
+            suppress(time, 250)
             return null
         }
 
         pair?.let { pending ->
-            if (normal < limit * 0.45 && lateral < limit) {
-                if (quietSince == 0L) quietSince = time
-                if (time - quietSince >= 35 * MS) {
-                    suppress(time, 1000)
-                    return pending
-                }
-            } else {
-                // A third impulse/continuous vibration is not a double tap.
+            val second = pending.second
+            if (isThirdImpulse(second, time, linear[2], risePerSecond, limit)) {
                 suppress(time, 350)
+                return null
             }
+            if (normal < maxOf(limit * 0.6, abs(second.z) * 0.5)) {
+                if (quietSince == 0L) quietSince = time
+            } else {
+                quietSince = 0
+            }
+            // Give the whole impulse time to finish, including opposite-polarity recoil.
+            if (time - second.peakTime >= 110 * MS && quietSince != 0L && time - quietSince >= 20 * MS) {
+                suppress(time, 1000)
+                return pending.gesture
+            }
+            if (time - second.peakTime > 200 * MS) suppress(time, 250)
             return null
         }
 
         val active = pulse
         if (active == null) {
-            if (normal >= limit && normal > lateral * 1.4) {
+            if (first?.let { time - it.peakTime > 550 * MS } == true) first = null
+            // Recoil is part of the first impulse; it cannot become the second tap.
+            if (first?.let { time - it.peakTime < 120 * MS } == true) return null
+            if (normal >= limit && normal > lateral * 1.4 && risePerSecond >= limit * 12) {
                 pulse = Pulse(time, time, linear[2], lateral)
             }
-            if (first?.let { time - it.peakTime > 500 * MS } == true) first = null
             return null
         }
-        active.lateral = maxOf(active.lateral, lateral)
-        if (normal > abs(active.z)) {
-            active.z = linear[2]
-            active.peakTime = time
-        }
-        if (time - active.start > 90 * MS) {
+        if (isThirdImpulse(active, time, linear[2], risePerSecond, limit)) {
             suppress(time, 350)
             return null
         }
-        if (normal < limit * 0.4) {
-            if (active.quietSince == 0L) active.quietSince = time
-            if (time - active.quietSince >= 20 * MS) {
-                pulse = null
-                if (active.quietSince - active.start < 6 * MS ||
-                    active.lateral > abs(active.z) * 0.7 ||
-                    abs(active.z) > 35
-                ) {
-                    first = null
-                    return null
-                }
-                val previous = first
-                val interval = previous?.let { active.peakTime - it.peakTime } ?: 0
-                if (previous != null &&
-                    interval in 120 * MS..500 * MS &&
-                    previous.z * active.z > 0 &&
-                    abs(active.z / previous.z) in 0.35..2.85
-                ) {
-                    pair = Gesture(active.peakTime, minOf(abs(previous.z), abs(active.z)))
-                    quietSince = time
-                    first = null
-                } else {
-                    first = if (previous != null && interval < 120 * MS) null else active
-                }
+        if (normal > abs(active.z)) {
+            active.z = linear[2]
+            active.peakTime = time
+            active.lateral = lateral
+        }
+        if (normal < abs(active.z) * 0.4) active.returned = true
+        if (time - active.start > 125 * MS) {
+            suppress(time, 200)
+            return null
+        }
+        if (time - active.start >= 80 * MS && normal < abs(active.z) * 0.5) {
+            pulse = null
+            if (active.lateral > abs(active.z) * 0.9 || abs(active.z) > 35) {
+                first = null
+                return null
             }
-        } else {
-            active.quietSince = 0
+            val previous = first
+            val interval = previous?.let { active.peakTime - it.peakTime } ?: 0
+            if (previous != null && interval in 120 * MS..550 * MS && abs(active.z / previous.z) in 0.2..4.0) {
+                pair = PendingPair(Gesture(active.peakTime, minOf(abs(previous.z), abs(active.z))), active)
+                quietSince = 0
+                first = null
+            } else {
+                first = active
+            }
         }
         return null
     }
+
+    private fun isThirdImpulse(active: Pulse, time: Long, z: Double, rise: Double, limit: Double) =
+        active.returned &&
+            time - active.peakTime >= 60 * MS &&
+            z * active.z > 0 &&
+            abs(z) > abs(active.z) * 0.8 &&
+            rise > limit * 15
 
     companion object {
         private const val MS = 1_000_000L

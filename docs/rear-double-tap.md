@@ -11,9 +11,13 @@ La sensibilità e il feedback tattile sono regolabili.
 `BackTapDetector` è un rilevatore originale, senza dipendenze da modelli o codice
 di altri progetti. Richiede accelerometro e giroscopio. Campiona a 100 Hz su un
 thread dedicato, rimuove la gravità e cerca impulsi brevi sull’asse perpendicolare
-allo schermo. Le due pulsazioni devono essere coerenti e distanti 120–500 ms;
-rotazioni, impulsi prolungati, rumore laterale e vibrazioni ravvicinate sono scartati.
-Una breve conferma di quiete precede la consegna; segue un secondo di cooldown.
+allo schermo. Le due pulsazioni devono essere distanti 120–550 ms. La rotazione
+viene filtrata e deve essere sostenuta: l'oscillazione breve prodotta da un tocco
+non annulla la coppia. Ogni impulso viene osservato per almeno 80 ms, includendo
+i rimbalzi di polarità opposta, e la quiete dipende dalla sua ampiezza anziché
+da una soglia assoluta troppo stretta. Impulsi prolungati, movimenti laterali,
+terzi tocchi e vibrazioni ravvicinate sono scartati. La consegna attende almeno
+110 ms dall'ultimo picco; segue un secondo di cooldown.
 Il comportamento non dipende dall’orientamento verticale/orizzontale del telefono.
 
 `BackTapCoordinator` assegna i sensori a una sola Activity ripresa e con il focus.
@@ -34,7 +38,9 @@ campioni dei sensori. Non servono root, accessibilità o servizi permanenti.
 
 I test automatici riproducono tracce sintetiche con timestamp, doppio/singolo tap,
 rumore, vibrazioni, rotazione, impatti, assenza di gyro, contatto, cooldown e campioni
-fuori ordine. Verificano anche calibrazione e invalidazione delle consegne dopo un
+fuori ordine. Quattro registrazioni di gesti reali, ridotte ai soli valori dei sensori
+e timestamp relativi, verificano oscillazione della mano e rimbalzi sia con la soglia
+di calibrazione sia con quella iniziale. Verificano anche invalidazione delle consegne dopo un
 cambio di proprietario. Questi test non misurano la precisione fisica sui telefoni.
 
 La verifica manuale deve includere almeno 50 doppi tocchi per telefono e cover,

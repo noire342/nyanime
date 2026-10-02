@@ -150,4 +150,47 @@ class BackTapDetectorTest {
         assertNull(BackTapDetector.calibratedThreshold(listOf(6.0, Double.NaN, 6.0)))
         assertNotNull(BackTapDetector.calibratedThreshold(listOf(4.0, 5.0, 6.0)))
     }
+
+    @Test fun shortRockingDuringATapDoesNotLookLikeSustainedTurning() {
+        val gestures = trace(
+            impulse = { pair(it) },
+            rotation = { if (it in 1410..1450 || it in 1710..1750) 2.8 else 0.0 },
+        )
+        assertEquals(1, gestures.size)
+    }
+
+    @Test fun bipolarRecoilBelongsToItsTapAndDoesNotCancelThePair() {
+        val gestures = trace(impulse = {
+            val first = tap(it, 1400) - tap(it, 1460, 3.5)
+            val second = -tap(it, 1690, 2.8) + tap(it, 1730, 6.0) - tap(it, 1780, 3.0)
+            doubleArrayOf(0.1, 0.2, first + second)
+        })
+        assertEquals(1, gestures.size)
+        assertTrue(gestures.single().timestampNanos >= 1_730_000_000L)
+    }
+
+    @Test fun handheldRecordingsWorkDuringCalibrationAndNormalUse() {
+        // Relative timestamps and sensor values only: no device identity, wall time or app data.
+        val recordings = checkNotNull(javaClass.getResourceAsStream("/gestures/back-tap-handheld.csv"))
+            .bufferedReader().useLines { lines ->
+                lines.filter { !it.startsWith("#") && it.isNotBlank() }.map { it.split(',') }.toList()
+            }.groupBy { it[0] }
+        assertEquals(4, recordings.size)
+        for ((name, samples) in recordings) {
+            for (threshold in listOf(1.4, 2.4)) {
+                val detector = BackTapDetector(threshold)
+                var detections = 0
+                for (sample in samples) {
+                    val time = sample[2].toLong()
+                    val values = sample.drop(3).map(String::toDouble)
+                    if (sample[1] == "4") {
+                        detector.gyroscope(time, values[0], values[1], values[2])
+                    } else if (detector.accelerometer(time, values[0], values[1], values[2]) != null) {
+                        detections++
+                    }
+                }
+                assertEquals(1, detections, "recording=$name, threshold=$threshold")
+            }
+        }
+    }
 }
