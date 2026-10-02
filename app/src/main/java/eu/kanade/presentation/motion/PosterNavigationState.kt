@@ -1,6 +1,8 @@
 package eu.kanade.presentation.motion
 
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 
 /** One origin per destination, never one key per title: the same title can appear in several rows. */
 internal data class PosterRoute<Artwork>(
@@ -9,14 +11,22 @@ internal data class PosterRoute<Artwork>(
     val element: String,
     val title: String,
     val artwork: Artwork,
+    val shape: Shape = RectangleShape,
 )
 
 internal class PosterNavigationState<Artwork> {
     private val routes = mutableStateMapOf<String, PosterRoute<Artwork>>()
 
-    fun connect(origin: String, destination: String, element: String, title: String, artwork: Artwork) {
+    fun connect(
+        origin: String,
+        destination: String,
+        element: String,
+        title: String,
+        artwork: Artwork,
+        shape: Shape = RectangleShape,
+    ) {
         if (origin == destination) return
-        routes[destination] = PosterRoute(origin, destination, element, title, artwork)
+        routes[destination] = PosterRoute(origin, destination, element, title, artwork, shape)
     }
 
     fun destination(key: String): PosterRoute<Artwork>? = routes[key]

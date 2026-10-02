@@ -1,15 +1,20 @@
 package eu.kanade.presentation.motion
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Test
 
 class PosterNavigationStateTest {
     @Test
     fun `duplicate titles use only the tapped card and the same pair on return`() {
         val state = PosterNavigationState<String>()
-        state.connect("home", "details", "second-row-card", "Same title", "decoded-poster")
+        val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+        state.connect("home", "details", "second-row-card", "Same title", "decoded-poster", shape)
         assertEquals("second-row-card", state.between("home", "details")?.element)
+        assertSame(shape, state.between("details", "home")?.shape)
         assertEquals(state.between("home", "details"), state.between("details", "home"))
         assertNull(state.between("other-home", "details"))
         assertNull(state.between("details", "details"))

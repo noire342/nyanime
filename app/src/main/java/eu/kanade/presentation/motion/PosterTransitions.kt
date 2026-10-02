@@ -4,18 +4,19 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Transition
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,11 +24,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import cafe.adriel.voyager.navigator.LocalNavigator
 import eu.kanade.presentation.discovery.sourceHomeArtworkIdentity
 import java.util.UUID
@@ -137,7 +141,7 @@ internal fun posterOpen(source: PosterSource, title: String, onClick: () -> Unit
                 before?.key == scene.route &&
                 after.key != before.key
             ) {
-                scene.state.connect(before.key, after.key, source.element, title, image)
+                scene.state.connect(before.key, after.key, source.element, title, image, source.shape)
             }
         }
     }
@@ -157,15 +161,14 @@ internal fun Modifier.posterSource(source: PosterSource?): Modifier {
     if (source == null) return this
     val scene = LocalPosterScene.current ?: return this
     if (!scene.enabled) return this
+    val overlayClip = rememberPosterOverlayClip(scene, source.shape, source = true)
     return with(scene.shared) {
-        this@posterSource.sharedBounds(
+        this@posterSource.sharedElement(
             sharedContentState = rememberSharedContentState(source.element),
             animatedVisibilityScope = scene.visibility,
-            enter = ModernMotion.enter(POSTER_TRANSITION_MILLIS),
-            exit = fadeOut(tween(POSTER_TRANSITION_MILLIS, easing = LinearOutSlowInEasing)),
-            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.Crop),
             boundsTransform = { _, _ -> tween(POSTER_TRANSITION_MILLIS, easing = FastOutSlowInEasing) },
-        ).then(if (source.shape == RectangleShape) Modifier else Modifier.clip(source.shape))
+            clipInOverlayDuringTransition = overlayClip,
+        )
     }
 }
 
@@ -175,14 +178,53 @@ internal fun Modifier.posterDestination(): Modifier {
     val scene = LocalPosterScene.current ?: return this
     val origin = scene.state.destination(scene.route) ?: return this
     if (!scene.enabled) return this
+    val overlayClip = rememberPosterOverlayClip(scene, origin.shape, source = false)
     return with(scene.shared) {
-        this@posterDestination.sharedBounds(
+        this@posterDestination.sharedElement(
             sharedContentState = rememberSharedContentState(origin.element),
             animatedVisibilityScope = scene.visibility,
-            enter = ModernMotion.enter(POSTER_TRANSITION_MILLIS),
-            exit = fadeOut(tween(POSTER_TRANSITION_MILLIS, easing = LinearOutSlowInEasing)),
-            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.Crop),
             boundsTransform = { _, _ -> tween(POSTER_TRANSITION_MILLIS, easing = FastOutSlowInEasing) },
+            clipInOverlayDuringTransition = overlayClip,
+        )
+    }
+}
+
+/** One retained image changes aspect ratio; clipping follows the animated bounds, not a scaled child. */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun rememberPosterOverlayClip(
+    scene: PosterScene,
+    shape: Shape,
+    source: Boolean,
+): SharedTransitionScope.OverlayClip {
+    if (shape == RectangleShape) return remember(scene.shared) { scene.shared.OverlayClip(RectangleShape) }
+    val corners = scene.visibility.transition.animateFloat(
+        transitionSpec = { tween(POSTER_TRANSITION_MILLIS, easing = FastOutSlowInEasing) },
+        label = "posterCorners",
+    ) { visibility -> if ((visibility == EnterExitState.Visible) == source) 1f else 0f }
+    return remember(scene.shared, shape, corners) {
+        scene.shared.OverlayClip(PosterOverlayShape(shape, corners))
+    }
+}
+
+/** Read animation state while drawing, without recomposing Home on every frame. */
+private class PosterOverlayShape(val source: Shape, val fraction: State<Float>) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val outline = source.createOutline(size, layoutDirection, density)
+        if (outline !is Outline.Rounded) return outline
+        val round = outline.roundRect
+        val value = fraction.value.coerceIn(0f, 1f)
+        return Outline.Rounded(
+            RoundRect(
+                round.left,
+                round.top,
+                round.right,
+                round.bottom,
+                round.topLeftCornerRadius * value,
+                round.topRightCornerRadius * value,
+                round.bottomRightCornerRadius * value,
+                round.bottomLeftCornerRadius * value,
+            ),
         )
     }
 }

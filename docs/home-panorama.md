@@ -24,9 +24,10 @@ The app contains no provider-specific routing or catalogue assumptions.
   of the changing state are invalidated, not every descendant of the screen.
 - Images retain their previous painter during refresh/failure, with existing retry
   and source-resolution paths. Portrait transitions into detail screens are retained.
-- Rounded artwork clips are applied inside the shared bounds. The overlay therefore
-  retains the source silhouette while it blends into the detail hero, in both directions;
-  clipping only the parent card would be lost as soon as the overlay starts.
+- One retained image follows the shared element bounds into the detail hero and back,
+  rather than crossfading two differently cropped copies. The overlay clip uses those
+  animated bounds, with corner radii driven by the same navigation transition. This
+  avoids losing a parent clip or scaling rounded corners outside the visible crop.
 
 ## Personal sections
 
