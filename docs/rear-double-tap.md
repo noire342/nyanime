@@ -9,8 +9,11 @@ La sensibilità e il feedback tattile sono regolabili.
 ## Motore e integrazione
 
 `BackTapDetector` è un rilevatore originale, senza dipendenze da modelli o codice
-di altri progetti. Richiede accelerometro e giroscopio. Campiona a 100 Hz su un
-thread dedicato, rimuove la gravità e cerca impulsi brevi sull’asse perpendicolare
+di altri progetti. Richiede accelerometro e giroscopio. Richiede fino a 400 Hz su un
+thread dedicato, rispettando il sensore più lento e ripiegando su 200 Hz se Android
+non consente la frequenza maggiore. La frequenza effettiva dipende dal dispositivo;
+il controllo privacy del microfono può limitarla senza impedire il funzionamento.
+Rimuove la gravità e cerca impulsi brevi sull’asse perpendicolare
 allo schermo. Le due pulsazioni devono essere distanti 120–550 ms. La rotazione
 viene filtrata e deve essere sostenuta sia nel segnale istantaneo sia in quello
 filtrato: la coda del filtro dopo un tocco deciso non prolunga il blocco.
@@ -22,6 +25,15 @@ da una soglia assoluta troppo stretta. Impulsi prolungati, movimenti laterali,
 terzi tocchi e vibrazioni ravvicinate sono scartati. La consegna attende almeno
 110 ms dall'ultimo picco; segue un secondo di cooldown.
 Il comportamento non dipende dall’orientamento verticale/orizzontale del telefono.
+
+La calibrazione misura prima il movimento di fondo per un secondo e riconosce
+anche coppie di tocchi leggere, senza applicare la soglia iniziale dell’uso normale.
+Tre coppie valide determinano la sensibilità personale mediante la mediana delle
+intensità; il filtro mantiene un limite adattato al rumore. L’aggiornamento del
+rumore dipende dal tempo trascorso, senza cambiare sensibilità al cambiare della
+frequenza dei sensori. Durante la calibrazione nessuna azione viene eseguita.
+È necessario usare i tocchi che si vogliono riprodurre quotidianamente: una
+calibrazione fatta con urti molto forti non insegna la sensibilità ai tocchi lievi.
 
 `BackTapCoordinator` assegna i sensori a una sola Activity ripresa e con il focus.
 Disabilitazione, background, PiP, finestre sovrapposte e comandi bloccati fermano
@@ -45,6 +57,10 @@ fuori ordine. Quattro registrazioni di gesti reali, ridotte ai soli valori dei s
 e timestamp relativi, verificano oscillazione della mano e rimbalzi sia con la soglia
 di calibrazione sia con quella iniziale. Verificano anche invalidazione delle consegne dopo un
 cambio di proprietario. Questi test non misurano la precisione fisica sui telefoni.
+Le prove sintetiche includono tocchi deboli, impulsi brevi tra due campioni a 100 Hz
+e rumore/vibrazioni con la soglia calibrata, a 100, 200 e 400 Hz. La registrazione
+del rumore sul dispositivo e la frequenza richiesta non dimostrano il tasso di
+riconoscimento dei tocchi reali.
 
 La verifica manuale deve includere almeno 50 doppi tocchi per telefono e cover,
 in verticale e orizzontale, riportando riconoscimenti, omissioni e attivazioni

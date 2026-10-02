@@ -8,6 +8,13 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 2 ottobre 2026 — Calibrazione dei tocchi posteriori leggeri
+
+- La calibrazione può apprendere da tocchi leggeri dopo una breve misura del
+  movimento di fondo, senza richiedere la sensibilità iniziale dell’uso normale.
+- Acquisizione più frequente degli impulsi brevi sui sensori compatibili, con
+  ripiego alla frequenza consentita e filtro del rumore indipendente dal campionamento.
+
 ## 2 ottobre 2026 — Icone delle estensioni Notizie
 
 - Le fonti Notizie mostrano l’icona del rispettivo APK anche se disabilitate,

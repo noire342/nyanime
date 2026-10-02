@@ -29,6 +29,7 @@ import uy.kohesive.injekt.api.get
 data class BackTapTestState(
     val active: Boolean = false,
     val calibrating: Boolean = false,
+    val warmingUp: Boolean = false,
     val completed: Int = 0,
     val detections: Int = 0,
 )
@@ -48,6 +49,7 @@ class BackTapCoordinator(context: Context, private val preferences: BackTapPrefe
     private var listener: SensorEventListener? = null
     private var detector: BackTapDetector? = null
     private var resetWorker: (() -> Unit)? = null
+    private var warmup: Runnable? = null
     private val strengths = mutableListOf<Double>()
     private val mutableTest = MutableStateFlow(BackTapTestState())
     val test = mutableTest.asStateFlow()
@@ -91,6 +93,8 @@ class BackTapCoordinator(context: Context, private val preferences: BackTapPrefe
     }
 
     private fun stop() {
+        warmup?.let(main::removeCallbacks)
+        warmup = null
         session.renew()
         listener?.let(sensors::unregisterListener)
         listener = null
@@ -104,6 +108,20 @@ class BackTapCoordinator(context: Context, private val preferences: BackTapPrefe
 
     private fun unlocked(): Boolean = !Injekt.get<SecurityPreferences>().useAuthenticator().get() ||
         !SecureActivityDelegate.requireUnlock
+
+    private fun prepareCalibration(binding: Binding): Long {
+        warmup?.let(main::removeCallbacks)
+        warmup = null
+        if (!test.value.calibrating) return 350
+        mutableTest.value = test.value.copy(warmingUp = true)
+        warmup = Runnable {
+            if (owner === binding && test.value.calibrating) {
+                mutableTest.value = test.value.copy(warmingUp = false)
+            }
+            warmup = null
+        }.also { main.postDelayed(it, 1000) }
+        return 1000
+    }
 
     private fun refresh() {
         stop()
@@ -119,8 +137,10 @@ class BackTapCoordinator(context: Context, private val preferences: BackTapPrefe
         var token = session.renew()
         val thread = HandlerThread("NyanimeBackTap").apply { start() }
         val handler = Handler(thread.looper)
-        val engine = BackTapDetector(if (test.value.calibrating) 1.4 else preferences.threshold())
-        engine.reset(SystemClock.elapsedRealtimeNanos())
+        val engine = BackTapDetector(
+            if (test.value.calibrating) BackTapDetector.CALIBRATION_THRESHOLD else preferences.threshold(),
+        )
+        engine.reset(SystemClock.elapsedRealtimeNanos(), prepareCalibration(binding))
         val events = object : SensorEventListener {
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
             override fun onSensorChanged(event: SensorEvent) {
@@ -149,19 +169,29 @@ class BackTapCoordinator(context: Context, private val preferences: BackTapPrefe
         listener = events
         resetWorker = {
             val renewed = session.renew()
+            val quietMillis = prepareCalibration(binding)
             handler.post {
-                engine.reset(SystemClock.elapsedRealtimeNanos(), 350)
+                engine.reset(SystemClock.elapsedRealtimeNanos(), quietMillis)
                 token = renewed
             }
         }
-        // 100 Hz. No high-sampling permission, accessibility service or background service.
-        val registered = try {
-            val accelRegistered = sensors.registerListener(events, accelerometer, 10_000, handler)
-            val gyroRegistered = sensors.registerListener(events, gyroscope, 10_000, handler)
+        val accelDelay = checkNotNull(accelerometer).minDelay
+        val gyroDelay = checkNotNull(gyroscope).minDelay
+        val period = BackTapSampling.periodMicros(accelDelay, gyroDelay)
+        fun register(periodMicros: Int): Boolean = try {
+            val accelRegistered = sensors.registerListener(events, accelerometer, periodMicros, handler)
+            val gyroRegistered = sensors.registerListener(events, gyroscope, periodMicros, handler)
             accelRegistered && gyroRegistered
         } catch (_: RuntimeException) {
             // Vendor policy or disabled sensors must never crash playback or settings.
             false
+        }
+        var registered = register(period)
+        if (!registered) {
+            // Remove either half of a failed registration before trying the unrestricted rate.
+            sensors.unregisterListener(events)
+            val fallback = BackTapSampling.periodMicros(accelDelay, gyroDelay, highRate = false)
+            if (fallback > period) registered = register(fallback)
         }
         if (!registered) stop() else mutableListening.value = true
     }
@@ -171,6 +201,7 @@ class BackTapCoordinator(context: Context, private val preferences: BackTapPrefe
             !binding.foreground() ||
             binding.touching ||
             binding.suspended ||
+            test.value.warmingUp ||
             !unlocked() ||
             (!preferences.enabled().get() && !test.value.active) ||
             (!test.value.active && !binding.available()) ||
@@ -184,7 +215,7 @@ class BackTapCoordinator(context: Context, private val preferences: BackTapPrefe
                 strengths.add(gesture.strength)
                 mutableTest.value = state.copy(completed = strengths.size, detections = state.detections + 1)
                 BackTapDetector.calibratedThreshold(strengths)?.let {
-                    mutableTest.value = mutableTest.value.copy(calibrating = false)
+                    mutableTest.value = mutableTest.value.copy(calibrating = false, warmingUp = false)
                     preferences.calibration().set(it.toFloat())
                 }
             } else {

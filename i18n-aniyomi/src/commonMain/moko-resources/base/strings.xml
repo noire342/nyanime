@@ -766,7 +766,8 @@
     <string name="back_tap_test">Try the gesture</string>
     <string name="back_tap_stop_test">Finish test</string>
     <string name="back_tap_test_wait">Tap twice on the back. Screen actions are suspended during this test.</string>
-    <string name="back_tap_calibration_wait">Repeat the double tap three times, waiting a second between each pair.</string>
+    <string name="back_tap_calibration_warmup">Hold your phone still for a moment. Measuring background movement…</string>
+    <string name="back_tap_calibration_wait">Make three double taps with the light touch you want to use. Wait a second between each pair.</string>
     <string name="back_tap_calibration_done">Calibration saved for this phone</string>
     <string name="back_tap_detected">Gesture detected · %1$d</string>
     <string name="back_tap_not_supported">This phone needs both an accelerometer and a gyroscope. Rear double tap is unavailable.</string>

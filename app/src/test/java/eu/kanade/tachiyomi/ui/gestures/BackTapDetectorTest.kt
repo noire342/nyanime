@@ -149,6 +149,65 @@ class BackTapDetectorTest {
         assertNull(BackTapDetector.calibratedThreshold(listOf(6.0, 6.0)))
         assertNull(BackTapDetector.calibratedThreshold(listOf(6.0, Double.NaN, 6.0)))
         assertNotNull(BackTapDetector.calibratedThreshold(listOf(4.0, 5.0, 6.0)))
+        assertEquals(0.09, checkNotNull(BackTapDetector.calibratedThreshold(listOf(0.18, 0.2, 0.25))), 0.00001)
+        assertNull(BackTapDetector.calibratedThreshold(listOf(0.0, 0.2, 0.25)))
+    }
+
+    private fun sampledTrace(
+        periodMicros: Int,
+        threshold: Double,
+        impulse: (Int) -> DoubleArray,
+    ): List<BackTapDetector.Gesture> = buildList {
+        val engine = BackTapDetector(threshold)
+        engine.reset(1_000_000_000L, 1000)
+        for (micros in 1_000_000..3_200_000 step periodMicros) {
+            val time = micros * 1000L
+            engine.gyroscope(time, 0.0, 0.0, 0.0)
+            val v = impulse(micros)
+            engine.accelerometer(time, v[0], 9.81 + v[1], v[2])?.let(::add)
+        }
+    }
+
+    @Test fun gentlePairsCanTeachCalibrationAndWorkWithTheLearnedThreshold() {
+        for (period in listOf(10_000, 5000, 2500)) {
+            val impulse: (Int) -> DoubleArray = {
+                doubleArrayOf(0.0, 0.0, tap(it / 1000, 2400, 0.2) + tap(it / 1000, 2700, 0.2))
+            }
+            assertTrue(sampledTrace(period, 2.4, impulse).isEmpty())
+            val gestures = sampledTrace(period, BackTapDetector.CALIBRATION_THRESHOLD, impulse)
+            assertEquals(1, gestures.size, "calibration period=$period")
+            val threshold = checkNotNull(BackTapDetector.calibratedThreshold(List(3) { gestures.single().strength }))
+            assertEquals(1, sampledTrace(period, threshold, impulse).size, "learned period=$period")
+        }
+    }
+
+    @Test fun fastSamplingCapturesBriefImpulsesBetweenTheOldSamplingInstants() {
+        val impulse: (Int) -> DoubleArray = { micros ->
+            fun shortTap(at: Int) = when (micros - at) {
+                in 0..2499 -> 0.22
+                in 2500..4999 -> -0.11
+                else -> 0.0
+            }
+            doubleArrayOf(0.0, 0.0, shortTap(2_403_000) + shortTap(2_703_000))
+        }
+        assertTrue(sampledTrace(10_000, BackTapDetector.CALIBRATION_THRESHOLD, impulse).isEmpty())
+        for (period in listOf(5000, 2500)) {
+            assertEquals(1, sampledTrace(period, BackTapDetector.CALIBRATION_THRESHOLD, impulse).size)
+        }
+    }
+
+    @Test fun learnedGentleThresholdStillRejectsNoiseVibrationAndShakingAtEveryRate() {
+        for (period in listOf(10_000, 5000, 2500)) {
+            for ((name, impulse) in listOf<Pair<String, (Int) -> DoubleArray>>(
+                "noise" to { doubleArrayOf(0.01 * sin(it / 7000.0), 0.02 * sin(it / 9000.0), 0.03 * sin(it / 8000.0)) },
+                "vibration" to { doubleArrayOf(0.0, 0.0, 0.4 * sin(it / 3000.0)) },
+                "shaking" to
+                    { doubleArrayOf(7.0 * sin(it / 35_000.0), 5.0 * sin(it / 45_000.0), 6.0 * sin(it / 40_000.0)) },
+                "single impact" to { doubleArrayOf(0.0, 0.0, tap(it / 1000, 2400, 0.2)) },
+            )) {
+                assertTrue(sampledTrace(period, 0.09, impulse).isEmpty(), "$name at period=$period")
+            }
+        }
     }
 
     @Test fun shortRockingDuringATapDoesNotLookLikeSustainedTurning() {

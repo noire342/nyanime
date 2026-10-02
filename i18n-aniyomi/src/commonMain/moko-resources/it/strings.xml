@@ -675,7 +675,8 @@
     <string name="back_tap_test">Prova il gesto</string>
     <string name="back_tap_stop_test">Termina la prova</string>
     <string name="back_tap_test_wait">Tocca due volte il retro. Durante la prova le azioni sulle schermate sono sospese.</string>
-    <string name="back_tap_calibration_wait">Ripeti il doppio tap tre volte, aspettando un secondo tra una coppia e l’altra.</string>
+    <string name="back_tap_calibration_warmup">Tieni fermo il telefono per un momento. Misuro il movimento di fondo…</string>
+    <string name="back_tap_calibration_wait">Fai tre doppi tocchi, leggeri come vorresti usarli. Aspetta un secondo tra una coppia e l’altra.</string>
     <string name="back_tap_calibration_done">Calibrazione salvata per questo telefono</string>
     <string name="back_tap_detected">Gesto riconosciuto · %1$d</string>
     <string name="back_tap_not_supported">Servono accelerometro e giroscopio. Il doppio tap posteriore non è disponibile su questo telefono.</string>

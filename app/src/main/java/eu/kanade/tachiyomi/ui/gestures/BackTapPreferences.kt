@@ -82,6 +82,10 @@ class BackTapPreferences(private val store: PreferenceStore) {
 
     // Sensor response depends on this handset and case. Never restore it on another device.
     fun calibration() = store.getFloat(Preference.appStateKey("back_tap_calibration"), 0f)
-    fun threshold() = (calibration().get().takeIf { it.isFinite() && it in 1.2f..8f } ?: 2.4f) *
+    fun threshold() = (
+        calibration().get().takeIf {
+            it.isFinite() && it in BackTapDetector.CALIBRATION_THRESHOLD.toFloat()..8f
+        } ?: 2.4f
+        ) *
         sensitivity().get().multiplier
 }

@@ -97,7 +97,8 @@ class BackTapDetector(private val threshold: Double = 2.4) {
         val risePerSecond = (normal - previousNormal) * 1_000_000_000 / gap
         previousNormal = normal
         if (normal < limit * 0.45 && lateral < limit * 0.45) {
-            noise += (normal - noise) * 0.025
+            // Keep the noise estimate independent of the sensor rate (100–400 Hz and above).
+            noise += (normal - noise) * (1 - exp(-gap.toDouble() / (400 * MS)))
         }
         // The two sensor streams are not phase-locked: the last gyro sample may be slightly newer.
         if (time < blockedUntil || time - gyroTime !in -30 * MS..80 * MS) return null
@@ -181,11 +182,12 @@ class BackTapDetector(private val threshold: Double = 2.4) {
 
     companion object {
         private const val MS = 1_000_000L
+        const val CALIBRATION_THRESHOLD = 0.08
 
         /** Three successful pairs, robust to one unusually strong gesture. */
         fun calibratedThreshold(strengths: List<Double>): Double? {
-            if (strengths.size != 3 || strengths.any { !it.isFinite() || it < 1.0 }) return null
-            return (strengths.sorted()[1] * 0.45).coerceIn(1.2, 8.0)
+            if (strengths.size != 3 || strengths.any { !it.isFinite() || it < CALIBRATION_THRESHOLD }) return null
+            return (strengths.sorted()[1] * 0.45).coerceIn(CALIBRATION_THRESHOLD, 8.0)
         }
     }
 }
