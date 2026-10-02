@@ -367,6 +367,8 @@ object HomeScreen : Screen() {
                     openTabEvent.receiveAsFlow().collectLatest {
                         tabNavigator.current = when (it) {
                             is Tab.Home -> eu.kanade.tachiyomi.ui.discovery.DiscoveryTab
+                            is Tab.Search -> AtlasSearchTab
+                            is Tab.Libraries -> LibrariesTab
                             is Tab.AnimeLib -> LibrariesTab.also { LibrariesTab.showAnime() }
                             is Tab.Library -> LibrariesTab.also { LibrariesTab.showManga() }
                             is Tab.Releases -> eu.kanade.tachiyomi.ui.releases.ReleasesTab
@@ -854,6 +856,8 @@ object HomeScreen : Screen() {
 
     sealed interface Tab {
         data object Home : Tab
+        data object Search : Tab
+        data object Libraries : Tab
         data class AnimeLib(val animeIdToOpen: Long? = null) : Tab
         data class Library(val mangaIdToOpen: Long? = null) : Tab
         data object Releases : Tab

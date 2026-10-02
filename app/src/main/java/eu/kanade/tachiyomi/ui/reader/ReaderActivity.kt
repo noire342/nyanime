@@ -115,6 +115,24 @@ import uy.kohesive.injekt.api.get
 import java.io.ByteArrayOutputStream
 
 class ReaderActivity : BaseActivity() {
+    override val backTapContext = eu.kanade.tachiyomi.ui.gestures.BackTapContext.Reader
+
+    override fun backTapAvailable() = viewModel.state.value.let {
+        it.viewer != null && it.dialog == null && !it.isLoadingAdjacentChapter
+    }
+
+    override fun performBackTap(action: eu.kanade.tachiyomi.ui.gestures.BackTapAction): Boolean {
+        if (!backTapAvailable()) return false
+        val viewer = viewModel.state.value.viewer ?: return false
+        when (action) {
+            eu.kanade.tachiyomi.ui.gestures.BackTapAction.NextPage -> viewer.moveToNext()
+            eu.kanade.tachiyomi.ui.gestures.BackTapAction.PreviousPage -> viewer.moveToPrevious()
+            eu.kanade.tachiyomi.ui.gestures.BackTapAction.Controls -> showMenu()
+            eu.kanade.tachiyomi.ui.gestures.BackTapAction.Bookmark -> viewModel.toggleChapterBookmark()
+            else -> return super.performBackTap(action)
+        }
+        return true
+    }
 
     companion object {
         private const val SHARED_PAGE = "nyanime.shared.page"
@@ -183,6 +201,9 @@ class ReaderActivity : BaseActivity() {
         }
 
         super.onCreate(savedInstanceState)
+        lifecycleScope.launch {
+            viewModel.state.collect { suspendBackTap(it.dialog != null) }
+        }
 
         binding = ReaderActivityBinding.inflate(layoutInflater)
         setContentView(binding.root)

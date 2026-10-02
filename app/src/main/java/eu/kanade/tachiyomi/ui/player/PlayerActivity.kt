@@ -137,6 +137,44 @@ import kotlin.math.floor
 import kotlin.time.Duration.Companion.seconds
 
 class PlayerActivity : BaseActivity() {
+    override val backTapContext: eu.kanade.tachiyomi.ui.gestures.BackTapContext
+        get() = if (castController.state.value.active) {
+            eu.kanade.tachiyomi.ui.gestures.BackTapContext.Remote
+        } else {
+            eu.kanade.tachiyomi.ui.gestures.BackTapContext.Player
+        }
+
+    override fun backTapAvailable(): Boolean {
+        val cast = castController.state.value
+        if (cast.active) return !cast.connecting && viewModel.sheetShown.value == Sheets.None
+        return !cast.connecting &&
+            !player.isExiting &&
+            !viewModel.isLoadingEpisode.value &&
+            !viewModel.isLoading.value &&
+            !viewModel.areControlsLocked.value &&
+            viewModel.sheetShown.value == Sheets.None &&
+            viewModel.panelShown.value == Panels.None &&
+            viewModel.dialogShown.value == Dialogs.None
+    }
+
+    override fun performBackTap(action: eu.kanade.tachiyomi.ui.gestures.BackTapAction): Boolean {
+        if (!backTapAvailable()) return false
+        if (castController.state.value.active) {
+            return eu.kanade.tachiyomi.ui.gestures.performBackTapRemote(this, action)
+        }
+        when (action) {
+            eu.kanade.tachiyomi.ui.gestures.BackTapAction.PlayPause -> viewModel.pauseUnpause()
+            eu.kanade.tachiyomi.ui.gestures.BackTapAction.Forward -> viewModel.seekBy(10)
+            eu.kanade.tachiyomi.ui.gestures.BackTapAction.Rewind -> viewModel.seekBy(-10)
+            eu.kanade.tachiyomi.ui.gestures.BackTapAction.Controls -> viewModel.showControls()
+            else -> {
+                viewModel.pauseByUser()
+                return super.performBackTap(action)
+            }
+        }
+        return true
+    }
+
     val castController by lazy { CastController.get(applicationContext) }
 
     fun castRequest(video: Video? = viewModel.currentVideo.value): CastRequest? {
@@ -388,6 +426,7 @@ class PlayerActivity : BaseActivity() {
         )
 
         castController.state.distinctUntilChangedBy { it.active || it.connecting }.onEach { cast ->
+            resetBackTap()
             setupPlayerOrientation()
             if (cast.active || cast.connecting) {
                 viewModel.remoteProgressOwned = true
@@ -447,6 +486,16 @@ class PlayerActivity : BaseActivity() {
         }.launchIn(lifecycleScope)
 
         viewModel.bindWatchPlayer()
+        lifecycleScope.launch {
+            kotlinx.coroutines.flow.combine(
+                viewModel.sheetShown,
+                viewModel.panelShown,
+                viewModel.dialogShown,
+                viewModel.areControlsLocked,
+            ) { sheet, panel, dialog, locked ->
+                sheet != Sheets.None || panel != Panels.None || dialog != Dialogs.None || locked
+            }.collect { suspendBackTap(it) }
+        }
         onNewIntent(this.intent)
     }
 
