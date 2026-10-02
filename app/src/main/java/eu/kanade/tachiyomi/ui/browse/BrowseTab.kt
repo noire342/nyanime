@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.ui.browse
 import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +82,12 @@ data object BrowseTab : Tab {
             mangaExtensionsTab(mangaExtensionsScreenModel),
             migrateAnimeSourceTab(),
             migrateMangaSourceTab(),
+            eu.kanade.presentation.components.TabContent(
+                titleRes = tachiyomi.i18n.aniyomi.AYMR.strings.label_news_sources,
+                content = { padding, _ ->
+                    eu.kanade.tachiyomi.ui.news.NewsSourcesContent(androidx.compose.ui.Modifier.padding(padding))
+                },
+            ),
         )
 
         val state = rememberPagerState { tabs.size }

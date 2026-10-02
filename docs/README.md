@@ -28,6 +28,7 @@ I documenti tecnici in inglese conservano i nomi delle API e dei componenti.
 | [Ricerca intelligente](smart-title-search.md) | Motore comune, suggerimenti, limiti, privacy e licenza SymSpellKt. |
 | [Home e scoperta](discovery-home.md) | Cataloghi, associazione alle fonti, calendario, cache e ripresa. |
 | [Home Panorama](home-panorama.md) | Carosello circolare, ripresa compatta, caricamento e interazioni. |
+| [Estensioni Notizie](news-extensions.md) | Fonti separate, lettore nativo, articoli salvati e avvisi facoltativi. |
 | [API Home anime](extension-home-api.md) | Contratto dichiarativo generico delle estensioni. |
 | [API Home manga](manga-home-api.md) | Sezioni manga, capitoli, classifiche e identità degli elementi. |
 | [ID per il tracking](extension-tracking-metadata.md) | Contratto facoltativo e generico per identificare titoli senza indovinare la stagione. |

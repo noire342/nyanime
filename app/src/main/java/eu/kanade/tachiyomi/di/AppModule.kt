@@ -74,6 +74,7 @@ class AppModule(val app: Application) : InjektModule {
 
     override fun InjektRegistrar.registerInjectables() {
         addSingleton(app)
+        addSingletonFactory { eu.kanade.tachiyomi.data.news.NewsRepository(app, get()) }
 
         val sqlDriverManga = AndroidSqliteDriver(
             schema = Database.Schema,

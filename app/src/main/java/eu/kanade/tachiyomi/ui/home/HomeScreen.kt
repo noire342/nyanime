@@ -168,6 +168,8 @@ object HomeScreen : Screen() {
         val navStyle = eu.kanade.domain.ui.model.NavStyle.DISCOVERY
         val navigator = LocalNavigator.currentOrThrow
         val atlas = rememberScreenModel { AtlasSearchScreenModel() }
+        val news = rememberScreenModel { eu.kanade.tachiyomi.ui.news.NewsScreenModel() }
+        var newsSearch by rememberSaveable { mutableStateOf(false) }
         val upgradeNotice = remember { AtlasUpgradeNotice(Injekt.get()) }
         val upgradeNoticeState by upgradeNotice.state.collectAsState()
         val headerHost = remember { DiscoveryHeaderHost() }
@@ -177,7 +179,7 @@ object HomeScreen : Screen() {
         ) { tabNavigator ->
             var originTag by rememberSaveable { mutableStateOf(navigationTag(defaultTab)) }
             val closeAtlas: () -> Unit = {
-                atlas.close()
+                if (newsSearch) news.closeSearch() else atlas.close()
                 tabNavigator.current = (navStyle.visibleTabs + navStyle.overflowTabs)
                     .firstOrNull { navigationTag(it) == originTag } ?: defaultTab
             }
@@ -185,16 +187,18 @@ object HomeScreen : Screen() {
                 if (tab == AtlasSearchTab) {
                     if (tabNavigator.current != AtlasSearchTab) {
                         originTag = navigationTag(tabNavigator.current)
-                        atlas.open()
+                        newsSearch = tabNavigator.current == DiscoveryTab && DiscoveryTab.newsSelected.value
+                        if (newsSearch) news.openSearch() else atlas.open()
                     }
                 } else if (tabNavigator.current == AtlasSearchTab) {
-                    atlas.close()
+                    if (newsSearch) news.closeSearch() else atlas.close()
                 }
                 tabNavigator.current = tab
             }
             val searching = tabNavigator.current == AtlasSearchTab
             LaunchedEffect(searching) {
-                if (searching && !atlas.state.value.open) atlas.open()
+                if (searching && newsSearch && !news.state.value.searching) news.openSearch()
+                if (searching && !newsSearch && !atlas.state.value.open) atlas.open()
                 if (!searching && atlas.state.value.open) atlas.close()
             }
             val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
@@ -215,6 +219,8 @@ object HomeScreen : Screen() {
                 CompositionLocalProvider(
                     LocalNavigator provides navigator,
                     LocalAtlasSearch provides atlas,
+                    eu.kanade.tachiyomi.ui.news.LocalNewsModel provides news,
+                    eu.kanade.tachiyomi.ui.news.LocalNewsSearch provides newsSearch,
                     LocalDiscoveryHeaderHost provides if (modern) headerHost else null,
                     LocalSelectHomeTab provides selectTab,
                     LocalCloseAtlas provides closeAtlas,
@@ -416,7 +422,17 @@ object HomeScreen : Screen() {
                 label = "discoveryHeaderActions",
             ) { search ->
                 if (search) {
-                    IconButton(onClick = { atlas.showPanel(AtlasPanel.SETTINGS) }) {
+                    val newsMode = eu.kanade.tachiyomi.ui.news.LocalNewsSearch.current
+                    val navigator = LocalNavigator.currentOrThrow
+                    IconButton(onClick = {
+                        if (newsMode) {
+                            navigator.push(
+                                eu.kanade.tachiyomi.ui.news.NewsSourcesScreen(),
+                            )
+                        } else {
+                            atlas.showPanel(AtlasPanel.SETTINGS)
+                        }
+                    }) {
                         Icon(Icons.Outlined.Tune, stringResource(R.string.atlas_settings))
                     }
                 } else {
@@ -483,7 +499,13 @@ object HomeScreen : Screen() {
                                     ),
                                 ),
                             ) {
-                                if (atlas != null) AtlasGenreBar(atlas)
+                                if (eu.kanade.tachiyomi.ui.news.LocalNewsSearch.current) {
+                                    eu.kanade.tachiyomi.ui.news.NewsFilterBar(
+                                        requireNotNull(eu.kanade.tachiyomi.ui.news.LocalNewsModel.current),
+                                    )
+                                } else if (atlas != null) {
+                                    AtlasGenreBar(atlas)
+                                }
                             }
                         }
                         FloatingNavigationBar(tabs)
@@ -545,12 +567,26 @@ object HomeScreen : Screen() {
                             label = "atlasNavigationMorph",
                         ) { searching ->
                             if (searching) {
-                                AtlasSearchBar(
-                                    requireNotNull(LocalAtlasSearch.current),
-                                    compact,
-                                    LocalCloseAtlas.current,
-                                    onBrowse = { selectTab(BrowseTab) },
-                                )
+                                if (eu.kanade.tachiyomi.ui.news.LocalNewsSearch.current) {
+                                    val newsModel = requireNotNull(eu.kanade.tachiyomi.ui.news.LocalNewsModel.current)
+                                    val newsState by newsModel.state.collectAsState()
+                                    eu.kanade.tachiyomi.ui.search.AtlasQueryBar(
+                                        newsState.query,
+                                        newsModel::edit,
+                                        newsModel::submit,
+                                        compact,
+                                        LocalCloseAtlas.current,
+                                        { selectTab(BrowseTab) },
+                                        stringResource(R.string.news_search_hint),
+                                    )
+                                } else {
+                                    AtlasSearchBar(
+                                        requireNotNull(LocalAtlasSearch.current),
+                                        compact,
+                                        LocalCloseAtlas.current,
+                                        onBrowse = { selectTab(BrowseTab) },
+                                    )
+                                }
                             } else {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                     tabs.fastForEach { FloatingNavigationItem(it, compact) }

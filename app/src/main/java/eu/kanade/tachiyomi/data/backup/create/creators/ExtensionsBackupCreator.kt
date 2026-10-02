@@ -43,6 +43,13 @@ class ExtensionsBackupCreator(
                 BackupExtension(packageName, apk),
             )
         }
-        return installedExtensions
+        context.packageManager.getInstalledPackages(PackageManager.GET_CONFIGURATIONS).filter { info ->
+            info.reqFeatures?.any { it.name == eu.kanade.tachiyomi.data.news.NewsExtensionRegistry.FEATURE } == true
+        }.forEach { info ->
+            info.applicationInfo?.sourceDir?.let { path ->
+                installedExtensions.add(BackupExtension(info.packageName, File(path).readBytes()))
+            }
+        }
+        return installedExtensions.distinctBy { it.pkgName }
     }
 }

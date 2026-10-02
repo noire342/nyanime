@@ -112,6 +112,13 @@ data object AtlasSearchTab : Tab {
 
     @Composable
     override fun Content() {
+        if (eu.kanade.tachiyomi.ui.news.LocalNewsSearch.current) {
+            eu.kanade.tachiyomi.ui.news.NewsContent(
+                requireNotNull(eu.kanade.tachiyomi.ui.news.LocalNewsModel.current),
+                search = true,
+            )
+            return
+        }
         val model = requireNotNull(LocalAtlasSearch.current)
         val state by model.state.collectAsState()
         val navigator = LocalNavigator.currentOrThrow

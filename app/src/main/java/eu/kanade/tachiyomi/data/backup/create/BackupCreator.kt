@@ -151,6 +151,11 @@ class BackupCreator(
                 backupCustomButton = backupCustomButtons(options),
                 backupHiddenResume = hiddenResume,
                 releaseSubscriptions = subscriptions,
+                newsState = if (options.appSettings) {
+                    Injekt.get<eu.kanade.tachiyomi.data.news.NewsRepository>().store.backup()
+                } else {
+                    null
+                },
             )
 
             val byteArray = parser.encodeToByteArray(Backup.serializer(), backup)

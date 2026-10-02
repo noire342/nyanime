@@ -41,6 +41,10 @@ internal sealed interface DiscoveryHomePage {
     data class Manga(val model: MangaHomeScreenModel) : DiscoveryHomePage {
         override val key = "manga"
     }
+
+    data class News(val model: eu.kanade.tachiyomi.ui.news.NewsScreenModel) : DiscoveryHomePage {
+        override val key = "news"
+    }
 }
 
 @Composable
@@ -48,7 +52,9 @@ internal fun DiscoveryTab.rememberHomePage(
     homeKey: String?,
     manga: Boolean,
     initializing: Boolean,
+    news: Boolean = false,
 ): DiscoveryHomePage = when {
+    news -> DiscoveryHomePage.News(requireNotNull(eu.kanade.tachiyomi.ui.news.LocalNewsModel.current))
     manga -> DiscoveryHomePage.Manga(rememberScreenModel { MangaHomeScreenModel() })
     initializing -> DiscoveryHomePage.Initializing
     homeKey != null -> DiscoveryHomePage.Source(
@@ -84,6 +90,7 @@ internal fun DiscoveryHomePage.headerState(homes: List<SourceHomeGroup>): Discov
     val seenAt by preference.changes().collectAsState(initial = preference.get())
     var updateKeys: Set<String> = emptySet()
     val header = when (this) {
+        is DiscoveryHomePage.News -> return DiscoveryHeaderState(onRefresh = { model.refresh(true) })
         DiscoveryHomePage.Initializing -> DiscoveryHeaderState()
         is DiscoveryHomePage.Catalog -> {
             val state by model.state.collectAsStateWithLifecycle()

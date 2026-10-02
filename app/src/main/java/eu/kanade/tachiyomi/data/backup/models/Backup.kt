@@ -61,4 +61,5 @@ data class Backup(
     @ProtoNumber(506) var backupCustomButton: List<BackupCustomButtons> = emptyList(),
     @ProtoNumber(507) val backupHiddenResume: BackupHiddenResumeState? = null,
     @ProtoNumber(508) val releaseSubscriptions: List<BackupReleaseSubscription> = emptyList(),
+    @ProtoNumber(509) val newsState: String? = null,
 )

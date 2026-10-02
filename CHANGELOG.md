@@ -8,6 +8,17 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 2 ottobre 2026 — Notizie dalle estensioni
+
+- Nuovo tipo di estensione Notizie, separato dalle fonti video e manga: si abilita da
+  Sfoglia e aggiunge una categoria nella Home, mantenendo la testata e la navigazione.
+- Articoli compatti in Ultime, Per te e Salvati, ricerca dedicata e lettore integrato
+  con testo regolabile, immagini ingrandibili e collegamento alla pubblicazione originale.
+- Salvataggi per leggere il testo offline, punto di lettura e associazioni ai titoli
+  inclusi nei backup. Gli articoli nuovi non spostano quelli che stai leggendo.
+- Notifiche facoltative per fonte, con controllo periodico, deduplicazione e nessun
+  invio dell’archivio storico alla prima attivazione o dopo un ripristino.
+
 ## 2 ottobre 2026 — Ripresa compatta nella Home
 
 - «Continua a guardare» usa segnalibri orizzontali compatti: piccola copertina verticale,

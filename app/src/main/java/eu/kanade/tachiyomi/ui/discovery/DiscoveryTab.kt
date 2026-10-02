@@ -91,6 +91,8 @@ import uy.kohesive.injekt.api.get
 
 data object DiscoveryTab : Tab {
     const val MANGA_CATEGORY = "nyanime:manga"
+    const val NEWS_CATEGORY = "nyanime:news"
+    val newsSelected = kotlinx.coroutines.flow.MutableStateFlow(false)
     private val reselectRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private val updateRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
 
@@ -116,27 +118,45 @@ data object DiscoveryTab : Tab {
             ),
         ) { mutableStateOf<String?>(null) }
         val isManga = selected == MANGA_CATEGORY
-        val homeKey = if (isManga) null else availability.selectedHome(selected)
+        val newsModel = requireNotNull(eu.kanade.tachiyomi.ui.news.LocalNewsModel.current)
+        val newsExtensions by newsModel.repository.registry.state.collectAsState()
+        val hasNews = newsExtensions.any { it.source != null }
+        val isNews = selected == NEWS_CATEGORY && hasNews
+        LaunchedEffect(isNews) { newsSelected.value = isNews }
+        val homeKey = if (isManga || isNews) null else availability.selectedHome(selected)
         LaunchedEffect(availability) {
-            if (selected != MANGA_CATEGORY) selected = availability.reconcileSelection(selected)
+            if (selected != MANGA_CATEGORY &&
+                selected != NEWS_CATEGORY
+            ) {
+                selected = availability.reconcileSelection(selected)
+            }
         }
-        val headerHomes = remember(availability.homes) {
-            availability.homes + SourceHomeGroup(MANGA_CATEGORY, "Manga", emptyList())
+        val newsTitle = androidx.compose.ui.res.stringResource(eu.kanade.tachiyomi.R.string.news_title)
+        val headerHomes = remember(availability.homes, hasNews, newsTitle) {
+            availability.homes +
+                SourceHomeGroup(MANGA_CATEGORY, "Manga", emptyList()) +
+                if (hasNews) listOf(SourceHomeGroup(NEWS_CATEGORY, newsTitle, emptyList())) else emptyList()
         }
         val orderPreference = remember { Injekt.get<UiPreferences>().homeCategoryOrder() }
         val categoryOrder by orderPreference.changes().collectAsState(initial = orderPreference.get())
         val cycleCategory = {
-            val current = if (selected == MANGA_CATEGORY) selected else availability.selectedHome(selected)
+            val current = if (selected == MANGA_CATEGORY || isNews) selected else availability.selectedHome(selected)
             selected = HomeCategories.next(current, HomeCategories.choices(headerHomes, categoryOrder))
         }
         val savedState = rememberSaveableStateHolder()
-        val page = rememberHomePage(homeKey, isManga, availability.loading)
+        val page = rememberHomePage(homeKey, isManga, availability.loading, isNews)
         val header = page.headerState(headerHomes)
         val navigator = LocalNavigator.currentOrThrow
         Scaffold(
             topBar = {
                 DiscoveryHomeHeader(
-                    selectedHome = if (isManga) MANGA_CATEGORY else homeKey,
+                    selectedHome = if (isManga) {
+                        MANGA_CATEGORY
+                    } else if (isNews) {
+                        NEWS_CATEGORY
+                    } else {
+                        homeKey
+                    },
                     homes = headerHomes,
                     onSelect = { selected = it },
                     onBack = if (navigator.lastItem == DiscoveryTab) ({ navigator.pop() }) else null,
@@ -157,6 +177,7 @@ data object DiscoveryTab : Tab {
             ) { displayed, active ->
                 savedState.SaveableStateProvider(displayed.key) {
                     when (displayed) {
+                        is DiscoveryHomePage.News -> eu.kanade.tachiyomi.ui.news.NewsContent(displayed.model, active)
                         DiscoveryHomePage.Initializing -> HomeLoadingSkeleton()
                         is DiscoveryHomePage.Manga -> MangaHomeTabContent(
                             page = displayed,

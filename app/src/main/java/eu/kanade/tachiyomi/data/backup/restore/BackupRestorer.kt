@@ -150,6 +150,9 @@ class BackupRestorer(
                 if (options.appSettings) {
                     backup.backupHiddenResume?.let { restoreHiddenResume(it) }
                     eu.kanade.tachiyomi.data.releases.ReleaseStore().restore(backup.releaseSubscriptions)
+                    backup.newsState?.let {
+                        Injekt.get<eu.kanade.tachiyomi.data.news.NewsRepository>().store.restore(it)
+                    }
                     eu.kanade.tachiyomi.data.releases.ReleaseMonitor.setup(context)
                 }
             }

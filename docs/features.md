@@ -26,6 +26,24 @@ La modalità AMOLED si applica soltanto all’aspetto scuro. Lo sfondo del letto
 manga resta configurabile separatamente. Le animazioni temporizzate rispettano la scala di sistema; il player
 offre anche la riduzione del movimento.
 
+## Notizie facoltative
+
+Le estensioni Notizie si abilitano in **Altro → Sfoglia → Notizie**. La categoria
+compare nella Home solo dopo averne abilitata una; ogni APK richiede la conferma
+locale della firma. Non vengono installate fonti automaticamente.
+
+**Ultime**, **Per te** e **Salvati** offrono articoli compatti, filtri e un lettore
+nativo con dimensione del testo, immagini ingrandibili e collegamento all'originale.
+Da questa Home, **Cerca** cerca articoli; le fonti prive di ricerca usano gli
+articoli già disponibili. Il testo salvato funziona offline, le immagini dipendono
+dalla cache. Backup completi includono preferenze e articoli salvati.
+
+Gli interessi partono dalla libreria e dai titoli seguiti: gli abbinamenti automatici
+usano ID verificati, quelli incerti richiedono una scelta. Gli avvisi sono spenti
+inizialmente e configurabili per fonte; quando attivi, il controllo è ogni ora e
+Android può ritardarlo. Le notizie restano separate dagli avvisi di episodi/capitoli.
+[Contratto e limiti](news-extensions.md).
+
 ## Catalogo video e ricerca
 
 | Area | Funzioni |

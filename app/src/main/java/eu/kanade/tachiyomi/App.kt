@@ -114,6 +114,13 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
 
         val scope = ProcessLifecycleOwner.get().lifecycleScope
+        scope.launch(Dispatchers.IO) {
+            try {
+                Injekt.get<eu.kanade.tachiyomi.data.news.NewsRepository>().initialize()
+            } catch (error: Exception) {
+                logcat(LogPriority.WARN, error) { "Unable to initialize news extensions" }
+            }
+        }
         val preferencesForRetirement = basePreferences
         scope.launch(Dispatchers.IO) {
             try {

@@ -47,11 +47,32 @@ import uy.kohesive.injekt.api.get
 @Composable
 fun AtlasSearchBar(model: AtlasSearchScreenModel, compact: Boolean, onClose: () -> Unit, onBrowse: () -> Unit) {
     val state by model.state.collectAsState()
+    AtlasQueryBar(
+        state.input,
+        model::edit,
+        model::submit,
+        compact,
+        onClose,
+        onBrowse,
+        stringResource(R.string.atlas_hint),
+    )
+}
+
+@Composable
+fun AtlasQueryBar(
+    value: String,
+    onEdit: (String) -> Unit,
+    onSubmit: () -> Unit,
+    compact: Boolean,
+    onClose: () -> Unit,
+    onBrowse: () -> Unit,
+    hint: String,
+) {
     val focus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val fieldStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium)
-    LaunchedEffect(model) {
+    LaunchedEffect(Unit) {
         if (Injekt.get<SourcePreferences>().atlasKeyboardOnOpen().get()) focus.requestFocus()
     }
     Row(
@@ -66,8 +87,8 @@ fun AtlasSearchBar(model: AtlasSearchScreenModel, compact: Boolean, onClose: () 
             Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.atlas_close))
         }
         BasicTextField(
-            value = state.input,
-            onValueChange = model::edit,
+            value = value,
+            onValueChange = onEdit,
             modifier = Modifier.weight(1f).focusRequester(focus).testTag("atlas_query"),
             textStyle = fieldStyle.copy(
                 color = androidx.compose.material3.LocalContentColor.current,
@@ -76,14 +97,14 @@ fun AtlasSearchBar(model: AtlasSearchScreenModel, compact: Boolean, onClose: () 
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = {
-                model.submit()
+                onSubmit()
                 keyboard?.hide()
             }),
             decorationBox = { input ->
                 Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
-                    if (state.input.isEmpty()) {
+                    if (value.isEmpty()) {
                         Text(
-                            stringResource(R.string.atlas_hint),
+                            hint,
                             style = fieldStyle,
                             color = androidx.compose.material3.LocalContentColor.current.copy(alpha = 0.65f),
                             maxLines = 1,
@@ -94,8 +115,8 @@ fun AtlasSearchBar(model: AtlasSearchScreenModel, compact: Boolean, onClose: () 
                 }
             },
         )
-        if (state.input.isNotEmpty()) {
-            IconButton(onClick = { model.edit("") }) {
+        if (value.isNotEmpty()) {
+            IconButton(onClick = { onEdit("") }) {
                 Icon(Icons.Outlined.Close, stringResource(R.string.atlas_clear))
             }
         }
@@ -109,7 +130,7 @@ fun AtlasSearchBar(model: AtlasSearchScreenModel, compact: Boolean, onClose: () 
                     onBrowse()
                 },
                 onClick = {
-                    model.submit()
+                    onSubmit()
                     keyboard?.hide()
                 },
             ),

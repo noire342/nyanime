@@ -14,6 +14,12 @@ Le stanze Guarda/Leggi insieme usano relay Nostr. Un codice o invito consente ai
 
 ## Dati non sincronizzati
 
+Le estensioni Notizie abilitate contattano i rispettivi editori. Preferenze,
+lettura e collegamenti personali restano sul dispositivo. Per riconoscere
+adattamenti e seguiti, la sezione Notizie può interrogare AniList usando soltanto
+ID di catalogo, senza progressi, credenziali o cronologia. Il controllo periodico
+degli articoli parte solo se si attivano gli avvisi.
+
 Le funzioni disattivate di profilo pubblico, amicizie, chat e sincronizzazione personale non inviano nuovi dati. Eventuali dati locali obsoleti di queste funzioni vengono rimossi dalla versione corrente dell'app. Download e copie Ultra restano locali.
 
 ## Controlli e contatti
