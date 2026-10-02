@@ -241,7 +241,8 @@ internal fun PanoramaLocalAnimeRow(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(entries, key = { it.anime.id }) { item ->
-                        val poster = rememberPosterSource(item.anime)
+                        val poster =
+                            rememberPosterSource(item.anime, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                         val openDetails = posterOpen(poster, item.anime.title) { onOpen(item) }
                         PanoramaWatchResumeCard(
                             title = item.anime.title,

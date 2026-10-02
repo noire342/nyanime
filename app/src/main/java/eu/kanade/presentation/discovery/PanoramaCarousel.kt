@@ -222,7 +222,7 @@ internal fun <T : Any> PanoramaCarousel(
                         },
                 ) { page ->
                     val item = items[PanoramaPages.index(page, items.size)]
-                    val poster = rememberPosterSource(artworkData(item))
+                    val poster = rememberPosterSource(artworkData(item), RoundedCornerShape(24.dp))
                     val open = posterOpen(poster, title(item)) { onOpen(item) }
                     val centered = page == pager.currentPage
                     Box(

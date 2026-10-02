@@ -24,6 +24,9 @@ The app contains no provider-specific routing or catalogue assumptions.
   of the changing state are invalidated, not every descendant of the screen.
 - Images retain their previous painter during refresh/failure, with existing retry
   and source-resolution paths. Portrait transitions into detail screens are retained.
+- Rounded artwork clips are applied inside the shared bounds. The overlay therefore
+  retains the source silhouette while it blends into the detail hero, in both directions;
+  clipping only the parent card would be lost as soon as the overlay starts.
 
 ## Personal sections
 

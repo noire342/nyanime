@@ -10,6 +10,8 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 
 ## 2 ottobre 2026 — Ripresa dalla Home e fluidità
 
+- Conservati gli angoli arrotondati delle copertine durante apertura e ritorno dalla
+  scheda, evitando il passaggio improvviso a una forma rettangolare.
 - «Continua a guardare» nella Home diventa una fila di schede ampie: ripresa diretta,
   episodio, minutaggio e avanzamento leggibili, con le altre azioni raccolte nel menu.
 - Migliorata la fluidità delle transizioni tra Home e schede, limitando i ricalcoli

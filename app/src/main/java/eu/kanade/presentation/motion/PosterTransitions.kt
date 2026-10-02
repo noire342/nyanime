@@ -23,6 +23,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -101,16 +104,16 @@ internal fun <T> PosterNavigationTransition(
     }
 }
 
-internal class PosterSource(val element: String) {
+internal class PosterSource(val element: String, val shape: Shape = RectangleShape) {
     var painter by mutableStateOf<Painter?>(null)
 }
 
 /** The saved token identifies a particular card, including its position in a particular row. */
 @Composable
-internal fun rememberPosterSource(data: Any?): PosterSource {
+internal fun rememberPosterSource(data: Any?, shape: Shape = RectangleShape): PosterSource {
     val identity = data?.let(::sourceHomeArtworkIdentity)
     val token = rememberSaveable(identity) { UUID.randomUUID().toString() }
-    return remember(token) { PosterSource(token) }
+    return remember(token, shape) { PosterSource(token, shape) }
 }
 
 @Composable
@@ -162,7 +165,7 @@ internal fun Modifier.posterSource(source: PosterSource?): Modifier {
             exit = fadeOut(tween(POSTER_TRANSITION_MILLIS, easing = LinearOutSlowInEasing)),
             resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(ContentScale.Crop),
             boundsTransform = { _, _ -> tween(POSTER_TRANSITION_MILLIS, easing = FastOutSlowInEasing) },
-        )
+        ).then(if (source.shape == RectangleShape) Modifier else Modifier.clip(source.shape))
     }
 }
 
