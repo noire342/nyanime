@@ -54,11 +54,11 @@ internal fun MangaHomeTabContent(
     DiscoveryTab.HandleHomeReselect(listState, onCycleCategory, active)
     val updateKeys = state.updates.map { it.inboxKey() }.toSet()
     val hasNewUpdates = hasNewLibraryUpdateNotice(updateKeys, lastSeenAt)
-    val updatesIndex = 2 +
-        (if (state.selected != null) 1 else 0) +
-        (if (state.homes.size > 1) 1 else 0) +
-        (if (state.history.isNotEmpty()) 1 else 0) +
-        (if (!state.initializing && state.homes.isEmpty()) 1 else 0)
+    val updatesIndex =
+        (if (state.selected != null && !state.offline) 1 else 0) +
+            (if (state.homes.size > 1) 1 else 0) +
+            (if (state.history.isNotEmpty()) 1 else 0) +
+            (if (!state.initializing && state.homes.isEmpty()) 1 else 0)
     DiscoveryTab.HandleHomeUpdateRequest(listState, page.key, updatesIndex, active)
     AcknowledgeUpdateNoticeWhenVisible(
         listState,

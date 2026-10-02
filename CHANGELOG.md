@@ -12,6 +12,19 @@ non garantiscono che ogni commit sia stato distribuito come APK.
 
 - Aumento di numerazione, nessun cambiamento alle funzionalità dell'app.
 
+## 2 ottobre 2026 — Home Panorama
+
+- Nuova Home Panorama per anime e manga: copertina centrale ampia, anteprime laterali,
+  scorrimento circolare con il dito e rotazione dopo sei secondi di inattività.
+- Testata stabile, titoli in dissolvenza e skeleton con le stesse dimensioni delle
+  copertine. Il titolo selezionato si conserva durante gli aggiornamenti delle sezioni.
+- Ripresa compatta con progressi e opzioni; novità più leggibili, con tutte le voci
+  raggiungibili e azioni di lettura, riproduzione e apertura della scheda conservate.
+- Categorie, sezioni, date, classifiche, capitoli, paginazione e fonti alternative
+  continuano a usare i contratti delle estensioni, senza regole specifiche nell'app.
+- Rotazione sospesa durante l'interazione, fuori dalla sezione visibile, nelle finestre
+  di scelta della fonte e con animazioni ridotte o lettore schermo attivo.
+
 ## 1 ottobre 2026 — Lingua della Libreria
 
 - Il pulsante Libreria e le intestazioni della raccolta seguono la lingua scelta

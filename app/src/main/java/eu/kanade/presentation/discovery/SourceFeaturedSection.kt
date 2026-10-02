@@ -23,6 +23,7 @@ fun SourceFeaturedSection(
     onRetry: () -> Unit,
     onOpen: (Anime) -> Unit,
     onSources: ((Anime) -> Unit)? = null,
+    autoplay: Boolean = false,
 ) {
     val items = state.data?.items.orEmpty().let { if (limit == null) it else it.take(limit) }
     Column {
@@ -33,7 +34,15 @@ fun SourceFeaturedSection(
             },
         ) {
             if (items.isNotEmpty()) {
-                SourceFeaturedCarousel(items, refreshKey, state.data?.title ?: title, onBrowse, onSources, onOpen)
+                SourceFeaturedCarousel(
+                    items,
+                    refreshKey,
+                    state.data?.title ?: title,
+                    onBrowse,
+                    onSources,
+                    autoplay,
+                    onOpen,
+                )
             } else if (!state.loading && state.error == null) {
                 Text(androidStringResource(R.string.home_featured_empty), Modifier.padding(16.dp))
             }

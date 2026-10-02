@@ -173,9 +173,10 @@ private fun HomePreview(modern: Boolean) {
                                     LocalHomeItem(
                                         it,
                                         Episode.create().copy(
+                                            id = it.id,
                                             name = "Episodio 4 · Il viaggio continua",
-                                            lastSecondSeen = 540,
-                                            totalSeconds = 1440,
+                                            lastSecondSeen = 540_000,
+                                            totalSeconds = 1_440_000,
                                         ),
                                     )
                                 },
@@ -183,6 +184,7 @@ private fun HomePreview(modern: Boolean) {
                             ),
                             onOpen = {},
                             onHide = {},
+                            resume = true,
                             onPlay = {},
                         )
                     }

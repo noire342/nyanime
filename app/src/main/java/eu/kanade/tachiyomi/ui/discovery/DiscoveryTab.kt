@@ -244,7 +244,11 @@ data object DiscoveryTab : Tab {
                             loading = featured.awaitingContent,
                             placeholder = { HomeHeroSkeleton(withBrowseAction = false) },
                         ) {
-                            FeaturedCarousel(featured.data?.items.orEmpty(), openCatalog)
+                            FeaturedCarousel(
+                                featured.data?.items.orEmpty(),
+                                openCatalog,
+                                eu.kanade.presentation.discovery.panoramaAutoplay(listState, "hero", active),
+                            )
                         }
                     }
                     item(key = "resume") {

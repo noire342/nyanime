@@ -126,7 +126,8 @@ fun metadataLabel(value: String?): String? = when (value) {
 fun SectionHeader(title: String, more: (() -> Unit)? = null) {
     if (!LocalNyanimeStyle.current) return eu.kanade.presentation.discovery.legacy.SectionHeader(title, more)
     Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 4.dp),
+        Modifier.fillMaxWidth().heightIn(min = homeSectionHeaderHeight())
+            .padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -134,15 +135,13 @@ fun SectionHeader(title: String, more: (() -> Unit)? = null) {
             Modifier.weight(1f).semantics {
                 heading()
             },
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (more != null) {
-            TextButton(onClick = more) {
-                Text(androidStringResource(R.string.home_see_all), maxLines = 1)
-                Spacer(Modifier.width(4.dp))
+            IconButton(onClick = more) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowForward,
                     androidStringResource(R.string.home_show_section, title),
@@ -317,46 +316,29 @@ fun CatalogRow(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit, calen
 }
 
 @Composable
-fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit) {
+fun FeaturedCarousel(items: List<CatalogAnime>, onClick: (CatalogAnime) -> Unit, autoplay: Boolean = false) {
     if (!LocalNyanimeStyle.current) return eu.kanade.presentation.discovery.legacy.FeaturedCarousel(items, onClick)
-    if (items.isEmpty()) return
-    val pager = rememberPagerState { items.size.coerceAtMost(5) }
-    Column {
-        HorizontalPager(state = pager, key = { "${items[it].id.provider}:${items[it].id.value}" }) { index ->
-            val anime = items[index]
-            val poster = rememberPosterSource(anime.banner ?: anime.cover)
-            val openDetails = posterOpen(poster, anime.title) { onClick(anime) }
-            CinematicHero(
-                title = anime.title,
-                eyebrow = androidStringResource(
-                    R.string.home_featured_position,
-                    androidStringResource(R.string.home_featured),
-                    index + 1,
-                    pager.pageCount,
-                ),
-                metadata = listOfNotNull(
-                    anime.score?.let {
-                        "★ $it/100"
-                    },
-                    anime.genres.joinToString(" · "),
-                ).joinToString(" · "),
-                description = anime.synopsis,
-                actionLabel = androidStringResource(R.string.home_discover_title),
-                onOpen = openDetails,
-                poster = poster,
-            ) {
-                AsyncImage(
-                    anime.banner ?: anime.cover,
-                    null,
-                    Modifier.matchParentSize().posterSource(poster),
-                    placeholder = posterSourcePlaceholder(poster),
-                    error = posterSourcePlaceholder(poster),
-                    onSuccess = { poster.painter = it.painter },
-                    contentScale = ContentScale.Crop,
-                )
-            }
-        }
-        CarouselPosition(pager.currentPage, pager.pageCount)
+    PanoramaCarousel(
+        items = items.take(8),
+        itemKey = { "${it.id.provider}:${it.id.value}" },
+        title = { it.title },
+        metadata = { anime ->
+            listOfNotNull(anime.score?.let { "★ $it/100" }, anime.genres.joinToString(" · "))
+                .filter { it.isNotBlank() }.joinToString(" · ")
+        },
+        artworkData = { it.cover.orEmpty() },
+        autoplay = autoplay,
+        onOpen = onClick,
+    ) { item, modifier, poster ->
+        AsyncImage(
+            model = item.cover,
+            contentDescription = item.title,
+            modifier = modifier.posterSource(poster),
+            placeholder = posterSourcePlaceholder(poster),
+            error = posterSourcePlaceholder(poster),
+            onSuccess = { poster.painter = it.painter },
+            contentScale = ContentScale.Crop,
+        )
     }
 }
 
@@ -366,154 +348,11 @@ fun LocalAnimeRow(
     onOpen: (LocalHomeItem) -> Unit,
     emptyMessage: String = androidStringResource(R.string.home_library_empty),
     onHide: ((LocalHomeItem) -> Unit)? = null,
+    resume: Boolean = false,
     onPlay: (LocalHomeItem) -> Unit,
 ) {
     if (!LocalNyanimeStyle.current) {
         return eu.kanade.presentation.discovery.legacy.LocalAnimeRow(state, onOpen, emptyMessage, onHide, onPlay)
     }
-    LoadNotice(state.loading, state.error, showLoadingIndicator = false)
-    val items = state.data.orEmpty()
-    if (!state.loading && items.isEmpty() && state.error == null) {
-        Text(
-            emptyMessage,
-            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-    HomeLoadingTransition(
-        loading = state.awaitingContent,
-        placeholder = { HomePosterRowSkeleton(wide = true) },
-    ) {
-        BoxWithConstraints(Modifier.fillMaxWidth().privacyRegion(PrivacyArea.RESUME)) {
-            val cardWidth = HomeLayout.resumeWidth(LocalDensity.current.fontScale, maxWidth)
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(items, key = { it.anime.id }) { item ->
-                    val poster = rememberPosterSource(item.anime)
-                    val openDetails = posterOpen(poster, item.anime.title) { onOpen(item) }
-                    Column(Modifier.width(cardWidth).nsfwPrivacy(item.anime)) {
-                        Box(
-                            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(14.dp))
-                                .clickable(
-                                    role = Role.Button,
-                                    onClickLabel = androidStringResource(R.string.home_open_title_details),
-                                    onClick = openDetails,
-                                )
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                        ) {
-                            SourceHomeArtwork(
-                                item.anime,
-                                Modifier.fillMaxSize().posterSource(poster),
-                                background = !item.anime.backgroundUrl.isNullOrBlank(),
-                                initialPainter = posterSourcePlaceholder(poster),
-                                onPainterReady = { poster.painter = it },
-                            )
-                            Box(
-                                Modifier.fillMaxSize().posterForeground(poster, zIndex = 1f).background(
-                                    Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))),
-                                ),
-                            )
-                            FilledIconButton(
-                                onClick = { onPlay(item) },
-                                modifier = Modifier.align(Alignment.Center).size(52.dp).posterForeground(poster),
-                                colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = Color.Black.copy(alpha = 0.66f),
-                                    contentColor = Color.White,
-                                ),
-                            ) {
-                                Icon(
-                                    Icons.Filled.PlayArrow,
-                                    androidStringResource(
-                                        R.string.home_play_named_title,
-                                        if (item.progress >
-                                            0
-                                        ) {
-                                            androidStringResource(R.string.home_resume_action)
-                                        } else {
-                                            androidStringResource(R.string.home_watch_action)
-                                        },
-                                        item.anime.title,
-                                    ),
-                                    Modifier.size(32.dp),
-                                )
-                            }
-                            LinearProgressIndicator(
-                                progress = { item.progress.coerceIn(0f, 1f) },
-                                modifier = Modifier.align(
-                                    Alignment.BottomCenter,
-                                ).fillMaxWidth().height(4.dp).posterForeground(poster),
-                                trackColor = Color.White.copy(alpha = 0.3f),
-                                gapSize = 0.dp,
-                                drawStopIndicator = {},
-                            )
-                        }
-                        Row(
-                            Modifier.fillMaxWidth().posterForeground(poster).padding(top = 6.dp),
-                            verticalAlignment = Alignment.Top,
-                        ) {
-                            Column(
-                                Modifier.weight(1f).clickable(
-                                    role = Role.Button,
-                                    onClickLabel = androidStringResource(R.string.home_open_title_details),
-                                    onClick = openDetails,
-                                ),
-                            ) {
-                                if (item.finale != null) {
-                                    Text(
-                                        androidStringResource(R.string.home_next_episode),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                                Text(
-                                    item.anime.title,
-                                    maxLines = 2,
-                                    minLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = MaterialTheme.typography.titleSmall,
-                                )
-                                Text(
-                                    item.episode.name,
-                                    maxLines = 2,
-                                    minLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                item.finale?.let { finale ->
-                                    TextButton(onClick = {
-                                        onPlay(
-                                            item.copy(
-                                                episode = finale,
-                                                finale = null,
-                                                forcedStartPositionMs = finale.lastSecondSeen,
-                                            ),
-                                        )
-                                    }) {
-                                        Text(androidStringResource(R.string.home_resume_ending))
-                                    }
-                                }
-                            }
-                            IconButton(onClick = openDetails, modifier = Modifier.size(48.dp)) {
-                                Icon(
-                                    Icons.Outlined.Info,
-                                    androidStringResource(R.string.home_named_details, item.anime.title),
-                                )
-                            }
-                            if (onHide != null) {
-                                IconButton(onClick = { onHide(item) }, modifier = Modifier.size(48.dp)) {
-                                    Icon(
-                                        Icons.Outlined.VisibilityOff,
-                                        androidStringResource(R.string.home_hide_resume, item.anime.title),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    PanoramaLocalAnimeRow(state, onOpen, emptyMessage, onHide, resume, onPlay)
 }

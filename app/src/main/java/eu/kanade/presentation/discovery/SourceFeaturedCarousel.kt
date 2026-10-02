@@ -1,81 +1,73 @@
 package eu.kanade.presentation.discovery
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import eu.kanade.presentation.motion.modernMotionEnabled
-import eu.kanade.presentation.motion.posterOpen
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.motion.posterSource
 import eu.kanade.presentation.motion.posterSourcePlaceholder
-import eu.kanade.presentation.motion.rememberPosterSource
 import eu.kanade.presentation.privacy.nsfwPrivacy
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.R
 import tachiyomi.domain.discovery.homeItemKey
 import tachiyomi.domain.discovery.homePresentation
 import tachiyomi.domain.entries.anime.model.Anime
-import kotlin.math.absoluteValue
 import androidx.compose.ui.res.stringResource as androidStringResource
 
-/** The extension supplies every title, image and synopsis; there is no catalogue resolution here. */
+/** Every title, image and action comes from the generic extension Home contract. */
 @Composable
 fun SourceFeaturedCarousel(
     items: List<Anime>,
     refreshKey: Int = 0,
-    title: String = androidStringResource(R.string.home_featured),
+    title: String = androidStringResource(R.string.home_panorama_featured),
     onBrowse: (() -> Unit)? = null,
     onSources: ((Anime) -> Unit)? = null,
+    autoplay: Boolean = false,
     onClick: (Anime) -> Unit,
 ) {
     if (!LocalNyanimeStyle.current) {
         return eu.kanade.presentation.discovery.legacy.SourceFeaturedCarousel(items, refreshKey, onClick)
     }
-    if (items.isEmpty()) return
-    val pager = rememberPagerState { items.size }
-    val motion = modernMotionEnabled()
-    Column {
-        HorizontalPager(state = pager, key = { items[it].homeItemKey }) { index ->
-            val anime = items[index]
-            val poster = rememberPosterSource(anime)
-            val openDetails = posterOpen(poster, anime.title) { onClick(anime) }
-            val presentation = anime.homePresentation
-            Box(
-                Modifier.nsfwPrivacy(anime).graphicsLayer {
-                    val offset = ((pager.currentPage - index) + pager.currentPageOffsetFraction).absoluteValue.coerceIn(
-                        0f,
-                        1f,
-                    )
-                    alpha = if (motion) 1f - offset * 0.25f else 1f
-                },
-            ) {
-                CinematicHero(
-                    title = anime.title,
-                    eyebrow = androidStringResource(R.string.home_featured_position, title, index + 1, items.size),
-                    metadata = (presentation?.badges.orEmpty() + presentation?.details.orEmpty()).joinToString(" · "),
-                    description = anime.description,
-                    actionLabel = androidStringResource(R.string.home_open_episodes),
-                    onOpen = openDetails,
-                    onSources = onSources?.takeIf { presentation?.choices.orEmpty().size > 1 }?.let { action ->
-                        { action(anime) }
-                    },
-                    poster = poster,
-                ) {
-                    SourceHomeArtwork(
-                        data = anime,
-                        background = !anime.backgroundUrl.isNullOrBlank(),
-                        refreshKey = refreshKey,
-                        contentDescription = null,
-                        modifier = Modifier.matchParentSize().posterSource(poster),
-                        initialPainter = posterSourcePlaceholder(poster),
-                        onPainterReady = { poster.painter = it },
-                    )
+    PanoramaCarousel(
+        items = items.distinctBy { it.homeItemKey },
+        itemKey = { it.homeItemKey },
+        title = { it.title },
+        metadata = {
+            (it.homePresentation?.badges.orEmpty() + it.homePresentation?.details.orEmpty()).joinToString(" · ")
+        },
+        artworkData = { it },
+        privacyModifier = { Modifier.nsfwPrivacy(it) },
+        heading = title,
+        onBrowse = onBrowse,
+        autoplay = autoplay,
+        onOpen = onClick,
+        actions = { anime ->
+            if (onSources != null && anime.homePresentation?.choices.orEmpty().size > 1) {
+                Surface(shape = CircleShape, color = Color.Black.copy(alpha = .8f), contentColor = Color.White) {
+                    IconButton(onClick = { onSources(anime) }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Outlined.SwapHoriz, androidStringResource(R.string.home_panorama_sources))
+                    }
                 }
             }
+        },
+    ) { anime, modifier, poster ->
+        Box(modifier.nsfwPrivacy(anime)) {
+            SourceHomeArtwork(
+                data = anime,
+                refreshKey = refreshKey,
+                contentDescription = anime.title,
+                modifier = Modifier.matchParentSize().posterSource(poster),
+                initialPainter = posterSourcePlaceholder(poster),
+                onPainterReady = { poster.painter = it },
+            )
         }
-        CarouselPosition(pager.currentPage, items.size, onBrowse)
     }
 }

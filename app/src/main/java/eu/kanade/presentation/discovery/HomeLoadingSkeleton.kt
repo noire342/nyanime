@@ -74,6 +74,7 @@ internal fun SkeletonBlock(modifier: Modifier) {
 
 @Composable
 fun HomeHeroSkeleton(withBrowseAction: Boolean = true, withSourceAction: Boolean = false) {
+    if (eu.kanade.presentation.theme.LocalNyanimeStyle.current) return PanoramaHeroSkeleton()
     HomeSkeleton {
         Column {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -180,7 +181,8 @@ fun HomePosterRowSkeleton(wide: Boolean = false, modifier: Modifier = Modifier) 
 fun HomeLoadingSkeleton(withSourceAction: Boolean = false) {
     LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp), userScrollEnabled = false) {
         item { HomeHeroSkeleton(withSourceAction = withSourceAction) }
-        items(2) {
+        item { PanoramaResumeSkeleton() }
+        items(1) {
             HomeSkeleton(Modifier.padding(horizontal = 16.dp)) {
                 SkeletonBlock(Modifier.width(160.dp).height(20.dp))
             }
@@ -191,21 +193,7 @@ fun HomeLoadingSkeleton(withSourceAction: Boolean = false) {
 }
 
 @Composable
-fun HomeMangaLoadingSkeleton() {
-    LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp), userScrollEnabled = false) {
-        item {
-            HomeSkeleton(Modifier.padding(horizontal = 20.dp)) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    SkeletonBlock(Modifier.width(120.dp).height(38.dp))
-                    SkeletonBlock(Modifier.width(200.dp).height(48.dp))
-                    SkeletonBlock(Modifier.fillMaxWidth().height(222.dp))
-                    SkeletonBlock(Modifier.width(170.dp).height(24.dp))
-                }
-            }
-        }
-        item { HomePosterRowSkeleton() }
-    }
-}
+fun HomeMangaLoadingSkeleton() = HomeLoadingSkeleton()
 
 @Preview(widthDp = 320)
 @Composable

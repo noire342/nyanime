@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -60,7 +62,10 @@ fun MangaSourceAction(
     discover: Boolean = false,
     compact: Boolean = false,
     onOpen: ((Manga) -> Unit)? = null,
+    onExpandedChange: (Boolean) -> Unit = {},
 ) {
+    // Design previews have no installed extension registry or navigator.
+    if (LocalInspectionMode.current) return
     val registry = remember { Injekt.get<MangaHomeRegistry>() }
     val service = remember { Injekt.get<MangaHomeService>() }
     val preferences = remember { Injekt.get<UiPreferences>() }
@@ -71,6 +76,10 @@ fun MangaSourceAction(
     )
     val navigator = LocalNavigator.currentOrThrow
     var expanded by remember(item.manga.source, item.manga.url) { mutableStateOf(false) }
+    DisposableEffect(expanded) {
+        onExpandedChange(expanded)
+        onDispose { if (expanded) onExpandedChange(false) }
+    }
     var loading by remember(item.manga.source, item.manga.url) { mutableStateOf(false) }
     var retry by remember(item.manga.source, item.manga.url) { mutableStateOf(0) }
     var resolved by remember(item.manga.source, item.manga.url) { mutableStateOf(item) }

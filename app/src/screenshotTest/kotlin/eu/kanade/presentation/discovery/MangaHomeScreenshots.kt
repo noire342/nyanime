@@ -130,7 +130,6 @@ private fun MangaPreview(firstItem: Int = 0, error: Boolean = false) {
                 onRetry = {},
                 onUpdates = {},
                 onUpdate = {},
-                onLibrary = {},
                 listState = rememberLazyListState(firstItem),
             )
         }

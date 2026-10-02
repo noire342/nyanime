@@ -52,6 +52,7 @@ fun ContinueWatchingRow(
                     }
                 }
             },
+            resume = true,
             onPlay = onPlay,
         )
         SnackbarHost(snackbar)

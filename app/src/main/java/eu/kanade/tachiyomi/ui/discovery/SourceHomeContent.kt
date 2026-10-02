@@ -37,6 +37,7 @@ import eu.kanade.presentation.discovery.HomePosterRowSkeleton
 import eu.kanade.presentation.discovery.HomeSelectionChip
 import eu.kanade.presentation.discovery.LoadNotice
 import eu.kanade.presentation.discovery.LocalAnimeRow
+import eu.kanade.presentation.discovery.PanoramaHeroSkeleton
 import eu.kanade.presentation.discovery.SectionHeader
 import eu.kanade.presentation.discovery.SourceFeaturedCarousel
 import eu.kanade.presentation.discovery.SourceFeaturedSection
@@ -45,6 +46,7 @@ import eu.kanade.presentation.discovery.SourceHomeDateSelector
 import eu.kanade.presentation.discovery.SourceHomePosterCard
 import eu.kanade.presentation.discovery.SourceHomeRankingCard
 import eu.kanade.presentation.discovery.awaitingContent
+import eu.kanade.presentation.discovery.panoramaAutoplay
 import eu.kanade.presentation.privacy.nsfwSourcePrivacy
 import eu.kanade.presentation.theme.LocalNyanimeStyle
 import eu.kanade.tachiyomi.data.discovery.SourceHomeSourceChoice
@@ -134,6 +136,7 @@ private fun DiscoveryTab.SourceHomeReadyContent(
             )
         }
     }
+    val rotateFeatured = panoramaAutoplay(listState, "hero:" + source.id, active) && pendingChoice == null
     val modern = LocalNyanimeStyle.current
     val featuredRow = source.rows.firstOrNull { row ->
         row.sections.size == 1 && row.sections.first().layout == "featured" && !row.sections.first().supportsDate
@@ -185,6 +188,7 @@ private fun DiscoveryTab.SourceHomeReadyContent(
                             state = featured,
                             title = heroSection.title,
                             refreshKey = state.artworkRefreshKey,
+                            autoplay = rotateFeatured,
                             limit = if (featuredRow == null) 8 else null,
                             onBrowse = {
                                 navigator.push(SourceHomeListScreen(homeKey, heroSection.id, heroSection.title))
@@ -268,12 +272,19 @@ private fun DiscoveryTab.SourceHomeReadyContent(
                             variantStates.SaveableStateProvider(section.id) {
                                 HomeLoadingTransition(
                                     loading = value.awaitingContent,
-                                    placeholder = { HomePosterRowSkeleton() },
+                                    placeholder = {
+                                        if (section.layout == "featured") {
+                                            PanoramaHeroSkeleton(showHeading = false)
+                                        } else {
+                                            HomePosterRowSkeleton()
+                                        }
+                                    },
                                 ) {
                                     if (section.layout == "featured") {
                                         SourceFeaturedCarousel(
                                             value.data?.items.orEmpty(),
                                             state.artworkRefreshKey,
+                                            title = "",
                                             onSources = { pendingChoice = it to false },
                                         ) { anime ->
                                             openCard(anime, false)
