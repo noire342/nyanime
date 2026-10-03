@@ -42,6 +42,22 @@ open class Hoster(
         memo = JsonObject.EMPTY,
     )
 
+    // Older lib 16 builds call the four-argument constructor (including its
+    // Kotlin default-argument bridge) from a separate extension class loader.
+    constructor(
+        hosterUrl: String = "",
+        hosterName: String = "",
+        videoList: List<Video>? = null,
+        internalData: String = "",
+    ) : this(
+        hosterUrl = hosterUrl,
+        hosterName = hosterName,
+        videoList = videoList,
+        internalData = internalData,
+        lazy = false,
+        memo = JsonObject.EMPTY,
+    )
+
     fun copy(
         hosterUrl: String = this.hosterUrl,
         hosterName: String = this.hosterName,
