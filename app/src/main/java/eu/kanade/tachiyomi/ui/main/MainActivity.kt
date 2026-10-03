@@ -142,7 +142,6 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class MainActivity : BaseActivity() {
-    override fun backTapAvailable() = ready && navigator != null
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         val controller = CastController.get(this)
         if (controller.state.value.active &&
@@ -528,15 +527,6 @@ class MainActivity : BaseActivity() {
         }
 
         val tabToOpen = when (intent.action) {
-            eu.kanade.tachiyomi.ui.gestures.BACK_TAP_NAVIGATE -> {
-                navigator.popUntilRoot()
-                when (intent.getStringExtra(eu.kanade.tachiyomi.ui.gestures.BACK_TAP_DESTINATION)) {
-                    "Search" -> HomeScreen.Tab.Search
-                    "Library" -> HomeScreen.Tab.Libraries
-                    "Releases" -> HomeScreen.Tab.Releases
-                    else -> return false
-                }
-            }
             Constants.SHORTCUT_ANIMELIB -> HomeScreen.Tab.AnimeLib()
             Constants.SHORTCUT_LIBRARY -> HomeScreen.Tab.Library()
             Constants.SHORTCUT_MANGA -> {

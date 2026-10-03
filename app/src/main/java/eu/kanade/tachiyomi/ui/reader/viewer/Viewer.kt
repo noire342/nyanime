@@ -31,10 +31,6 @@ interface Viewer {
      */
     fun moveToPage(page: ReaderPage)
 
-    /** Reading order, independent of orientation, touch mapping and volume-key preferences. */
-    fun moveToNext()
-    fun moveToPrevious()
-
     /**
      * Called from the containing activity when a key [event] is received. It should return true
      * if the event was handled, false otherwise.

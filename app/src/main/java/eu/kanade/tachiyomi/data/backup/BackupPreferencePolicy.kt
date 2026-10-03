@@ -1,9 +1,18 @@
 package eu.kanade.tachiyomi.data.backup
 
 import tachiyomi.core.common.preference.Preference
+import tachiyomi.core.common.preference.PreferenceStore
 
 /** Settings that remain meaningful after the database IDs and hardware change. */
 object BackupPreferencePolicy {
+    private val retiredPrefixes = listOf("back_tap_", Preference.appStateKey("back_tap_"))
+
+    fun isRetired(key: String): Boolean = retiredPrefixes.any(key::startsWith)
+
+    fun removeRetired(store: PreferenceStore) {
+        store.getAll().keys.filter(::isRetired).forEach { store.getString(it).delete() }
+    }
+
     private val portableAppStateKeys = setOf(
         Preference.appStateKey("has_filters_toggle_state"),
         Preference.appStateKey("last_anime_catalogue_source"),
@@ -16,6 +25,7 @@ object BackupPreferencePolicy {
     )
 
     fun isPortable(key: String): Boolean =
-        (!Preference.isAppState(key) || key in portableAppStateKeys) &&
+        !isRetired(key) &&
+            (!Preference.isAppState(key) || key in portableAppStateKeys) &&
             deviceSpecificPrefixes.none(key::startsWith)
 }

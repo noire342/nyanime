@@ -21,7 +21,6 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Sync
-import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.VideoSettings
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -201,12 +200,6 @@ object SettingsMainScreen : Screen() {
             subtitleRes = AYMR.strings.pref_release_notifications_summary,
             icon = Icons.Outlined.NotificationsActive,
             screen = SettingsReleaseNotificationsScreen,
-        ),
-        Item(
-            titleRes = AYMR.strings.back_tap_settings_gestures,
-            subtitleRes = AYMR.strings.back_tap_summary,
-            icon = Icons.Outlined.TouchApp,
-            screen = SettingsGesturesScreen,
         ),
         Item(
             titleRes = MR.strings.pref_category_library,

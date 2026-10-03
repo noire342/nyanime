@@ -14,8 +14,6 @@ import eu.kanade.tachiyomi.core.security.SecurityPreferences
 import eu.kanade.tachiyomi.data.theme.AndroidThemeModeApplier
 import eu.kanade.tachiyomi.data.theme.AndroidThemeSettingsRepository
 import eu.kanade.tachiyomi.network.NetworkPreferences
-import eu.kanade.tachiyomi.ui.gestures.BackTapCoordinator
-import eu.kanade.tachiyomi.ui.gestures.BackTapPreferences
 import eu.kanade.tachiyomi.ui.player.settings.AdvancedPlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.DecoderPreferences
@@ -76,8 +74,6 @@ class PreferenceModule(val app: Application) : InjektModule {
         addSingletonFactory {
             GesturePreferences(get())
         }
-        addSingletonFactory { BackTapPreferences(get()) }
-        addSingletonFactory { BackTapCoordinator(app, get()) }
         addSingletonFactory {
             DecoderPreferences(get())
         }

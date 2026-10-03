@@ -130,7 +130,10 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
                 logcat(LogPriority.WARN, error) { "Unable to retire an earlier Home refresh" }
             }
         }
-        scope.launch(Dispatchers.IO) { removeRetiredTranslationData() }
+        scope.launch(Dispatchers.IO) {
+            eu.kanade.tachiyomi.data.backup.BackupPreferencePolicy.removeRetired(Injekt.get<PreferenceStore>())
+            removeRetiredTranslationData()
+        }
         scope.launch(Dispatchers.IO) {
             eu.kanade.tachiyomi.data.community.CommunityDormancy.stopBackgroundWork(this@App)
             eu.kanade.tachiyomi.data.community.CommunityDormancy.cleanObsoleteData(this@App, preferencesForRetirement)

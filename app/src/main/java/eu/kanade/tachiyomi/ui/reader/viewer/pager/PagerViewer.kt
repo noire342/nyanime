@@ -310,14 +310,14 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
     /**
      * Moves to the next page.
      */
-    override fun moveToNext() {
+    open fun moveToNext() {
         moveRight()
     }
 
     /**
      * Moves to the previous page.
      */
-    override fun moveToPrevious() {
+    open fun moveToPrevious() {
         moveLeft()
     }
 

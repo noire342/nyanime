@@ -26,18 +26,6 @@ La modalità AMOLED si applica soltanto all’aspetto scuro. Lo sfondo del letto
 manga resta configurabile separatamente. Le animazioni temporizzate rispettano la scala di sistema; il player
 offre anche la riduzione del movimento.
 
-## Doppio tap posteriore
-
-Da **Impostazioni → Gesti** puoi attivare due tocchi sul retro del telefono e
-scegliere azioni diverse per navigazione, video, lettore manga e telecomando TV.
-La prova guidata calibra tre gesti, con sensibilità e conferma tattile regolabili.
-Il menu rapido apre Cerca, Libreria, Le tue uscite o Guarda insieme.
-
-La funzione è spenta inizialmente, richiede accelerometro e giroscopio e ascolta
-solo mentre l’app è in primo piano. Tocchi sullo schermo, finestre e PiP sospendono
-il riconoscimento. Le azioni sono incluse nei backup, la calibrazione resta locale.
-[Funzionamento e verifica sui dispositivi](rear-double-tap.md).
-
 ## Notizie facoltative
 
 Le estensioni Notizie si abilitano in **Altro → Sfoglia → Notizie**. La categoria

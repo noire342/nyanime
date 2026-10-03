@@ -8,12 +8,12 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
-## 2 ottobre 2026 — Calibrazione dei tocchi posteriori leggeri
+## 3 ottobre 2026 — Rimozione del doppio tocco posteriore
 
-- La calibrazione può apprendere da tocchi leggeri dopo una breve misura del
-  movimento di fondo, senza richiedere la sensibilità iniziale dell’uso normale.
-- Acquisizione più frequente degli impulsi brevi sui sensori compatibili, con
-  ripiego alla frequenza consentita e filtro del rumore indipendente dal campionamento.
+- Rimossi il gesto posteriore, la calibrazione, le relative impostazioni e
+  l’ascolto dei sensori in tutte le schermate.
+- Pulizia automatica delle preferenze obsolete, escluse anche dal ripristino
+  dei vecchi backup. Restano disponibili i normali gesti del player e del lettore.
 
 ## 2 ottobre 2026 — Icone delle estensioni Notizie
 
@@ -28,25 +28,6 @@ non garantiscono che ogni commit sia stato distribuito come APK.
   comparire nel feed, ma non generano notifiche personali senza un riscontro affidabile.
 - Recupero graduale dei dati mancanti degli articoli, cache degli abbinamenti e
   esclusioni valide anche per gli ID equivalenti. Restano esclusi gli avvisi storici.
-
-## 2 ottobre 2026 — Riconoscimento del doppio tap
-
-- I tocchi decisi non vengono più scartati per la sola intensità o per il
-  contraccolpo laterale; il filtro di rotazione non prolunga il blocco a telefono fermo.
-- Il contatore della prova continua ad aggiornarsi anche dopo la calibrazione.
-- Corretto il filtro che scartava i tocchi posteriori quando il telefono oscillava
-  brevemente nella mano, rendendo intermittente anche la calibrazione.
-- Riconoscimento dei rimbalzi del tocco e quiete proporzionata alla sua intensità,
-  mantenendo i controlli contro rotazioni, scuotimenti e attivazioni accidentali.
-
-## 2 ottobre 2026 — Doppio tap posteriore
-
-- Nuovo gesto facoltativo in Impostazioni → Gesti, disattivato inizialmente: azioni
-  personalizzabili per navigazione, player, lettore manga e telecomando TV.
-- Prova guidata, calibrazione con tre doppi tocchi, sensibilità e conferma tattile;
-  menu rapido per Cerca, Libreria, Le tue uscite e Guarda insieme.
-- Ascolto limitato all’app in primo piano, sospeso durante tocchi, finestre e PiP;
-  comandi del player compatibili con le stanze e calibrazione locale al telefono.
 
 ## 2 ottobre 2026 — Notizie dalle estensioni
 
