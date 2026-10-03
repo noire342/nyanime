@@ -4,9 +4,21 @@ Questo file descrive le modifiche del fork Nyanime. Le funzioni ereditate e mant
 sono incluse nel [catalogo completo](docs/features.md). La documentazione corrente
 è raccolta nell'[indice](docs/README.md).
 
-Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantiche
-né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
-non garantiscono che ogni commit sia stato distribuito come APK.
+Le nuove versioni usano quattro numeri `X.Y.Z.W`, con `versionCode` Android crescente.
+Le vecchie revisioni `rNNNN` restano riconosciute dal sistema OTA. Gli hash qui sotto
+identificano modifiche nel repository, non garantiscono che ogni commit sia stato
+distribuito come APK.
+
+## 3 ottobre 2026 — Versioni e scelta degli aggiornamenti
+
+- Nuova numerazione a quattro componenti, a partire da 0.19.0.0, con confronto numerico
+  e versione Android crescente; le installazioni precedenti continuano ad aggiornarsi via OTA.
+- Scelta iniziale tra «Consigliati» e «Anche le anteprime», chiesta una sola volta dopo
+  la conferma, con schermata adattiva nei due temi e testi in italiano e inglese.
+- Preferenza modificabile in Impostazioni → Aggiornamenti, con controllo manuale e
+  installazione integrata; cambiare canale non propone versioni precedenti.
+- Pubblicazioni con note dedicate e APK immutabili, mantenendo pacchetto e firma per
+  conservare i dati. [Numerazione e compatibilità](docs/versioning.md).
 
 ## 3 ottobre 2026 — Player più reattivo e compatibilità delle estensioni
 

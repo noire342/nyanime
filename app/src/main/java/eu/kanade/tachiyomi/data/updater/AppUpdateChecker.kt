@@ -21,6 +21,7 @@ class AppUpdateChecker {
 
         return withIOContext {
             val preferences = AppUpdatePreferences(Injekt.get())
+            val requestedChannel = preferences.channel()
             val result = getApplicationRelease.await(
                 GetApplicationRelease.Arguments(
                     false,
@@ -28,9 +29,14 @@ class AppUpdateChecker {
                     BuildConfig.VERSION_NAME,
                     GITHUB_REPO,
                     forceCheck,
-                    preferences.channel(),
+                    requestedChannel,
                 ),
             )
+
+            // A slow response must not notify a preview after the user selects Recommended.
+            if (preferences.channel() != requestedChannel) {
+                return@withIOContext GetApplicationRelease.Result.NoNewUpdate
+            }
 
             when (result) {
                 is GetApplicationRelease.Result.NewUpdate -> AppUpdateNotifier(context).promptUpdate(

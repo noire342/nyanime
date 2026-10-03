@@ -662,4 +662,6 @@
     <string name="pref_release_notifications">Notifiche e uscite</string>
     <string name="pref_release_notifications_summary">Orari dei promemoria, nuovi episodi e capitoli, permessi</string>
     <string name="pref_release_delivery">Permessi e ricezione</string>
+    <string name="pref_app_updates">Aggiornamenti</string>
+    <string name="pref_app_updates_summary">Versioni, canali e installazione di Nyanime</string>
 </resources>

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.VideoSettings
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -195,6 +196,16 @@ object SettingsMainScreen : Screen() {
             icon = Icons.Outlined.Palette,
             screen = SettingsAppearanceScreen,
         ),
+        if (BuildConfig.UPDATER_ENABLED) {
+            Item(
+                titleRes = AYMR.strings.pref_app_updates,
+                subtitleRes = AYMR.strings.pref_app_updates_summary,
+                icon = Icons.Outlined.SystemUpdate,
+                screen = SettingsAppUpdatesScreen,
+            )
+        } else {
+            null
+        },
         Item(
             titleRes = AYMR.strings.pref_release_notifications,
             subtitleRes = AYMR.strings.pref_release_notifications_summary,

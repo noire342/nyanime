@@ -100,11 +100,11 @@ import eu.kanade.tachiyomi.ui.deeplink.manga.DeepLinkMangaScreen
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
+import eu.kanade.tachiyomi.ui.more.InitialAppSetupGate
 import eu.kanade.tachiyomi.ui.more.NewUpdateScreen
 import eu.kanade.tachiyomi.ui.more.OnboardingScreen
 import eu.kanade.tachiyomi.ui.player.ExternalIntents
 import eu.kanade.tachiyomi.ui.player.PlayerActivity
-import eu.kanade.tachiyomi.ui.theme.InitialThemeChoiceGate
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.isNavigationBarNeedsScrim
 import eu.kanade.tachiyomi.util.system.openInBrowser
@@ -195,7 +195,7 @@ class MainActivity : BaseActivity() {
         }
 
         setComposeContent {
-            InitialThemeChoiceGate(onReady = { ready = true }) {
+            InitialAppSetupGate(onReady = { ready = true }) {
                 val context = LocalContext.current
 
                 var incognito by remember { mutableStateOf(getMangaIncognitoState.await(null)) }
@@ -422,8 +422,7 @@ class MainActivity : BaseActivity() {
         LaunchedEffect(Unit) {
             if (updaterEnabled) {
                 try {
-                    // Preview builds follow the fork's bleeding-edge release cadence. Check once
-                    // for every app launch instead of inheriting the upstream three-day cache.
+                    // Check the selected channel once per launch after the initial choice.
                     val result = AppUpdateChecker().checkForUpdate(context, forceCheck = true)
                     if (result is GetApplicationRelease.Result.NewUpdate) {
                         val updateScreen = NewUpdateScreen(

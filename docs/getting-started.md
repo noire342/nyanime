@@ -11,9 +11,12 @@ di installare applicazioni. Un aggiornamento deve avere lo stesso package e
 certificato della copia installata. Le build di sviluppo e quelle distribuite
 possono essere distinte o avere firme diverse.
 
-La dicitura `rNNNN` identifica la revisione derivata dal numero dei commit;
-non è il `versionCode` usato da Android. Il nome del file da solo non prova
-che l'APK sia compatibile o che abbia la stessa firma.
+Le versioni nuove usano quattro numeri, per esempio `0.19.0.0`. Al primo avvio
+scegli gli aggiornamenti **Consigliati** oppure **Anche le anteprime**; puoi cambiare
+in seguito da **Impostazioni → Aggiornamenti**, dove trovi anche **Controlla aggiornamenti**
+e la scelta di scaricare e installare nell'app. Le vecchie `rNNNN` possono ancora
+aggiornarsi direttamente all'ultima versione compatibile, senza installare quelle intermedie.
+Il nome del file da solo non prova che l'APK sia compatibile o che abbia la stessa firma.
 
 Prima di cambiare variante, crea un backup da **Impostazioni > Dati e archiviazione**.
 I backup non includono i file multimediali scaricati. Gli APK di questa

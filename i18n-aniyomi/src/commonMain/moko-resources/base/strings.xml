@@ -753,4 +753,6 @@
     <string name="pref_release_notifications">Notifications and releases</string>
     <string name="pref_release_notifications_summary">Reminder times, new episodes and chapters, permissions</string>
     <string name="pref_release_delivery">Permissions and delivery</string>
+    <string name="pref_app_updates">Updates</string>
+    <string name="pref_app_updates_summary">Nyanime versions, channels and installation</string>
 </resources>

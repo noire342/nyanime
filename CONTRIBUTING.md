@@ -76,6 +76,12 @@ Per preparare la variante distribuita:
 ./gradlew :app:assemblePreview
 ```
 
+Prima di pubblicare un nuovo APK, incrementa la versione in `release.properties`
+con `python3 scripts/release_version.py --bump fix` (oppure `improvement`/`feature`)
+e aggiungi le relative note in `CHANGELOG.md`. Canali, numerazione e aggiornamento
+delle vecchie installazioni sono descritti nella [guida alle versioni](docs/versioning.md).
+Una versione già pubblicata non può essere riutilizzata per codice diverso.
+
 La firma debug prevista dalla build locale non è automaticamente la firma della
 copia distribuita. Firma, package e versione devono essere verificati prima della
 consegna; un APK compilato non è per questo aggiornabile sopra qualunque installazione.

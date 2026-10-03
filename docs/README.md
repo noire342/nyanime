@@ -10,6 +10,7 @@ I documenti tecnici in inglese conservano i nomi delle API e dei componenti.
 | --- | --- |
 | [Condivisione in Nyanime](content-sharing.md) | Schede, episodi con minutaggio e capitoli con pagina, senza logica specifica delle fonti. |
 | [Primi passi e FAQ](getting-started.md) | Installazione, aggiornamenti, estensioni, preferenze e problemi comuni. |
+| [Versioni e aggiornamenti](versioning.md) | Numerazione a quattro componenti, scelta dei canali e compatibilità OTA. |
 | [Aiuto](support.md) | Archiviazione, migrazione, tracker e risoluzione dei problemi. |
 | [Privacy](privacy.md) | Dati locali, connessioni esterne e controlli disponibili. |
 | [Tutte le funzionalità](features.md) | Catalogo delle funzioni video, manga, librerie, rete e dati. |

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_update_choice_title">Which updates would you like to receive?</string>
+    <string name="app_update_choice_description">Choose recommended releases or try upcoming features too.</string>
+    <string name="app_update_version_chip">Clearer versions · %1$s</string>
+    <string name="app_update_recommended">Recommended</string>
+    <string name="app_update_recommended_badge">Recommended choice</string>
+    <string name="app_update_recommended_description">Features and fixes after review. For everyday use of Nyanime.</string>
+    <string name="app_update_previews">Include previews</string>
+    <string name="app_update_preview_description">All recommended releases and features in testing. More frequent updates, with possible issues.</string>
+    <string name="app_update_change_later">You can change your choice in Settings → Updates.</string>
+    <string name="app_update_confirm">Confirm choice</string>
+    <string name="app_update_once">We only ask you once.</string>
+    <string name="app_update_settings_title">Updates</string>
+    <string name="app_update_settings_description">Choose which versions of Nyanime you receive.</string>
+    <string name="app_update_current_version">Installed version · %1$s</string>
+    <string name="app_update_saved">Update preferences saved.</string>
+    <string name="app_update_check">Check for updates</string>
+    <string name="app_update_no_new">You have the latest version available for your choice.</string>
+    <string name="app_update_checking">Checking for updates…</string>
+    <string name="app_update_check_error">Could not check for updates. Try again.</string>
+    <string name="app_update_wait_recommended">Switching does not install an older version. You will receive the next recommended release newer than yours.</string>
+</resources>

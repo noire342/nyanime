@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_update_choice_title">Quali aggiornamenti vuoi ricevere?</string>
+    <string name="app_update_choice_description">Scegli quelli consigliati o prova anche le novità in anteprima.</string>
+    <string name="app_update_version_chip">Versioni più chiare · %1$s</string>
+    <string name="app_update_recommended">Consigliati</string>
+    <string name="app_update_recommended_badge">Consigliato</string>
+    <string name="app_update_recommended_description">Novità e correzioni dopo le verifiche. Per usare Nyanime ogni giorno.</string>
+    <string name="app_update_previews">Anche le anteprime</string>
+    <string name="app_update_preview_description">Tutte le versioni consigliate e le novità in prova. Aggiornamenti più frequenti, con possibili problemi.</string>
+    <string name="app_update_change_later">Puoi cambiare scelta in Impostazioni → Aggiornamenti.</string>
+    <string name="app_update_confirm">Conferma scelta</string>
+    <string name="app_update_once">Te lo chiediamo una sola volta.</string>
+    <string name="app_update_settings_title">Aggiornamenti</string>
+    <string name="app_update_settings_description">Scegli quali versioni di Nyanime ricevere.</string>
+    <string name="app_update_current_version">Versione installata · %1$s</string>
+    <string name="app_update_saved">Preferenze di aggiornamento salvate.</string>
+    <string name="app_update_check">Controlla aggiornamenti</string>
+    <string name="app_update_no_new">Hai già la versione più recente disponibile per la tua scelta.</string>
+    <string name="app_update_checking">Controllo degli aggiornamenti…</string>
+    <string name="app_update_check_error">Impossibile controllare gli aggiornamenti. Riprova.</string>
+    <string name="app_update_wait_recommended">Il cambio non installa una versione precedente. Riceverai la prossima versione consigliata più recente della tua.</string>
+</resources>
