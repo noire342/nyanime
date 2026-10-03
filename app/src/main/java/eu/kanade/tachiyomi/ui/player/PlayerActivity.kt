@@ -113,6 +113,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
@@ -137,6 +139,7 @@ import kotlin.math.floor
 import kotlin.time.Duration.Companion.seconds
 
 class PlayerActivity : BaseActivity() {
+    private val trackLoadingMutex = Mutex()
     val castController by lazy { CastController.get(applicationContext) }
 
     fun castRequest(video: Video? = viewModel.currentVideo.value): CastRequest? {
@@ -2249,7 +2252,7 @@ class PlayerActivity : BaseActivity() {
         }
     }
 
-    private fun setupTracks() {
+    private suspend fun setupTracks() {
         if (player.isExiting) return
         viewModel.isLoadingTracks.update { _ -> true }
 
@@ -2263,11 +2266,22 @@ class PlayerActivity : BaseActivity() {
             return
         }
 
-        audioTracks?.forEach { audio ->
-            executeMPVCommand(arrayOf("audio-add", audio.url, "auto", audio.lang))
-        }
-        subtitleTracks?.forEach { sub ->
-            executeMPVCommand(arrayOf("sub-add", sub.url, "auto", sub.lang))
+        val generation = playbackGeneration
+        // Adding a remote track may synchronously open its URL. Keep the player
+        // controls responsive even when an extension supplies many slow tracks.
+        withContext(Dispatchers.IO) {
+            trackLoadingMutex.withLock {
+                audioTracks?.forEach { audio ->
+                    currentCoroutineContext().ensureActive()
+                    if (player.isExiting || playbackGeneration != generation) return@withLock
+                    executeMPVCommand(arrayOf("audio-add", audio.url, "auto", audio.lang))
+                }
+                subtitleTracks?.forEach { sub ->
+                    currentCoroutineContext().ensureActive()
+                    if (player.isExiting || playbackGeneration != generation) return@withLock
+                    executeMPVCommand(arrayOf("sub-add", sub.url, "auto", sub.lang))
+                }
+            }
         }
 
         viewModel.isLoadingTracks.update { _ -> false }
