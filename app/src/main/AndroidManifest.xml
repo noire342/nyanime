@@ -128,7 +128,16 @@
                 <data android:host="extension-store" />
             </intent-filter>
 
-            <!-- Open backup files -->
+            <!-- Import extension catalogues -->
+            <intent-filter android:label="@string/action_add_repo">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="nyanime" android:host="extension-catalogue" />
+                <data android:scheme="nyanime" android:host="anime-store" />
+                <data android:scheme="nyanime" android:host="manga-repo" />
+            </intent-filter>
+
             <intent-filter android:label="@string/pref_restore_backup">
                 <action android:name="android.intent.action.VIEW" />
 
@@ -183,6 +192,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="noire342.github.io" android:path="/open/" />
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="owouwuiwi.github.io" android:path="/open/" />
             </intent-filter>
         </activity>
 

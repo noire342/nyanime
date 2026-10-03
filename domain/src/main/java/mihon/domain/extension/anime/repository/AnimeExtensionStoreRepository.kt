@@ -7,6 +7,8 @@ import mihon.domain.extension.anime.model.AnimeExtensionStore
 interface AnimeExtensionStoreRepository {
     suspend fun insert(indexUrl: String): Result<Unit>
 
+    suspend fun upsert(store: AnimeExtensionStore)
+
     suspend fun insertFromPreference(indexUrl: String, name: String)
 
     suspend fun refreshAll()

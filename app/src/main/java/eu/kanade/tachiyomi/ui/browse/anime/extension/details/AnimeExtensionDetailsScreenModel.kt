@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.Immutable
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import eu.kanade.domain.extension.ExtensionUpdateRepository
 import eu.kanade.domain.extension.anime.interactor.AnimeExtensionSourceItem
 import eu.kanade.domain.extension.anime.interactor.GetAnimeExtensionSources
 import eu.kanade.domain.source.anime.interactor.ToggleAnimeIncognito
@@ -21,6 +22,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -48,6 +50,16 @@ class AnimeExtensionDetailsScreenModel(
 
     init {
         screenModelScope.launch {
+            launch {
+                extensionManager.installedExtensionsFlow.combine(extensionManager.availableExtensionsFlow) {
+                        installed,
+                        _,
+                    ->
+                    installed.firstOrNull { it.pkgName == pkgName }?.let(extensionManager::updateRepositories).orEmpty()
+                }.distinctUntilChanged().collectLatest { repositories ->
+                    mutableState.update { it.copy(updateRepositories = repositories.toImmutableList()) }
+                }
+            }
             launch {
                 extensionManager.installedExtensionsFlow
                     .map { it.firstOrNull { extension -> extension.pkgName == pkgName } }
@@ -121,6 +133,11 @@ class AnimeExtensionDetailsScreenModel(
         logcat { "Cleared $cleared cookies for: ${urls.joinToString()}" }
     }
 
+    fun bindUpdateRepository(repository: String) {
+        val extension = state.value.extension ?: return
+        extensionManager.bindUpdateRepository(extension, repository)
+    }
+
     fun setKeepVersion(keep: Boolean) {
         val extension = state.value.extension ?: return
         extensionManager.setKeepVersion(extension, keep)
@@ -151,6 +168,7 @@ class AnimeExtensionDetailsScreenModel(
     data class State(
         val extension: AnimeExtension.Installed? = null,
         val isIncognito: Boolean = false,
+        val updateRepositories: ImmutableList<ExtensionUpdateRepository> = persistentListOf(),
         private val _sources: ImmutableList<AnimeExtensionSourceItem>? = null,
     ) {
 

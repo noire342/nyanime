@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.drawable.Drawable
 import eu.kanade.domain.extension.ExtensionUpdateCandidate
 import eu.kanade.domain.extension.ExtensionUpdatePolicy
+import eu.kanade.domain.extension.ExtensionUpdateRepository
 import eu.kanade.domain.extension.ExtensionUpdateStatus
 import eu.kanade.domain.extension.anime.interactor.TrustAnimeExtension
 import eu.kanade.domain.source.service.SourcePreferences
@@ -232,6 +233,7 @@ class AnimeExtensionManager(
         },
         compatibleApi = extension.libVersion in AnimeExtensionLoader.SUPPORTED_LIB_VERSIONS,
         distributionId = extension.distributionId,
+        repositoryAliases = extension.repositoryAliases,
     )
 
     private fun decide(extension: AnimeExtension.Installed, candidates: List<AnimeExtension.Available>) =
@@ -260,6 +262,42 @@ class AnimeExtensionManager(
             store = chosen?.store ?: extension.store,
         )
     }
+
+    fun updateRepositories(extension: AnimeExtension.Installed): List<ExtensionUpdateRepository> {
+        if (extension.metadata.distribution?.updatePolicy != "manual" ||
+            updatePreferences.keep(extension.pkgName, extension.metadata)
+        ) {
+            return emptyList()
+        }
+        return availableExtensionsMapFlow.value.values.mapNotNull { available ->
+            val decision = ExtensionUpdatePolicy.resolve(
+                extension.pkgName,
+                extension.versionCode,
+                extension.metadata,
+                listOf(candidate(available)),
+                boundRepository = available.store.indexUrl,
+                unavailableRepositories = unavailableRepositories,
+            )
+            if (decision.candidate ==
+                null
+            ) {
+                null
+            } else {
+                ExtensionUpdateRepository(available.store.name, available.store.indexUrl)
+            }
+        }.distinctBy { it.url }
+    }
+
+    fun bindUpdateRepository(extension: AnimeExtension.Installed, repository: String): Boolean {
+        if (updateRepositories(extension).none { it.url == repository }) return false
+        updatePreferences.bind(extension.pkgName, extension.metadata, repository)
+        updatedInstalledAnimeExtensionsStatuses(availableExtensionsMapFlow.value.values.toList())
+        return true
+    }
+
+    fun approvedManualRepository(extension: AnimeExtension.Installed): String? =
+        updatePreferences.repository(extension.pkgName, extension.metadata)
+            .takeUnless { updatePreferences.keep(extension.pkgName, extension.metadata) }
 
     fun setKeepVersion(extension: AnimeExtension.Installed, keep: Boolean) {
         updatePreferences.setKeep(extension.pkgName, extension.metadata, keep)

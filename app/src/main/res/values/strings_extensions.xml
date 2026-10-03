@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="extensions_link_updates">Connect to updates</string>
+    <string name="extensions_link_updates_hint">Choose where to receive updates. These catalogues match the installed package, signing certificate and distribution. Your library and progress are preserved.</string>
     <string name="extensions_installed">Installed</string>
     <string name="extensions_catalogue">Catalogue</string>
     <string name="extensions_all">All</string>
@@ -22,7 +24,7 @@
     <string name="extensions_partial_hint">Some declared Home sections are not compatible with this version. The catalogue remains available.</string>
     <string name="extensions_ready_hint">Provides catalogue sections to Home. Visibility and language settings still apply.</string>
     <string name="extensions_unknown_hint">This catalogue does not declare Home support. It will be checked after installation.</string>
-    <string name="extensions_manual_hint">This APK is updated manually. Repository versions will not replace it.</string>
+    <string name="extensions_manual_hint">This APK is updated manually until you explicitly connect a compatible repository.</string>
     <string name="extensions_different_hint">The available package belongs to another distribution. It cannot update this installation.</string>
     <string name="extensions_unverified_hint">The origin could not be verified. No automatic update will be offered.</string>
     <string name="extensions_ambiguous_hint">Several repositories match this package. No origin is chosen automatically.</string>
@@ -48,4 +50,11 @@
     <string name="extensions_check_error">Some catalogues could not be checked. Pull to retry.</string>
     <string name="extensions_nsfw">Adult content</string>
     <string name="extensions_open_site">Open website</string>
+    <string name="extensions_catalogue_add">Add catalogue</string>
+    <string name="extensions_catalogue_counts">%1$d video extensions · %2$d manga extensions · %3$d news extensions</string>
+    <string name="extensions_catalogue_consent">Add this catalogue for video, manga and news. Extensions are installed only when you choose them.</string>
+    <string name="extensions_catalogue_replaces">Replaces previous catalogues: %1$s</string>
+    <string name="extensions_catalogue_error">The catalogue could not be added. Check the link and connection, then try again.</string>
+    <string name="extensions_catalogue_done">Catalogue added. Video and manga extensions are in Browse; news extensions are in News → Sources.</string>
+    <string name="action_close">Close</string>
 </resources>

@@ -41,6 +41,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import eu.kanade.domain.extension.ExtensionUpdateRepository
 import eu.kanade.domain.extension.anime.interactor.AnimeExtensionSourceItem
 import eu.kanade.presentation.browse.anime.components.AnimeExtensionIcon
 import eu.kanade.presentation.browse.components.ExtensionIntegrationDetails
@@ -77,6 +78,7 @@ fun AnimeExtensionDetailsScreen(
     onClickSource: (sourceId: Long) -> Unit,
     onClickIncognito: (Boolean) -> Unit,
     onKeepVersion: (Boolean) -> Unit = {},
+    onUpdateRepository: (String) -> Unit = {},
 ) {
     val uriHandler = LocalUriHandler.current
     val url = remember(state.extension) {
@@ -151,6 +153,8 @@ fun AnimeExtensionDetailsScreen(
             onClickSource = onClickSource,
             onClickIncognito = onClickIncognito,
             onKeepVersion = onKeepVersion,
+            updateRepositories = state.updateRepositories,
+            onUpdateRepository = onUpdateRepository,
         )
     }
 }
@@ -166,6 +170,8 @@ private fun AnimeExtensionDetails(
     onClickSource: (sourceId: Long) -> Unit,
     onClickIncognito: (Boolean) -> Unit,
     onKeepVersion: (Boolean) -> Unit = {},
+    onUpdateRepository: (String) -> Unit = {},
+    updateRepositories: List<ExtensionUpdateRepository> = emptyList(),
 ) {
     val context = LocalContext.current
     var showNsfwWarning by remember { mutableStateOf(false) }
@@ -205,6 +211,8 @@ private fun AnimeExtensionDetails(
                 repository = extension.store?.name,
                 keep = extension.keepVersion,
                 onKeep = onKeepVersion,
+                updateRepositories = updateRepositories,
+                onUpdateRepository = onUpdateRepository,
             )
         }
 
@@ -415,7 +423,7 @@ private fun InfoText(
         )
 
         Text(
-            text = secondaryText + if (onClick != null) " ⓘ" else "",
+            text = secondaryText + if (onClick != null) " â“˜" else "",
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),

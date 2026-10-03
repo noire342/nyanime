@@ -47,6 +47,7 @@ sealed class MangaExtension {
         override val isNsfw: Boolean,
         val expectedSigner: String? = null,
         val distributionId: String? = null,
+        val repositoryAliases: Set<String> = emptySet(),
         val sources: List<MangaSource>,
         val apkUrl: String,
         val iconUrl: String,

@@ -54,7 +54,7 @@ class AnimeExtensionStoreRepositoryImpl(
         }
     }
 
-    private suspend fun upsert(store: AnimeExtensionStore) {
+    override suspend fun upsert(store: AnimeExtensionStore) {
         handler.await {
             extension_storeQueries.upsert(
                 indexUrl = store.indexUrl,

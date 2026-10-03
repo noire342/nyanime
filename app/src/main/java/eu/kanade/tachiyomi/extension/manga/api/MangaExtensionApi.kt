@@ -200,7 +200,9 @@ internal class MangaExtensionApi {
     }
 
     private fun NetworkMangaExtensionStore.ExtensionList.toExtensions(repoUrl: String): List<MangaExtension.Available> {
-        return extensions.map { extension ->
+        return extensions.filter {
+            eu.kanade.domain.extension.ExtensionCatalogueMedium.accepts(it.medium, "manga")
+        }.map { extension ->
             val lang = extension.sources.map { it.language }.toSet()
             MangaExtension.Available(
                 name = extension.name,
@@ -222,6 +224,7 @@ internal class MangaExtensionApi {
                 iconUrl = extension.resources.iconUrl,
                 repoUrl = repoUrl,
                 distributionId = extension.nyanimeDistributionId,
+                repositoryAliases = extension.repositoryAliases,
             )
         }
     }

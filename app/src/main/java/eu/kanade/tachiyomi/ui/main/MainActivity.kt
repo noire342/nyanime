@@ -67,6 +67,7 @@ import eu.kanade.presentation.components.DownloadedOnlyBannerBackgroundColor
 import eu.kanade.presentation.components.IncognitoModeBannerBackgroundColor
 import eu.kanade.presentation.components.IndexingBannerBackgroundColor
 import eu.kanade.presentation.more.settings.screen.browse.AnimeExtensionStoresScreen
+import eu.kanade.presentation.more.settings.screen.browse.ExtensionCatalogueScreen
 import eu.kanade.presentation.more.settings.screen.browse.MangaExtensionReposScreen
 import eu.kanade.presentation.more.settings.screen.data.RestoreBackupScreen
 import eu.kanade.presentation.util.AssistContentScreen
@@ -614,6 +615,11 @@ class MainActivity : BaseActivity() {
                 else if (BackupFileFormat.acceptsPath(intent.data?.path)) {
                     navigator.popUntilRoot()
                     navigator.push(RestoreBackupScreen(intent.data.toString()))
+                } else if (intent.scheme == "nyanime" && intent.data?.host == "extension-catalogue") {
+                    intent.data?.getQueryParameter("url")?.let { repoUrl ->
+                        navigator.popUntilRoot()
+                        navigator.push(ExtensionCatalogueScreen(repoUrl.take(4096)))
+                    }
                 }
                 // Deep link to add anime extension repo
                 else if (intent.isAddAnimeExtensionStoreIntent()) {
@@ -622,7 +628,9 @@ class MainActivity : BaseActivity() {
                         navigator.push(AnimeExtensionStoresScreen(repoUrl))
                     }
                 } // Deep link to add extension repo
-                else if (intent.scheme == "tachiyomi" && intent.data?.host == "add-repo") {
+                else if ((intent.scheme == "tachiyomi" && intent.data?.host == "add-repo") ||
+                    (intent.scheme == "nyanime" && intent.data?.host == "manga-repo")
+                ) {
                     intent.data?.getQueryParameter("url")?.let { repoUrl ->
                         navigator.popUntilRoot()
                         navigator.push(MangaExtensionReposScreen(repoUrl))
@@ -655,7 +663,8 @@ class MainActivity : BaseActivity() {
     }
 
     private fun Intent.isAddAnimeExtensionStoreIntent(): Boolean {
-        return scheme == "aniyomi" && (data?.host == "add-repo" || data?.host == "extension-store")
+        return (scheme == "aniyomi" && (data?.host == "add-repo" || data?.host == "extension-store")) ||
+            (scheme == "nyanime" && data?.host == "anime-store")
     }
 
     companion object {

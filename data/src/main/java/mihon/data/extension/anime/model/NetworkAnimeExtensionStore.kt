@@ -38,6 +38,8 @@ data class NetworkAnimeExtensionStore(
         @ProtoNumber(8) val isTorrent: Boolean = false,
         @ProtoNumber(9) val sources: List<Source>,
         @ProtoNumber(10001) val nyanimeDistributionId: String? = null,
+        @ProtoNumber(10002) val medium: String? = null,
+        @ProtoNumber(10003) val repositoryAliases: Set<String> = emptySet(),
     )
 
     @Serializable
@@ -94,7 +96,9 @@ data class NetworkAnimeExtensionStore(
 fun NetworkAnimeExtensionStore.ExtensionList.toAvailableExtensions(
     store: AnimeExtensionStore,
 ): List<AnimeExtension.Available> {
-    return extensions.map { extension ->
+    return extensions.filter {
+        eu.kanade.domain.extension.ExtensionCatalogueMedium.accepts(it.medium, "anime")
+    }.map { extension ->
         val lang = extension.sources.map { it.language }.toSet()
         AnimeExtension.Available(
             name = extension.name,
@@ -117,6 +121,7 @@ fun NetworkAnimeExtensionStore.ExtensionList.toAvailableExtensions(
             },
             store = store,
             distributionId = extension.nyanimeDistributionId,
+            repositoryAliases = extension.repositoryAliases,
         )
     }
 }

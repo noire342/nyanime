@@ -55,6 +55,7 @@ data class ExtensionUpdateCandidate(
     val signer: String?,
     val compatibleApi: Boolean,
     val distributionId: String? = null,
+    val repositoryAliases: Set<String> = emptySet(),
 )
 
 enum class ExtensionUpdateStatus {
@@ -74,6 +75,8 @@ data class ExtensionUpdateDecision(
     val candidate: ExtensionUpdateCandidate? = null,
 )
 
+data class ExtensionUpdateRepository(val name: String, val url: String)
+
 /** UI, background checks and installers must resolve the same identity, not merely a package name. */
 object ExtensionUpdatePolicy {
     fun resolve(
@@ -88,19 +91,25 @@ object ExtensionUpdatePolicy {
         fun status(value: ExtensionUpdateStatus) = ExtensionUpdateDecision(value)
         if (keepVersion) return status(ExtensionUpdateStatus.PROTECTED)
         val distribution = metadata.distribution
-        if (distribution?.updatePolicy == "manual") return status(ExtensionUpdateStatus.MANUAL)
+        if (distribution?.updatePolicy == "manual" && boundRepository == null) {
+            return status(ExtensionUpdateStatus.MANUAL)
+        }
         if (metadata.invalidDistribution) return status(ExtensionUpdateStatus.UNVERIFIED)
         if (distribution == null && metadata.hasHomeDeclaration && boundRepository == null) {
             return status(ExtensionUpdateStatus.MANUAL)
         }
-        val repository = distribution?.repository ?: boundRepository
+        val repository = if (distribution?.updatePolicy == "manual") {
+            boundRepository
+        } else {
+            distribution?.repository ?: boundRepository
+        }
         val all = candidates.filter {
             it.packageName == packageName &&
                 it.compatibleApi &&
                 it.repository !in unavailableRepositories
         }
         val matching = all.filter {
-            (repository == null || it.repository == repository) &&
+            (repository == null || it.repository == repository || repository in it.repositoryAliases) &&
                 it.signer?.lowercase() in metadata.signers.map(String::lowercase) &&
                 (distribution == null || it.distributionId == distribution.id)
         }
@@ -127,4 +136,18 @@ object ExtensionUpdatePolicy {
             latest,
         )
     }
+
+    /** A manual APK may adopt updates only from the repository explicitly chosen by its user. */
+    fun permitsManualTransition(
+        old: ExtensionPackageMetadata,
+        updated: ExtensionPackageMetadata,
+        approvedRepository: String?,
+    ): Boolean = approvedRepository?.startsWith("https://") == true &&
+        old.distribution?.updatePolicy == "manual" &&
+        updated.distribution?.updatePolicy == "repository" &&
+        updated.distribution.repository == approvedRepository &&
+        old.distribution.id == updated.distribution.id &&
+        old.signers.isNotEmpty() &&
+        old.signers == updated.signers &&
+        (!old.hasHomeDeclaration || updated.hasHomeDeclaration)
 }

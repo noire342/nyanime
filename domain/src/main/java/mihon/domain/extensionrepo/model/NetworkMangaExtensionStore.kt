@@ -40,6 +40,8 @@ data class NetworkMangaExtensionStore(
         @ProtoNumber(7) val contentWarning: ContentWarning,
         @ProtoNumber(8) val sources: List<Source>,
         @ProtoNumber(10001) val nyanimeDistributionId: String? = null,
+        @ProtoNumber(10002) val medium: String? = null,
+        @ProtoNumber(10003) val repositoryAliases: Set<String> = emptySet(),
     )
 
     @Serializable

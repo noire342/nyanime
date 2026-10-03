@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.core.content.pm.PackageInfoCompat
 import com.android.apksig.ApkVerifier
 import eu.kanade.domain.extension.ExtensionPackageMetadata
+import eu.kanade.domain.extension.ExtensionUpdatePolicy
 import java.io.File
 
 /** Verification precedes every installer backend, including loading APKs privately. */
@@ -25,6 +26,7 @@ object ExtensionApkValidator {
         val anime: Boolean = false,
         val libVersion: Double,
         val installed: ExtensionPackageMetadata? = null,
+        val approvedManualRepository: String? = null,
         val kind: Kind = if (anime) Kind.ANIME else Kind.MANGA,
     )
 
@@ -58,6 +60,10 @@ object ExtensionApkValidator {
         val metadata = ExtensionPackageInspector.inspect(info) { it.sections.size }
         require(!metadata.invalidDistribution)
         require(expected.distributionId == metadata.distribution?.id)
+        if (expected.kind == Kind.NEWS) {
+            require(metadata.distribution?.updatePolicy == "repository")
+            require(metadata.distribution?.repository == expected.repository)
+        }
         val signer = expected.signer?.lowercase()
         if (signer != null && signer.matches(Regex("[a-f0-9]{64}"))) {
             require(signer in metadata.signerHistory || signer in metadata.signers)
@@ -70,7 +76,10 @@ object ExtensionApkValidator {
                 require(metadata.signerHistory.containsAll(old.signers) || metadata.signers == old.signers)
             }
             require(old.distribution?.id == metadata.distribution?.id)
-            require(old.distribution?.updatePolicy != "manual")
+            if (old.distribution?.updatePolicy == "manual") {
+                require(expected.repository == expected.approvedManualRepository)
+                require(ExtensionUpdatePolicy.permitsManualTransition(old, metadata, expected.approvedManualRepository))
+            }
             require(!old.hasHomeDeclaration || metadata.hasHomeDeclaration)
         }
         true

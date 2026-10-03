@@ -60,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.kanade.domain.extension.ExtensionHomeSupport
 import eu.kanade.domain.extension.ExtensionPackageMetadata
+import eu.kanade.domain.extension.ExtensionUpdateRepository
 import eu.kanade.domain.extension.ExtensionUpdateStatus
 import eu.kanade.presentation.motion.ModernMotion
 import eu.kanade.presentation.motion.modernMotionEnabled
@@ -451,7 +452,10 @@ fun ExtensionIntegrationDetails(
     repository: String?,
     keep: Boolean,
     onKeep: (Boolean) -> Unit,
+    updateRepositories: List<ExtensionUpdateRepository> = emptyList(),
+    onUpdateRepository: (String) -> Unit = {},
 ) {
+    var chooseRepository by remember { mutableStateOf(false) }
     Surface(
         Modifier.fillMaxWidth().padding(16.dp),
         shape = RoundedCornerShape(20.dp),
@@ -492,6 +496,12 @@ fun ExtensionIntegrationDetails(
                 else -> null
             }
             if (hint != null) Text(stringResource(hint), style = MaterialTheme.typography.bodySmall)
+            if (updateRepositories.isNotEmpty() && !keep) {
+                TextButton(onClick = { chooseRepository = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Outlined.SystemUpdateAlt, null, Modifier.size(18.dp))
+                    Text(stringResource(R.string.extensions_link_updates), Modifier.padding(start = 8.dp))
+                }
+            }
             Row(Modifier.fillMaxWidth().clickable { onKeep(!keep) }, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(end = 12.dp)) {
                     Text(stringResource(R.string.extensions_keep), style = MaterialTheme.typography.titleSmall)
@@ -500,6 +510,39 @@ fun ExtensionIntegrationDetails(
                 Switch(checked = keep, onCheckedChange = onKeep)
             }
         }
+    }
+    if (chooseRepository) {
+        AlertDialog(
+            onDismissRequest = { chooseRepository = false },
+            title = { Text(stringResource(R.string.extensions_link_updates)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.extensions_link_updates_hint))
+                    updateRepositories.forEach { repository ->
+                        TextButton(onClick = {
+                            chooseRepository = false
+                            onUpdateRepository(repository.url)
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.fillMaxWidth()) {
+                                Text(repository.name, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    repository.url,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { chooseRepository = false }) {
+                    Text(stringResource(R.string.extensions_cancel))
+                }
+            },
+        )
     }
 }
 

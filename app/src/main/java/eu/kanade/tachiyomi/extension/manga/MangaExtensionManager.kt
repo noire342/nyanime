@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.drawable.Drawable
 import eu.kanade.domain.extension.ExtensionUpdateCandidate
 import eu.kanade.domain.extension.ExtensionUpdatePolicy
+import eu.kanade.domain.extension.ExtensionUpdateRepository
 import eu.kanade.domain.extension.ExtensionUpdateStatus
 import eu.kanade.domain.extension.manga.interactor.TrustMangaExtension
 import eu.kanade.domain.source.service.SourcePreferences
@@ -225,6 +226,7 @@ class MangaExtensionManager(
         signer = extension.expectedSigner?.takeIf { it.matches(Regex("[a-fA-F0-9]{64}")) },
         compatibleApi = extension.libVersion in MangaExtensionLoader.SUPPORTED_LIB_VERSIONS,
         distributionId = extension.distributionId,
+        repositoryAliases = extension.repositoryAliases,
     )
 
     private fun decide(extension: MangaExtension.Installed, candidates: List<MangaExtension.Available>) =
@@ -254,6 +256,43 @@ class MangaExtensionManager(
             repoName = chosen?.repoName ?: extension.repoName,
         )
     }
+
+    fun updateRepositories(extension: MangaExtension.Installed): List<ExtensionUpdateRepository> {
+        if (extension.metadata.distribution?.updatePolicy != "manual" ||
+            updatePreferences.keep(extension.pkgName, extension.metadata)
+        ) {
+            return emptyList()
+        }
+        return availableExtensionsMapFlow.value.values.mapNotNull { available ->
+            val repository = available.repoUrl
+            val decision = ExtensionUpdatePolicy.resolve(
+                extension.pkgName,
+                extension.versionCode,
+                extension.metadata,
+                listOf(candidate(available)),
+                boundRepository = repository,
+                unavailableRepositories = unavailableRepositories,
+            )
+            if (decision.candidate ==
+                null
+            ) {
+                null
+            } else {
+                ExtensionUpdateRepository(available.repoName ?: repository, repository)
+            }
+        }.distinctBy { it.url }
+    }
+
+    fun bindUpdateRepository(extension: MangaExtension.Installed, repository: String): Boolean {
+        if (updateRepositories(extension).none { it.url == repository }) return false
+        updatePreferences.bind(extension.pkgName, extension.metadata, repository)
+        updatedInstalledExtensionsStatuses(availableExtensionsMapFlow.value.values.toList())
+        return true
+    }
+
+    fun approvedManualRepository(extension: MangaExtension.Installed): String? =
+        updatePreferences.repository(extension.pkgName, extension.metadata)
+            .takeUnless { updatePreferences.keep(extension.pkgName, extension.metadata) }
 
     fun setKeepVersion(extension: MangaExtension.Installed, keep: Boolean) {
         updatePreferences.setKeep(extension.pkgName, extension.metadata, keep)

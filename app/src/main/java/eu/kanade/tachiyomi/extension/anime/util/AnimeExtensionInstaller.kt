@@ -196,6 +196,7 @@ internal class AnimeExtensionInstaller(private val context: Context) {
                 val current = expected.copy(
                     installedVersion = live?.versionCode ?: expected.installedVersion,
                     installed = live?.metadata ?: expected.installed,
+                    approvedManualRepository = live?.let(manager::approvedManualRepository),
                 )
                 if (!ExtensionApkValidator.validate(context, staged, current)) {
                     manager.updateInstallStep(downloadId, InstallStep.Error)

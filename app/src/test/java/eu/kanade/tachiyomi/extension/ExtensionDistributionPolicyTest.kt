@@ -26,6 +26,24 @@ class ExtensionDistributionPolicyTest {
     ) =
         ExtensionUpdatePolicy.resolve("example.extension", 10, meta, candidates, keep, bound, failures)
 
+    @Test fun catalogueMigrationKeepsSignerAndDistributionChecks() {
+        val oldUrl = "https://catalogue.invalid/previous/index.json"
+        val distribution =
+            ExtensionDistribution(id = "example", label = "Example", updatePolicy = "repository", repository = oldUrl)
+        val meta = metadata.copy(distribution = distribution)
+        val migrated = candidate.copy(distributionId = "example", repositoryAliases = setOf(oldUrl))
+        assertEquals(ExtensionUpdateStatus.AVAILABLE, resolve(meta, listOf(migrated)).status)
+        assertEquals(
+            ExtensionUpdateStatus.DIFFERENT_DISTRIBUTION,
+            resolve(meta, listOf(migrated.copy(signer = local))).status,
+        )
+        assertEquals(
+            ExtensionUpdateStatus.DIFFERENT_DISTRIBUTION,
+            resolve(meta, listOf(migrated.copy(distributionId = "other"))).status,
+        )
+        assertEquals(ExtensionUpdateStatus.PROTECTED, resolve(meta, listOf(migrated), keep = true).status)
+    }
+
     @Test fun newerOriginalIsEligibleOnlyWithTheMatchingSigner() {
         assertEquals(ExtensionUpdateStatus.AVAILABLE, resolve().status)
         assertEquals(
@@ -38,6 +56,44 @@ class ExtensionDistributionPolicyTest {
         val meta = metadata.copy(distribution = ExtensionDistribution(id = "local", label = "Local"))
         assertEquals(ExtensionUpdateStatus.MANUAL, resolve(meta).status)
         assertNull(resolve(meta).candidate)
+    }
+
+    @Test fun manualUpdatesRequireAnExplicitSignerBoundRepositoryChoice() {
+        val manual = metadata.copy(distribution = ExtensionDistribution(id = "local", label = "Local"))
+        val update = candidate.copy(distributionId = "local")
+        assertEquals(ExtensionUpdateStatus.MANUAL, resolve(manual, listOf(update)).status)
+        assertEquals(ExtensionUpdateStatus.AVAILABLE, resolve(manual, listOf(update), bound = repo).status)
+        assertEquals(ExtensionUpdateStatus.PROTECTED, resolve(manual, listOf(update), keep = true, bound = repo).status)
+        assertEquals(
+            ExtensionUpdateStatus.DIFFERENT_DISTRIBUTION,
+            resolve(manual, listOf(update.copy(signer = local)), bound = repo).status,
+        )
+        assertEquals(
+            ExtensionUpdateStatus.DIFFERENT_DISTRIBUTION,
+            resolve(manual, listOf(update.copy(repository = "https://other.invalid/index.json")), bound = repo).status,
+        )
+    }
+
+    @Test fun manualMigrationChecksTheDownloadedApkPublisherRepositoryAndHome() {
+        val old = metadata.copy(
+            home = ExtensionHomeSupport.READY,
+            distribution = ExtensionDistribution(id = "local", label = "Local"),
+        )
+        val updated = old.copy(
+            distribution = old.distribution!!.copy(updatePolicy = "repository", repository = repo),
+        )
+        org.junit.jupiter.api.Assertions.assertTrue(ExtensionUpdatePolicy.permitsManualTransition(old, updated, repo))
+        for (invalid in listOf(
+            updated.copy(signers = setOf(local)),
+            updated.copy(home = ExtensionHomeSupport.NONE),
+            updated.copy(distribution = updated.distribution!!.copy(id = "other")),
+            old,
+        )) {
+            org.junit.jupiter.api.Assertions.assertFalse(
+                ExtensionUpdatePolicy.permitsManualTransition(old, invalid, repo),
+            )
+        }
+        org.junit.jupiter.api.Assertions.assertFalse(ExtensionUpdatePolicy.permitsManualTransition(old, updated, null))
     }
 
     @Test fun legacyHomeApksAreProtectedWithoutInferringTheirPublisherFromTheName() {

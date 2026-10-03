@@ -50,6 +50,7 @@ sealed class AnimeExtension {
         override val isTorrent: Boolean,
         val expectedSigner: String? = null,
         val distributionId: String? = null,
+        val repositoryAliases: Set<String> = emptySet(),
         val sources: List<AnimeSource>,
         val apkUrl: String,
         val iconUrl: String,

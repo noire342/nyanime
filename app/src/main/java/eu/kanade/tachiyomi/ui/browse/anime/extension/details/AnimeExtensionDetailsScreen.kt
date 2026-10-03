@@ -46,6 +46,7 @@ data class AnimeExtensionDetailsScreen(
             onClickSource = screenModel::toggleSource,
             onClickIncognito = screenModel::toggleIncognito,
             onKeepVersion = screenModel::setKeepVersion,
+            onUpdateRepository = screenModel::bindUpdateRepository,
         )
 
         LaunchedEffect(Unit) {
