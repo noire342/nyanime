@@ -68,6 +68,20 @@ Numeric clients ignore these aliases. The app and APK filenames show only X.Y.Z.
 legacy tag identifiers are retained solely for compatibility with already shipped clients.
 The old application ID and signing identity are unchanged, preserving app data.
 
+## The update screen
+
+The update page shows the installed and available versions, complete release notes in
+separate cards, and a fixed action area. Only release notes scroll; the compact version
+header and download status remain visible. Download progress, waiting, cancellation and
+retry states stay visible without blocking navigation. Closing the page does not stop
+an active download; its notification and the existing ready-update cards remain available.
+
+The install action only appears after checking that the saved APK still exists, belongs
+to this application and is newer than the installed version. These checks run off the
+UI thread and repeat when returning from Android's installer. Missing or obsolete
+files can be downloaded again. The page respects the in-app installation preference,
+the chosen theme and reduced motion, with Italian and English labels.
+
 To promote a tested preview without rebuilding it, manually run **Nyanime releases and
 OTA** on the same commit with the Recommended channel. Existing public APK assets are
 not overwritten. Unfinished uploads stay drafts until all assets have been uploaded.

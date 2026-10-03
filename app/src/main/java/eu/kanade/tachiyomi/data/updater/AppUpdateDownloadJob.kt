@@ -146,7 +146,7 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
         const val PROGRESS = "PROGRESS"
         const val OUTPUT_APK_PATH = "APK_PATH"
 
-        fun start(context: Context, url: String, title: String? = null) {
+        fun start(context: Context, url: String, title: String? = null): java.util.UUID {
             val constraints = Constraints(
                 requiredNetworkType = NetworkType.CONNECTED,
             )
@@ -165,6 +165,7 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
                 .build()
 
             context.workManager.enqueueUniqueWork(TAG, ExistingWorkPolicy.REPLACE, request)
+            return request.id
         }
 
         fun observe(context: Context) = context.workManager.getWorkInfosForUniqueWorkFlow(TAG)

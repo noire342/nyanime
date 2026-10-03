@@ -7,6 +7,7 @@ import android.provider.Settings
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.net.toUri
 import androidx.work.WorkInfo
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.util.storage.getUriCompat
 import tachiyomi.domain.release.model.ReleaseVersion
 import java.io.File
@@ -60,7 +61,7 @@ fun installReadyAppUpdate(context: Context, apk: File): String? = try {
                 data = "package:${context.packageName}".toUri()
             },
         )
-        "Consenti l'installazione da Nyanime, poi torna nell'app e premi Installa."
+        context.getString(R.string.app_update_install_permission)
     } else {
         context.startActivity(
             Intent(Intent.ACTION_VIEW).apply {
@@ -71,5 +72,5 @@ fun installReadyAppUpdate(context: Context, apk: File): String? = try {
         null
     }
 } catch (e: Exception) {
-    "Impossibile aprire l'installer Android: ${e.localizedMessage.orEmpty()}"
+    context.getString(R.string.app_update_install_error)
 }

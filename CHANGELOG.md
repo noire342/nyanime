@@ -9,6 +9,15 @@ Le vecchie revisioni `rNNNN` restano riconosciute dal sistema OTA. Gli hash qui 
 identificano modifiche nel repository, non garantiscono che ogni commit sia stato
 distribuito come APK.
 
+## 3 ottobre 2026 — Una nuova schermata per gli aggiornamenti
+
+- Schermata degli aggiornamenti ridisegnata con testata compatta, versione e comandi
+  fissi; scorrono soltanto le novità, in schede leggibili nei temi chiaro e scuro.
+- Download con avanzamento, annullamento e possibilità di continuare a usare l’app;
+  «Installa ora» compare dopo il controllo del file scaricato.
+- Controlli fuori dal thread dell’interfaccia, protezione dai tocchi ripetuti e recupero
+  dei file non più disponibili, con messaggi in italiano e inglese.
+
 ## 3 ottobre 2026 — Nuovo repository e continuità degli aggiornamenti
 
 - Aggiornamenti e collegamenti di aiuto usano il repository dell’organizzazione.
