@@ -64,7 +64,7 @@ class GetApplicationReleaseTest {
         every { preference.set(any()) }.answers { }
 
         val release = Release(
-            "v2.0.0",
+            "v2.0.0.0",
             "info",
             "http://example.com/release_link",
             "http://example.com/release_link.apk",
@@ -76,7 +76,7 @@ class GetApplicationReleaseTest {
             GetApplicationRelease.Arguments(
                 isPreview = false,
                 commitCount = 0,
-                versionName = "v1.0.0",
+                versionName = "v1.0.0.0",
                 repository = "test",
             ),
         )
@@ -92,7 +92,7 @@ class GetApplicationReleaseTest {
         every { preference.set(any()) }.answers { }
 
         val release = Release(
-            "v1.0.0",
+            "v1.0.0.0",
             "info",
             "http://example.com/release_link",
             "http://example.com/release_link.apk",
@@ -104,7 +104,7 @@ class GetApplicationReleaseTest {
             GetApplicationRelease.Arguments(
                 isPreview = false,
                 commitCount = 0,
-                versionName = "v2.0.0",
+                versionName = "v2.0.0.0",
                 repository = "test",
             ),
         )
@@ -144,7 +144,7 @@ class GetApplicationReleaseTest {
         every { preference.set(any()) }.answers { }
 
         val release = Release(
-            "v1.0.0",
+            "v1.0.0.0",
             "info",
             "http://example.com/release_link",
             "http://example.com/release_link.apk",
@@ -156,7 +156,7 @@ class GetApplicationReleaseTest {
             GetApplicationRelease.Arguments(
                 isPreview = false,
                 commitCount = 0,
-                versionName = "v2.0.0",
+                versionName = "v2.0.0.0",
                 repository = "test",
             ),
         )

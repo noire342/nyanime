@@ -2,9 +2,11 @@ package eu.kanade.tachiyomi.data.updater
 
 import android.content.Context
 import eu.kanade.tachiyomi.BuildConfig
-import eu.kanade.tachiyomi.util.system.isPreviewBuildType
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.domain.release.interactor.GetApplicationRelease
+import tachiyomi.domain.release.service.AppUpdatePreferences
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 
 class AppUpdateChecker {
@@ -18,13 +20,15 @@ class AppUpdateChecker {
         // }
 
         return withIOContext {
+            val preferences = AppUpdatePreferences(Injekt.get())
             val result = getApplicationRelease.await(
                 GetApplicationRelease.Arguments(
-                    isPreviewBuildType,
+                    false,
                     BuildConfig.COMMIT_COUNT.toInt(),
                     BuildConfig.VERSION_NAME,
                     GITHUB_REPO,
                     forceCheck,
+                    preferences.channel(),
                 ),
             )
 
@@ -43,12 +47,6 @@ class AppUpdateChecker {
 /** GitHub repository that publishes the fork's signed APK releases. */
 const val GITHUB_REPO = "noire342/nyanime"
 
-val RELEASE_TAG: String by lazy {
-    if (isPreviewBuildType) {
-        "r${BuildConfig.COMMIT_COUNT}"
-    } else {
-        "v${BuildConfig.VERSION_NAME}"
-    }
-}
+val RELEASE_TAG = "v${BuildConfig.VERSION_NAME}"
 
 val RELEASE_URL = "https://github.com/$GITHUB_REPO/releases/tag/$RELEASE_TAG"

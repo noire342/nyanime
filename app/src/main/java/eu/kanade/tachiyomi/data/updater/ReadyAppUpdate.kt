@@ -8,6 +8,7 @@ import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.net.toUri
 import androidx.work.WorkInfo
 import eu.kanade.tachiyomi.util.storage.getUriCompat
+import tachiyomi.domain.release.model.ReleaseVersion
 import java.io.File
 
 data class ReadyAppUpdate(val id: String, val apk: File)
@@ -32,16 +33,20 @@ fun WorkInfo.readyAppUpdate(context: Context): ReadyAppUpdate? {
     return ReadyAppUpdate(id.toString(), apk)
 }
 
-/** Preview releases intentionally share a versionCode; their revision suffix increases instead. */
+/** Numeric publications increase versionCode; suffix comparison remains only for old downloads. */
 internal fun isNewerAppUpdate(
     installedCode: Long,
     installedName: String?,
     archiveCode: Long,
     archiveName: String?,
 ): Boolean {
-    if (archiveCode != installedCode) return archiveCode > installedCode
-    val installed = installedName ?: return false
-    val archive = archiveName ?: return false
+    if (archiveCode < installedCode) return false
+    val installed = installedName.orEmpty()
+    val archive = archiveName.orEmpty()
+    val numericCurrent = ReleaseVersion.installed(installed)
+    val numericCandidate = ReleaseVersion.parse(archive)
+    if (numericCurrent != null && numericCandidate != null) return numericCandidate > numericCurrent
+    if (archiveCode > installedCode) return true
     val current = installed.substringAfterLast('-').toLongOrNull() ?: return false
     val candidate = archive.substringAfterLast('-').toLongOrNull() ?: return false
     return archive.substringBeforeLast('-') == installed.substringBeforeLast('-') && candidate > current

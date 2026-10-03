@@ -1,22 +1,29 @@
-name: Nyanime preview and OTA release
+name: Nyanime releases and OTA
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Publication channel for this manual run'
+        required: false
+        type: choice
+        options: [preview, recommended]
+        default: preview
 
 permissions:
   contents: write
 
 concurrency:
-  group: nyanime-preview-${{ github.ref }}
+  group: nyanime-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   preview:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout complete history for the preview revision
+      - name: Checkout complete release history
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
@@ -61,10 +68,20 @@ jobs:
             exit 1
           fi
 
+      - name: Validate the public version
+        id: version
+        env:
+          REQUESTED_CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [[ -n "$REQUESTED_CHANNEL" ]]; then args+=(--channel "$REQUESTED_CHANNEL"); fi
+          python3 -m unittest scripts.tests.test_release_notes scripts.tests.test_release_version
+          python3 scripts/release_version.py --check-published --github-output "$GITHUB_OUTPUT" "${args[@]}"
+
       - name: Check release notes before building
         run: |
-          python3 -m unittest discover -s scripts/tests -p test_release_notes.py
-          tag="r$(git rev-list --count HEAD)"
+          tag="${{ steps.version.outputs.tag }}"
           python3 scripts/release_notes.py --tag "$tag" --output "$RUNNER_TEMP/nyanime-release-notes.md" \
             --repository "$GITHUB_REPOSITORY" --revision "$GITHUB_SHA"
 
@@ -91,15 +108,14 @@ jobs:
           EXPECTED_CERT_SHA256: F99AD47F9286CE3D61345F65DD0F888F16AEBF53BFE75EFE5B6AB889041AB259
         run: |
           set -euo pipefail
-          tag="r$(git rev-list --count HEAD)"
-          echo "NYANIME_TAG=$tag" >> "$GITHUB_ENV"
+          version="${{ steps.version.outputs.version }}"
           sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
           apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
           if [[ -z "$apksigner" ]]; then
             echo '::error::Android apksigner is unavailable.'
             exit 1
           fi
-          mkdir -p dist
+          mkdir -p dist/numeric
           for abi in universal arm64-v8a armeabi-v7a x86 x86_64; do
             apk="app/build/outputs/apk/preview/app-${abi}-preview.apk"
             test -f "$apk" || { echo "::error::Missing $apk"; exit 1; }
@@ -109,38 +125,87 @@ jobs:
               echo "::error::Wrong signing certificate for $apk: $actual"
               exit 1
             fi
-            # Older Nyanime previews recognize these stable names; the release tag
-            # carries the version and lets every installed preview upgrade directly.
-            cp "$apk" "dist/app-${abi}-preview.apk"
+            # These names are intentionally not recognized by pre-numeric clients.
+            # Those clients must skip the canonical release and choose its compatible alias.
+            cp "$apk" "dist/numeric/Nyanime-${version}-${abi}.apk"
           done
-          (cd dist && sha256sum *.apk > SHA256SUMS)
+          (cd dist/numeric && sha256sum *.apk > SHA256SUMS)
 
       - name: Keep APKs available from the workflow
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: nyanime-preview-${{ github.sha }}
+          name: nyanime-${{ steps.version.outputs.version }}-${{ github.sha }}
           path: dist/
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish GitHub release for OTA
+      - name: Publish numeric release and permanent legacy OTA alias
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          LEGACY_TAG: ${{ steps.version.outputs.legacy_tag }}
+          CHANNEL: ${{ steps.version.outputs.channel }}
         run: |
           set -euo pipefail
-          tag="$NYANIME_TAG"
-          existing="$(git ls-remote --tags origin "refs/tags/$tag" | awk '{print $1}')"
-          if [[ -n "$existing" && "$existing" != "$GITHUB_SHA" ]]; then
-            echo "::error::Tag $tag already points to another commit. Refusing to replace an OTA version."
-            exit 1
-          fi
           notes_file="$(mktemp)"
-          python3 scripts/release_notes.py --tag "$tag" --output "$notes_file" \
+          python3 scripts/release_notes.py --tag "$TAG" --output "$notes_file" \
             --repository "$GITHUB_REPOSITORY" --revision "$GITHUB_SHA"
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" dist/* --repo "$GITHUB_REPOSITORY" --clobber
-            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "Nyanime $tag" --notes-file "$notes_file" --prerelease --draft=false
-          else
-            gh release create "$tag" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Nyanime $tag" --notes-file "$notes_file" --prerelease
+
+          check_tag() {
+            existing="$(git ls-remote --tags origin "refs/tags/$1" | awk '{print $1}')"
+            if [[ -n "$existing" && "$existing" != "$GITHUB_SHA" ]]; then
+              echo "::error::Tag $1 belongs to another commit. Refusing to replace a published APK."
+              exit 1
+            fi
+          }
+          publish() {
+            local tag="$1" directory="$2" preview="$3"
+            local latest=false
+            if [[ "$preview" == 'false' ]]; then
+              previous_latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+              if python3 - "$tag" "$previous_latest" <<'PY'
+          import sys
+          from scripts.release_version import VERSION_PATTERN
+          current = VERSION_PATTERN.fullmatch(sys.argv[1].removeprefix('v'))
+          previous = VERSION_PATTERN.fullmatch(sys.argv[2].removeprefix('v'))
+          raise SystemExit(0 if not previous or tuple(map(int, current.groups())) >= tuple(map(int, previous.groups())) else 1)
+          PY
+              then latest=true; fi
+            fi
+            check_tag "$tag"
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              draft="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')"
+              if [[ "$draft" == 'true' ]]; then
+                gh release upload "$tag" "$directory"/* --repo "$GITHUB_REPOSITORY" --clobber
+              fi
+              # Published APKs are immutable; changing channels promotes the same bytes.
+              gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "Nyanime $VERSION" \
+                --notes-file "$notes_file" --prerelease="$preview" --draft=false --latest="$latest"
+            else
+              gh release create "$tag" "$directory"/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+                --title "Nyanime $VERSION" --notes-file "$notes_file" --draft
+              gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --prerelease="$preview" --draft=false --latest="$latest"
+            fi
+          }
+
+          canonical_exists=false
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then canonical_exists=true; fi
+          preview=true
+          if [[ "$CHANNEL" == 'recommended' ]]; then preview=false; fi
+          publish "$TAG" dist/numeric "$preview"
+
+          # Every publication keeps an r-style release with fixed APK names. Old apps
+          # can therefore jump directly to the latest version, even years later.
+          # Numeric clients ignore these aliases; legacy clients skip numeric filenames.
+          if [[ "$canonical_exists" == 'true' ]]; then
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'Nyanime-*.apk' \
+              --dir dist/numeric --clobber
           fi
+          mkdir -p dist/legacy
+          for abi in universal arm64-v8a armeabi-v7a x86 x86_64; do
+            cp "dist/numeric/Nyanime-${VERSION}-${abi}.apk" "dist/legacy/app-${abi}-preview.apk"
+          done
+          (cd dist/legacy && sha256sum *.apk > SHA256SUMS)
+          publish "$LEGACY_TAG" dist/legacy true

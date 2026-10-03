@@ -2,6 +2,7 @@ import mihon.buildlogic.Config
 import mihon.buildlogic.getBuildTime
 import mihon.buildlogic.getCommitCount
 import mihon.buildlogic.getGitSha
+import java.util.Properties
 
 plugins {
     id("mihon.android.application")
@@ -17,6 +18,13 @@ shortcutHelper.setFilePath("./shortcuts.xml")
 // Release gates: dormant sources are retained; obsolete on-device data is purged. Rooms are independent.
 val communityEnabled = false
 val personalSyncEnabled = false
+val publicRelease = Properties().apply {
+    rootProject.file("release.properties").inputStream().use(::load)
+}
+val publicVersion = publicRelease.getProperty("versionName")
+require(publicVersion.matches(Regex("(0|[1-9]\\d*)(\\.(0|[1-9]\\d*)){3}"))) { "Invalid four-part public version" }
+val publicVersionCode = publicRelease.getProperty("versionCode").toInt()
+require(publicVersionCode in 134..2_100_000_000) { "Invalid Android versionCode" }
 
 android {
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
@@ -25,8 +33,8 @@ android {
     defaultConfig {
         applicationId = "xyz.jmir.tachiyomi.mi.anime4k"
 
-        versionCode = 133
-        versionName = "0.18.1.4"
+        versionCode = publicVersionCode
+        versionName = publicVersion
 
         buildConfigField("String", "COMMIT_COUNT", "\"${getCommitCount()}\"")
         buildConfigField("String", "COMMIT_SHA", "\"${getGitSha()}\"")
@@ -71,7 +79,7 @@ android {
             initWith(release)
             applicationIdSuffix = ".debug"
 
-            versionNameSuffix = debug.versionNameSuffix
+            versionNameSuffix = ""
             signingConfig = debug.signingConfig
             buildConfigField("boolean", "UPDATER_ENABLED", "true")
 

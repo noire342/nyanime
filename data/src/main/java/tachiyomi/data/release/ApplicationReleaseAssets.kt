@@ -4,11 +4,14 @@ package tachiyomi.data.release
 object ApplicationReleaseAssets {
     private val abis = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
     private val stableTag = Regex("[vr][0-9][A-Za-z0-9.+-]*")
+    private val numericName =
+        Regex("Nyanime-(\\d+\\.\\d+\\.\\d+\\.\\d+)-(universal|arm64-v8a|armeabi-v7a|x86_64|x86)\\.apk")
 
     fun select(assets: List<GitHubAsset>, supportedAbis: List<String>): String? {
         val packages = assets.mapNotNull { asset ->
             val name = asset.name
             val abi = when {
+                numericName.matches(name) -> numericName.matchEntire(name)!!.groupValues[2]
                 name == "app-universal-preview.apk" -> "universal"
                 name.removePrefix("Nyanime-").removeSuffix(".apk").matches(stableTag) &&
                     name.startsWith("Nyanime-") &&

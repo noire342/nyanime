@@ -11,18 +11,15 @@ def git(*args: str) -> str:
     return subprocess.check_output(["git", *args], text=True, encoding="utf-8").strip()
 
 
-def previous_tag(current_tag: str) -> str | None:
-    current_number = int(current_tag.removeprefix("r"))
-    candidates = git("tag", "--list", "r[0-9]*").splitlines()
-    candidates = sorted(
-        (tag for tag in candidates if re.fullmatch(r"r\d+", tag) and int(tag[1:]) < current_number),
-        key=lambda tag: int(tag[1:]),
-        reverse=True,
-    )
-    for tag in candidates:
-        if subprocess.run(["git", "merge-base", "--is-ancestor", tag, "HEAD"], check=False).returncode == 0:
-            return tag
-    return None
+def previous_tag(current_tag: str, revision: str = "HEAD") -> str | None:
+    candidates = []
+    for tag in git("tag", "--merged", revision).splitlines():
+        if tag == current_tag or not re.fullmatch(r"r\d+|v\d+\.\d+\.\d+\.\d+", tag):
+            continue
+        distance = int(git("rev-list", "--count", f"{tag}..{revision}"))
+        if distance > 0:
+            candidates.append((distance, not tag.startswith("v"), tag))
+    return min(candidates)[2] if candidates else None
 
 
 def sections(markdown: str) -> list[tuple[str, list[str]]]:
@@ -60,7 +57,7 @@ def sections(markdown: str) -> list[tuple[str, list[str]]]:
 def release_notes(current: str, previous: str | None, tag: str) -> str:
     current_sections = sections(current)
     old_entries = {entry for _, entries in sections(previous or "") for entry in entries}
-    notes = [f"## Novità di Nyanime {tag}", ""]
+    notes = [f"## Novità di Nyanime {tag.removeprefix('v')}", ""]
     for heading, entries in current_sections:
         added = [entry for entry in entries if entry not in old_entries]
         if added:
@@ -79,7 +76,7 @@ def main() -> None:
     args = parser.parse_args()
 
     current = Path("CHANGELOG.md").read_text(encoding="utf-8")
-    previous = previous_tag(args.tag)
+    previous = previous_tag(args.tag, args.revision)
     old = git("show", f"{previous}:CHANGELOG.md") if previous else None
     notes = release_notes(current, old, args.tag)
     if not re.search(r"(?m)^- ", notes):

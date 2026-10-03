@@ -3,6 +3,8 @@ package tachiyomi.domain.release.interactor
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.domain.release.model.Release
+import tachiyomi.domain.release.model.ReleaseVersion
+import tachiyomi.domain.release.model.UpdateChannel
 import tachiyomi.domain.release.service.ReleaseService
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -12,12 +14,12 @@ class GetApplicationRelease(
     private val preferenceStore: PreferenceStore,
 ) {
 
-    private val lastChecked: Preference<Long> by lazy {
-        preferenceStore.getLong(Preference.appStateKey("last_app_check"), 0)
-    }
-
     suspend fun await(arguments: Arguments): Result {
         val now = Instant.now()
+        val lastChecked = preferenceStore.getLong(
+            Preference.appStateKey("last_app_check_${arguments.channel.key}"),
+            0,
+        )
 
         // Limit checks to once every 3 days at most
         if (!arguments.forceCheck &&
@@ -51,10 +53,11 @@ class GetApplicationRelease(
         versionName: String,
         versionTag: String,
     ): Boolean {
-        // Removes prefixes like "r" or "v"
-        return if (isPreview) {
-            // Preview builds from the fork are tagged as "r<fork commit count>".
-            // Reject unrelated tag formats instead of accidentally extracting digits from them.
+        val candidate = ReleaseVersion.parse(versionTag)
+        val installed = ReleaseVersion.installed(versionName)
+        if (candidate != null && installed != null) return candidate > installed
+        // Only installations of the old updater can consume the legacy compatibility alias.
+        return if (isPreview && ReleaseVersion.parse(versionName) == null) {
             val newCommitCount = PREVIEW_TAG_REGEX
                 .matchEntire(versionTag)
                 ?.groupValues
@@ -62,20 +65,6 @@ class GetApplicationRelease(
                 ?.toIntOrNull()
             newCommitCount != null && newCommitCount > commitCount
         } else {
-            // Release builds: based on releases in "tachiyomiorg/tachiyomi" repo
-            // tagged as something like "v0.1.2"
-            val newVersion = versionTag.replace("[^\\d.]".toRegex(), "")
-            val oldVersion = versionName.replace("[^\\d.]".toRegex(), "")
-
-            val newSemVer = newVersion.split(".").map { it.toInt() }
-            val oldSemVer = oldVersion.split(".").map { it.toInt() }
-
-            oldSemVer.mapIndexed { index, i ->
-                if (newSemVer[index] > i) {
-                    return true
-                }
-            }
-
             false
         }
     }
@@ -86,6 +75,7 @@ class GetApplicationRelease(
         val versionName: String,
         val repository: String,
         val forceCheck: Boolean = false,
+        val channel: UpdateChannel = if (isPreview) UpdateChannel.INCLUDING_PREVIEWS else UpdateChannel.RECOMMENDED,
     )
 
     sealed interface Result {

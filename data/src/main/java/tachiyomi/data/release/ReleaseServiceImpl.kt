@@ -2,12 +2,14 @@ package tachiyomi.data.release
 
 import android.os.Build
 import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.network.HttpException
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.network.parseAs
 import kotlinx.serialization.json.Json
 import tachiyomi.domain.release.interactor.GetApplicationRelease
 import tachiyomi.domain.release.model.Release
+import tachiyomi.domain.release.model.UpdateChannel
 import tachiyomi.domain.release.service.ReleaseService
 
 class ReleaseServiceImpl(
@@ -16,30 +18,53 @@ class ReleaseServiceImpl(
 ) : ReleaseService {
 
     override suspend fun latest(arguments: GetApplicationRelease.Arguments): Release? {
-        val release = if (arguments.isPreview) {
-            // GitHub's /releases/latest endpoint excludes prereleases. The fork publishes
-            // bleeding-edge builds as prereleases, so inspect the newest releases and choose the
-            // first one that contains an APK compatible with this device.
-            with(json) {
-                networkService.client
-                    .newCall(GET("https://api.github.com/repos/${arguments.repository}/releases?per_page=20"))
-                    .awaitSuccess()
-                    .parseAs<List<GithubRelease>>()
-                    .firstOrNull { getDownloadLink(it) != null }
+        val candidates = mutableListOf<GithubRelease>()
+        if (arguments.channel == UpdateChannel.RECOMMENDED) {
+            // GitHub already excludes previews here, even after thousands of preview releases.
+            try {
+                val recommended = with(json) {
+                    networkService.client.newCall(
+                        GET("https://api.github.com/repos/${arguments.repository}/releases/latest"),
+                    )
+                        .awaitSuccess().parseAs<GithubRelease>()
+                }
+                candidates.add(recommended)
+            } catch (e: HttpException) {
+                if (e.code != 404) throw e
             }
-        } else {
-            with(json) {
-                networkService.client
-                    .newCall(GET("https://api.github.com/repos/${arguments.repository}/releases/latest"))
-                    .awaitSuccess()
-                    .parseAs<GithubRelease>()
+        }
+        // Preview publications can be frequent: paginate until a compatible recommended
+        // release is found rather than losing it behind the first page of previews.
+        for (page in 1..5) {
+            if (ApplicationReleasePolicy.select(candidates, arguments.channel, Build.SUPPORTED_ABIS.toList()) !=
+                null
+            ) {
+                break
             }
-        } ?: return null
+            val batch = with(json) {
+                networkService.client
+                    .newCall(
+                        GET("https://api.github.com/repos/${arguments.repository}/releases?per_page=100&page=$page"),
+                    )
+                    .awaitSuccess().parseAs<List<GithubRelease>>()
+            }
+            candidates.addAll(batch)
+            if (ApplicationReleasePolicy.select(candidates, arguments.channel, Build.SUPPORTED_ABIS.toList()) != null ||
+                batch.size < 100
+            ) {
+                break
+            }
+        }
+        val release = ApplicationReleasePolicy.select(
+            candidates,
+            arguments.channel,
+            Build.SUPPORTED_ABIS.toList(),
+        ) ?: return null
 
         val downloadLink = getDownloadLink(release = release) ?: return null
 
         return Release(
-            version = release.version,
+            version = release.version.removePrefix("v"),
             info = release.info.replace(gitHubUsernameMentionRegex) { mention ->
                 "[${mention.value}](https://github.com/${mention.value.substring(1)})"
             },
