@@ -66,4 +66,11 @@
     <string name="news_more">Carica altri</string>
     <string name="news_end">Fine dell’elenco</string>
     <string name="news_offline">Gli articoli salvati restano disponibili anche senza una fonte abilitata.</string>
+    <string name="news_catalogue_empty">Installa le estensioni notizie da un catalogo aggiunto a Nyanime. Puoi anche installare un APK manualmente.</string>
+    <string name="news_catalogue_available">Scopri le fonti di notizie</string>
+    <string name="news_catalogue_install">Installa estensione</string>
+    <string name="news_catalogue_update">Aggiorna estensione</string>
+    <string name="news_catalogue_progress">Download · %1$d%%</string>
+    <string name="news_catalogue_connect">Collega e aggiorna</string>
+    <string name="news_catalogue_connect_body">Consenti a questa estensione installata manualmente di ricevere aggiornamenti da %1$s? Nyanime verifica il pacchetto e la firma prima di installarla.</string>
 </resources>

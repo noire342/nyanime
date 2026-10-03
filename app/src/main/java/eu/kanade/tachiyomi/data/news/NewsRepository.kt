@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit
 
 class NewsRepository(private val context: Context, network: NetworkHelper) {
     val store = NewsStore(context)
+    val catalogue = NewsExtensionCatalogue(context, network)
     private val relations = NewsRelations(network, store)
     private val relationLock = Mutex()
     private val personalizationLock = Mutex()

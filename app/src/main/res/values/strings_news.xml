@@ -66,4 +66,11 @@
     <string name="news_more">Load more</string>
     <string name="news_end">End of the list</string>
     <string name="news_offline">Saved articles remain available without an enabled source.</string>
+    <string name="news_catalogue_empty">Install news extensions from a catalogue you added to Nyanime. You can also install an APK manually.</string>
+    <string name="news_catalogue_available">Discover news sources</string>
+    <string name="news_catalogue_install">Install extension</string>
+    <string name="news_catalogue_update">Update extension</string>
+    <string name="news_catalogue_progress">Downloading · %1$d%%</string>
+    <string name="news_catalogue_connect">Connect and update</string>
+    <string name="news_catalogue_connect_body">Allow this manually installed extension to receive updates from %1$s? Nyanime verifies its package and signing certificate before installing.</string>
 </resources>

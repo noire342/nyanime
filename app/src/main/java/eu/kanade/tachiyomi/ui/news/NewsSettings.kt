@@ -25,6 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Newspaper
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -63,7 +65,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.toBitmap
-import androidx.lifecycle.compose.LifecycleStartEffect
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -71,6 +73,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.news.NewsAlerts
 import eu.kanade.tachiyomi.data.news.NewsExtension
+import eu.kanade.tachiyomi.data.news.NewsExtensionCatalogue
 import eu.kanade.tachiyomi.data.news.NewsPersonalLibrary
 import eu.kanade.tachiyomi.data.news.NewsPersonalTitles
 import eu.kanade.tachiyomi.data.news.NewsRepository
@@ -98,14 +101,20 @@ class NewsSourcesScreen : Screen {
 fun NewsSourcesContent(modifier: Modifier = Modifier) {
     val repository = remember { Injekt.get<NewsRepository>() }
     val extensions by repository.registry.state.collectAsState()
+    val catalogue by repository.catalogue.state.collectAsState()
     val snapshot by repository.store.state.collectAsState()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val navigator = LocalNavigator.currentOrThrow
     var trust by remember { mutableStateOf<NewsExtension?>(null) }
+    var connectUpdates by remember { mutableStateOf<NewsExtensionCatalogue.Entry?>(null) }
     var failed by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    val available = repository.catalogue.availableFor(extensions, catalogue)
+    val install: (NewsExtensionCatalogue.Entry) -> Unit = { entry ->
+        scope.launch { repository.catalogue.install(entry, repository.registry) }
+    }
     val configure: (NewsExtension, Boolean, NewsAlerts?) -> Unit = { extension, enabled, alerts ->
         scope.launch {
             busy = true
@@ -129,17 +138,20 @@ fun NewsSourcesContent(modifier: Modifier = Modifier) {
             permission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-    LifecycleStartEffect(Unit) {
+    // Package installers can cover this screen without stopping its activity.
+    // Reinspect on resume so installed versions and signer-bound trust reflect their result.
+    LifecycleResumeEffect(Unit) {
         val job = scope.launch {
             try {
                 repository.initialize()
+                repository.catalogue.refresh()
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (_: Exception) {
                 failed = true
             }
         }
-        onStopOrDispose { job.cancel() }
+        onPauseOrDispose { job.cancel() }
     }
     LazyColumn(
         modifier.fillMaxSize(),
@@ -157,7 +169,18 @@ fun NewsSourcesContent(modifier: Modifier = Modifier) {
             }
         }
         if (failed) item { Text(stringResource(R.string.news_storage_error)) }
-        if (extensions.isEmpty()) item { Text(stringResource(R.string.news_empty_body)) }
+        if (catalogue.unavailable.isNotEmpty()) {
+            item {
+                TextButton(onClick = { scope.launch { repository.catalogue.refresh() } }) {
+                    Text(stringResource(R.string.extensions_check_error))
+                }
+            }
+        }
+        if (extensions.isEmpty() && available.isEmpty()) {
+            item {
+                Text(stringResource(R.string.news_catalogue_empty))
+            }
+        }
         items(extensions, key = { it.packageName }) { extension ->
             val settings = snapshot.sources[extension.packageName]
             val enabled = settings?.enabled == true && extension.trusted
@@ -209,6 +232,15 @@ fun NewsSourcesContent(modifier: Modifier = Modifier) {
                         }
                         Text(stringResource(errorLabel), style = MaterialTheme.typography.bodySmall)
                     }
+                    available.firstOrNull { it.packageName == extension.packageName }?.let { entry ->
+                        NewsCatalogueAction(entry, catalogue, update = true) {
+                            if (extension.metadata.distribution?.updatePolicy == "manual") {
+                                connectUpdates = entry
+                            } else {
+                                install(entry)
+                            }
+                        }
+                    }
                     if (enabled) {
                         Text(stringResource(R.string.news_notifications), style = MaterialTheme.typography.labelLarge)
                         NewsAlerts.entries.forEach { option ->
@@ -247,6 +279,40 @@ fun NewsSourcesContent(modifier: Modifier = Modifier) {
                 }
             }
         }
+        val uninstalled = available.filter { entry -> extensions.none { it.packageName == entry.packageName } }
+        if (uninstalled.isNotEmpty()) {
+            item {
+                Text(stringResource(R.string.news_catalogue_available), style = MaterialTheme.typography.titleLarge)
+            }
+        }
+        items(uninstalled, key = { "catalogue:${it.packageName}" }) { entry ->
+            Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(Icons.Outlined.Newspaper, null, Modifier.size(44.dp), MaterialTheme.colorScheme.primary)
+                        Column(Modifier.weight(1f)) {
+                            Text(entry.name, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                entry.repositoryName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    NewsCatalogueAction(entry, catalogue, update = false) { install(entry) }
+                }
+            }
+        }
+        if (catalogue.loading) {
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                }
+            }
+        }
         item {
             Text(
                 stringResource(R.string.news_alert_note),
@@ -266,6 +332,22 @@ fun NewsSourcesContent(modifier: Modifier = Modifier) {
                 }) { Text(stringResource(R.string.news_permission)) }
             }
         }
+    }
+    connectUpdates?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { connectUpdates = null },
+            title = { Text(stringResource(R.string.news_catalogue_connect)) },
+            text = { Text(stringResource(R.string.news_catalogue_connect_body, entry.repositoryName)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    connectUpdates = null
+                    install(entry)
+                }) { Text(stringResource(R.string.news_catalogue_connect)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { connectUpdates = null }) { Text(stringResource(R.string.news_cancel)) }
+            },
+        )
     }
     trust?.let { extension ->
         AlertDialog(
@@ -291,6 +373,36 @@ fun NewsSourcesContent(modifier: Modifier = Modifier) {
             },
             dismissButton = { TextButton(onClick = { trust = null }) { Text(stringResource(R.string.news_cancel)) } },
         )
+    }
+}
+
+@Composable
+private fun NewsCatalogueAction(
+    entry: NewsExtensionCatalogue.Entry,
+    state: NewsExtensionCatalogue.State,
+    update: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick, enabled = state.installing == null, modifier = Modifier.fillMaxWidth()) {
+            if (state.installing == entry.packageName) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                Text(
+                    state.progress?.let { stringResource(R.string.news_catalogue_progress, (it * 100).toInt()) }
+                        ?: stringResource(R.string.extensions_download),
+                    Modifier.padding(start = 12.dp),
+                )
+            } else {
+                Text(stringResource(if (update) R.string.news_catalogue_update else R.string.news_catalogue_install))
+            }
+        }
+        if (state.error == entry.packageName) {
+            Text(
+                stringResource(R.string.extensions_error),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
 
