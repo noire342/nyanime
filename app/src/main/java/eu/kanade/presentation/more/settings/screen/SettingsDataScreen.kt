@@ -79,7 +79,7 @@ import uy.kohesive.injekt.api.get
 object SettingsDataScreen : SearchableSettings {
 
     val restorePreferenceKeyString = MR.strings.label_backup
-    const val HELP_URL = "https://github.com/noire342/nyanime/blob/main/docs/support.md#archiviazione"
+    const val HELP_URL = "https://github.com/owouwuiwi/nyanime/blob/main/docs/support.md#archiviazione"
 
     @ReadOnlyComposable
     @Composable

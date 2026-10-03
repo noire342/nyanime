@@ -139,6 +139,27 @@ class GetApplicationReleaseTest {
     }
 
     @Test
+    fun `Changing publisher checks immediately even when the old channel was recently checked`() = runTest {
+        val store = mockk<PreferenceStore>()
+        val oldCheck = mockk<Preference<Long>>()
+        val newCheck = mockk<Preference<Long>>()
+        every { oldCheck.get() } returns Instant.now().toEpochMilli()
+        every { newCheck.get() } returns 0
+        every { newCheck.set(any()) } answers { }
+        every { store.getLong(Preference.appStateKey("last_app_check_previous/app_recommended"), 0) } returns oldCheck
+        every { store.getLong(Preference.appStateKey("last_app_check_current/app_recommended"), 0) } returns newCheck
+        val release = Release("0.19.0.1", "notes", "https://example.test/release", "https://example.test/app.apk")
+        coEvery { releaseService.latest(any()) } returns release
+        val checker = GetApplicationRelease(releaseService, store)
+        val arguments = GetApplicationRelease.Arguments(false, 0, "0.19.0.0", "previous/app")
+
+        checker.await(arguments) shouldBe GetApplicationRelease.Result.NoNewUpdate
+        checker.await(arguments.copy(repository = "current/app")) shouldBe
+            GetApplicationRelease.Result.NewUpdate(release)
+        coVerify(exactly = 1) { releaseService.latest(match { it.repository == "current/app" }) }
+    }
+
+    @Test
     fun `When now is before three days expect no new update`() = runTest {
         every { preference.get() } returns Instant.now().toEpochMilli()
         every { preference.set(any()) }.answers { }

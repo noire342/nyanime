@@ -18,6 +18,12 @@ class ReleaseServiceImpl(
 ) : ReleaseService {
 
     override suspend fun latest(arguments: GetApplicationRelease.Arguments): Release? {
+        return ReleaseRepositoryFallback.latest(arguments.repository, arguments.fallbackRepositories) { repository ->
+            latestFromRepository(arguments.copy(repository = repository))
+        }
+    }
+
+    private suspend fun latestFromRepository(arguments: GetApplicationRelease.Arguments): Release? {
         val candidates = mutableListOf<GithubRelease>()
         if (arguments.channel == UpdateChannel.RECOMMENDED) {
             // GitHub already excludes previews here, even after thousands of preview releases.

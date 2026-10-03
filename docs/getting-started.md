@@ -20,7 +20,7 @@ Il nome del file da solo non prova che l'APK sia compatibile o che abbia la stes
 
 Prima di cambiare variante, crea un backup da **Impostazioni > Dati e archiviazione**.
 I backup non includono i file multimediali scaricati. Gli APK di questa
-distribuzione sono pubblicati nelle [release Nyanime](https://github.com/noire342/nyanime/releases);
+distribuzione sono pubblicati nelle [release Nyanime](https://github.com/owouwuiwi/nyanime/releases);
 l'app controlla gli aggiornamenti lì e puoi anche aggiornare manualmente.
 
 ## Preparare la libreria

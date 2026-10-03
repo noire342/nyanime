@@ -9,6 +9,14 @@ Le vecchie revisioni `rNNNN` restano riconosciute dal sistema OTA. Gli hash qui 
 identificano modifiche nel repository, non garantiscono che ogni commit sia stato
 distribuito come APK.
 
+## 3 ottobre 2026 — Nuovo repository e continuità degli aggiornamenti
+
+- Aggiornamenti e collegamenti di aiuto usano il repository dell’organizzazione.
+- Compatibilità mantenuta con il vecchio indirizzo OTA e con le versioni `r…`,
+  conservando pacchetto, firma e dati dell’app.
+- Recupero tramite l’indirizzo precedente se quello principale non è disponibile;
+  il cambio di repository avvia un nuovo controllo senza attendere la vecchia cache.
+
 ## 3 ottobre 2026 — Versioni e scelta degli aggiornamenti
 
 - Nuova numerazione a quattro componenti, a partire da 0.19.0.0, con confronto numerico

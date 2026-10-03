@@ -56,7 +56,7 @@ internal class GuidesStep(
     }
 }
 
-const val GETTING_STARTED_URL = "https://github.com/noire342/nyanime/blob/main/docs/getting-started.md"
+const val GETTING_STARTED_URL = "https://github.com/owouwuiwi/nyanime/blob/main/docs/getting-started.md"
 
 @PreviewLightDark
 @Composable

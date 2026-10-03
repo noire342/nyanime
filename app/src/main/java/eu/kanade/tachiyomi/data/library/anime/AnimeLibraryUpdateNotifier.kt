@@ -450,7 +450,7 @@ class AnimeLibraryUpdateNotifier(
 
     companion object {
         const val HELP_WARNING_URL =
-            "https://github.com/noire342/nyanime/blob/main/docs/support.md#aggiornamenti-in-blocco"
+            "https://github.com/owouwuiwi/nyanime/blob/main/docs/support.md#aggiornamenti-in-blocco"
     }
 }
 

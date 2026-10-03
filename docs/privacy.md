@@ -24,6 +24,6 @@ Le funzioni disattivate di profilo pubblico, amicizie, chat e sincronizzazione p
 
 ## Controlli e contatti
 
-Puoi disattivare funzioni facoltative nelle impostazioni, rimuovere download, cancellare dati dall'app o dal sistema Android e scollegare tracker esterni. Per domande o segnalazioni su questa distribuzione usa le [issue del repository Nyanime](https://github.com/noire342/nyanime/issues). Le librerie e i servizi di terzi hanno informative e licenze separate.
+Puoi disattivare funzioni facoltative nelle impostazioni, rimuovere download, cancellare dati dall'app o dal sistema Android e scollegare tracker esterni. Per domande o segnalazioni su questa distribuzione usa le [issue del repository Nyanime](https://github.com/owouwuiwi/nyanime/issues). Le librerie e i servizi di terzi hanno informative e licenze separate.
 
 Questa pagina descrive il comportamento del codice Nyanime distribuito in questo repository; una build modificata o un'estensione di terzi può comportarsi diversamente.

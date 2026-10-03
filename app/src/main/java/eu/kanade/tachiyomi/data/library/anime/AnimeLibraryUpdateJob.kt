@@ -516,7 +516,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         private const val WORK_NAME_CATCHUP = "AnimeLibraryUpdate-catchup"
         private const val RETIRED_HOME_WORK_NAME = "AnimeLibraryUpdate-home"
 
-        private const val ERROR_LOG_HELP_URL = "https://github.com/noire342/nyanime/blob/main/docs/support.md"
+        private const val ERROR_LOG_HELP_URL = "https://github.com/owouwuiwi/nyanime/blob/main/docs/support.md"
 
         private const val ANIME_PER_SOURCE_QUEUE_WARNING_THRESHOLD = 60
         private const val MAX_AUTO_UPDATE_PER_RUN = 24

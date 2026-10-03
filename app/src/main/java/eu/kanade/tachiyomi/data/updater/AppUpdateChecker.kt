@@ -30,6 +30,7 @@ class AppUpdateChecker {
                     GITHUB_REPO,
                     forceCheck,
                     requestedChannel,
+                    fallbackRepositories = listOf(LEGACY_GITHUB_REPO),
                 ),
             )
 
@@ -51,7 +52,10 @@ class AppUpdateChecker {
 }
 
 /** GitHub repository that publishes the fork's signed APK releases. */
-const val GITHUB_REPO = "noire342/nyanime"
+const val GITHUB_REPO = "owouwuiwi/nyanime"
+
+/** Former publisher address retained for already installed clients and migration fallback. */
+const val LEGACY_GITHUB_REPO = "noire342/nyanime"
 
 val RELEASE_TAG = "v${BuildConfig.VERSION_NAME}"
 

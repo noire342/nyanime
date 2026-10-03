@@ -34,7 +34,7 @@ fun Screen.migrateAnimeSourceTab(): TabContent {
                 icon = Icons.AutoMirrored.Outlined.HelpOutline,
                 onClick = {
                     uriHandler.openUri(
-                        "https://github.com/noire342/nyanime/blob/main/docs/support.md#migrazione-della-fonte",
+                        "https://github.com/owouwuiwi/nyanime/blob/main/docs/support.md#migrazione-della-fonte",
                     )
                 },
             ),

@@ -180,7 +180,7 @@ fun WebViewScreenContent(
                                     .clip(MaterialTheme.shapes.small)
                                     .clickable {
                                         uriHandler.openUri(
-                                            "https://github.com/noire342/nyanime/blob/main/docs/support.md#pagine-di-verifica-nel-browser",
+                                            "https://github.com/owouwuiwi/nyanime/blob/main/docs/support.md#pagine-di-verifica-nel-browser",
                                         )
                                     },
                             )

@@ -17,7 +17,7 @@ class GetApplicationRelease(
     suspend fun await(arguments: Arguments): Result {
         val now = Instant.now()
         val lastChecked = preferenceStore.getLong(
-            Preference.appStateKey("last_app_check_${arguments.channel.key}"),
+            Preference.appStateKey("last_app_check_${arguments.repository}_${arguments.channel.key}"),
             0,
         )
 
@@ -76,6 +76,7 @@ class GetApplicationRelease(
         val repository: String,
         val forceCheck: Boolean = false,
         val channel: UpdateChannel = if (isPreview) UpdateChannel.INCLUDING_PREVIEWS else UpdateChannel.RECOMMENDED,
+        val fallbackRepositories: List<String> = emptyList(),
     )
 
     sealed interface Result {

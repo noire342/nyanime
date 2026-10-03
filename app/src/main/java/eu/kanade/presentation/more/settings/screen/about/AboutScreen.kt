@@ -163,7 +163,7 @@ object AboutScreen : Screen() {
                     TextPreferenceWidget(
                         title = stringResource(MR.strings.licenses),
                         onPreferenceClick = {
-                            uriHandler.openUri("https://github.com/noire342/nyanime/blob/main/docs/credits.md")
+                            uriHandler.openUri("https://github.com/owouwuiwi/nyanime/blob/main/docs/credits.md")
                         },
                     )
                 }
@@ -179,7 +179,7 @@ object AboutScreen : Screen() {
                     TextPreferenceWidget(
                         title = stringResource(MR.strings.privacy_policy),
                         onPreferenceClick = {
-                            uriHandler.openUri("https://github.com/noire342/nyanime/blob/main/docs/privacy.md")
+                            uriHandler.openUri("https://github.com/owouwuiwi/nyanime/blob/main/docs/privacy.md")
                         },
                     )
                 }

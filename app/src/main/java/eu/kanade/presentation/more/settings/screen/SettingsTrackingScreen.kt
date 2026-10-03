@@ -84,7 +84,7 @@ object SettingsTrackingScreen : SearchableSettings {
     override fun RowScope.AppBarAction() {
         val uriHandler = LocalUriHandler.current
         IconButton(onClick = {
-            uriHandler.openUri("https://github.com/noire342/nyanime/blob/main/docs/support.md#tracker")
+            uriHandler.openUri("https://github.com/owouwuiwi/nyanime/blob/main/docs/support.md#tracker")
         }) {
             Icon(
                 imageVector = Icons.Outlined.HelpOutline,
