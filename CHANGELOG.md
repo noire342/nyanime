@@ -8,6 +8,15 @@ Le revisioni `rNNNN` derivano dal numero dei commit: non sono versioni semantich
 né il `versionCode` Android. Gli hash qui sotto identificano modifiche nel repository,
 non garantiscono che ogni commit sia stato distribuito come APK.
 
+## 3 ottobre 2026 — Player più reattivo e compatibilità delle estensioni
+
+- Caricamento delle tracce audio e dei sottotitoli esterni fuori dal thread
+  dell’interfaccia, per evitare blocchi all’apertura dei video con molte tracce.
+- Il caricamento delle tracce rispetta il cambio di episodio e la chiusura del player,
+  evitando di applicare tracce a una riproduzione successiva.
+- Ripristinata la compatibilità con le varianti della libreria video 16 usate dalle
+  estensioni, evitando errori di apertura dovuti ai costruttori dei server video.
+
 ## 3 ottobre 2026 — Rimozione del doppio tocco posteriore
 
 - Rimossi il gesto posteriore, la calibrazione, le relative impostazioni e
