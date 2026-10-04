@@ -43,6 +43,7 @@ I documenti tecnici in inglese conservano i nomi delle API e dei componenti.
 | [Cast](casting.md) | Google Cast, UPnP/DLNA, telecomando, relay locale e limiti. |
 | [Affidabilità](app-reliability.md) | Ricerca, download, backup, copertine e prestazioni. |
 | [Aggiornamenti delle estensioni](extension-update-alerts.md) | Frequenza dei controlli e deduplicazione delle notifiche. |
+| [Cataloghi delle estensioni](extension-catalogues.md) | Importazione e collegamento esplicito degli APK locali agli aggiornamenti. |
 | [Regressioni del player](stability-regressions.md) | Verifiche native e del ciclo di vita del player. |
 
 ## Sviluppo e provenienza

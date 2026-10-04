@@ -26,14 +26,15 @@ does not inherit a three-day delay from checks against the previous address.
 
 ## Website and links
 
-The website and Android App Link landing page stay in their separate Pages repository
-at `https://noire342.github.io/`. Shared links, signing association and installed apps'
-accepted host remain unchanged. The website's download and documentation links point
-to the organization repository.
+The website and Android App Link landing page are published from the organization's
+`owouwuiwi.github.io` repository at `https://owouwuiwi.github.io/`. New content links
+use that domain; the app still recognizes the former domain and custom-scheme links.
 
-GitHub Pages does not redirect automatically when its own repository is transferred.
-Moving the website would require a separate compatibility migration; it is not part
-of transferring the Android repository.
+Because GitHub Pages does not redirect automatically, the previous Pages address
+retains a small compatibility site and the original Android signing association.
+Its browser redirect preserves the query and fragment. The new domain also publishes
+the signing association; older apps can open the landing page's compatible app link.
+Neither site resolves extension references or receives shared-content fragments.
 
 ## Operations
 

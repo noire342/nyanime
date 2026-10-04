@@ -40,13 +40,13 @@ data class ContentLink(
 object ContentLinks {
     /** Kept for links sent by earlier versions. */
     const val PREFIX = "nyanime://open/v1#"
-    const val WEB_PREFIX = "https://noire342.github.io/open/#"
+    const val WEB_PREFIX = "https://owouwuiwi.github.io/open/#"
     const val MAX_LINK_LENGTH = 24_000
     const val MAX_POSITION_MS = 30L * 24 * 60 * 60 * 1000
     const val MAX_PAGE = 100_000
     private val json = Json { ignoreUnknownKeys = true }
     private val linkInText = Regex(
-        "(?:nyanime://open/|https://noire342\\.github\\.io/open/)[^\\s<>\"]+",
+        "(?:nyanime://open/|https://(?:owouwuiwi|noire342)\\.github\\.io/open/)[^\\s<>\"]+",
         RegexOption.IGNORE_CASE,
     )
     private val encoded = Regex("[A-Za-z0-9_-]+")
@@ -115,7 +115,7 @@ object ContentLinks {
         (uri.scheme.equals("nyanime", true) && uri.host.equals("open", true)) ||
             (
                 uri.scheme.equals("https", true) &&
-                    uri.host.equals("noire342.github.io", true) &&
+                    (uri.host.equals("owouwuiwi.github.io", true) || uri.host.equals("noire342.github.io", true)) &&
                     uri.rawPath == "/open/"
                 )
 

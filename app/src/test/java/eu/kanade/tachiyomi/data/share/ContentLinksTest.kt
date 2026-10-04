@@ -87,9 +87,9 @@ class ContentLinksTest {
         val encoded = ContentLinks.encode(link)
         listOf(
             encoded.replace("https://", "http://"),
-            encoded.replace("noire342.github.io", "noire342.github.io.example.org"),
-            encoded.replace("noire342.github.io", "user@noire342.github.io"),
-            encoded.replace("noire342.github.io", "noire342.github.io:443"),
+            encoded.replace("owouwuiwi.github.io", "owouwuiwi.github.io.example.org"),
+            encoded.replace("owouwuiwi.github.io", "user@owouwuiwi.github.io"),
+            encoded.replace("owouwuiwi.github.io", "owouwuiwi.github.io:443"),
             encoded.replace("/open/#", "/open/?key=1#"),
             encoded.replace("v2/anime/", "v3/anime/"),
             encoded.replace("v2/anime/", "v2/unknown/"),
@@ -100,6 +100,22 @@ class ContentLinksTest {
             encoded.replace("title=Titolo", "title=%00Titolo"),
         ).forEach { assertNull(ContentLinks.decode(it), it.take(100)) }
         assertNull(ContentLinks.decode(ContentLinks.encode(manga.copy(itemUrl = "/c/1", page = 2)) + "&at=0"))
+    }
+
+    @Test
+    fun `new organization links and previously shared links resolve the same exact target`() {
+        val cases = listOf(
+            anime.copy(itemUrl = "/episode/2", positionMs = 125_000),
+            manga.copy(itemUrl = "/chapter/3", page = 17),
+        )
+        cases.forEach { target ->
+            val link = ContentLinks.encode(target)
+            assertTrue(link.startsWith("https://owouwuiwi.github.io/open/#"))
+            val legacy = link.replace("owouwuiwi.github.io", "noire342.github.io")
+            assertEquals(target, ContentLinks.decode(legacy))
+            assertEquals(target, ContentLinks.decode("Shared title\n$legacy"))
+            assertNull(ContentLinks.decode(legacy.replace("noire342.github.io", "noire342.github.io.example.org")))
+        }
     }
 
     @Test

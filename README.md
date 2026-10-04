@@ -12,7 +12,7 @@ marchio rosso e uno chiaro con accenti Arancio solare, oppure segue il sistema.
 Al primo avvio viene chiesto quale usare; puoi cambiarlo in Impostazioni → Aspetto.
 Lo sfondo del lettore manga resta configurabile indipendentemente.
 
-[Sito Nyanime](https://noire342.github.io/) · [Funzionalità complete](docs/features.md) · [Primi passi e FAQ](docs/getting-started.md) ·
+[Sito Nyanime](https://owouwuiwi.github.io/) · [Funzionalità complete](docs/features.md) · [Primi passi e FAQ](docs/getting-started.md) ·
 [Documentazione](docs/README.md) · [Novità](CHANGELOG.md) · [Contribuire](CONTRIBUTING.md)
 
 ## L'esperienza Nyanime

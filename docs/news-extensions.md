@@ -31,6 +31,13 @@ required before loading a source. An incompatible API, changed distribution or
 untrusted signer prevents loading. Android verifies installation signatures; the
 generic APK validator also understands the News family.
 
+User-imported unified catalogues declare `media: ["news", ...]` and mark their entries
+with `medium: "news"`. News → Sources discovers installable extensions and compatible
+updates from these same catalogues. Downloads verify the published SHA-256, pinned
+catalogue certificate, package, version, API and distribution before opening Android’s
+installer. Connecting a manually installed distribution requires explicit consent.
+Installation never enables or executes a new publisher automatically.
+
 ## Articles and capabilities
 
 `feed(NewsRequest)` returns `NewsPage(articles, nextCursor)`. Cursors are opaque to the
@@ -120,3 +127,8 @@ Source management displays the installed APK's application icon, loaded off the 
 thread and refreshed when its version changes. Reading package resources does not
 instantiate untrusted source code. Missing or removed package resources use a generic
 news icon; publisher artwork remains exclusively inside extension APKs.
+
+Returning from the Android installer reloads package versions and update offers,
+including installers that cover the app without stopping its activity. Existing
+preferences survive an update; execution trust remains bound to the signer and
+distribution identity.

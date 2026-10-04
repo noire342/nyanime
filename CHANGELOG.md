@@ -9,6 +9,23 @@ Le vecchie revisioni `rNNNN` restano riconosciute dal sistema OTA. Gli hash qui 
 identificano modifiche nel repository, non garantiscono che ogni commit sia stato
 distribuito come APK.
 
+## 4 ottobre 2026 — Cataloghi unificati e aggiornamenti delle estensioni
+
+- Possibilità di collegare un’estensione installata manualmente a un catalogo compatibile,
+  scegliendo esplicitamente l’origine nei dettagli dell’estensione.
+- Controllo di pacchetto, firma, distribuzione e supporto Home prima del passaggio;
+  «Mantieni questa versione» continua a escludere gli aggiornamenti.
+- Un’unica conferma per importare cataloghi che comprendono video, manga e notizie;
+  ogni sezione mostra soltanto le estensioni del proprio tipo.
+- Installazione e aggiornamento delle estensioni Notizie dalla schermata Fonti,
+  con avanzamento, controlli di firma e consenso separato per abilitarle.
+- Versioni e pulsanti delle estensioni Notizie aggiornati al ritorno dall’installatore,
+  conservando preferenze e consenso quando l’identità della distribuzione coincide.
+- Collegamenti Nyanime per importare cataloghi senza credenziali condivise
+  e senza nomi o regole delle fonti incorporati nell’app.
+- Sito e nuovi link di condivisione sul dominio dell’organizzazione; collegamenti
+  precedenti ancora compatibili, inclusi episodio, minutaggio, capitolo e pagina.
+
 ## 3 ottobre 2026 — Una nuova schermata per gli aggiornamenti
 
 - Schermata degli aggiornamenti ridisegnata con testata compatta, versione e comandi

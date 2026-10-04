@@ -16,12 +16,16 @@ stesso identificatore. Se l’estensione manca o è disabilitata, viene mostrato
 l’errore e, se disponibile, il suo nome. Un riferimento che non esiste più non
 viene sostituito con il primo risultato di una ricerca.
 
-I nuovi collegamenti sono HTTPS su `https://noire342.github.io/open/` e si possono
+I nuovi collegamenti sono HTTPS su `https://owouwuiwi.github.io/open/` e si possono
 toccare nelle applicazioni di messaggistica. Android associa il dominio all'app
 mediante il certificato della distribuzione pubblica. Se la versione installata
 non supporta ancora questi link, il sito mostra un pulsante per aprirla usando il
 contratto precedente. Si può anche condividere il messaggio ricevuto con Nyanime
 tramite il menu Condividi di Android.
+
+I link HTTPS già condivisi sul dominio precedente restano riconosciuti dall’app.
+Il vecchio sito conserva l’associazione Android e inoltra al nuovo sito mantenendo
+il frammento, senza inviare i riferimenti dei contenuti al server.
 
 I file locali non sono condivisibili con un link: il destinatario non possiede
 quel file. Condividere l’immagine di una pagina rimane un’azione separata.
